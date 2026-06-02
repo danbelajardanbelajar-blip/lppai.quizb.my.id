@@ -12,7 +12,8 @@ $currentUser = getCurrentUser();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= sanitize(PAGE_TITLE) ?> - <?= APP_NAME ?></title>
-    <link rel="icon" type="image/png" href="<?= BASE_URL ?>/assets/favicon.png">
+    <link rel="icon" href="<?= BASE_URL ?>/favicon.ico" type="image/x-icon">
+    <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
