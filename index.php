@@ -43,12 +43,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?= APP_NAME ?></title>
+    <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
 </head>
 <body>
 <div class="login-wrapper">
     <div class="login-card">
-        <div class="logo">LP</div>
+        <div class="logo">
+            <img src="<?= BASE_URL ?>/assets/logo.svg" alt="<?= APP_NAME ?> Logo">
+        </div>
         <h1><?= APP_NAME ?></h1>
         <p class="subtitle">Lembaga Pengembangan Pendidikan Agama Islam</p>
 
