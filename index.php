@@ -48,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 <div class="login-wrapper">
     <div class="login-card">
-        <div class="logo">LP</div>
+        <div class="logo">
+            <img src="<?= BASE_URL ?>/assets/logo.png" alt="<?= APP_NAME ?> logo">
+        </div>
         <h1><?= APP_NAME ?></h1>
         <p class="subtitle">Lembaga Pengembangan Pendidikan Agama Islam</p>
 

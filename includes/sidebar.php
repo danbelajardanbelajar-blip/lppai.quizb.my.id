@@ -12,7 +12,9 @@ function menuActive($page) {
 ?>
 <aside class="sidebar">
     <div class="sidebar-header">
-        <div class="app-logo">LP</div>
+        <div class="app-logo">
+            <img src="<?= BASE_URL ?>/assets/logo.png" alt="<?= APP_NAME ?> logo">
+        </div>
         <h2><?= APP_NAME ?></h2>
         <small>Lembaga Pengembangan Pendidikan Agama Islam</small>
     </div>

@@ -109,6 +109,15 @@ body {
     box-shadow: 0 8px 24px var(--primary-glow);
 }
 
+.login-card .logo img,
+.sidebar-header .app-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border-radius: inherit;
+}
+
 .login-card h1 {
     font-size: 24px;
     font-weight: 800;
