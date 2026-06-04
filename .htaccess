@@ -1,0 +1,7 @@
+# Prevent directory listing and ensure the root index is used.
+Options -Indexes
+DirectoryIndex index.php
+
+# Redirect the bare domain root to /web/
+RewriteEngine On
+RewriteRule ^$ /web/ [L,R=302,L]
