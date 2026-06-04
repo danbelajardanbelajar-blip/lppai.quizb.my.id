@@ -4,6 +4,9 @@ DirectoryIndex index.php
 RewriteEngine On
 RewriteBase /
 
+# Serve the logo SVG for favicon requests so the browser icon matches the logo.
+RewriteRule ^favicon\.ico$ assets/logo.svg [L]
+
 # If requested PHP page does not exist in root, serve it from the pages folder.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
