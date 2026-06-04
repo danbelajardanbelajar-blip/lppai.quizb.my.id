@@ -3,7 +3,7 @@
  * LPPAI Corner - Dashboard Mahasiswa
  */
 define('PAGE_TITLE', 'Dashboard Mahasiswa');
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 if (isAdmin()) {
@@ -33,7 +33,7 @@ $tutorialRegs = $stmt->fetchAll();
 $stmt = $pdo->query("SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 5");
 $recentAnnouncements = $stmt->fetchAll();
 
-include __DIR__ . '/includes/header.php';
+include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- Welcome Card -->
@@ -152,4 +152,5 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<?php include __DIR__ . '/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+

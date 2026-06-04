@@ -2,10 +2,10 @@
 /**
  * LPPAI Corner - Setup Script
  * Jalankan file ini sekali untuk membuat database dan data dummy.
- * Akses: http://localhost/lppai-corner/web/setup.php
+ * Akses: http://localhost/lppai-corner/setup.php
  */
 
-require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 echo "<h2>LPPAI Corner - Setup Database</h2>";
 
@@ -224,3 +224,4 @@ try {
 } catch (PDOException $e) {
     echo "<p>❌ Error: " . htmlspecialchars($e->getMessage()) . "</p>";
 }
+

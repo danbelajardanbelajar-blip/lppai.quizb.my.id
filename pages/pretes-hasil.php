@@ -3,7 +3,7 @@
  * LPPAI Corner - Hasil Pretes
  */
 define('PAGE_TITLE', 'Pengumuman Hasil Pretes');
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -29,7 +29,7 @@ $allResults = $pdo->query("
     ORDER BY pr.nilai DESC
 ")->fetchAll();
 
-include __DIR__ . '/includes/header.php';
+include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- My Result -->
@@ -125,4 +125,5 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<?php include __DIR__ . '/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+

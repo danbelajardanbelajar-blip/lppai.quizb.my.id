@@ -1,6 +1,10 @@
-# Prevent directory listing and ensure the root index is used.
 Options -Indexes
 DirectoryIndex index.php
 
-# Root requests are redirected by index.php, not by rewrite rules.
-# This avoids redirect loops on some Apache configurations.
+RewriteEngine On
+RewriteBase /
+
+# If requested PHP page does not exist in root, serve it from the pages folder.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^/]+\.php)$ pages/$1 [L]
