@@ -46,9 +46,25 @@ try {
             periode VARCHAR(20) NOT NULL,
             tanggal_daftar DATETIME DEFAULT CURRENT_TIMESTAMP,
             status ENUM('terdaftar', 'hadir', 'tidak_hadir') DEFAULT 'terdaftar',
+            username_tes VARCHAR(100) DEFAULT NULL,
+            password_tes VARCHAR(100) DEFAULT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB
     ");
+
+    // Migrasi: tambah kolom credentials jika belum ada (untuk database yang sudah ada)
+    try {
+        $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN username_tes VARCHAR(100) DEFAULT NULL");
+        echo '<p>✅ Kolom <code>username_tes</code> berhasil ditambahkan ke tabel pretes_registrations.</p>';
+    } catch (PDOException $e) {
+        // Kolom sudah ada — abaikan
+    }
+    try {
+        $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN password_tes VARCHAR(100) DEFAULT NULL");
+        echo '<p>✅ Kolom <code>password_tes</code> berhasil ditambahkan ke tabel pretes_registrations.</p>';
+    } catch (PDOException $e) {
+        // Kolom sudah ada — abaikan
+    }
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS pretes_schedules (

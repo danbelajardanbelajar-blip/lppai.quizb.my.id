@@ -33,7 +33,9 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
 
     // Get graduation results if applicable
     $graduationResults = [];
-    $myGraduation = null;
+    $myGraduation     = null;
+    $nextStepInfo     = null; // CTA data untuk langkah berikutnya
+
     if (strpos($tipe, 'kelulusan') !== false) {
         $stmt = $pdo->prepare("
             SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, u.nama_lengkap, u.nim, u.program_studi
@@ -54,6 +56,73 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
         ");
         $stmt->execute([$user['id'], $gelombang]);
         $myGraduation = $stmt->fetch();
+
+        // ── CTA: Langkah berikutnya jika tidak lulus ─────────────────────
+        if ($myGraduation && $myGraduation['status'] === 'tidak_lulus') {
+
+            if ($gelombang === 'gel1') {
+                // Cek apakah TU sudah membuka pendaftaran Gel 2
+                $stmtAnnGel2 = $pdo->prepare(
+                    "SELECT * FROM announcements
+                     WHERE tipe = 'pendaftaran_gel2' AND is_active = 1
+                     ORDER BY created_at DESC LIMIT 1"
+                );
+                $stmtAnnGel2->execute();
+                $annGel2Open = $stmtAnnGel2->fetch();
+
+                // Cek apakah mahasiswa sudah terdaftar di gel2
+                $stmtRegGel2 = $pdo->prepare(
+                    "SELECT tr.id FROM tutorial_registrations tr
+                     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+                     WHERE tr.user_id = ? AND tc.gelombang = 'gel2' LIMIT 1"
+                );
+                $stmtRegGel2->execute([$user['id']]);
+                $alreadyGel2 = $stmtRegGel2->fetchColumn();
+
+                $nextStepInfo = [
+                    'gelombang'   => 'gel2',
+                    'label'       => 'Tutorial Gelombang 2',
+                    'url'         => BASE_URL . '/tutorial-gel2-pendaftaran.php',
+                    'ann_open'    => $annGel2Open,
+                    'already_reg' => $alreadyGel2,
+                    'icon'        => '📋',
+                    'color'       => '#1a73e8',
+                    'bg'          => '#e8f0fe',
+                    'border'      => '#1a73e8',
+                ];
+
+            } elseif ($gelombang === 'gel2') {
+                // Cek apakah TU sudah membuka pendaftaran Mandiri
+                $stmtAnnMandiri = $pdo->prepare(
+                    "SELECT * FROM announcements
+                     WHERE tipe = 'pendaftaran_mandiri' AND is_active = 1
+                     ORDER BY created_at DESC LIMIT 1"
+                );
+                $stmtAnnMandiri->execute();
+                $annMandiriOpen = $stmtAnnMandiri->fetch();
+
+                // Cek apakah mahasiswa sudah mengajukan mandiri
+                $stmtRegMandiri = $pdo->prepare(
+                    "SELECT tr.id FROM tutorial_registrations tr
+                     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+                     WHERE tr.user_id = ? AND tc.gelombang = 'mandiri' LIMIT 1"
+                );
+                $stmtRegMandiri->execute([$user['id']]);
+                $alreadyMandiri = $stmtRegMandiri->fetchColumn();
+
+                $nextStepInfo = [
+                    'gelombang'   => 'mandiri',
+                    'label'       => 'Tutorial Mandiri',
+                    'url'         => BASE_URL . '/tutorial-mandiri-pendaftaran.php',
+                    'ann_open'    => $annMandiriOpen,
+                    'already_reg' => $alreadyMandiri,
+                    'icon'        => '📝',
+                    'color'       => '#e65100',
+                    'bg'          => '#fff3e0',
+                    'border'      => '#e65100',
+                ];
+            }
+        }
     }
 
     ?>
@@ -164,7 +233,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                     <?php elseif ($myGraduation['status'] === 'tidak_lulus'): ?>
                         <span style="font-size:48px;">📚</span>
                         <h2 style="color:#dc3545;margin:10px 0;">BELUM LULUS</h2>
-                        <p>Silakan mendaftar ulang pada gelombang berikutnya.</p>
+                        <p>Jangan menyerah! Anda masih bisa melanjutkan ke langkah berikutnya.</p>
                     <?php else: ?>
                         <span style="font-size:48px;">⏳</span>
                         <h2 style="color:var(--text-muted);margin:10px 0;">Belum Diumumkan</h2>
@@ -172,6 +241,69 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                 </div>
             </div>
         </div>
+
+        <?php
+        // ── Panel CTA: Langkah Berikutnya ────────────────────────────────
+        if ($nextStepInfo):
+            $ns = $nextStepInfo;
+        ?>
+        <div class="card" style="border:2px solid <?= $ns['border'] ?>;margin-top:16px;">
+            <div class="card-header" style="background:<?= $ns['bg'] ?>;color:<?= $ns['color'] ?>;font-weight:700;">
+                <?= $ns['icon'] ?> Langkah Selanjutnya: Daftar <?= $ns['label'] ?>
+            </div>
+            <div class="card-body">
+                <?php if ($ns['already_reg']): ?>
+                    <!-- Sudah terdaftar di langkah berikutnya -->
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div style="font-size:40px;">✅</div>
+                        <div>
+                            <h3 style="margin:0 0 6px;color:#28a745;">Anda Sudah Terdaftar</h3>
+                            <p style="color:var(--text-muted);margin:0;">Anda sudah mendaftarkan diri ke <?= $ns['label'] ?>. Silakan cek halaman <?= $ns['label'] ?> untuk detail jadwal.</p>
+                        </div>
+                        <a href="<?= $ns['url'] ?>" class="btn btn-primary" style="width:auto;margin-left:auto;background:<?= $ns['color'] ?>;border-color:<?= $ns['color'] ?>;">
+                            <?= $ns['icon'] ?> Lihat <?= $ns['label'] ?>
+                        </a>
+                    </div>
+
+                <?php elseif ($ns['ann_open']): ?>
+                    <!-- Pendaftaran sudah dibuka, belum daftar -->
+                    <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+                        <div style="font-size:40px;"><?= $ns['icon'] ?></div>
+                        <div style="flex:1;">
+                            <h3 style="margin:0 0 6px;color:<?= $ns['color'] ?>;">
+                                Pendaftaran <?= $ns['label'] ?> Sudah Dibuka!
+                            </h3>
+                            <p style="color:var(--text-muted);margin:0 0 8px;">
+                                <?= sanitize($ns['ann_open']['judul']) ?><br>
+                                <small>🕐 Dibuka: <?= date('d M Y', strtotime($ns['ann_open']['created_at'])) ?></small>
+                            </p>
+                            <div style="padding:10px 14px;background:<?= $ns['bg'] ?>;border-radius:8px;font-size:13px;color:<?= $ns['color'] ?>;">
+                                ⚠️ Segera daftarkan diri Anda sebelum pendaftaran ditutup.
+                            </div>
+                        </div>
+                        <a href="<?= $ns['url'] ?>" class="btn btn-primary"
+                           style="width:auto;background:<?= $ns['color'] ?>;border-color:<?= $ns['color'] ?>;white-space:nowrap;">
+                            <?= $ns['icon'] ?> Daftar <?= $ns['label'] ?> Sekarang
+                        </a>
+                    </div>
+
+                <?php else: ?>
+                    <!-- Pendaftaran belum dibuka -->
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div style="font-size:40px;">🔒</div>
+                        <div style="flex:1;">
+                            <h3 style="margin:0 0 6px;color:#6c757d;">Pendaftaran <?= $ns['label'] ?> Belum Dibuka</h3>
+                            <p style="color:var(--text-muted);margin:0;">TU akan segera membuka pendaftaran <?= $ns['label'] ?>. Pantau terus halaman ini.</p>
+                        </div>
+                        <a href="<?= $ns['url'] ?>" class="btn btn-primary"
+                           style="width:auto;background:#6c757d;border-color:#6c757d;white-space:nowrap;">
+                            <?= $ns['icon'] ?> Lihat <?= $ns['label'] ?>
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; // end nextStepInfo ?>
         <?php endif; ?>
 
         <?php if (!empty($graduationResults)): ?>

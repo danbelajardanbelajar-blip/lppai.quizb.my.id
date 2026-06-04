@@ -31,8 +31,15 @@ CREATE TABLE pretes_registrations (
     periode VARCHAR(20) NOT NULL,
     tanggal_daftar DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('terdaftar', 'hadir', 'tidak_hadir') DEFAULT 'terdaftar',
+    username_tes VARCHAR(100) DEFAULT NULL COMMENT 'Username untuk tes tulis pretes',
+    password_tes VARCHAR(100) DEFAULT NULL COMMENT 'Password untuk tes tulis pretes',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Jika database sudah ada, jalankan ALTER ini:
+-- ALTER TABLE pretes_registrations
+--   ADD COLUMN username_tes VARCHAR(100) DEFAULT NULL COMMENT 'Username untuk tes tulis pretes',
+--   ADD COLUMN password_tes VARCHAR(100) DEFAULT NULL COMMENT 'Password untuk tes tulis pretes';
 
 -- Tabel Jadwal Pretes
 CREATE TABLE pretes_schedules (
