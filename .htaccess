@@ -2,6 +2,5 @@
 Options -Indexes
 DirectoryIndex index.php
 
-# Redirect the bare domain root to /web/
-RewriteEngine On
-RewriteRule ^$ /web/ [L,R=302,L]
+# Root requests are redirected by index.php, not by rewrite rules.
+# This avoids redirect loops on some Apache configurations.
