@@ -19,12 +19,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $action = $_POST['action'];
 
         if ($action === 'create') {
-            $periode = trim($_POST['periode'] ?? '');
-            $tanggal = $_POST['tanggal'] ?? '';
-            $waktuMulai = $_POST['waktu_mulai'] ?? '';
+            $periode      = trim($_POST['periode'] ?? '');
+            $tanggal      = $_POST['tanggal'] ?? '';
+            $waktuMulai   = $_POST['waktu_mulai'] ?? '';
             $waktuSelesai = $_POST['waktu_selesai'] ?? '';
-            $ruangan = trim($_POST['ruangan'] ?? '');
-            $kuota = (int)($_POST['kuota'] ?? 0);
+            $ruangan      = trim($_POST['ruangan'] ?? '');
+            $kuota        = (int)($_POST['kuota'] ?? 0);
 
             if (empty($periode) || empty($tanggal) || empty($waktuMulai) || empty($waktuSelesai) || empty($ruangan) || $kuota <= 0) {
                 $message = 'Semua field harus diisi.';
@@ -35,13 +35,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Jadwal pretes berhasil ditambahkan!';
                 $msgType = 'success';
             }
+
+        } elseif ($action === 'update') {
+            $id           = (int)($_POST['id'] ?? 0);
+            $periode      = trim($_POST['periode'] ?? '');
+            $tanggal      = $_POST['tanggal'] ?? '';
+            $waktuMulai   = $_POST['waktu_mulai'] ?? '';
+            $waktuSelesai = $_POST['waktu_selesai'] ?? '';
+            $ruangan      = trim($_POST['ruangan'] ?? '');
+            $kuota        = (int)($_POST['kuota'] ?? 0);
+
+            if ($id <= 0 || empty($periode) || empty($tanggal) || empty($waktuMulai) || empty($waktuSelesai) || empty($ruangan) || $kuota <= 0) {
+                $message = 'Semua field harus diisi dengan benar.';
+                $msgType = 'danger';
+            } else {
+                $stmt = $pdo->prepare("UPDATE pretes_schedules SET periode=?, tanggal=?, waktu_mulai=?, waktu_selesai=?, ruangan=?, kuota=? WHERE id=?");
+                $stmt->execute([$periode, $tanggal, $waktuMulai, $waktuSelesai, $ruangan, $kuota, $id]);
+                $message = 'Jadwal pretes berhasil diperbarui!';
+                $msgType = 'success';
+            }
+
         } elseif ($action === 'delete') {
             $id = (int)($_POST['id'] ?? 0);
             $pdo->prepare("DELETE FROM pretes_schedules WHERE id = ?")->execute([$id]);
             $message = 'Jadwal berhasil dihapus.';
             $msgType = 'success';
+
         } elseif ($action === 'update_status') {
-            $id = (int)($_POST['id'] ?? 0);
+            $id     = (int)($_POST['id'] ?? 0);
             $status = $_POST['status'] ?? '';
             if (in_array($status, ['aktif', 'selesai', 'dibatalkan'])) {
                 $pdo->prepare("UPDATE pretes_schedules SET status = ? WHERE id = ?")->execute([$status, $id]);
@@ -131,6 +152,18 @@ include __DIR__ . '/../includes/header.php';
                             <span class="badge <?= $badges[$s['status']] ?? 'badge-info' ?>"><?= ucfirst($s['status']) ?></span>
                         </td>
                         <td style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <!-- Tombol Edit -->
+                            <button type="button" class="btn btn-sm btn-warning"
+                                onclick="openEditModal(
+                                    <?= $s['id'] ?>,
+                                    <?= json_encode($s['periode']) ?>,
+                                    <?= json_encode($s['tanggal']) ?>,
+                                    <?= json_encode($s['waktu_mulai']) ?>,
+                                    <?= json_encode($s['waktu_selesai']) ?>,
+                                    <?= json_encode($s['ruangan']) ?>,
+                                    <?= $s['kuota'] ?>
+                                )">✏️ Edit</button>
+
                             <?php foreach (['aktif', 'selesai', 'dibatalkan'] as $st): ?>
                                 <?php if ($s['status'] !== $st): ?>
                                 <form method="POST" style="display:inline;">
@@ -142,11 +175,12 @@ include __DIR__ . '/../includes/header.php';
                                 </form>
                                 <?php endif; ?>
                             <?php endforeach; ?>
+
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?= $s['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-danger" data-confirm="Hapus jadwal ini?" data-table="pretes_schedules" data-id="<?= $s['id'] ?>">Hapus</button>
+                                <button type="submit" class="btn btn-sm btn-danger" data-confirm="Hapus jadwal ini?" data-table="pretes_schedules" data-id="<?= $s['id'] ?>">🗑️ Hapus</button>
                             </form>
                         </td>
                     </tr>
@@ -156,5 +190,84 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- ====== MODAL EDIT JADWAL ====== -->
+<div class="modal-backdrop" id="editModal">
+    <div class="modal-content" style="max-width:600px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="margin:0;">✏️ Edit Jadwal Pretes</h3>
+            <button type="button" onclick="closeEditModal()"
+                style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
+                aria-label="Tutup">&times;</button>
+        </div>
+
+        <form method="POST" id="editForm">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="id" id="edit_id">
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                <div class="form-group">
+                    <label>Periode</label>
+                    <input type="text" name="periode" id="edit_periode" placeholder="2025/2026-Ganjil" required>
+                </div>
+                <div class="form-group">
+                    <label>Tanggal</label>
+                    <input type="date" name="tanggal" id="edit_tanggal" required>
+                </div>
+                <div class="form-group">
+                    <label>Waktu Mulai</label>
+                    <input type="time" name="waktu_mulai" id="edit_waktu_mulai" required>
+                </div>
+                <div class="form-group">
+                    <label>Waktu Selesai</label>
+                    <input type="time" name="waktu_selesai" id="edit_waktu_selesai" required>
+                </div>
+                <div class="form-group">
+                    <label>Ruangan</label>
+                    <input type="text" name="ruangan" id="edit_ruangan" placeholder="Gedung A - Ruang 101" required>
+                </div>
+                <div class="form-group">
+                    <label>Kuota</label>
+                    <input type="number" name="kuota" id="edit_kuota" min="1" required>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                <button type="button" class="btn btn-secondary" style="width:auto;" onclick="closeEditModal()">Batal</button>
+                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditModal(id, periode, tanggal, waktuMulai, waktuSelesai, ruangan, kuota) {
+    document.getElementById('edit_id').value          = id;
+    document.getElementById('edit_periode').value     = periode;
+    document.getElementById('edit_tanggal').value     = tanggal;
+    // Waktu dari DB bisa "HH:MM:SS" — potong ke "HH:MM" agar sesuai input[type=time]
+    document.getElementById('edit_waktu_mulai').value   = (waktuMulai   || '').slice(0, 5);
+    document.getElementById('edit_waktu_selesai').value = (waktuSelesai || '').slice(0, 5);
+    document.getElementById('edit_ruangan').value     = ruangan;
+    document.getElementById('edit_kuota').value       = kuota;
+
+    document.getElementById('editModal').classList.add('show');
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('show');
+}
+
+// Tutup modal jika klik area backdrop
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+
+// Tutup modal dengan Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeEditModal();
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
