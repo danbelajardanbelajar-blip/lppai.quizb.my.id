@@ -121,6 +121,20 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                     'bg'          => '#fff3e0',
                     'border'      => '#e65100',
                 ];
+
+            } elseif ($gelombang === 'mandiri') {
+                // Tutorial Mandiri adalah tahap terakhir — tampilkan panel informasi
+                $nextStepInfo = [
+                    'gelombang'   => 'final',
+                    'label'       => 'Hubungi Admin',
+                    'url'         => null,
+                    'ann_open'    => null,
+                    'already_reg' => null,
+                    'icon'        => '📞',
+                    'color'       => '#6c757d',
+                    'bg'          => '#f8f9fa',
+                    'border'      => '#6c757d',
+                ];
             }
         }
     }
@@ -249,10 +263,29 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
         ?>
         <div class="card" style="border:2px solid <?= $ns['border'] ?>;margin-top:16px;">
             <div class="card-header" style="background:<?= $ns['bg'] ?>;color:<?= $ns['color'] ?>;font-weight:700;">
-                <?= $ns['icon'] ?> Langkah Selanjutnya: Daftar <?= $ns['label'] ?>
+                <?php if ($ns['gelombang'] === 'final'): ?>
+                    <?= $ns['icon'] ?> Informasi Selanjutnya
+                <?php else: ?>
+                    <?= $ns['icon'] ?> Langkah Selanjutnya: Daftar <?= $ns['label'] ?>
+                <?php endif; ?>
             </div>
             <div class="card-body">
-                <?php if ($ns['already_reg']): ?>
+                <?php if ($ns['gelombang'] === 'final'): ?>
+                    <!-- Tahap mandiri = tahap akhir, tidak ada langkah selanjutnya -->
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <div style="font-size:40px;">📞</div>
+                        <div style="flex:1;">
+                            <h3 style="margin:0 0 6px;color:#6c757d;">Tutorial Mandiri adalah Tahap Terakhir</h3>
+                            <p style="color:var(--text-muted);margin:0 0 8px;">
+                                Anda telah mengikuti seluruh tahapan tutorial. Silakan hubungi admin LPPAI untuk informasi lebih lanjut mengenai status kelulusan Anda.
+                            </p>
+                            <div style="padding:10px 14px;background:#f8f9fa;border-radius:8px;font-size:13px;color:#6c757d;border:1px solid #dee2e6;">
+                                💡 Jika ada pertanyaan, hubungi Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) secara langsung.
+                            </div>
+                        </div>
+                    </div>
+
+                <?php elseif ($ns['already_reg']): ?>
                     <!-- Sudah terdaftar di langkah berikutnya -->
                     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
                         <div style="font-size:40px;">✅</div>

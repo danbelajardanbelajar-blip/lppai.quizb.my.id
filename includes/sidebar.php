@@ -105,6 +105,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/tutorial-mandiri-pembagian.php" class="page-nav <?= menuActive('tutorial-mandiri-pembagian.php') ?>">
                 <span class="icon">🏫</span> Pembagian Kelas Mandiri
             </a>
+            <a href="<?= BASE_URL ?>/tutorial-mandiri-kelulusan.php" class="page-nav <?= menuActive('tutorial-mandiri-kelulusan.php') ?>">
+                <span class="icon">🎓</span> Kelulusan Mandiri
+            </a>
         <?php endif; ?>
 
         <div class="menu-label">Akun</div>

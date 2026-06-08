@@ -80,7 +80,7 @@ CREATE TABLE announcements (
     tipe ENUM(
         'pendaftaran_gel1', 'pembagian_kelas_gel1', 'kelulusan_gel1',
         'pendaftaran_gel2', 'pembagian_kelas_gel2', 'kelulusan_gel2',
-        'pendaftaran_mandiri', 'pembagian_kelas_mandiri',
+        'pendaftaran_mandiri', 'pembagian_kelas_mandiri', 'kelulusan_mandiri',
         'umum'
     ) NOT NULL,
     file_lampiran VARCHAR(255) DEFAULT NULL,
