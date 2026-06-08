@@ -346,10 +346,18 @@ function submitVerify() {
     fd.append('password', pw);
 
     fetch('<?= BASE_URL ?>/api/verify-password.php', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.text())
+        .then(text => {
+            let data;
+            try { data = JSON.parse(text); }
+            catch(e) {
+                err.textContent = 'Respons server tidak valid: ' + text.substring(0, 120);
+                err.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '🔓 Konfirmasi';
+                return;
+            }
             if (data.ok) {
-                // Ambil password via hidden AJAX field yang sudah di-render server
                 const encoded = document.getElementById('__enc_pass').value;
                 _revealedPassword = atob(encoded);
 
@@ -366,8 +374,8 @@ function submitVerify() {
                 document.getElementById('verify-pass-input').select();
             }
         })
-        .catch(() => {
-            err.textContent = 'Terjadi kesalahan. Coba lagi.';
+        .catch(e => {
+            err.textContent = 'Koneksi gagal: ' + e.message;
             err.style.display = 'block';
             btn.disabled = false;
             btn.textContent = '🔓 Konfirmasi';

@@ -4,31 +4,44 @@
  * Digunakan oleh halaman pretes-peserta (mahasiswa & admin)
  * untuk memastikan pengguna memasukkan password akun mereka
  * sendiri sebelum password tes tulis ditampilkan.
+ *
+ * CATATAN: ob_start() dipanggil paling awal untuk menangkap
+ * segala PHP notice/warning agar tidak merusak output JSON.
+ * session_start() hanya dipanggil jika belum aktif.
  */
 
-require_once __DIR__ . '/../includes/auth.php';
+ob_start(); // tangkap semua output sebelum header JSON
 
-header('Content-Type: application/json');
+// Mulai session hanya jika belum aktif
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Harus sudah login
-if (!isLoggedIn()) {
+require_once __DIR__ . '/../config/database.php';  // BASE_URL, APP_NAME, getDBConnection()
+
+// Fungsi helper minimal (tidak pakai auth.php agar tidak double session_start)
+function _isLoggedIn()  { return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']); }
+function _verifyCsrf($t){ return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $t); }
+
+ob_clean(); // buang semua output PHP sebelum header
+header('Content-Type: application/json; charset=utf-8');
+
+if (!_isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'message' => 'Tidak terautentikasi.']);
     exit;
 }
 
-// Harus POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['ok' => false, 'message' => 'Method tidak diizinkan.']);
     exit;
 }
 
-// Verifikasi CSRF
 $token = $_POST['csrf_token'] ?? '';
-if (!verifyCsrf($token)) {
+if (!_verifyCsrf($token)) {
     http_response_code(403);
-    echo json_encode(['ok' => false, 'message' => 'Token tidak valid.']);
+    echo json_encode(['ok' => false, 'message' => 'Token tidak valid. Muat ulang halaman dan coba lagi.']);
     exit;
 }
 
@@ -38,14 +51,18 @@ if ($inputPassword === '') {
     exit;
 }
 
-// Ambil hash password dari database
-$pdo  = getDBConnection();
-$stmt = $pdo->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
-$stmt->execute([$_SESSION['user_id']]);
-$user = $stmt->fetch();
+try {
+    $pdo  = getDBConnection();
+    $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch();
 
-if ($user && password_verify($inputPassword, $user['password'])) {
-    echo json_encode(['ok' => true]);
-} else {
-    echo json_encode(['ok' => false, 'message' => 'Password salah. Coba lagi.']);
+    if ($user && password_verify($inputPassword, $user['password'])) {
+        echo json_encode(['ok' => true]);
+    } else {
+        echo json_encode(['ok' => false, 'message' => 'Password salah. Coba lagi.']);
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'message' => 'Kesalahan server. Coba lagi.']);
 }

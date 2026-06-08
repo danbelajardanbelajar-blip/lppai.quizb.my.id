@@ -432,11 +432,19 @@ function submitAdminVerify() {
     fd.append('password', pw);
 
     fetch('<?= BASE_URL ?>/api/verify-password.php', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => {
+        .then(r => r.text())
+        .then(text => {
+            let data;
+            try { data = JSON.parse(text); }
+            catch(e) {
+                err.textContent = 'Respons server tidak valid: ' + text.substring(0, 120);
+                err.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '🔓 Konfirmasi';
+                return;
+            }
             if (data.ok) {
                 const regId = _currentRegId;
-                // Ambil password dari hidden input di baris tabel
                 const encInput = document.querySelector('.enc-pass-data[data-reg-id="' + regId + '"]');
                 const plain = atob(encInput.value);
 
@@ -455,8 +463,8 @@ function submitAdminVerify() {
                 document.getElementById('verify-pass-input').select();
             }
         })
-        .catch(() => {
-            err.textContent = 'Terjadi kesalahan. Coba lagi.';
+        .catch(e => {
+            err.textContent = 'Koneksi gagal: ' + e.message;
             err.style.display = 'block';
             btn.disabled = false;
             btn.textContent = '🔓 Konfirmasi';
