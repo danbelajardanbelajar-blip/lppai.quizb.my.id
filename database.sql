@@ -28,18 +28,22 @@ CREATE TABLE users (
 CREATE TABLE pretes_registrations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    pretes_schedule_id INT DEFAULT NULL,
     periode VARCHAR(20) NOT NULL,
     tanggal_daftar DATETIME DEFAULT CURRENT_TIMESTAMP,
     status ENUM('terdaftar', 'hadir', 'tidak_hadir') DEFAULT 'terdaftar',
     username_tes VARCHAR(100) DEFAULT NULL COMMENT 'Username untuk tes tulis pretes',
     password_tes VARCHAR(100) DEFAULT NULL COMMENT 'Password untuk tes tulis pretes',
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (pretes_schedule_id) REFERENCES pretes_schedules(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- Jika database sudah ada, jalankan ALTER ini:
 -- ALTER TABLE pretes_registrations
+--   ADD COLUMN pretes_schedule_id INT DEFAULT NULL AFTER user_id,
 --   ADD COLUMN username_tes VARCHAR(100) DEFAULT NULL COMMENT 'Username untuk tes tulis pretes',
---   ADD COLUMN password_tes VARCHAR(100) DEFAULT NULL COMMENT 'Password untuk tes tulis pretes';
+--   ADD COLUMN password_tes VARCHAR(100) DEFAULT NULL COMMENT 'Password untuk tes tulis pretes',
+--   ADD FOREIGN KEY (pretes_schedule_id) REFERENCES pretes_schedules(id) ON DELETE SET NULL;
 
 -- Tabel Jadwal Pretes
 CREATE TABLE pretes_schedules (
