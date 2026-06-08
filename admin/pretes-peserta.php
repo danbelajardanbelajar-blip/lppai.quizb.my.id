@@ -2,6 +2,40 @@
 /**
  * LPPAI Corner - Admin: Data Peserta Pretes & Kelola Credentials Tes Tulis
  */
+
+// ── Handler AJAX: verifikasi password (harus di paling atas, sebelum HTML) ──
+if (isset($_POST['action']) && $_POST['action'] === 'verify_password') {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    require_once __DIR__ . '/../config/database.php';
+    ob_clean();
+    header('Content-Type: application/json; charset=utf-8');
+
+    $ok  = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
+    $tok = $_POST['csrf_token'] ?? '';
+    $validTok = isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $tok);
+
+    if (!$ok)       { echo json_encode(['ok'=>false,'message'=>'Sesi habis. Muat ulang halaman.']); exit; }
+    if (!$validTok) { echo json_encode(['ok'=>false,'message'=>'Token tidak valid. Muat ulang halaman.']); exit; }
+
+    $pw = $_POST['password'] ?? '';
+    if ($pw === '') { echo json_encode(['ok'=>false,'message'=>'Password tidak boleh kosong.']); exit; }
+
+    try {
+        $pdo2 = getDBConnection();
+        $s = $pdo2->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+        $s->execute([$_SESSION['user_id']]);
+        $u = $s->fetch();
+        if ($u && password_verify($pw, $u['password'])) {
+            echo json_encode(['ok' => true]);
+        } else {
+            echo json_encode(['ok'=>false,'message'=>'Password salah. Coba lagi.']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['ok'=>false,'message'=>'Kesalahan server.']);
+    }
+    exit;
+}
+
 define('PAGE_TITLE', 'Data Peserta & Credentials Tes Tulis');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
@@ -431,7 +465,7 @@ function submitAdminVerify() {
     fd.append('csrf_token', <?= json_encode(csrfToken()) ?>);
     fd.append('password', pw);
 
-    fetch('<?= BASE_URL ?>/api/verify-password.php', { method: 'POST', body: fd })
+    fetch(window.location.href, { method: 'POST', body: fd })
         .then(r => r.text())
         .then(text => {
             let data;
