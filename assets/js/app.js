@@ -190,16 +190,20 @@ function initAllTablesWithRetry(scope, attempts) {
    AJAX DELETE
    ============================================= */
 function ajaxDelete(table, id, csrfToken, rowEl, successMsg) {
-    var baseUrl = document.querySelector('meta[name="base-url"]')
-        ? document.querySelector('meta[name="base-url"]').content
-        : '';
+    // Use window.location.origin as a reliable origin (avoids trailing-slash issues
+    // with the base-url meta) and point to the root-level ajax-delete.php which is
+    // always reachable regardless of subdirectory deployment status.
+    var origin = window.location.origin ||
+        (document.querySelector('meta[name="base-url"]')
+            ? document.querySelector('meta[name="base-url"]').content
+            : '');
 
     var formData = new FormData();
     formData.append('table', table);
     formData.append('id', id);
     formData.append('csrf_token', csrfToken);
 
-    fetch(baseUrl + '/api/ajax-delete.php', {
+    fetch(origin + '/ajax-delete.php', {
         method: 'POST',
         body: formData
     })
