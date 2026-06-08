@@ -76,7 +76,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 /* =============================================================
    DATA
    ============================================================= */
-$students = $pdo->query("SELECT id, nama_lengkap, nim, program_studi FROM users WHERE role='mahasiswa' ORDER BY nama_lengkap")->fetchAll();
+$students = $pdo->query("
+    SELECT id, nama_lengkap, nim, program_studi
+    FROM users
+    WHERE role = 'mahasiswa'
+      AND EXISTS (
+          SELECT 1 FROM tutorial_registrations tr WHERE tr.user_id = users.id
+      )
+    ORDER BY nama_lengkap
+")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari, nama_kelas")->fetchAll();
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 
