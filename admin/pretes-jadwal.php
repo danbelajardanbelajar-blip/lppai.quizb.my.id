@@ -152,17 +152,15 @@ include __DIR__ . '/../includes/header.php';
                             <span class="badge <?= $badges[$s['status']] ?? 'badge-info' ?>"><?= ucfirst($s['status']) ?></span>
                         </td>
                         <td style="display:flex;gap:4px;flex-wrap:wrap;">
-                            <!-- Tombol Edit -->
-                            <button type="button" class="btn btn-sm btn-warning"
-                                onclick="openEditModal(
-                                    <?= $s['id'] ?>,
-                                    <?= json_encode($s['periode']) ?>,
-                                    <?= json_encode($s['tanggal']) ?>,
-                                    <?= json_encode($s['waktu_mulai']) ?>,
-                                    <?= json_encode($s['waktu_selesai']) ?>,
-                                    <?= json_encode($s['ruangan']) ?>,
-                                    <?= $s['kuota'] ?>
-                                )">✏️ Edit</button>
+                            <!-- Tombol Edit — data-* dipakai agar tidak ada kutip ganda di atribut HTML -->
+                            <button type="button" class="btn btn-sm btn-warning btn-edit-jadwal"
+                                data-id="<?= $s['id'] ?>"
+                                data-periode="<?= htmlspecialchars($s['periode'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-tanggal="<?= htmlspecialchars($s['tanggal'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-waktu-mulai="<?= htmlspecialchars($s['waktu_mulai'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-waktu-selesai="<?= htmlspecialchars($s['waktu_selesai'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-ruangan="<?= htmlspecialchars($s['ruangan'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-kuota="<?= (int)$s['kuota'] ?>">✏️ Edit</button>
 
                             <?php foreach (['aktif', 'selesai', 'dibatalkan'] as $st): ?>
                                 <?php if ($s['status'] !== $st): ?>
@@ -201,7 +199,7 @@ include __DIR__ . '/../includes/header.php';
                 aria-label="Tutup">&times;</button>
         </div>
 
-        <form method="POST" id="editForm">
+        <form method="POST" id="editForm" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="update">
             <input type="hidden" name="id" id="edit_id">
@@ -242,32 +240,54 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+// Fungsi helper — didefinisikan sekali, aman dipanggil berulang oleh SPA
 function openEditModal(id, periode, tanggal, waktuMulai, waktuSelesai, ruangan, kuota) {
-    document.getElementById('edit_id').value          = id;
-    document.getElementById('edit_periode').value     = periode;
-    document.getElementById('edit_tanggal').value     = tanggal;
-    // Waktu dari DB bisa "HH:MM:SS" — potong ke "HH:MM" agar sesuai input[type=time]
+    document.getElementById('edit_id').value            = id;
+    document.getElementById('edit_periode').value       = periode;
+    document.getElementById('edit_tanggal').value       = tanggal;
+    // Waktu dari DB bisa "HH:MM:SS" — potong ke "HH:MM" agar cocok input[type=time]
     document.getElementById('edit_waktu_mulai').value   = (waktuMulai   || '').slice(0, 5);
     document.getElementById('edit_waktu_selesai').value = (waktuSelesai || '').slice(0, 5);
-    document.getElementById('edit_ruangan').value     = ruangan;
-    document.getElementById('edit_kuota').value       = kuota;
-
+    document.getElementById('edit_ruangan').value       = ruangan;
+    document.getElementById('edit_kuota').value         = kuota;
     document.getElementById('editModal').classList.add('show');
 }
 
 function closeEditModal() {
-    document.getElementById('editModal').classList.remove('show');
+    var m = document.getElementById('editModal');
+    if (m) m.classList.remove('show');
 }
 
-// Tutup modal jika klik area backdrop
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) closeEditModal();
-});
+// Delegasi klik tombol Edit — baca data dari data-* attributes
+// Guard flag mencegah event listener menumpuk saat SPA swap halaman
+if (!window._editJadwalBound) {
+    window._editJadwalBound = true;
 
-// Tutup modal dengan Escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeEditModal();
-});
+    document.addEventListener('click', function(e) {
+        // Tombol Edit
+        var btn = e.target.closest('.btn-edit-jadwal');
+        if (btn) {
+            var d = btn.dataset;
+            openEditModal(
+                d.id,
+                d.periode,
+                d.tanggal,
+                d.waktuMulai,   // dataset otomatis camelCase dari data-waktu-mulai
+                d.waktuSelesai,
+                d.ruangan,
+                d.kuota
+            );
+            return;
+        }
+
+        // Klik backdrop modal untuk menutup
+        if (e.target && e.target.id === 'editModal') closeEditModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeEditModal();
+    });
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
