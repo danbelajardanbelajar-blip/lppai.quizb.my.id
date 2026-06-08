@@ -33,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Nama kelas, mata kuliah, dan gelombang harus diisi.';
                 $msgType = 'danger';
             } else {
-                $stmt = $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?,?)");
-                $stmt->execute([$namaKelas, $mataKuliah, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
+                $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?,?)")
+                    ->execute([$namaKelas, $mataKuliah, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
                 $message = 'Kelas tutorial berhasil ditambahkan!';
                 $msgType = 'success';
             }
@@ -80,9 +80,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
 <?php endif; ?>
 
-<!-- ===================================================
-     CARD: TAMBAH KELAS
-     =================================================== -->
+<!-- ── Tambah Kelas ──────────────────────────────────────────── -->
 <div class="card">
     <div class="card-header">➕ Tambah Kelas Tutorial</div>
     <div class="card-body">
@@ -104,7 +102,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Gelombang *</label>
-                    <select name="gelombang" style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;" required>
+                    <select name="gelombang" required>
                         <option value="">-- Pilih --</option>
                         <option value="gel1">Gelombang 1 (Ganjil)</option>
                         <option value="gel2">Gelombang 2 (Genap)</option>
@@ -137,12 +135,17 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- ===================================================
-     CARD: DAFTAR KELAS
-     =================================================== -->
+<!-- ── Daftar Kelas ──────────────────────────────────────────── -->
 <div class="card">
     <div class="card-header">📋 Daftar Kelas Tutorial (<?= count($classes) ?>)</div>
     <div class="card-body">
+        <?php if (empty($classes)): ?>
+            <div class="empty-state">
+                <div class="icon">🏫</div>
+                <h3>Belum ada kelas tutorial</h3>
+                <p>Tambahkan kelas melalui form di atas.</p>
+            </div>
+        <?php else: ?>
         <div class="table-responsive">
             <table>
                 <thead>
@@ -166,19 +169,30 @@ include __DIR__ . '/../includes/header.php';
                         <td><span class="badge badge-primary"><?= $gelLabels[$c['gelombang']] ?? $c['gelombang'] ?></span></td>
                         <td><?= sanitize(($c['hari'] ?? '-') . ', ' . ($c['jam'] ?? '-')) ?></td>
                         <td><?= sanitize($c['ruangan'] ?? '-') ?></td>
-                        <td><?= $c['kuota'] ?></td>
+                        <td><?= (int)$c['kuota'] ?></td>
                         <td style="white-space:nowrap;">
-                            <!-- Tombol Edit -->
-                            <button type="button" class="btn btn-sm btn-secondary"
-                                onclick="openEditModal(<?= htmlspecialchars(json_encode($c), ENT_QUOTES) ?>)"
-                                style="margin-right:4px;">✏️ Edit</button>
+                            <!-- Tombol Edit — data-* attributes, aman dari XSS -->
+                            <button type="button" class="btn btn-sm btn-warning btn-edit-kelas"
+                                data-id="<?= (int)$c['id'] ?>"
+                                data-nama-kelas="<?= htmlspecialchars($c['nama_kelas'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-mata-kuliah="<?= htmlspecialchars($c['mata_kuliah'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-dosen="<?= htmlspecialchars($c['dosen_pengampu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-gelombang="<?= htmlspecialchars($c['gelombang'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-hari="<?= htmlspecialchars($c['hari'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-jam="<?= htmlspecialchars($c['jam'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-ruangan="<?= htmlspecialchars($c['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-semester="<?= htmlspecialchars($c['semester'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-kuota="<?= (int)$c['kuota'] ?>"
+                                style="margin-right:4px;">
+                                ✏️ Edit
+                            </button>
                             <!-- Tombol Hapus -->
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id" value="<?= $c['id'] ?>">
                                 <button type="submit" class="btn btn-sm btn-danger"
-                                    data-confirm="Hapus kelas ini?"
+                                    data-confirm="Hapus kelas ini? Semua registrasi mahasiswa di kelas ini juga akan terhapus."
                                     data-table="tutorial_classes"
                                     data-id="<?= $c['id'] ?>">🗑️ Hapus</button>
                             </form>
@@ -188,132 +202,128 @@ include __DIR__ . '/../includes/header.php';
                 </tbody>
             </table>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<!-- ===================================================
-     MODAL: EDIT KELAS
-     =================================================== -->
-<div id="editModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);
-    backdrop-filter:blur(3px);align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:16px;width:min(760px,96vw);max-height:90vh;
-        overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:modalIn .2s ease;">
-        <!-- Header modal -->
-        <div style="display:flex;align-items:center;justify-content:space-between;
-            padding:20px 24px;border-bottom:1px solid #e5e7eb;">
-            <h3 style="margin:0;font-size:18px;font-weight:700;color:#111827;">✏️ Edit Kelas Tutorial</h3>
-            <button onclick="closeEditModal()"
-                style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;line-height:1;">×</button>
+<!-- ── Modal Edit Kelas ──────────────────────────────────────── -->
+<div class="modal-backdrop" id="editKelasModal">
+    <div class="modal-content" style="max-width:760px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="margin:0;">✏️ Edit Kelas Tutorial</h3>
+            <button type="button" onclick="closeKelasModal()"
+                style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
+                aria-label="Tutup">&times;</button>
         </div>
-        <!-- Body modal -->
-        <div style="padding:24px;">
-            <form method="POST" id="editForm">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="update">
-                <input type="hidden" name="id" id="edit_id">
 
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
-                    <div class="form-group">
-                        <label>Nama Kelas *</label>
-                        <input type="text" name="nama_kelas" id="edit_nama_kelas" required
-                            placeholder="Kelas A">
-                    </div>
-                    <div class="form-group">
-                        <label>Mata Kuliah *</label>
-                        <input type="text" name="mata_kuliah" id="edit_mata_kuliah" required
-                            placeholder="Bahasa Arab Dasar">
-                    </div>
-                    <div class="form-group">
-                        <label>Dosen Pengampu</label>
-                        <input type="text" name="dosen_pengampu" id="edit_dosen_pengampu"
-                            placeholder="Dr. Ahmad">
-                    </div>
-                    <div class="form-group">
-                        <label>Gelombang *</label>
-                        <select name="gelombang" id="edit_gelombang" required
-                            style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:10px;">
-                            <option value="">-- Pilih --</option>
-                            <option value="gel1">Gelombang 1 (Ganjil)</option>
-                            <option value="gel2">Gelombang 2 (Genap)</option>
-                            <option value="mandiri">Mandiri</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Hari</label>
-                        <input type="text" name="hari" id="edit_hari" placeholder="Senin">
-                    </div>
-                    <div class="form-group">
-                        <label>Jam</label>
-                        <input type="text" name="jam" id="edit_jam" placeholder="08:00-09:30">
-                    </div>
-                    <div class="form-group">
-                        <label>Ruangan</label>
-                        <input type="text" name="ruangan" id="edit_ruangan" placeholder="Ruang 101">
-                    </div>
-                    <div class="form-group">
-                        <label>Semester</label>
-                        <input type="text" name="semester" id="edit_semester"
-                            placeholder="2025/2026-Ganjil">
-                    </div>
-                    <div class="form-group">
-                        <label>Kuota</label>
-                        <input type="number" name="kuota" id="edit_kuota" min="0" placeholder="30">
-                    </div>
-                </div>
+        <form method="POST" id="editKelasForm" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="id" id="edit_id">
 
-                <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary" style="width:auto;">
-                        💾 Simpan Perubahan
-                    </button>
-                    <button type="button" class="btn btn-secondary" style="width:auto;"
-                        onclick="closeEditModal()">
-                        Batal
-                    </button>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                <div class="form-group">
+                    <label>Nama Kelas *</label>
+                    <input type="text" name="nama_kelas" id="edit_nama_kelas" placeholder="Kelas A" required>
                 </div>
-            </form>
-        </div>
+                <div class="form-group">
+                    <label>Mata Kuliah *</label>
+                    <input type="text" name="mata_kuliah" id="edit_mata_kuliah" placeholder="Bahasa Arab Dasar" required>
+                </div>
+                <div class="form-group">
+                    <label>Dosen Pengampu</label>
+                    <input type="text" name="dosen_pengampu" id="edit_dosen" placeholder="Dr. Ahmad">
+                </div>
+                <div class="form-group">
+                    <label>Gelombang *</label>
+                    <select name="gelombang" id="edit_gelombang" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="gel1">Gelombang 1 (Ganjil)</option>
+                        <option value="gel2">Gelombang 2 (Genap)</option>
+                        <option value="mandiri">Mandiri</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hari</label>
+                    <input type="text" name="hari" id="edit_hari" placeholder="Senin">
+                </div>
+                <div class="form-group">
+                    <label>Jam</label>
+                    <input type="text" name="jam" id="edit_jam" placeholder="08:00-09:30">
+                </div>
+                <div class="form-group">
+                    <label>Ruangan</label>
+                    <input type="text" name="ruangan" id="edit_ruangan" placeholder="Ruang 101">
+                </div>
+                <div class="form-group">
+                    <label>Semester</label>
+                    <input type="text" name="semester" id="edit_semester" placeholder="2025/2026-Ganjil">
+                </div>
+                <div class="form-group">
+                    <label>Kuota</label>
+                    <input type="number" name="kuota" id="edit_kuota" min="0" placeholder="30">
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" class="btn btn-secondary" style="width:auto;"
+                    onclick="closeKelasModal()">Batal</button>
+                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan Perubahan</button>
+            </div>
+        </form>
     </div>
 </div>
-
-<style>
-@keyframes modalIn {
-    from { opacity: 0; transform: translateY(-16px) scale(.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-</style>
 
 <script>
-function openEditModal(data) {
-    document.getElementById('edit_id').value            = data.id;
-    document.getElementById('edit_nama_kelas').value    = data.nama_kelas   || '';
-    document.getElementById('edit_mata_kuliah').value   = data.mata_kuliah  || '';
-    document.getElementById('edit_dosen_pengampu').value= data.dosen_pengampu || '';
-    document.getElementById('edit_gelombang').value     = data.gelombang    || '';
-    document.getElementById('edit_hari').value          = data.hari         || '';
-    document.getElementById('edit_jam').value           = data.jam          || '';
-    document.getElementById('edit_ruangan').value       = data.ruangan      || '';
-    document.getElementById('edit_semester').value      = data.semester     || '';
-    document.getElementById('edit_kuota').value         = data.kuota        || 0;
-
-    var modal = document.getElementById('editModal');
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+function openKelasModal(d) {
+    document.getElementById('edit_id').value          = d.id;
+    document.getElementById('edit_nama_kelas').value  = d.namaKelas  || '';
+    document.getElementById('edit_mata_kuliah').value = d.mataKuliah || '';
+    document.getElementById('edit_dosen').value       = d.dosen      || '';
+    document.getElementById('edit_gelombang').value   = d.gelombang  || '';
+    document.getElementById('edit_hari').value        = d.hari       || '';
+    document.getElementById('edit_jam').value         = d.jam        || '';
+    document.getElementById('edit_ruangan').value     = d.ruangan    || '';
+    document.getElementById('edit_semester').value    = d.semester   || '';
+    document.getElementById('edit_kuota').value       = d.kuota      || 0;
+    document.getElementById('editKelasModal').classList.add('show');
 }
 
-function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
-    document.body.style.overflow = '';
+function closeKelasModal() {
+    var m = document.getElementById('editKelasModal');
+    if (m) m.classList.remove('show');
 }
 
-// Tutup modal saat klik di luar area modal
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) closeEditModal();
-});
+// Event delegation — baca dari data-* attributes (aman dari XSS, tidak ada JSON di onclick)
+if (!window._editKelasBound) {
+    window._editKelasBound = true;
 
-// Tutup modal dengan tombol Escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeEditModal();
-});
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.btn-edit-kelas');
+        if (btn) {
+            var d = btn.dataset;
+            openKelasModal({
+                id:         d.id,
+                namaKelas:  d.namaKelas,
+                mataKuliah: d.mataKuliah,
+                dosen:      d.dosen,
+                gelombang:  d.gelombang,
+                hari:       d.hari,
+                jam:        d.jam,
+                ruangan:    d.ruangan,
+                semester:   d.semester,
+                kuota:      d.kuota,
+            });
+            return;
+        }
+        // Klik backdrop untuk tutup
+        if (e.target && e.target.id === 'editKelasModal') closeKelasModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeKelasModal();
+    });
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
