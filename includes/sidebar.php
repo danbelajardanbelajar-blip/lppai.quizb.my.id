@@ -44,6 +44,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/tutorial-peserta.php" class="page-nav <?= menuActive('tutorial-peserta.php') ?>">
                 <span class="icon">📋</span> Data Peserta Tutorial
             </a>
+            <a href="<?= BASE_URL ?>/admin/tutorial-hasil.php" class="page-nav <?= menuActive('tutorial-hasil.php') ?>">
+                <span class="icon">🎓</span> Kelola Hasil Tutorial
+            </a>
 
             <div class="menu-label">Pengumuman</div>
             <a href="<?= BASE_URL ?>/admin/pengumuman.php" class="page-nav <?= menuActive('pengumuman.php') ?>">

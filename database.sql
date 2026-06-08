@@ -109,10 +109,14 @@ CREATE TABLE tutorial_registrations (
     tutorial_class_id INT NOT NULL,
     status ENUM('terdaftar', 'aktif', 'lulus', 'tidak_lulus', 'mengundurkan_diri') DEFAULT 'terdaftar',
     nilai_akhir DECIMAL(5,2) DEFAULT NULL,
+    keterangan TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (tutorial_class_id) REFERENCES tutorial_classes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Jika database sudah ada, jalankan ALTER ini:
+-- ALTER TABLE tutorial_registrations ADD COLUMN keterangan TEXT DEFAULT NULL AFTER nilai_akhir;
 
 -- =====================
 -- DATA DUMMY
