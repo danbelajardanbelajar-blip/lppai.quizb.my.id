@@ -82,37 +82,15 @@ function menuActive($page) {
                 <span class="icon">📊</span> Hasil Pretes
             </a>
 
-            <div class="menu-label">Tutorial Gelombang 1 (Ganjil)</div>
-            <a href="<?= BASE_URL ?>/tutorial-gel1-pendaftaran.php" class="page-nav <?= menuActive('tutorial-gel1-pendaftaran.php') ?>">
-                <span class="icon">📝</span> Pendaftaran Gel. 1
+            <div class="menu-label">Tutorial</div>
+            <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">
+                <span class="icon">📝</span> Pendaftaran Tutorial
             </a>
-            <a href="<?= BASE_URL ?>/tutorial-gel1-pembagian.php" class="page-nav <?= menuActive('tutorial-gel1-pembagian.php') ?>">
-                <span class="icon">🏫</span> Pembagian Kelas Gel. 1
+            <a href="<?= BASE_URL ?>/tutorial-pembagian.php" class="page-nav <?= menuActive('tutorial-pembagian.php') ?>">
+                <span class="icon">🏫</span> Pembagian Kelas
             </a>
-            <a href="<?= BASE_URL ?>/tutorial-gel1-kelulusan.php" class="page-nav <?= menuActive('tutorial-gel1-kelulusan.php') ?>">
-                <span class="icon">🎓</span> Kelulusan Gel. 1
-            </a>
-
-            <div class="menu-label">Tutorial Gelombang 2 (Genap)</div>
-            <a href="<?= BASE_URL ?>/tutorial-gel2-pendaftaran.php" class="page-nav <?= menuActive('tutorial-gel2-pendaftaran.php') ?>">
-                <span class="icon">📝</span> Pendaftaran Gel. 2
-            </a>
-            <a href="<?= BASE_URL ?>/tutorial-gel2-pembagian.php" class="page-nav <?= menuActive('tutorial-gel2-pembagian.php') ?>">
-                <span class="icon">🏫</span> Pembagian Kelas Gel. 2
-            </a>
-            <a href="<?= BASE_URL ?>/tutorial-gel2-kelulusan.php" class="page-nav <?= menuActive('tutorial-gel2-kelulusan.php') ?>">
-                <span class="icon">🎓</span> Kelulusan Gel. 2
-            </a>
-
-            <div class="menu-label">Tutorial Mandiri</div>
-            <a href="<?= BASE_URL ?>/tutorial-mandiri-pendaftaran.php" class="page-nav <?= menuActive('tutorial-mandiri-pendaftaran.php') ?>">
-                <span class="icon">📝</span> Pendaftaran Mandiri
-            </a>
-            <a href="<?= BASE_URL ?>/tutorial-mandiri-pembagian.php" class="page-nav <?= menuActive('tutorial-mandiri-pembagian.php') ?>">
-                <span class="icon">🏫</span> Pembagian Kelas Mandiri
-            </a>
-            <a href="<?= BASE_URL ?>/tutorial-mandiri-kelulusan.php" class="page-nav <?= menuActive('tutorial-mandiri-kelulusan.php') ?>">
-                <span class="icon">🎓</span> Kelulusan Mandiri
+            <a href="<?= BASE_URL ?>/tutorial-kelulusan.php" class="page-nav <?= menuActive('tutorial-kelulusan.php') ?>">
+                <span class="icon">🎓</span> Kelulusan Tutorial
             </a>
         <?php endif; ?>
 
