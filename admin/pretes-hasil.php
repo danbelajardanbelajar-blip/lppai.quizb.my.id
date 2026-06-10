@@ -69,7 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$students  = $pdo->query("SELECT id, nama_lengkap, nim FROM users WHERE role='mahasiswa' ORDER BY nama_lengkap")->fetchAll();
+$students  = $pdo->query("
+    SELECT DISTINCT u.id, u.nama_lengkap, u.nim 
+    FROM users u
+    JOIN pretes_registrations pr ON u.id = pr.user_id
+    WHERE u.role = 'mahasiswa' 
+    ORDER BY u.nama_lengkap
+")->fetchAll();
 $schedules = $pdo->query("SELECT * FROM pretes_schedules ORDER BY tanggal DESC")->fetchAll();
 
 $results = $pdo->query("
