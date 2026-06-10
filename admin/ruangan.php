@@ -6,18 +6,11 @@ define('PAGE_TITLE', 'Kelola Ruangan');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
-// Require SimpleXLSX if available
-require_once __DIR__ . '/../includes/SimpleXLSX.php';
+// Require PhpSpreadsheet dari direktori vendor
+require_once __DIR__ . '/../../../vendor/autoload.php';
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $pdo = getDBConnection();
-
-$pdo->exec("
-    CREATE TABLE IF NOT EXISTS rooms (
-        id VARCHAR(50) PRIMARY KEY,
-        ruang VARCHAR(150) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB
-");
 
 $message = '';
 $msgType = '';
@@ -89,25 +82,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (isset($_FILES['file_excel']) && $_FILES['file_excel']['error'] === UPLOAD_ERR_OK) {
                 $fileInfo = pathinfo($_FILES['file_excel']['name']);
                 if (strtolower($fileInfo['extension']) === 'xlsx') {
-                    if (class_exists('SimpleXLSX') && $xlsx = SimpleXLSX::parse($_FILES['file_excel']['tmp_name'])) {
-                        $rows = $xlsx->rows();
+                    try {
+                        $spreadsheet = IOFactory::load($_FILES['file_excel']['tmp_name']);
+                        $worksheet = $spreadsheet->getActiveSheet();
+                        $rows = $worksheet->toArray();
+                        
                         $berhasil = 0;
                         $gagal = 0;
-                        
-                        // Melewati baris pertama jika dianggap sebagai header
                         $isHeader = true;
                         
                         foreach ($rows as $r) {
                             if ($isHeader) {
                                 // Jika sel A1 = 'id' dan B1 = 'ruang' abaikan
-                                if (strtolower(trim($r[0])) == 'id' || strtolower(trim($r[1])) == 'ruang') {
+                                if (strtolower(trim($r[0] ?? '')) == 'id' || strtolower(trim($r[1] ?? '')) == 'ruang') {
                                     $isHeader = false;
                                     continue;
                                 }
                                 $isHeader = false;
                             }
                             
-                            $id = trim($r[0]);
+                            $id = trim($r[0] ?? '');
                             $ruang = trim($r[1] ?? '');
                             
                             if (!empty($id) && !empty($ruang)) {
@@ -122,8 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                         $message = "Import selesai. Berhasil: $berhasil baris. Gagal: $gagal baris.";
                         $msgType = 'success';
-                    } else {
-                        $message = 'Gagal membaca file Excel. ' . (class_exists('SimpleXLSX') ? SimpleXLSX::parseError() : 'Library SimpleXLSX tidak ditemukan.');
+                    } catch (Exception $e) {
+                        $message = 'Gagal membaca file Excel. ' . $e->getMessage();
                         $msgType = 'danger';
                     }
                 } else {
