@@ -131,7 +131,14 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Jam</label>
-                    <input type="text" name="jam" placeholder="08:00-09:30">
+                    <select name="jam">
+                        <option value="">-- Pilih Jam --</option>
+                        <option value="08:00-09:30">08:00 - 09:30</option>
+                        <option value="10:00-11:30">10:00 - 11:30</option>
+                        <option value="13:00-14:30">13:00 - 14:30</option>
+                        <option value="15:30-17:00">15:30 - 17:00</option>
+                        <option value="18:30-20:00">18:30 - 20:00</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Ruangan</label>
@@ -284,7 +291,14 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Jam</label>
-                    <input type="text" name="jam" id="edit_jam" placeholder="08:00-09:30">
+                    <select name="jam" id="edit_jam">
+                        <option value="">-- Pilih Jam --</option>
+                        <option value="08:00-09:30">08:00 - 09:30</option>
+                        <option value="10:00-11:30">10:00 - 11:30</option>
+                        <option value="13:00-14:30">13:00 - 14:30</option>
+                        <option value="15:30-17:00">15:30 - 17:00</option>
+                        <option value="18:30-20:00">18:30 - 20:00</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Ruangan</label>
