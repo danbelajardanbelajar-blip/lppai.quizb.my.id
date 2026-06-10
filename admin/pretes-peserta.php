@@ -3,38 +3,7 @@
  * LPPAI Corner - Admin: Data Peserta Pretes & Kelola Credentials Tes Tulis
  */
 
-// ── Handler AJAX: verifikasi password (harus di paling atas, sebelum HTML) ──
-if (isset($_POST['action']) && $_POST['action'] === 'verify_password') {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    require_once __DIR__ . '/../config/database.php';
-    ob_clean();
-    header('Content-Type: application/json; charset=utf-8');
 
-    $ok  = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
-    $tok = $_POST['csrf_token'] ?? '';
-    $validTok = isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $tok);
-
-    if (!$ok)       { echo json_encode(['ok'=>false,'message'=>'Sesi habis. Muat ulang halaman.']); exit; }
-    if (!$validTok) { echo json_encode(['ok'=>false,'message'=>'Token tidak valid. Muat ulang halaman.']); exit; }
-
-    $pw = $_POST['password'] ?? '';
-    if ($pw === '') { echo json_encode(['ok'=>false,'message'=>'Password tidak boleh kosong.']); exit; }
-
-    try {
-        $pdo2 = getDBConnection();
-        $s = $pdo2->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
-        $s->execute([$_SESSION['user_id']]);
-        $u = $s->fetch();
-        if ($u && password_verify($pw, $u['password'])) {
-            echo json_encode(['ok' => true]);
-        } else {
-            echo json_encode(['ok'=>false,'message'=>'Password salah. Coba lagi.']);
-        }
-    } catch (Exception $e) {
-        echo json_encode(['ok'=>false,'message'=>'Kesalahan server.']);
-    }
-    exit;
-}
 
 define('PAGE_TITLE', 'Data Peserta & Credentials Tes Tulis');
 require_once __DIR__ . '/../includes/auth.php';
@@ -374,51 +343,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- ── Modal Konfirmasi Password (Admin) ──────────────────── -->
-<div id="modal-verify-pass"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;
-            align-items:center;justify-content:center;backdrop-filter:blur(3px);">
-    <div style="background:#fff;border-radius:16px;width:min(420px,92vw);
-                box-shadow:0 20px 60px rgba(0,0,0,.25);animation:modalInVP .2s ease;overflow:hidden;">
-        <div style="background:#1a73e8;color:#fff;padding:18px 24px;font-weight:700;font-size:16px;">
-            🔐 Konfirmasi Password Admin
-        </div>
-        <div style="padding:24px;">
-            <p style="margin:0 0 16px;color:#555;font-size:14px;">
-                Masukkan <strong>password akun</strong> Anda untuk melihat password tes tulis peserta.
-            </p>
-            <input type="password" id="verify-pass-input"
-                placeholder="Password akun admin..."
-                style="width:100%;box-sizing:border-box;padding:11px 14px;
-                       border:2px solid #e0e0e0;border-radius:10px;font-size:14px;
-                       font-family:inherit;margin-bottom:10px;"
-                onkeydown="if(event.key==='Enter'){submitAdminVerify();}"
-                autocomplete="current-password">
-            <div id="verify-pass-error"
-                 style="display:none;color:#ef4444;font-size:13px;margin-bottom:10px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button onclick="closePassModal()"
-                    style="background:#f3f4f6;color:#555;border:none;border-radius:8px;
-                           padding:8px 18px;cursor:pointer;font-size:13px;font-family:inherit;">Batal</button>
-                <button onclick="submitAdminVerify()" id="verify-pass-btn"
-                    style="background:#1a73e8;color:#fff;border:none;border-radius:8px;
-                           padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;
-                           font-family:inherit;">🔓 Konfirmasi</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-@keyframes modalInVP {
-    from { opacity:0; transform:translateY(-14px) scale(.97); }
-    to   { opacity:1; transform:translateY(0) scale(1); }
-}
-</style>
 
 <script>
-var _currentRegId = null; // reg_id baris yang sedang dibuka
-
 function openPasswordModal(regId) {
     const code = document.getElementById('pass-display-' + regId);
     const btn  = document.getElementById('pass-btn-' + regId);
@@ -432,77 +358,14 @@ function openPasswordModal(regId) {
         return;
     }
 
-    _currentRegId = regId;
-    document.getElementById('verify-pass-input').value = '';
-    document.getElementById('verify-pass-error').style.display = 'none';
-    document.getElementById('modal-verify-pass').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => document.getElementById('verify-pass-input').focus(), 100);
-}
-
-function closePassModal() {
-    document.getElementById('modal-verify-pass').style.display = 'none';
-    document.body.style.overflow = '';
-    _currentRegId = null;
-}
-
-function submitAdminVerify() {
-    const pw  = document.getElementById('verify-pass-input').value;
-    const btn = document.getElementById('verify-pass-btn');
-    const err = document.getElementById('verify-pass-error');
-
-    if (!pw) {
-        err.textContent = 'Password tidak boleh kosong.';
-        err.style.display = 'block';
-        return;
+    const encInput = document.querySelector('.enc-pass-data[data-reg-id="' + regId + '"]');
+    if (encInput) {
+        const plain = atob(encInput.value);
+        code.textContent = plain;
+        code.style.letterSpacing = 'normal';
+        btn.textContent = '🙈';
+        btn.title = 'Sembunyikan password';
     }
-
-    btn.disabled = true;
-    btn.textContent = '⏳ Memverifikasi...';
-    err.style.display = 'none';
-
-    const fd = new FormData();
-    fd.append('csrf_token', <?= json_encode(csrfToken()) ?>);
-    fd.append('password', pw);
-
-    fetch(window.location.href, { method: 'POST', body: fd })
-        .then(r => r.text())
-        .then(text => {
-            let data;
-            try { data = JSON.parse(text); }
-            catch(e) {
-                err.textContent = 'Respons server tidak valid: ' + text.substring(0, 120);
-                err.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = '🔓 Konfirmasi';
-                return;
-            }
-            if (data.ok) {
-                const regId = _currentRegId;
-                const encInput = document.querySelector('.enc-pass-data[data-reg-id="' + regId + '"]');
-                const plain = atob(encInput.value);
-
-                const code = document.getElementById('pass-display-' + regId);
-                const toggleBtn = document.getElementById('pass-btn-' + regId);
-                code.textContent = plain;
-                code.style.letterSpacing = 'normal';
-                toggleBtn.textContent = '🙈';
-                toggleBtn.title = 'Sembunyikan password';
-                closePassModal();
-            } else {
-                err.textContent = data.message || 'Password salah.';
-                err.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = '🔓 Konfirmasi';
-                document.getElementById('verify-pass-input').select();
-            }
-        })
-        .catch(e => {
-            err.textContent = 'Koneksi gagal: ' + e.message;
-            err.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = '🔓 Konfirmasi';
-        });
 }
 
 // Buka modal edit credentials
@@ -518,12 +381,8 @@ function openEditModal(regId, nama, username, password) {
 document.getElementById('modal-edit-cred').addEventListener('click', function(e) {
     if (e.target === this) this.style.display = 'none';
 });
-document.getElementById('modal-verify-pass').addEventListener('click', function(e) {
-    if (e.target === this) closePassModal();
-});
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        closePassModal();
         document.getElementById('modal-edit-cred').style.display = 'none';
     }
 });
