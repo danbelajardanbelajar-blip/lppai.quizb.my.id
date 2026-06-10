@@ -194,7 +194,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="modal-content" style="max-width:600px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
             <h3 style="margin:0;">✏️ Edit Jadwal Pretes</h3>
-            <button type="button" onclick="closeEditModal()"
+            <button type="button" class="btn-close-modal"
                 style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
                 aria-label="Tutup">&times;</button>
         </div>
@@ -232,7 +232,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
-                <button type="button" class="btn btn-secondary" style="width:auto;" onclick="closeEditModal()">Batal</button>
+                <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto;">Batal</button>
                 <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan Perubahan</button>
             </div>
         </form>
@@ -277,6 +277,12 @@ if (!window._editJadwalBound) {
                 d.ruangan,
                 d.kuota
             );
+            return;
+        }
+
+        // Tombol Tutup (X) atau Batal
+        if (e.target.closest('.btn-close-modal')) {
+            closeEditModal();
             return;
         }
 
