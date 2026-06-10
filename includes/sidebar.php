@@ -60,6 +60,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/ruangan.php" class="page-nav <?= menuActive('ruangan.php') ?>">
                 <span class="icon">🏢</span> Kelola Ruangan
             </a>
+            <a href="<?= BASE_URL ?>/admin/tutor.php" class="page-nav <?= menuActive('tutor.php') ?>">
+                <span class="icon">👨‍🏫</span> Kelola Tutor
+            </a>
 
         <?php else: ?>
             <!-- MAHASISWA MENU -->

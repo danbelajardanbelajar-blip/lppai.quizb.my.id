@@ -73,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $classes   = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, nama_kelas")->fetchAll();
 $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
+$tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -99,7 +100,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Dosen Pengampu</label>
-                    <input type="text" name="dosen_pengampu" placeholder="Dr. Ahmad">
+                    <select name="dosen_pengampu">
+                        <option value="">-- Pilih Dosen --</option>
+                        <?php foreach ($tutorsList as $t): ?>
+                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Gelombang *</label>
@@ -247,7 +253,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Dosen Pengampu</label>
-                    <input type="text" name="dosen_pengampu" id="edit_dosen" placeholder="Dr. Ahmad">
+                    <select name="dosen_pengampu" id="edit_dosen">
+                        <option value="">-- Pilih Dosen --</option>
+                        <?php foreach ($tutorsList as $t): ?>
+                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Gelombang *</label>
