@@ -72,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 $classes   = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, nama_kelas")->fetchAll();
 $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
+$roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -128,7 +129,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Ruangan</label>
-                    <input type="text" name="ruangan" placeholder="Ruang 101">
+                    <select name="ruangan">
+                        <option value="">-- Pilih Ruangan --</option>
+                        <?php foreach ($roomsList as $rm): ?>
+                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Semester</label>
@@ -271,7 +277,12 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Ruangan</label>
-                    <input type="text" name="ruangan" id="edit_ruangan" placeholder="Ruang 101">
+                    <select name="ruangan" id="edit_ruangan">
+                        <option value="">-- Pilih Ruangan --</option>
+                        <?php foreach ($roomsList as $rm): ?>
+                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Semester</label>

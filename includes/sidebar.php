@@ -55,7 +55,10 @@ function menuActive($page) {
 
             <div class="menu-label">Users</div>
             <a href="<?= BASE_URL ?>/admin/users.php" class="page-nav <?= menuActive('users.php') ?>">
-                <span class="icon">👤</span> Kelola Pengguna
+                <span class="icon">👥</span> Kelola Pengguna
+            </a>
+            <a href="<?= BASE_URL ?>/admin/ruangan.php" class="page-nav <?= menuActive('ruangan.php') ?>">
+                <span class="icon">🏢</span> Kelola Ruangan
             </a>
 
         <?php else: ?>
