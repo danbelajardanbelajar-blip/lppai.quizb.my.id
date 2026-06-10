@@ -111,7 +111,16 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Hari</label>
-                    <input type="text" name="hari" placeholder="Senin">
+                    <select name="hari">
+                        <option value="">-- Pilih --</option>
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Ahad">Ahad</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Jam</label>
@@ -245,7 +254,16 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Hari</label>
-                    <input type="text" name="hari" id="edit_hari" placeholder="Senin">
+                    <select name="hari" id="edit_hari">
+                        <option value="">-- Pilih --</option>
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Ahad">Ahad</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Jam</label>
