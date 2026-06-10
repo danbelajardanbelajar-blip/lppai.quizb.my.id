@@ -144,9 +144,13 @@ include __DIR__ . '/../includes/header.php';
                     <select id="filterHari"
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
                         <option value="">-- Semua Hari --</option>
-                        <?php foreach ($hariList as $h): ?>
-                            <option value="<?= htmlspecialchars($h, ENT_QUOTES) ?>"><?= htmlspecialchars($h) ?></option>
-                        <?php endforeach; ?>
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Ahad">Ahad</option>
                     </select>
                 </div>
 
