@@ -80,9 +80,6 @@ $students = $pdo->query("
     SELECT id, nama_lengkap, nim, program_studi
     FROM users
     WHERE role = 'mahasiswa'
-      AND EXISTS (
-          SELECT 1 FROM tutorial_registrations tr WHERE tr.user_id = users.id
-      )
     ORDER BY nama_lengkap
 ")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari, nama_kelas")->fetchAll();
