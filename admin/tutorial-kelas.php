@@ -26,7 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $jam        = trim($_POST['jam'] ?? '');
             $ruangan    = trim($_POST['ruangan'] ?? '');
             $gelombang  = $_POST['gelombang'] ?? '';
-            $semester   = trim($_POST['semester'] ?? '');
+            $tahunAjaran = trim($_POST['tahun_ajaran'] ?? '');
+            $semesterTipe = trim($_POST['semester_tipe'] ?? '');
+            $semester   = (!empty($tahunAjaran) && !empty($semesterTipe)) ? $tahunAjaran . '-' . $semesterTipe : '';
             $kuota      = (int)($_POST['kuota'] ?? 0);
 
             if (empty($namaKelas) || empty($mataKuliah) || !in_array($gelombang, ['gel1','gel2','mandiri'])) {
@@ -48,7 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $jam        = trim($_POST['jam'] ?? '');
             $ruangan    = trim($_POST['ruangan'] ?? '');
             $gelombang  = $_POST['gelombang'] ?? '';
-            $semester   = trim($_POST['semester'] ?? '');
+            $tahunAjaran = trim($_POST['tahun_ajaran'] ?? '');
+            $semesterTipe = trim($_POST['semester_tipe'] ?? '');
+            $semester   = (!empty($tahunAjaran) && !empty($semesterTipe)) ? $tahunAjaran . '-' . $semesterTipe : '';
             $kuota      = (int)($_POST['kuota'] ?? 0);
 
             if ($id <= 0 || empty($namaKelas) || empty($mataKuliah) || !in_array($gelombang, ['gel1','gel2','mandiri'])) {
@@ -150,8 +154,21 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Tahun Ajaran</label>
+                    <select name="tahun_ajaran" required>
+                        <option value="">-- Pilih Tahun --</option>
+                        <?php for($y=2017; $y<=2050; $y++): ?>
+                        <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Semester</label>
-                    <input type="text" name="semester" placeholder="2025/2026-Ganjil">
+                    <select name="semester_tipe" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Kuota</label>
@@ -310,8 +327,21 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>Tahun Ajaran</label>
+                    <select name="tahun_ajaran" id="edit_tahun_ajaran" required>
+                        <option value="">-- Pilih Tahun --</option>
+                        <?php for($y=2017; $y<=2050; $y++): ?>
+                        <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Semester</label>
-                    <input type="text" name="semester" id="edit_semester" placeholder="2025/2026-Ganjil">
+                    <select name="semester_tipe" id="edit_semester_tipe" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Kuota</label>
@@ -337,7 +367,14 @@ function openKelasModal(d) {
     document.getElementById('edit_hari').value        = d.hari       || '';
     document.getElementById('edit_jam').value         = d.jam        || '';
     document.getElementById('edit_ruangan').value     = d.ruangan    || '';
-    document.getElementById('edit_semester').value    = d.semester   || '';
+    if (d.semester && d.semester.includes('-')) {
+        var parts = d.semester.split('-');
+        document.getElementById('edit_tahun_ajaran').value = parts[0] || '';
+        document.getElementById('edit_semester_tipe').value = parts[1] || '';
+    } else {
+        document.getElementById('edit_tahun_ajaran').value = '';
+        document.getElementById('edit_semester_tipe').value = '';
+    }
     document.getElementById('edit_kuota').value       = d.kuota      || 0;
     document.getElementById('editKelasModal').classList.add('show');
 }
