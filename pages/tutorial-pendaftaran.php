@@ -23,7 +23,7 @@ $gelombangs = [
 ];
 
 // Handle Form Submit
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['daftar_tutorial'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
     $token     = $_POST['csrf_token'] ?? '';
     $classId   = (int)($_POST['class_id'] ?? 0);
     $gelombang = $_POST['gelombang'] ?? '';
@@ -170,7 +170,7 @@ foreach ($gelombangs as $gelKey => $g):
                         </label>
                         <?php endforeach; ?>
                     </div>
-                    <button type="submit" name="daftar_tutorial" class="btn btn-primary">📝 Daftar di <?= $g['label'] ?></button>
+                    <button type="submit" name="daftar_tutorial" value="1" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600;">📝 Daftar di <?= $g['label'] ?></button>
                 </form>
             <?php endif; ?>
         <?php endif; ?>
