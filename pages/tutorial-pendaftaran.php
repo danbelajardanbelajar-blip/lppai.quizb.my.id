@@ -156,21 +156,15 @@ foreach ($gelombangs as $gelKey => $g):
                 <form method="POST">
                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                     <input type="hidden" name="gelombang" value="<?= $gelKey ?>">
-                    <label style="font-weight:600;margin-bottom:12px;display:block;">Pilih Kelas <span style="color:red">*</span></label>
+                    <label style="font-weight:600;margin-bottom:12px;display:block;">Pilih Jadwal <span style="color:red">*</span></label>
                     <div style="display:grid;gap:12px;margin-bottom:16px;">
                         <?php foreach ($kelasTersedia as $k): ?>
                         <label style="display:flex;align-items:flex-start;gap:14px;padding:16px;border:2px solid #e0e0e0;border-radius:12px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#e0e0e0'">
-                            <input type="radio" name="class_id" value="<?= $k['id'] ?>" required style="margin-top:3px;width:18px;height:18px;">
+                            <input type="radio" name="class_id" value="<?= $k['id'] ?>" required style="margin-top:2px;width:18px;height:18px;">
                             <div style="flex:1;">
-                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-                                    <strong style="font-size:16px;"><?= sanitize($k['nama_kelas']) ?></strong>
-                                    <span class="badge badge-primary"><?= sanitize($k['mata_kuliah']) ?></span>
-                                </div>
-                                <div style="display:flex;gap:20px;flex-wrap:wrap;color:var(--text-muted);font-size:13px;">
-                                    <span>👨‍🏫 <?= sanitize($k['dosen_pengampu'] ?: '-') ?></span>
-                                    <span>📅 <?= sanitize($k['hari'] ?: '-') ?>, <?= sanitize($k['jam'] ?: '-') ?></span>
-                                    <span>🏫 <?= sanitize($k['ruangan'] ?: '-') ?></span>
-                                    <span>👥 Kuota: <?= $k['kuota'] ?></span>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <strong style="font-size:16px;">📅 <?= sanitize($k['hari'] ?: '-') ?>, <?= sanitize($k['jam'] ?: '-') ?></strong>
+                                    <span style="color:var(--text-muted);font-size:13px;">(Kuota: <?= $k['kuota'] ?>)</span>
                                 </div>
                             </div>
                         </label>
