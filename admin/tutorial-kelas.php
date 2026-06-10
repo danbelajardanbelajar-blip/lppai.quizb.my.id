@@ -211,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="modal-content" style="max-width:760px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
             <h3 style="margin:0;">✏️ Edit Kelas Tutorial</h3>
-            <button type="button" onclick="closeKelasModal()"
+            <button type="button" class="btn-close-modal"
                 style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
                 aria-label="Tutup">&times;</button>
         </div>
@@ -266,8 +266,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-                <button type="button" class="btn btn-secondary" style="width:auto;"
-                    onclick="closeKelasModal()">Batal</button>
+                <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto;">Batal</button>
                 <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan Perubahan</button>
             </div>
         </form>
@@ -316,6 +315,13 @@ if (!window._editKelasBound) {
             });
             return;
         }
+
+        // Klik tombol Batal atau (X)
+        if (e.target.closest('.btn-close-modal')) {
+            closeKelasModal();
+            return;
+        }
+
         // Klik backdrop untuk tutup
         if (e.target && e.target.id === 'editKelasModal') closeKelasModal();
     });
