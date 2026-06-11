@@ -158,7 +158,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="assign">
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:24px;background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;">
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Nama Kelas *</label>
                     <input type="text" name="nama_kelas" placeholder="Kelas A" required
@@ -232,12 +232,15 @@ include __DIR__ . '/../includes/header.php';
                 </label>
 
                 <!-- Search + Pilih Semua -->
-                <div style="display:flex;gap:10px;margin-bottom:8px;align-items:center;flex-wrap:wrap;">
-                    <input type="text" id="searchMhs" placeholder="🔍 Cari nama atau NIM..."
-                        style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;">
-                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:600;color:var(--primary);white-space:nowrap;user-select:none;">
-                        <input type="checkbox" id="selectAll" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary);">
-                        Pilih Semua
+                <div style="display:flex;gap:16px;margin-bottom:12px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:12px 16px;border-radius:10px;border:1px solid #e5e7eb;">
+                    <div style="flex:1;min-width:250px;position:relative;">
+                        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;">🔍</span>
+                        <input type="text" id="searchMhs" placeholder="Cari nama atau NIM..."
+                            style="width:100%;padding:10px 12px 10px 36px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;transition:all 0.2s;">
+                    </div>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1e293b;white-space:nowrap;user-select:none;background:#fff;padding:8px 16px;border-radius:8px;border:1.5px solid #e5e7eb;transition:all 0.2s;" onmouseover="this.style.borderColor='#cbd5e1'" onmouseout="this.style.borderColor='#e5e7eb'">
+                        <input type="checkbox" id="selectAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
+                        Pilih Semua Mahasiswa
                     </label>
                 </div>
 
@@ -246,7 +249,11 @@ include __DIR__ . '/../includes/header.php';
                     style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:320px;overflow-y:auto;background:#fafafa;">
 
                     <?php if (empty($students)): ?>
-                        <div style="padding:24px;text-align:center;color:#9ca3af;">Belum ada data mahasiswa.</div>
+                        <div style="padding:40px 24px;text-align:center;color:#64748b;display:flex;flex-direction:column;align-items:center;gap:12px;">
+                            <div style="font-size:48px;color:#cbd5e1;">👥</div>
+                            <h3 style="margin:0;font-size:16px;font-weight:600;color:#334155;">Belum ada data mahasiswa</h3>
+                            <p style="margin:0;font-size:14px;">Tambahkan data mahasiswa terlebih dahulu di menu Kelola Pengguna.</p>
+                        </div>
                     <?php else: ?>
                         <?php foreach ($students as $s): ?>
                         <label class="student-row"
@@ -273,14 +280,14 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                <button type="submit" class="btn btn-primary" style="width:auto;">
-                    📋 Buat Kelas & Tambah Peserta
+            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb;">
+                <button type="submit" class="btn btn-primary" style="width:auto;display:flex;align-items:center;gap:8px;padding:10px 20px;">
+                    <span style="font-size:16px;">📋</span> Buat Kelas & Tambah Peserta
                 </button>
-                <button type="button" class="btn btn-secondary" style="width:auto;" onclick="clearSelection()">
-                    ✕ Batal Pilihan
+                <button type="button" class="btn btn-secondary" style="width:auto;display:flex;align-items:center;gap:8px;padding:10px 20px;background:#f1f5f9;color:#475569;border:none;" onclick="clearSelection()" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                    <span style="font-size:16px;">✕</span> Batal Pilihan
                 </button>
-                <span id="submitHint" style="font-size:12px;color:#6b7280;"></span>
+                <span id="submitHint" style="font-size:13px;font-weight:500;color:#64748b;margin-left:8px;"></span>
             </div>
         </form>
     </div>
@@ -289,12 +296,14 @@ include __DIR__ . '/../includes/header.php';
 <!-- ===================================================
      CARD: DAFTAR PESERTA
      =================================================== -->
-<div class="card">
-    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-        <span>📋 Daftar Peserta Tutorial (<span class="badge-count">0</span>)</span>
-        <div style="width: 250px;">
+<div class="card" style="margin-top: 30px;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+        <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">📋</span> Daftar Peserta Tutorial (<span class="badge-count" style="background:#e0e7ff; color:#4f46e5; padding:2px 8px; border-radius:12px; font-size:14px;">0</span>)
+        </span>
+        <div style="flex:1; max-width:300px;">
             <select id="filterKelasBottom"
-                style="width:100%;padding:6px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;font-weight:normal;color:#333;">
+                style="width:100%;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;font-weight:500;color:#334155;box-shadow:0 1px 2px rgba(0,0,0,0.05);cursor:pointer;">
                 <option value="">-- Pilih Kelas --</option>
                 <?php foreach ($classes as $c): ?>
                     <option value="<?= $c['id'] ?>">
