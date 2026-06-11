@@ -21,33 +21,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } else {
         $action = $_POST['action'];
 
-        /* ---- TAMBAH BANYAK PESERTA SEKALIGUS ---- */
+        /* ---- BUAT KELAS & TAMBAH PESERTA ---- */
         if ($action === 'assign') {
-            $classId  = (int)($_POST['class_id'] ?? 0);
+            $namaKelas  = trim($_POST['nama_kelas'] ?? '');
+            $mataKuliah = trim($_POST['mata_kuliah'] ?? '');
+            $dosen      = trim($_POST['dosen_pengampu'] ?? '');
+            $hari       = trim($_POST['hari'] ?? '');
+            $jam        = trim($_POST['jam'] ?? '');
+            $ruangan    = trim($_POST['ruangan'] ?? '');
+            $kuota      = (int)($_POST['kuota'] ?? 0);
             $userIds  = array_filter(array_map('intval', (array)($_POST['user_ids'] ?? [])));
 
-            if ($classId <= 0 || empty($userIds)) {
-                $message = 'Pilih kelas dan minimal satu mahasiswa.';
+            // Nilai Default
+            $gelombang = 'gel1';
+            $tahun = date('Y');
+            $semester = $tahun . '/' . ($tahun+1) . '-Ganjil';
+
+            if (empty($namaKelas) || empty($mataKuliah) || empty($userIds)) {
+                $message = 'Isi Nama Kelas, Mata Kuliah, dan pilih minimal satu mahasiswa.';
                 $msgType = 'danger';
             } else {
+                $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?,?)")
+                    ->execute([$namaKelas, $mataKuliah, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
+                
+                $classId = (int)$pdo->lastInsertId();
+
                 $added = 0;
-                $skipped = 0;
-                $stmtCheck  = $pdo->prepare("SELECT id FROM tutorial_registrations WHERE user_id = ? AND tutorial_class_id = ?");
                 $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status) VALUES (?, ?, 'terdaftar')");
 
                 foreach ($userIds as $uid) {
-                    $stmtCheck->execute([$uid, $classId]);
-                    if ($stmtCheck->fetch()) {
-                        $skipped++;
-                    } else {
-                        $stmtInsert->execute([$uid, $classId]);
-                        $added++;
-                    }
+                    // Cek apakah mahasiswa ini sudah ada di kelas lain? 
+                    // Karena membuat kelas baru, tidak mungkin sudah ada di kelas *ini*.
+                    // Kita insert saja
+                    $stmtInsert->execute([$uid, $classId]);
+                    $added++;
                 }
 
-                $message  = "$added mahasiswa berhasil ditambahkan ke kelas.";
-                if ($skipped > 0) $message .= " ($skipped sudah terdaftar, dilewati.)";
-                $msgType  = $added > 0 ? 'success' : 'warning';
+                $message  = "Kelas '$namaKelas' berhasil dibuat dan $added mahasiswa dimasukkan ke dalamnya.";
+                $msgType  = 'success';
             }
 
         /* ---- UPDATE STATUS ---- */
@@ -85,6 +96,8 @@ $students = $pdo->query("
 ")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari, nama_kelas")->fetchAll();
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
+$roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
+$tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
 
 // Kumpulkan hari unik dari kelas yang ada
 $hariList = [];
@@ -138,22 +151,39 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- ===================================================
      CARD: TAMBAH PESERTA
-     =================================================== -->
-<div class="card">
-    <div class="card-header">➕ Tambah Peserta ke Kelas</div>
+     =================================================== --><div class="card">
+    <div class="card-header">➕ Buat Kelas & Tambah Peserta</div>
     <div class="card-body">
         <form method="POST" id="assignForm" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="assign">
 
-            <!-- Baris 1: Filter Hari, Tutor + Pilih Kelas -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:16px;margin-bottom:20px;">
-                <!-- Filter Hari -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
                 <div class="form-group" style="margin-bottom:0;">
-                    <label>Filter Hari</label>
-                    <select id="filterHari"
+                    <label>Nama Kelas *</label>
+                    <input type="text" name="nama_kelas" placeholder="Kelas A" required
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Semua Hari --</option>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Mata Kuliah *</label>
+                    <input type="text" name="mata_kuliah" placeholder="Bahasa Arab Dasar" required
+                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Dosen Pengampu</label>
+                    <select name="dosen_pengampu"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="">-- Pilih Dosen --</option>
+                        <?php foreach ($tutorsList as $t): ?>
+                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Hari</label>
+                    <select name="hari"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="">-- Pilih Hari --</option>
                         <option value="Senin">Senin</option>
                         <option value="Selasa">Selasa</option>
                         <option value="Rabu">Rabu</option>
@@ -163,37 +193,34 @@ include __DIR__ . '/../includes/header.php';
                         <option value="Ahad">Ahad</option>
                     </select>
                 </div>
-
-                <!-- Filter Tutor -->
                 <div class="form-group" style="margin-bottom:0;">
-                    <label>Filter Tutor</label>
-                    <select id="filterTutor"
+                    <label>Jam</label>
+                    <select name="jam"
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Semua Tutor --</option>
-                        <?php foreach ($tutorList as $t): ?>
-                            <option value="<?= htmlspecialchars($t, ENT_QUOTES) ?>"><?= sanitize($t) ?></option>
+                        <option value="">-- Pilih Jam --</option>
+                        <option value="08:00-09:30">08:00 - 09:30</option>
+                        <option value="10:00-11:30">10:00 - 11:30</option>
+                        <option value="13:00-14:30">13:00 - 14:30</option>
+                        <option value="15:30-17:00">15:30 - 17:00</option>
+                        <option value="18:30-20:00">18:30 - 20:00</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Ruangan</label>
+                    <select name="ruangan"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="">-- Pilih Ruangan --</option>
+                        <?php foreach ($roomsList as $rm): ?>
+                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-
-                <!-- Pilih Kelas -->
                 <div class="form-group" style="margin-bottom:0;">
-                    <label>Kelas Tutorial <span style="color:#ef4444;">*</span></label>
-                    <select name="class_id" id="selectKelas" required
+                    <label>Kuota</label>
+                    <input type="number" name="kuota" min="0" placeholder="30"
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Pilih Kelas --</option>
-                        <?php foreach ($classes as $c): ?>
-                            <option value="<?= $c['id'] ?>"
-                                data-hari="<?= htmlspecialchars($c['hari'] ?? '', ENT_QUOTES) ?>"
-                                data-tutor="<?= htmlspecialchars($c['dosen_pengampu'] ?? '', ENT_QUOTES) ?>">
-                                [<?= $gelLabels[$c['gelombang']] ?>]
-                                <?= sanitize($c['nama_kelas']) ?> — <?= sanitize($c['mata_kuliah']) ?>
-                                <?php if (!empty($c['hari'])): ?>(<?= sanitize($c['hari']) ?>)<?php endif; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
                 </div>
-            </div>
+            </div></div>
 
             <!-- Baris 2: Daftar Mahasiswa dengan Checkbox -->
             <div class="form-group" style="margin-bottom:20px;">
@@ -248,7 +275,7 @@ include __DIR__ . '/../includes/header.php';
 
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <button type="submit" class="btn btn-primary" style="width:auto;">
-                    📋 Tambah Peserta Terpilih
+                    📋 Buat Kelas & Tambah Peserta
                 </button>
                 <button type="button" class="btn btn-secondary" style="width:auto;" onclick="clearSelection()">
                     ✕ Batal Pilihan
@@ -263,7 +290,20 @@ include __DIR__ . '/../includes/header.php';
      CARD: DAFTAR PESERTA
      =================================================== -->
 <div class="card">
-    <div class="card-header">📋 Daftar Peserta Tutorial (<span class="badge-count">0</span>)</div>
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>📋 Daftar Peserta Tutorial (<span class="badge-count">0</span>)</span>
+        <div style="width: 250px;">
+            <select id="filterKelasBottom"
+                style="width:100%;padding:6px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;font-weight:normal;color:#333;">
+                <option value="">-- Pilih Kelas --</option>
+                <?php foreach ($classes as $c): ?>
+                    <option value="<?= $c['id'] ?>">
+                        <?= sanitize($c['nama_kelas']) ?> - <?= sanitize($c['mata_kuliah']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    </div>
     <div class="card-body">
         <div class="empty-state" id="tableEmptyState" style="display: flex; flex-direction:column; align-items:center;">
             <div class="icon" style="font-size:3rem; margin-bottom:10px;">📋</div>
@@ -359,9 +399,7 @@ include __DIR__ . '/../includes/header.php';
     var selectAll    = document.getElementById('selectAll');
     var countBadge   = document.getElementById('selectedCount');
     var submitHint   = document.getElementById('submitHint');
-    var filterHari   = document.getElementById('filterHari');
-    var filterTutor  = document.getElementById('filterTutor');
-    var selectKelas  = document.getElementById('selectKelas');
+    var filterKelasBottom = document.getElementById('filterKelasBottom');
 
     /* ---- Helper: semua baris yang saat ini terlihat ---- */
     function visibleRows() {
@@ -374,7 +412,7 @@ include __DIR__ . '/../includes/header.php';
         var checked = document.querySelectorAll('.student-cb:checked').length;
         countBadge.textContent = '(' + checked + ' dipilih)';
         submitHint.textContent = checked > 0
-            ? checked + ' mahasiswa akan ditambahkan ke kelas yang dipilih.'
+            ? checked + ' mahasiswa akan dimasukkan ke kelas yang akan dibuat.'
             : '';
 
         // Sinkronisasi checkbox "pilih semua"
@@ -426,7 +464,7 @@ include __DIR__ . '/../includes/header.php';
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                 if (settings.nTable.id !== 'participantTable') return true;
                 
-                var selectedClassId = selectKelas.value;
+                var selectedClassId = filterKelasBottom.value;
                 if (!selectedClassId) return false;
                 
                 var tr = settings.aoData[dataIndex].nTr;
@@ -434,12 +472,12 @@ include __DIR__ . '/../includes/header.php';
                 return rowClassId === selectedClassId;
             });
             
-            selectKelas.addEventListener('change', function() {
+            filterKelasBottom.addEventListener('change', function() {
                 if ($.fn.DataTable.isDataTable(tableEl)) {
                     tableEl.DataTable().draw();
                 }
                 
-                var selectedClassId = selectKelas.value;
+                var selectedClassId = filterKelasBottom.value;
                 var countBadge = document.querySelector('.card-header span.badge-count');
                 var emptyState = document.getElementById('tableEmptyState');
                 var tableDiv = document.getElementById('tableResponsiveContainer');
@@ -448,7 +486,7 @@ include __DIR__ . '/../includes/header.php';
                     if (emptyState) {
                         emptyState.style.display = 'flex';
                         emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
-                        emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial di atas.';
+                        emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial.';
                     }
                     if (tableDiv) tableDiv.style.display = 'none';
                     if (countBadge) countBadge.textContent = '0';
@@ -475,45 +513,14 @@ include __DIR__ . '/../includes/header.php';
             });
             
             setTimeout(function() {
-                selectKelas.dispatchEvent(new Event('change'));
+                filterKelasBottom.dispatchEvent(new Event('change'));
             }, 100);
         }
     }, 500);
 
-    /* ---- Filter Hari & Tutor → saring opsi kelas ---- */
-    function applyFilters() {
-        var hari = filterHari.value;
-        var tutor = filterTutor.value;
-        var opts = selectKelas.querySelectorAll('option');
-        var currentVal = selectKelas.value;
-        var found = false;
-
-        opts.forEach(function(opt) {
-            if (!opt.value) return; // placeholder
-            var show = true;
-            if (hari && opt.dataset.hari !== hari) show = false;
-            if (tutor && opt.dataset.tutor !== tutor) show = false;
-            
-            opt.style.display = show ? '' : 'none';
-            if (opt.value === currentVal && show) found = true;
-        });
-
-        // Reset pilihan kelas jika yang dipilih tidak ada di filter
-        if (!found) selectKelas.value = '';
-    }
-
-    filterHari.addEventListener('change', applyFilters);
-    filterTutor.addEventListener('change', applyFilters);
-
     /* ---- Validasi sebelum submit ---- */
     document.getElementById('assignForm').addEventListener('submit', function(e) {
-        var classId  = selectKelas.value;
         var anyCheck = document.querySelector('.student-cb:checked');
-        if (!classId) {
-            e.preventDefault();
-            alert('Pilih kelas terlebih dahulu.');
-            return;
-        }
         if (!anyCheck) {
             e.preventDefault();
             alert('Pilih minimal satu mahasiswa.');
