@@ -146,6 +146,13 @@ include __DIR__ . '/../includes/header.php';
                 <div class="ann-title"><?= sanitize($ann['judul']) ?></div>
                 <div class="ann-date">🕐 <?= date('d M Y, H:i', strtotime($ann['created_at'])) ?></div>
                 <div class="ann-content"><?= nl2br(sanitize($ann['konten'])) ?></div>
+                <?php if (!empty($ann['link_tujuan'])): ?>
+                <div style="margin-top: 15px;">
+                    <a href="<?= BASE_URL . sanitize($ann['link_tujuan']) ?>" class="btn btn-primary" style="display:inline-block; padding:8px 16px; font-size:14px; width:auto; text-decoration:none; background:var(--primary); color:#fff; border-radius:6px; font-weight:600;">
+                        Buka Halaman ➔
+                    </a>
+                </div>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
         <?php endif; ?>
