@@ -34,6 +34,7 @@ try {
         'pretes_results'         => 'id',
         'tutorial_classes'       => 'id',
         'tutorial_registrations' => 'id',
+        'master_gelombang'       => 'id',
     ];
 
     $table = trim($_POST['table'] ?? '');

@@ -46,6 +46,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Data Gelombang berhasil ditambahkan!';
                 $msgType = 'success';
             }
+        } elseif ($action === 'edit_gelombang') {
+            $id = (int)($_POST['id'] ?? 0);
+            $semester = $_POST['semester_tipe'] ?? '';
+            $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
+            $gelombang = $_POST['gelombang'] ?? '';
+
+            if ($id <= 0 || empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
+                $message = 'Data tidak valid.';
+                $msgType = 'danger';
+            } else {
+                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=? WHERE id=?")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $id]);
+                $message = 'Gelombang berhasil diperbarui!';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -130,6 +145,15 @@ include __DIR__ . '/../includes/header.php';
                         <td><span class="badge badge-primary"><?= $gelLabels[$g['gelombang']] ?? $g['gelombang'] ?></span></td>
                         <td><?= date('d M Y H:i', strtotime($g['created_at'])) ?></td>
                         <td style="white-space:nowrap;">
+                            <!-- Tombol Edit -->
+                            <button type="button" class="btn btn-sm btn-warning btn-edit-gelombang"
+                                data-id="<?= $g['id'] ?>"
+                                data-semester="<?= htmlspecialchars($g['semester'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-tahun_ajaran="<?= htmlspecialchars($g['tahun_ajaran'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-gelombang="<?= htmlspecialchars($g['gelombang'], ENT_QUOTES, 'UTF-8') ?>"
+                                style="margin-right:4px;">
+                                ✏️ Edit
+                            </button>
                             <!-- Tombol Hapus -->
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -151,3 +175,99 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+
+<!-- ── Modal Edit Gelombang ──────────────────────────────────────── -->
+<div class="modal-backdrop" id="editGelombangModal">
+    <div class="modal-content" style="max-width:500px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <h3 style="margin:0;">✏️ Edit Gelombang Pendaftaran</h3>
+            <button type="button" class="btn-close-modal"
+                style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
+                aria-label="Tutup">&times;</button>
+        </div>
+
+        <form method="POST" id="editGelombangForm" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_gelombang">
+            <input type="hidden" name="id" id="edit_id">
+
+            <div class="form-group">
+                <label>Semester *</label>
+                <select name="semester_tipe" id="edit_semester_tipe" required>
+                    <option value="">-- Pilih --</option>
+                    <option value="Ganjil">Ganjil</option>
+                    <option value="Genap">Genap</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tahun Ajaran *</label>
+                <select name="tahun_ajaran" id="edit_tahun_ajaran" required>
+                    <option value="">-- Pilih Tahun --</option>
+                    <?php for($y=2017; $y<=2049; $y++): ?>
+                    <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Gelombang *</label>
+                <select name="gelombang" id="edit_gelombang" required>
+                    <option value="">-- Pilih --</option>
+                    <option value="gel1">Gelombang 1 (Ganjil)</option>
+                    <option value="gel2">Gelombang 2 (Genap)</option>
+                    <option value="mandiri">Mandiri</option>
+                </select>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+                <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openGelombangModal(d) {
+    document.getElementById('edit_id').value = d.id;
+    document.getElementById('edit_semester_tipe').value = d.semester || '';
+    document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
+    document.getElementById('edit_gelombang').value = d.gelombang || '';
+    document.getElementById('editGelombangModal').classList.add('show');
+}
+
+function closeGelombangModal() {
+    var m = document.getElementById('editGelombangModal');
+    if (m) m.classList.remove('show');
+}
+
+if (!window._editGelombangBound) {
+    window._editGelombangBound = true;
+
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.btn-edit-gelombang');
+        if (btn) {
+            var d = btn.dataset;
+            openGelombangModal({
+                id: d.id,
+                semester: d.semester,
+                tahun_ajaran: d.tahun_ajaran,
+                gelombang: d.gelombang
+            });
+            return;
+        }
+
+        if (e.target.closest('.btn-close-modal')) {
+            closeGelombangModal();
+            return;
+        }
+
+        if (e.target && e.target.id === 'editGelombangModal') {
+            closeGelombangModal();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeGelombangModal();
+    });
+}
+</script>
