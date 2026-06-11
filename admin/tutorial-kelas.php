@@ -16,6 +16,7 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS master_gelombang (
 )");
 try {
     $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN kuota_senin INT DEFAULT 0, ADD COLUMN kuota_selasa INT DEFAULT 0, ADD COLUMN kuota_rabu INT DEFAULT 0, ADD COLUMN kuota_kamis INT DEFAULT 0, ADD COLUMN kuota_jumat INT DEFAULT 0");
+    $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN tutors_senin VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_selasa VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_rabu VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_kamis VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_jumat VARCHAR(1000) DEFAULT NULL");
 } catch (Exception $e) {}
 
 $message = '';
@@ -43,13 +44,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
+            $tsenin = implode(',', array_filter($_POST['tutors_senin'] ?? []));
+            $tselasa = implode(',', array_filter($_POST['tutors_selasa'] ?? []));
+            $trabu = implode(',', array_filter($_POST['tutors_rabu'] ?? []));
+            $tkamis = implode(',', array_filter($_POST['tutors_kamis'] ?? []));
+            $tjumat = implode(',', array_filter($_POST['tutors_jumat'] ?? []));
 
             if (empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Semua field gelombang harus diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat]);
+                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat, tutors_senin, tutors_selasa, tutors_rabu, tutors_kamis, tutors_jumat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat]);
                 $message = 'Data Gelombang berhasil ditambahkan!';
                 $msgType = 'success';
             }
@@ -63,13 +69,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
+            $tsenin = implode(',', array_filter($_POST['tutors_senin'] ?? []));
+            $tselasa = implode(',', array_filter($_POST['tutors_selasa'] ?? []));
+            $trabu = implode(',', array_filter($_POST['tutors_rabu'] ?? []));
+            $tkamis = implode(',', array_filter($_POST['tutors_kamis'] ?? []));
+            $tjumat = implode(',', array_filter($_POST['tutors_jumat'] ?? []));
 
             if ($id <= 0 || empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Data tidak valid.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=?, kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=? WHERE id=?")
-                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $id]);
+                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=?, kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat, $id]);
                 $message = 'Gelombang berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -81,6 +92,29 @@ $gelombangData = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at
 $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
 
 include __DIR__ . '/../includes/header.php';
+
+$tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
+function renderTutorSelect($day, $tutorsList, $isEdit = false) {
+    $idPrefix = $isEdit ? 'edit_' : '';
+    ?>
+    <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; gap:8px;">
+        <label style="font-weight:bold; font-size:14px; text-transform:capitalize;"><?= $day ?></label>
+        <div id="<?= $idPrefix ?>tutors_<?= $day ?>_container" class="tutor-container" data-day="<?= $day ?>" data-edit="<?= $isEdit ? '1' : '0' ?>">
+            <div class="tutor-row" style="display:flex; gap:4px; margin-bottom:4px;">
+                <select name="tutors_<?= $day ?>[]" class="tutor-select" style="flex:1; padding:6px; border:1.5px solid #e5e7eb; border-radius:6px; font-size:13px;" onchange="calculateQuota('<?= $day ?>', <?= $isEdit ? 'true' : 'false' ?>)">
+                    <option value="">- Tutor -</option>
+                    <?php foreach($tutorsList as $t): ?>
+                    <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-sm btn-success add-tutor-btn" onclick="addTutorRow('<?= $day ?>', <?= $isEdit ? 'true' : 'false' ?>)" style="padding:0 8px;">+</button>
+            </div>
+        </div>
+        <div style="font-size:12px; color:#64748b; margin-top:-4px;">Kuota:</div>
+        <input type="number" name="kuota_<?= $day ?>" id="<?= $idPrefix ?>kuota_<?= $day ?>" class="kuota-input" data-day="<?= $day ?>" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:14px;background:#f8fafc;" readonly tabindex="-1">
+    </div>
+    <?php
+}
 ?>
 
 <?php if ($message): ?>
@@ -123,27 +157,14 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
             
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota Senin</label>
-                    <input type="number" name="kuota_senin" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota Selasa</label>
-                    <input type="number" name="kuota_selasa" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota Rabu</label>
-                    <input type="number" name="kuota_rabu" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota Kamis</label>
-                    <input type="number" name="kuota_kamis" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota Jumat</label>
-                    <input type="number" name="kuota_jumat" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
-                </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                <?php
+                renderTutorSelect('senin', $tutorsList);
+                renderTutorSelect('selasa', $tutorsList);
+                renderTutorSelect('rabu', $tutorsList);
+                renderTutorSelect('kamis', $tutorsList);
+                renderTutorSelect('jumat', $tutorsList);
+                ?>
             </div>
             <button type="submit" class="btn btn-primary" style="width:auto;margin-top:10px;">➕ Tambah Gelombang</button>
         </form>
@@ -201,6 +222,11 @@ include __DIR__ . '/../includes/header.php';
                                 data-kuota_rabu="<?= $g['kuota_rabu'] ?? 0 ?>"
                                 data-kuota_kamis="<?= $g['kuota_kamis'] ?? 0 ?>"
                                 data-kuota_jumat="<?= $g['kuota_jumat'] ?? 0 ?>"
+                                data-tutors_senin="<?= htmlspecialchars($g['tutors_senin'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_selasa="<?= htmlspecialchars($g['tutors_selasa'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_rabu="<?= htmlspecialchars($g['tutors_rabu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_kamis="<?= htmlspecialchars($g['tutors_kamis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_jumat="<?= htmlspecialchars($g['tutors_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
                             </button>
@@ -268,27 +294,14 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:12px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:12px;">Sn</label>
-                    <input type="number" name="kuota_senin" id="edit_kuota_senin" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:12px;">Sl</label>
-                    <input type="number" name="kuota_selasa" id="edit_kuota_selasa" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:12px;">Rb</label>
-                    <input type="number" name="kuota_rabu" id="edit_kuota_rabu" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:12px;">Km</label>
-                    <input type="number" name="kuota_kamis" id="edit_kuota_kamis" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:12px;">Jm</label>
-                    <input type="number" name="kuota_jumat" id="edit_kuota_jumat" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
-                </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                <?php
+                renderTutorSelect('senin', $tutorsList, true);
+                renderTutorSelect('selasa', $tutorsList, true);
+                renderTutorSelect('rabu', $tutorsList, true);
+                renderTutorSelect('kamis', $tutorsList, true);
+                renderTutorSelect('jumat', $tutorsList, true);
+                ?>
             </div>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
@@ -300,16 +313,89 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+function calculateQuota(day, isEdit) {
+    const prefix = isEdit ? 'edit_' : '';
+    const container = document.getElementById(prefix + 'tutors_' + day + '_container');
+    const selects = container.querySelectorAll('select');
+    let validTutors = 0;
+    selects.forEach(sel => {
+        if (sel.value.trim() !== '') validTutors++;
+    });
+    const kuotaInput = document.getElementById(prefix + 'kuota_' + day);
+    if (kuotaInput) kuotaInput.value = validTutors * 30;
+}
+
+function addTutorRow(day, isEdit) {
+    const prefix = isEdit ? 'edit_' : '';
+    const container = document.getElementById(prefix + 'tutors_' + day + '_container');
+    const rows = container.querySelectorAll('.tutor-row');
+    if (rows.length === 0) return;
+    const firstRow = rows[0];
+    const newRow = firstRow.cloneNode(true);
+    const select = newRow.querySelector('select');
+    select.value = ''; // Reset value
+    const btn = newRow.querySelector('button');
+    btn.textContent = 'x';
+    btn.classList.replace('btn-success', 'btn-danger');
+    btn.onclick = function() {
+        newRow.remove();
+        calculateQuota(day, isEdit);
+    };
+    container.appendChild(newRow);
+}
+
+function populateTutors(day, tutorsString) {
+    const isEdit = true;
+    const prefix = 'edit_';
+    const container = document.getElementById(prefix + 'tutors_' + day + '_container');
+    const rows = container.querySelectorAll('.tutor-row');
+    // Keep only the first row
+    for(let i = 1; i < rows.length; i++) {
+        rows[i].remove();
+    }
+    
+    const firstSelect = container.querySelector('select');
+    firstSelect.value = '';
+    
+    if (!tutorsString) {
+        calculateQuota(day, isEdit);
+        return;
+    }
+    
+    const tutors = tutorsString.split(',');
+    if (tutors.length > 0) {
+        firstSelect.value = tutors[0];
+    }
+    
+    for(let i = 1; i < tutors.length; i++) {
+        const newRow = rows[0].cloneNode(true);
+        const select = newRow.querySelector('select');
+        select.value = tutors[i];
+        const btn = newRow.querySelector('button');
+        btn.textContent = 'x';
+        btn.classList.replace('btn-success', 'btn-danger');
+        btn.onclick = function() {
+            newRow.remove();
+            calculateQuota(day, isEdit);
+        };
+        container.appendChild(newRow);
+    }
+    calculateQuota(day, isEdit);
+}
+
 function openGelombangModal(d) {
     document.getElementById('edit_id').value = d.id;
     document.getElementById('edit_semester_tipe').value = d.semester || '';
     document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
     document.getElementById('edit_gelombang').value = d.gelombang || '';
-    document.getElementById('edit_kuota_senin').value = d.kuota_senin || 0;
-    document.getElementById('edit_kuota_selasa').value = d.kuota_selasa || 0;
-    document.getElementById('edit_kuota_rabu').value = d.kuota_rabu || 0;
-    document.getElementById('edit_kuota_kamis').value = d.kuota_kamis || 0;
-    document.getElementById('edit_kuota_jumat').value = d.kuota_jumat || 0;
+    
+    // We update the kuota inputs dynamically based on the tutors list
+    populateTutors('senin', d.tutors_senin);
+    populateTutors('selasa', d.tutors_selasa);
+    populateTutors('rabu', d.tutors_rabu);
+    populateTutors('kamis', d.tutors_kamis);
+    populateTutors('jumat', d.tutors_jumat);
+
     document.getElementById('editGelombangModal').classList.add('show');
 }
 
@@ -330,11 +416,11 @@ if (!window._editGelombangBound) {
                 semester: d.semester,
                 tahun_ajaran: d.tahun_ajaran,
                 gelombang: d.gelombang,
-                kuota_senin: d.kuota_senin,
-                kuota_selasa: d.kuota_selasa,
-                kuota_rabu: d.kuota_rabu,
-                kuota_kamis: d.kuota_kamis,
-                kuota_jumat: d.kuota_jumat
+                tutors_senin: d.tutors_senin,
+                tutors_selasa: d.tutors_selasa,
+                tutors_rabu: d.tutors_rabu,
+                tutors_kamis: d.tutors_kamis,
+                tutors_jumat: d.tutors_jumat
             });
             return;
         }
