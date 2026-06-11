@@ -7,6 +7,12 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+
+// Auto add link_tujuan column if not exists
+try {
+    $pdo->exec("ALTER TABLE announcements ADD COLUMN link_tujuan VARCHAR(255) DEFAULT NULL AFTER konten");
+} catch (Exception $e) {}
+
 $user = getCurrentUser();
 $message = '';
 $msgType = '';
@@ -23,6 +29,14 @@ $tipeOptions = [
     'umum'                   => 'Pengumuman Umum',
 ];
 
+$linkOptions = [
+    '' => '-- Tidak Ada Link --',
+    '/pages/pretes-daftar.php' => 'Pendaftaran Pretes',
+    '/pages/tutorial-pendaftaran.php' => 'Pendaftaran Tutorial',
+    '/pages/tutorial-pembagian.php' => 'Cek Pembagian Kelas',
+    '/pages/tutorial-kelulusan.php' => 'Cek Kelulusan',
+];
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $token = $_POST['csrf_token'] ?? '';
     if (!verifyCsrf($token)) {
@@ -35,13 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $judul  = trim($_POST['judul'] ?? '');
             $konten = trim($_POST['konten'] ?? '');
             $tipe   = $_POST['tipe'] ?? '';
+            $link   = $_POST['link_tujuan'] ?? '';
+            if ($link === '') $link = null;
 
             if (empty($judul) || empty($konten) || !isset($tipeOptions[$tipe])) {
                 $message = 'Semua field harus diisi dengan benar.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO announcements (judul, konten, tipe, created_by) VALUES (?, ?, ?, ?)")
-                    ->execute([$judul, $konten, $tipe, $user['id']]);
+                $pdo->prepare("INSERT INTO announcements (judul, konten, tipe, link_tujuan, created_by) VALUES (?, ?, ?, ?, ?)")
+                    ->execute([$judul, $konten, $tipe, $link, $user['id']]);
                 $message = 'Pengumuman berhasil ditambahkan!';
                 $msgType = 'success';
             }
@@ -51,13 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $judul  = trim($_POST['judul'] ?? '');
             $konten = trim($_POST['konten'] ?? '');
             $tipe   = $_POST['tipe'] ?? '';
+            $link   = $_POST['link_tujuan'] ?? '';
+            if ($link === '') $link = null;
 
             if ($id <= 0 || empty($judul) || empty($konten) || !isset($tipeOptions[$tipe])) {
                 $message = 'Data tidak valid. Semua field harus diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE announcements SET judul = ?, konten = ?, tipe = ? WHERE id = ?")
-                    ->execute([$judul, $konten, $tipe, $id]);
+                $pdo->prepare("UPDATE announcements SET judul = ?, konten = ?, tipe = ?, link_tujuan = ? WHERE id = ?")
+                    ->execute([$judul, $konten, $tipe, $link, $id]);
                 $message = 'Pengumuman berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -113,6 +131,15 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="judul" placeholder="Judul pengumuman" required>
             </div>
             <div class="form-group">
+                <label>Link Aksi Mahasiswa (Opsional)</label>
+                <select name="link_tujuan">
+                    <?php foreach ($linkOptions as $val => $label): ?>
+                        <option value="<?= $val ?>"><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <small style="color:#6b7280;">Tambahkan tombol link pendaftaran di pengumuman untuk mahasiswa.</small>
+            </div>
+            <div class="form-group">
                 <label>Konten</label>
                 <textarea name="konten" rows="5" placeholder="Isi pengumuman..." required></textarea>
             </div>
@@ -165,6 +192,7 @@ include __DIR__ . '/../includes/header.php';
                                 data-judul="<?= htmlspecialchars($a['judul'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-konten="<?= htmlspecialchars($a['konten'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-tipe="<?= htmlspecialchars($a['tipe'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-link_tujuan="<?= htmlspecialchars($a['link_tujuan'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
                             </button>
@@ -225,6 +253,14 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="judul" id="edit_ann_judul" placeholder="Judul pengumuman" required>
             </div>
             <div class="form-group">
+                <label>Link Aksi Mahasiswa (Opsional)</label>
+                <select name="link_tujuan" id="edit_ann_link">
+                    <?php foreach ($linkOptions as $val => $label): ?>
+                        <option value="<?= $val ?>"><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>Konten</label>
                 <textarea name="konten" id="edit_ann_konten" rows="6"
                     placeholder="Isi pengumuman..." required></textarea>
@@ -240,11 +276,12 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-function openAnnModal(id, judul, konten, tipe) {
+function openAnnModal(id, judul, konten, tipe, link) {
     document.getElementById('edit_ann_id').value    = id;
     document.getElementById('edit_ann_judul').value = judul;
     document.getElementById('edit_ann_konten').value= konten;
     document.getElementById('edit_ann_tipe').value  = tipe;
+    document.getElementById('edit_ann_link').value  = link || '';
     document.getElementById('editAnnModal').classList.add('show');
 }
 
@@ -260,7 +297,7 @@ if (!window._editAnnBound) {
         var btn = e.target.closest('.btn-edit-ann');
         if (btn) {
             var d = btn.dataset;
-            openAnnModal(d.id, d.judul, d.konten, d.tipe);
+            openAnnModal(d.id, d.judul, d.konten, d.tipe, d.link_tujuan);
             return;
         }
         if (e.target && e.target.id === 'editAnnModal') closeAnnModal();
