@@ -7,7 +7,6 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
-// Ensure master table exists
 $pdo->exec("CREATE TABLE IF NOT EXISTS master_gelombang (
     id INT AUTO_INCREMENT PRIMARY KEY,
     semester VARCHAR(50) NOT NULL,
@@ -15,6 +14,9 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS master_gelombang (
     gelombang ENUM('gel1','gel2','mandiri') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )");
+try {
+    $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN kuota_senin INT DEFAULT 0, ADD COLUMN kuota_selasa INT DEFAULT 0, ADD COLUMN kuota_rabu INT DEFAULT 0, ADD COLUMN kuota_kamis INT DEFAULT 0, ADD COLUMN kuota_jumat INT DEFAULT 0");
+} catch (Exception $e) {}
 
 $message = '';
 $msgType = '';
@@ -36,13 +38,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $semester = $_POST['semester_tipe'] ?? '';
             $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
             $gelombang = $_POST['gelombang'] ?? '';
+            $ksenin = (int)($_POST['kuota_senin'] ?? 0);
+            $kselasa = (int)($_POST['kuota_selasa'] ?? 0);
+            $krabu = (int)($_POST['kuota_rabu'] ?? 0);
+            $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
+            $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
 
             if (empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Semua field gelombang harus diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang) VALUES (?, ?, ?)")
-                    ->execute([$semester, $tahun_ajaran, $gelombang]);
+                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat]);
                 $message = 'Data Gelombang berhasil ditambahkan!';
                 $msgType = 'success';
             }
@@ -51,13 +58,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $semester = $_POST['semester_tipe'] ?? '';
             $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
             $gelombang = $_POST['gelombang'] ?? '';
+            $ksenin = (int)($_POST['kuota_senin'] ?? 0);
+            $kselasa = (int)($_POST['kuota_selasa'] ?? 0);
+            $krabu = (int)($_POST['kuota_rabu'] ?? 0);
+            $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
+            $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
 
             if ($id <= 0 || empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Data tidak valid.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=? WHERE id=?")
-                    ->execute([$semester, $tahun_ajaran, $gelombang, $id]);
+                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=?, kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=? WHERE id=?")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $id]);
                 $message = 'Gelombang berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -110,6 +122,29 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
             </div>
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Kuota Senin</label>
+                    <input type="number" name="kuota_senin" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Kuota Selasa</label>
+                    <input type="number" name="kuota_selasa" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Kuota Rabu</label>
+                    <input type="number" name="kuota_rabu" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Kuota Kamis</label>
+                    <input type="number" name="kuota_kamis" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Kuota Jumat</label>
+                    <input type="number" name="kuota_jumat" min="0" value="0" style="width:100%;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;background:#fff;">
+                </div>
+            </div>
             <button type="submit" class="btn btn-primary" style="width:auto;margin-top:10px;">➕ Tambah Gelombang</button>
         </form>
     </div>
@@ -133,6 +168,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Tahun Ajaran</th>
                         <th>Semester</th>
                         <th>Gelombang</th>
+                        <th>Kuota (Sn-Jm)</th>
                         <th>Ditambahkan Pada</th>
                         <th>Aksi</th>
                     </tr>
@@ -143,6 +179,15 @@ include __DIR__ . '/../includes/header.php';
                         <td><strong><?= sanitize($g['tahun_ajaran']) ?></strong></td>
                         <td><?= sanitize($g['semester']) ?></td>
                         <td><span class="badge badge-primary"><?= $gelLabels[$g['gelombang']] ?? $g['gelombang'] ?></span></td>
+                        <td>
+                            <div style="font-size:12px; color:#475569; display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+                                <span>Sn: <b><?= $g['kuota_senin'] ?? 0 ?></b></span>
+                                <span>Sl: <b><?= $g['kuota_selasa'] ?? 0 ?></b></span>
+                                <span>Rb: <b><?= $g['kuota_rabu'] ?? 0 ?></b></span>
+                                <span>Km: <b><?= $g['kuota_kamis'] ?? 0 ?></b></span>
+                                <span>Jm: <b><?= $g['kuota_jumat'] ?? 0 ?></b></span>
+                            </div>
+                        </td>
                         <td><?= date('d M Y H:i', strtotime($g['created_at'])) ?></td>
                         <td style="white-space:nowrap;">
                             <!-- Tombol Edit -->
@@ -151,6 +196,11 @@ include __DIR__ . '/../includes/header.php';
                                 data-semester="<?= htmlspecialchars($g['semester'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-tahun_ajaran="<?= htmlspecialchars($g['tahun_ajaran'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-gelombang="<?= htmlspecialchars($g['gelombang'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-kuota_senin="<?= $g['kuota_senin'] ?? 0 ?>"
+                                data-kuota_selasa="<?= $g['kuota_selasa'] ?? 0 ?>"
+                                data-kuota_rabu="<?= $g['kuota_rabu'] ?? 0 ?>"
+                                data-kuota_kamis="<?= $g['kuota_kamis'] ?? 0 ?>"
+                                data-kuota_jumat="<?= $g['kuota_jumat'] ?? 0 ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
                             </button>
@@ -218,6 +268,29 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
 
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:12px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:12px;">Sn</label>
+                    <input type="number" name="kuota_senin" id="edit_kuota_senin" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:12px;">Sl</label>
+                    <input type="number" name="kuota_selasa" id="edit_kuota_selasa" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:12px;">Rb</label>
+                    <input type="number" name="kuota_rabu" id="edit_kuota_rabu" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:12px;">Km</label>
+                    <input type="number" name="kuota_kamis" id="edit_kuota_kamis" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:12px;">Jm</label>
+                    <input type="number" name="kuota_jumat" id="edit_kuota_jumat" min="0" value="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:13px;">
+                </div>
+            </div>
+
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
                 <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto;">Batal</button>
                 <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan</button>
@@ -232,6 +305,11 @@ function openGelombangModal(d) {
     document.getElementById('edit_semester_tipe').value = d.semester || '';
     document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
     document.getElementById('edit_gelombang').value = d.gelombang || '';
+    document.getElementById('edit_kuota_senin').value = d.kuota_senin || 0;
+    document.getElementById('edit_kuota_selasa').value = d.kuota_selasa || 0;
+    document.getElementById('edit_kuota_rabu').value = d.kuota_rabu || 0;
+    document.getElementById('edit_kuota_kamis').value = d.kuota_kamis || 0;
+    document.getElementById('edit_kuota_jumat').value = d.kuota_jumat || 0;
     document.getElementById('editGelombangModal').classList.add('show');
 }
 
@@ -251,7 +329,12 @@ if (!window._editGelombangBound) {
                 id: d.id,
                 semester: d.semester,
                 tahun_ajaran: d.tahun_ajaran,
-                gelombang: d.gelombang
+                gelombang: d.gelombang,
+                kuota_senin: d.kuota_senin,
+                kuota_selasa: d.kuota_selasa,
+                kuota_rabu: d.kuota_rabu,
+                kuota_kamis: d.kuota_kamis,
+                kuota_jumat: d.kuota_jumat
             });
             return;
         }
