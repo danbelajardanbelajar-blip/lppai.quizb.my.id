@@ -263,17 +263,16 @@ include __DIR__ . '/../includes/header.php';
      CARD: DAFTAR PESERTA
      =================================================== -->
 <div class="card">
-    <div class="card-header">📋 Daftar Peserta Tutorial (<?= count($registrations) ?>)</div>
+    <div class="card-header">📋 Daftar Peserta Tutorial (<span class="badge-count">0</span>)</div>
     <div class="card-body">
-        <?php if (empty($registrations)): ?>
-            <div class="empty-state">
-                <div class="icon">📋</div>
-                <h3>Belum ada peserta terdaftar</h3>
-                <p>Tambahkan mahasiswa ke kelas melalui form di atas.</p>
-            </div>
-        <?php else: ?>
-        <div class="table-responsive">
-            <table>
+        <div class="empty-state" id="tableEmptyState" style="display: flex; flex-direction:column; align-items:center;">
+            <div class="icon" style="font-size:3rem; margin-bottom:10px;">📋</div>
+            <h3>Pilih Kelas Terlebih Dahulu</h3>
+            <p>Daftar peserta akan muncul setelah Anda memilih kelas tutorial di atas.</p>
+        </div>
+
+        <div class="table-responsive" id="tableResponsiveContainer" style="display: none;">
+            <table id="participantTable">
                 <thead>
                     <tr>
                         <th>No</th>
@@ -290,7 +289,7 @@ include __DIR__ . '/../includes/header.php';
                 </thead>
                 <tbody>
                     <?php foreach ($registrations as $i => $r): ?>
-                    <tr>
+                    <tr data-class-id="<?= $r['tutorial_class_id'] ?>">
                         <td><?= $i + 1 ?></td>
                         <td><strong><?= sanitize($r['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($r['nim']) ?></td>
@@ -342,7 +341,6 @@ include __DIR__ . '/../includes/header.php';
                 </tbody>
             </table>
         </div>
-        <?php endif; ?>
     </div>
 </div>
 
@@ -418,6 +416,69 @@ include __DIR__ . '/../includes/header.php';
     document.getElementById('studentList').addEventListener('change', function(e) {
         if (e.target.classList.contains('student-cb')) updateCount();
     });
+
+    /* ---- Filter tabel bawah berdasarkan Kelas Tutorial yang dipilih ---- */
+    setTimeout(function() {
+        if (window.jQuery && window.jQuery.fn.DataTable) {
+            var $ = window.jQuery;
+            var tableEl = $('#participantTable');
+            
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'participantTable') return true;
+                
+                var selectedClassId = selectKelas.value;
+                if (!selectedClassId) return false;
+                
+                var tr = settings.aoData[dataIndex].nTr;
+                var rowClassId = tr.getAttribute('data-class-id');
+                return rowClassId === selectedClassId;
+            });
+            
+            selectKelas.addEventListener('change', function() {
+                if ($.fn.DataTable.isDataTable(tableEl)) {
+                    tableEl.DataTable().draw();
+                }
+                
+                var selectedClassId = selectKelas.value;
+                var countBadge = document.querySelector('.card-header span.badge-count');
+                var emptyState = document.getElementById('tableEmptyState');
+                var tableDiv = document.getElementById('tableResponsiveContainer');
+                
+                if (!selectedClassId) {
+                    if (emptyState) {
+                        emptyState.style.display = 'flex';
+                        emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
+                        emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial di atas.';
+                    }
+                    if (tableDiv) tableDiv.style.display = 'none';
+                    if (countBadge) countBadge.textContent = '0';
+                } else {
+                    if ($.fn.DataTable.isDataTable(tableEl)) {
+                        var info = tableEl.DataTable().page.info();
+                        var count = info.recordsDisplay;
+                        if (countBadge) countBadge.textContent = count;
+                        
+                        if (count === 0 && emptyState) {
+                            emptyState.style.display = 'flex';
+                            emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
+                            emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
+                            if (tableDiv) tableDiv.style.display = 'none';
+                        } else {
+                            if (emptyState) emptyState.style.display = 'none';
+                            if (tableDiv) tableDiv.style.display = 'block';
+                        }
+                    } else {
+                        if (emptyState) emptyState.style.display = 'none';
+                        if (tableDiv) tableDiv.style.display = 'block';
+                    }
+                }
+            });
+            
+            setTimeout(function() {
+                selectKelas.dispatchEvent(new Event('change'));
+            }, 100);
+        }
+    }, 500);
 
     /* ---- Filter Hari & Tutor → saring opsi kelas ---- */
     function applyFilters() {
