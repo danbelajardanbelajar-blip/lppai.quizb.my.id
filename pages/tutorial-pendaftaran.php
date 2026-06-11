@@ -13,6 +13,16 @@ if (isAdmin()) {
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+
+// Auto-patch database for new registration flow
+try {
+    $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
+    $pdo->exec("ALTER TABLE tutorial_registrations MODIFY tutorial_class_id INT NULL");
+    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN hari_pilihan VARCHAR(20) DEFAULT NULL");
+    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN gelombang VARCHAR(20) DEFAULT NULL");
+    $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+} catch (Exception $e) {}
+
 $message = '';
 $msgType = '';
 
@@ -24,15 +34,16 @@ $gelombangs = [
 
 // Handle Form Submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
-    $token     = $_POST['csrf_token'] ?? '';
-    $classId   = (int)($_POST['class_id'] ?? 0);
-    $gelombang = $_POST['gelombang'] ?? '';
+    $token        = $_POST['csrf_token'] ?? '';
+    $hari_pilihan = $_POST['hari_pilihan'] ?? '';
+    $gelombang    = $_POST['gelombang'] ?? '';
+    $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
 
     if (!verifyCsrf($token)) {
         $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
         $msgType = 'danger';
-    } elseif ($classId <= 0 || !isset($gelombangs[$gelombang])) {
-        $message = 'Pilih kelas tutorial yang valid.';
+    } elseif (!in_array($hari_pilihan, $validDays) || !isset($gelombangs[$gelombang])) {
+        $message = 'Pilih hari yang valid.';
         $msgType = 'danger';
     } else {
         // Cek pengumuman aktif
@@ -42,29 +53,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
             $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
             $msgType = 'danger';
         } else {
-            // Cek apakah sudah daftar di gelombang ini
+            // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
             $stmtReg = $pdo->prepare("
                 SELECT tr.id FROM tutorial_registrations tr 
-                JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
-                WHERE tr.user_id = ? AND tc.gelombang = ?
+                LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
+                WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
             ");
-            $stmtReg->execute([$user['id'], $gelombang]);
+            $stmtReg->execute([$user['id'], $gelombang, $gelombang]);
             if ($stmtReg->fetch()) {
                 $message = 'Anda sudah terdaftar di gelombang ini.';
                 $msgType = 'warning';
             } else {
-                // Pastikan kelas tersebut ada dan sesuai gelombang
-                $stmtCek = $pdo->prepare("SELECT id FROM tutorial_classes WHERE id = ? AND gelombang = ?");
-                $stmtCek->execute([$classId, $gelombang]);
-                if (!$stmtCek->fetch()) {
-                    $message = 'Kelas tidak valid.';
-                    $msgType = 'danger';
-                } else {
-                    $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status) VALUES (?, ?, 'terdaftar')");
-                    $stmtInsert->execute([$user['id'], $classId]);
-                    $message = 'Pendaftaran tutorial berhasil! Tunggu konfirmasi jadwal dari TU.';
-                    $msgType = 'success';
-                }
+                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
+                $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang]);
+                $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
+                $msgType = 'success';
             }
         }
     }
@@ -97,17 +100,12 @@ foreach ($gelombangs as $gelKey => $g):
     $stmtReg = $pdo->prepare("
         SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan 
         FROM tutorial_registrations tr
-        JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-        WHERE tr.user_id = ? AND tc.gelombang = ?
+        LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
         ORDER BY tr.created_at DESC LIMIT 1
     ");
-    $stmtReg->execute([$user['id'], $gelKey]);
+    $stmtReg->execute([$user['id'], $gelKey, $gelKey]);
     $sudahDaftar = $stmtReg->fetch();
-
-    // Ambil kelas tersedia
-    $stmtKelas = $pdo->prepare("SELECT * FROM tutorial_classes WHERE gelombang = ? ORDER BY nama_kelas");
-    $stmtKelas->execute([$gelKey]);
-    $kelasTersedia = $stmtKelas->fetchAll();
 
     if ($announcement || $sudahDaftar): // Tampilkan hanya jika ada pengumuman buka ATAU sudah pernah daftar
 ?>
@@ -131,11 +129,17 @@ foreach ($gelombangs as $gelKey => $g):
             <div style="padding:16px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">
                 <h4 style="margin-top:0; color:#166534;">✅ Status Pendaftaran: Terdaftar</h4>
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px;">
-                    <div><strong style="font-size:12px;color:#166534;">KELAS</strong><p style="margin:4px 0 0;font-weight:bold;"><?= sanitize($sudahDaftar['nama_kelas']) ?></p></div>
-                    <div><strong style="font-size:12px;color:#166534;">MATA KULIAH</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['mata_kuliah']) ?></p></div>
-                    <div><strong style="font-size:12px;color:#166534;">DOSEN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['dosen_pengampu'] ?: '-') ?></p></div>
-                    <div><strong style="font-size:12px;color:#166534;">JADWAL</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['hari']) ?>, <?= sanitize($sudahDaftar['jam']) ?></p></div>
-                    <div><strong style="font-size:12px;color:#166534;">RUANGAN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['ruangan'] ?: '-') ?></p></div>
+                    <?php if ($sudahDaftar['tutorial_class_id']): ?>
+                        <div><strong style="font-size:12px;color:#166534;">KELAS</strong><p style="margin:4px 0 0;font-weight:bold;"><?= sanitize($sudahDaftar['nama_kelas']) ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">MATA KULIAH</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['mata_kuliah']) ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">DOSEN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['dosen_pengampu'] ?: '-') ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">JADWAL</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['hari']) ?>, <?= sanitize($sudahDaftar['jam']) ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">RUANGAN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['ruangan'] ?: '-') ?></p></div>
+                    <?php else: ?>
+                        <div><strong style="font-size:12px;color:#166534;">HARI PILIHAN</strong><p style="margin:4px 0 0;font-weight:bold;"><?= sanitize($sudahDaftar['hari_pilihan']) ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">JAM</strong><p style="margin:4px 0 0;">13.00 - 14.30</p></div>
+                        <div style="grid-column: 1 / -1;"><p style="margin:4px 0 0;color:#15803d;font-size:14px;"><em>Anda telah memilih hari. Silakan tunggu admin membagikan kelas Anda.</em></p></div>
+                    <?php endif; ?>
                     <div>
                         <strong style="font-size:12px;color:#166534;">STATUS</strong>
                         <p style="margin:4px 0 0;">
@@ -149,27 +153,24 @@ foreach ($gelombangs as $gelKey => $g):
             </div>
         
         <?php elseif ($announcement): ?>
-            <!-- Form Pendaftaran -->
-            <?php if (empty($kelasTersedia)): ?>
-                <div class="alert alert-warning">Belum ada kelas yang ditambahkan oleh TU untuk gelombang ini.</div>
-            <?php else: ?>
-                <form method="POST">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="gelombang" value="<?= $gelKey ?>">
-                    <label style="font-weight:600;margin-bottom:12px;display:block;">Pilih Jadwal <span style="color:red">*</span></label>
-                    <div class="form-group" style="margin-bottom:20px;">
-                        <select name="class_id" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
-                            <option value="">-- Pilih Hari / Jadwal --</option>
-                            <?php foreach ($kelasTersedia as $k): ?>
-                            <option value="<?= $k['id'] ?>">
-                                <?= sanitize($k['hari'] ?: '-') ?>, <?= sanitize($k['jam'] ?: '-') ?> (Sisa Kuota: <?= $k['kuota'] ?>)
-                            </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <button type="submit" name="daftar_tutorial" value="1" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600;">📝 Daftar di <?= $g['label'] ?></button>
-                </form>
-            <?php endif; ?>
+            <!-- Form Pendaftaran Hari -->
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                <input type="hidden" name="gelombang" value="<?= $gelKey ?>">
+                <label style="font-weight:600;margin-bottom:12px;display:block;">Pilih Hari (Jam: 13.00 - 14.30) <span style="color:red">*</span></label>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <select name="hari_pilihan" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
+                        <option value="">-- Pilih Hari --</option>
+                        <?php 
+                        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+                        foreach ($days as $day): 
+                        ?>
+                        <option value="<?= $day ?>"><?= $day ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="submit" name="daftar_tutorial" value="1" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600;">📝 Daftar di <?= $g['label'] ?></button>
+            </form>
         <?php endif; ?>
     </div>
 </div>
