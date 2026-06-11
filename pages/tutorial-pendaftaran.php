@@ -157,18 +157,15 @@ foreach ($gelombangs as $gelKey => $g):
                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                     <input type="hidden" name="gelombang" value="<?= $gelKey ?>">
                     <label style="font-weight:600;margin-bottom:12px;display:block;">Pilih Jadwal <span style="color:red">*</span></label>
-                    <div style="display:grid;gap:12px;margin-bottom:16px;">
-                        <?php foreach ($kelasTersedia as $k): ?>
-                        <label style="display:flex;align-items:flex-start;gap:14px;padding:16px;border:2px solid #e0e0e0;border-radius:12px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='#e0e0e0'">
-                            <input type="radio" name="class_id" value="<?= $k['id'] ?>" required style="margin-top:2px;width:18px;height:18px;">
-                            <div style="flex:1;">
-                                <div style="display:flex;align-items:center;gap:10px;">
-                                    <strong style="font-size:16px;">📅 <?= sanitize($k['hari'] ?: '-') ?>, <?= sanitize($k['jam'] ?: '-') ?></strong>
-                                    <span style="color:var(--text-muted);font-size:13px;">(Kuota: <?= $k['kuota'] ?>)</span>
-                                </div>
-                            </div>
-                        </label>
-                        <?php endforeach; ?>
+                    <div class="form-group" style="margin-bottom:20px;">
+                        <select name="class_id" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
+                            <option value="">-- Pilih Hari / Jadwal --</option>
+                            <?php foreach ($kelasTersedia as $k): ?>
+                            <option value="<?= $k['id'] ?>">
+                                <?= sanitize($k['hari'] ?: '-') ?>, <?= sanitize($k['jam'] ?: '-') ?> (Sisa Kuota: <?= $k['kuota'] ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                     <button type="submit" name="daftar_tutorial" value="1" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600;">📝 Daftar di <?= $g['label'] ?></button>
                 </form>
