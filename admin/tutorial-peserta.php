@@ -95,6 +95,15 @@ foreach ($classes as $c) {
 }
 sort($hariList);
 
+// Kumpulkan tutor unik dari kelas yang ada
+$tutorList = [];
+foreach ($classes as $c) {
+    if (!empty($c['dosen_pengampu']) && !in_array($c['dosen_pengampu'], $tutorList)) {
+        $tutorList[] = $c['dosen_pengampu'];
+    }
+}
+sort($tutorList);
+
 // Build lookup: class_id → hari, untuk filter JS
 $classHariMap = [];
 foreach ($classes as $c) {
@@ -137,8 +146,8 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="assign">
 
-            <!-- Baris 1: Filter Hari + Pilih Kelas -->
-            <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px;">
+            <!-- Baris 1: Filter Hari, Tutor + Pilih Kelas -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:16px;margin-bottom:20px;">
                 <!-- Filter Hari -->
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Filter Hari</label>
@@ -155,6 +164,18 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
 
+                <!-- Filter Tutor -->
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Filter Tutor</label>
+                    <select id="filterTutor"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
+                        <option value="">-- Semua Tutor --</option>
+                        <?php foreach ($tutorList as $t): ?>
+                            <option value="<?= htmlspecialchars($t, ENT_QUOTES) ?>"><?= sanitize($t) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <!-- Pilih Kelas -->
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Kelas Tutorial <span style="color:#ef4444;">*</span></label>
@@ -163,7 +184,8 @@ include __DIR__ . '/../includes/header.php';
                         <option value="">-- Pilih Kelas --</option>
                         <?php foreach ($classes as $c): ?>
                             <option value="<?= $c['id'] ?>"
-                                data-hari="<?= htmlspecialchars($c['hari'] ?? '', ENT_QUOTES) ?>">
+                                data-hari="<?= htmlspecialchars($c['hari'] ?? '', ENT_QUOTES) ?>"
+                                data-tutor="<?= htmlspecialchars($c['dosen_pengampu'] ?? '', ENT_QUOTES) ?>">
                                 [<?= $gelLabels[$c['gelombang']] ?>]
                                 <?= sanitize($c['nama_kelas']) ?> — <?= sanitize($c['mata_kuliah']) ?>
                                 <?php if (!empty($c['hari'])): ?>(<?= sanitize($c['hari']) ?>)<?php endif; ?>
@@ -340,6 +362,7 @@ include __DIR__ . '/../includes/header.php';
     var countBadge   = document.getElementById('selectedCount');
     var submitHint   = document.getElementById('submitHint');
     var filterHari   = document.getElementById('filterHari');
+    var filterTutor  = document.getElementById('filterTutor');
     var selectKelas  = document.getElementById('selectKelas');
 
     /* ---- Helper: semua baris yang saat ini terlihat ---- */
@@ -396,23 +419,30 @@ include __DIR__ . '/../includes/header.php';
         if (e.target.classList.contains('student-cb')) updateCount();
     });
 
-    /* ---- Filter Hari → saring opsi kelas ---- */
-    filterHari.addEventListener('change', function () {
-        var hari = this.value;
+    /* ---- Filter Hari & Tutor → saring opsi kelas ---- */
+    function applyFilters() {
+        var hari = filterHari.value;
+        var tutor = filterTutor.value;
         var opts = selectKelas.querySelectorAll('option');
         var currentVal = selectKelas.value;
         var found = false;
 
         opts.forEach(function(opt) {
             if (!opt.value) return; // placeholder
-            var show = !hari || (opt.dataset.hari === hari);
+            var show = true;
+            if (hari && opt.dataset.hari !== hari) show = false;
+            if (tutor && opt.dataset.tutor !== tutor) show = false;
+            
             opt.style.display = show ? '' : 'none';
             if (opt.value === currentVal && show) found = true;
         });
 
-        // Reset pilihan kelas jika yang dipilih tidak ada di hari yang dipilih
+        // Reset pilihan kelas jika yang dipilih tidak ada di filter
         if (!found) selectKelas.value = '';
-    });
+    }
+
+    filterHari.addEventListener('change', applyFilters);
+    filterTutor.addEventListener('change', applyFilters);
 
     /* ---- Validasi sebelum submit ---- */
     document.getElementById('assignForm').addEventListener('submit', function(e) {
