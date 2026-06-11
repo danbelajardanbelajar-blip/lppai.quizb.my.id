@@ -220,7 +220,7 @@ include __DIR__ . '/../includes/header.php';
                     <input type="number" name="kuota" min="0" placeholder="30"
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
                 </div>
-            </div></div>
+            </div>
 
             <!-- Baris 2: Daftar Mahasiswa dengan Checkbox -->
             <div class="form-group" style="margin-bottom:20px;">
