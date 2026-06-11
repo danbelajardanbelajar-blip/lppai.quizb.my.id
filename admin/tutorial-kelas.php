@@ -7,6 +7,15 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+// Ensure master table exists
+$pdo->exec("CREATE TABLE IF NOT EXISTS master_gelombang (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    semester VARCHAR(50) NOT NULL,
+    tahun_ajaran VARCHAR(50) NOT NULL,
+    gelombang ENUM('gel1','gel2','mandiri') NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+
 $message = '';
 $msgType = '';
 
@@ -70,6 +79,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->prepare("DELETE FROM tutorial_classes WHERE id = ?")->execute([$id]);
             $message = 'Kelas berhasil dihapus.';
             $msgType = 'success';
+        } elseif ($action === 'create_gelombang') {
+            $semester = $_POST['semester_tipe'] ?? '';
+            $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
+            $gelombang = $_POST['gelombang'] ?? '';
+
+            if (empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
+                $message = 'Semua field gelombang harus diisi.';
+                $msgType = 'danger';
+            } else {
+                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang) VALUES (?, ?, ?)")
+                    ->execute([$semester, $tahun_ajaran, $gelombang]);
+                $message = 'Data Gelombang berhasil ditambahkan!';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -86,6 +109,45 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
 <?php endif; ?>
 
+<!-- ── Tambah Gelombang ──────────────────────────────────────────── -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">➕ Tambah Gelombang</div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="create_gelombang">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+                <div class="form-group">
+                    <label>Semester *</label>
+                    <select name="semester_tipe" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tahun Ajaran *</label>
+                    <select name="tahun_ajaran" required>
+                        <option value="">-- Pilih Tahun --</option>
+                        <?php for($y=2017; $y<=2049; $y++): ?>
+                        <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Gelombang *</label>
+                    <select name="gelombang" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="gel1">Gelombang 1 (Ganjil)</option>
+                        <option value="gel2">Gelombang 2 (Genap)</option>
+                        <option value="mandiri">Mandiri</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:auto;margin-top:10px;">➕ Tambah Gelombang</button>
+        </form>
+    </div>
+</div>
 
 <!-- ── Daftar Kelas ──────────────────────────────────────────── -->
 <div class="card">
