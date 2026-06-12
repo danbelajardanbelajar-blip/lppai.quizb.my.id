@@ -17,6 +17,7 @@ $pdo->exec("
 
 $message = '';
 $msgType = '';
+$isMessageHtml = false;
 
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
 $active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
@@ -200,10 +201,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         if (!empty($failedToRegister)) {
                             $failedNames = array_map(function($u) { return "<li><strong>" . htmlspecialchars($u['nama_lengkap']) . "</strong></li>"; }, $failedToRegister);
                             $failedCount = count($failedToRegister);
-                            $message = "Hanya $added mahasiswa jurusan $jurusan yang didaftarkan. <br><br><strong>$failedCount mahasiswa berikut gagal didaftarkan karena kuota hari $hari_pilihan penuh:</strong><ul style='margin-top: 8px; margin-bottom: 12px; padding-left: 20px; max-height: 150px; overflow-y: auto; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 6px; padding: 10px 10px 10px 30px;'>" . implode('', $failedNames) . "</ul><em>👉 Tips: Pilih jurusan yang sama dan pilih <b>Hari Lain</b> pada form di bawah untuk langsung mendaftarkan sisa mahasiswa ini.</em>";
+                            $message = "Hanya $added mahasiswa jurusan " . htmlspecialchars($jurusan) . " yang didaftarkan. <br><br><strong>$failedCount mahasiswa berikut gagal didaftarkan karena kuota hari $hari_pilihan penuh:</strong><ul style='margin-top: 8px; margin-bottom: 12px; padding-left: 20px; max-height: 150px; overflow-y: auto; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 6px; padding: 10px 10px 10px 30px;'>" . implode('', $failedNames) . "</ul><em>👉 Tips: Pilih jurusan yang sama dan pilih <b>Hari Lain</b> pada form di bawah untuk langsung mendaftarkan sisa mahasiswa ini.</em>";
                             $msgType = 'warning';
+                            $isMessageHtml = true;
                         } else {
-                            $message = "$added mahasiswa dari jurusan $jurusan berhasil didaftarkan kolektif pada hari $hari_pilihan.";
+                            $message = "$added mahasiswa dari jurusan " . htmlspecialchars($jurusan) . " berhasil didaftarkan kolektif pada hari $hari_pilihan.";
                             $msgType = 'success';
                         }
                     }
@@ -340,7 +342,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <?php if ($message): ?>
-    <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
+    <div class="alert alert-<?= $msgType ?>"><?= $isMessageHtml ? $message : sanitize($message) ?></div>
 <?php endif; ?>
 
 <style>
