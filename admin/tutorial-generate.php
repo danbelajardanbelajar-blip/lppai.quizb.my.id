@@ -42,7 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($hariList as $hari) {
             $hariLower = strtolower($hari);
             $tutorsString = $gel['tutors_'.$hariLower] ?? '';
-            $tutors = array_filter(array_map('trim', explode(',', $tutorsString)));
+            $delimiter = (strpos($tutorsString, '|||') !== false) ? '|||' : ',';
+            $tutors = array_filter(array_map('trim', explode($delimiter, $tutorsString)));
             
             // Cari mahasiswa yang sudah mendaftar di hari ini tetapi belum masuk kelas
             // dan pastikan mereka terdaftar pada gelombang yang aktif ini

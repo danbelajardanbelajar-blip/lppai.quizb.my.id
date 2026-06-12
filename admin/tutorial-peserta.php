@@ -134,11 +134,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $kuota_kamis = (int)($_POST['kuota_kamis'] ?? 0);
                 $kuota_jumat = (int)($_POST['kuota_jumat'] ?? 0);
                 
-                $tutors_senin = isset($_POST['tutors_senin']) && is_array($_POST['tutors_senin']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_senin']))) : '';
-                $tutors_selasa = isset($_POST['tutors_selasa']) && is_array($_POST['tutors_selasa']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_selasa']))) : '';
-                $tutors_rabu = isset($_POST['tutors_rabu']) && is_array($_POST['tutors_rabu']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_rabu']))) : '';
-                $tutors_kamis = isset($_POST['tutors_kamis']) && is_array($_POST['tutors_kamis']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_kamis']))) : '';
-                $tutors_jumat = isset($_POST['tutors_jumat']) && is_array($_POST['tutors_jumat']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_jumat']))) : '';
+                $tutors_senin = isset($_POST['tutors_senin']) && is_array($_POST['tutors_senin']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_senin']))) : '';
+                $tutors_selasa = isset($_POST['tutors_selasa']) && is_array($_POST['tutors_selasa']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_selasa']))) : '';
+                $tutors_rabu = isset($_POST['tutors_rabu']) && is_array($_POST['tutors_rabu']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_rabu']))) : '';
+                $tutors_kamis = isset($_POST['tutors_kamis']) && is_array($_POST['tutors_kamis']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_kamis']))) : '';
+                $tutors_jumat = isset($_POST['tutors_jumat']) && is_array($_POST['tutors_jumat']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_jumat']))) : '';
                 
                 $pdo->prepare("UPDATE master_gelombang SET kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
                     ->execute([$kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat, $tutors_senin, $tutors_selasa, $tutors_rabu, $tutors_kamis, $tutors_jumat, $active_gel_id]);
@@ -319,7 +319,9 @@ include __DIR__ . '/../includes/header.php';
                 $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                 foreach ($days as $day):
                     $dayLower = strtolower($day);
-                    $currentTutors = array_filter(array_map('trim', explode(',', $active_gel["tutors_$dayLower"] ?? '')));
+                    $tutorsStr = $active_gel["tutors_$dayLower"] ?? '';
+                    $delimiter = (strpos($tutorsStr, '|||') !== false) ? '|||' : ',';
+                    $currentTutors = array_filter(array_map('trim', explode($delimiter, $tutorsStr)));
                     $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                     $terisi = $registeredCounts[$day] ?? 0;
                     $sisaKuota = $totalKuota - $terisi;

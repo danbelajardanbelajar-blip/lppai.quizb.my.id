@@ -47,11 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
-            $tsenin = implode(',', array_filter($_POST['tutors_senin'] ?? []));
-            $tselasa = implode(',', array_filter($_POST['tutors_selasa'] ?? []));
-            $trabu = implode(',', array_filter($_POST['tutors_rabu'] ?? []));
-            $tkamis = implode(',', array_filter($_POST['tutors_kamis'] ?? []));
-            $tjumat = implode(',', array_filter($_POST['tutors_jumat'] ?? []));
+            $tsenin = implode('|||', array_filter($_POST['tutors_senin'] ?? []));
+            $tselasa = implode('|||', array_filter($_POST['tutors_selasa'] ?? []));
+            $trabu = implode('|||', array_filter($_POST['tutors_rabu'] ?? []));
+            $tkamis = implode('|||', array_filter($_POST['tutors_kamis'] ?? []));
+            $tjumat = implode('|||', array_filter($_POST['tutors_jumat'] ?? []));
 
             if (empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Semua field gelombang harus diisi.';
@@ -72,11 +72,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
-            $tsenin = implode(',', array_filter($_POST['tutors_senin'] ?? []));
-            $tselasa = implode(',', array_filter($_POST['tutors_selasa'] ?? []));
-            $trabu = implode(',', array_filter($_POST['tutors_rabu'] ?? []));
-            $tkamis = implode(',', array_filter($_POST['tutors_kamis'] ?? []));
-            $tjumat = implode(',', array_filter($_POST['tutors_jumat'] ?? []));
+            $tsenin = implode('|||', array_filter($_POST['tutors_senin'] ?? []));
+            $tselasa = implode('|||', array_filter($_POST['tutors_selasa'] ?? []));
+            $trabu = implode('|||', array_filter($_POST['tutors_rabu'] ?? []));
+            $tkamis = implode('|||', array_filter($_POST['tutors_kamis'] ?? []));
+            $tjumat = implode('|||', array_filter($_POST['tutors_jumat'] ?? []));
 
             if ($id <= 0 || empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Data tidak valid.';
@@ -365,15 +365,21 @@ window.populateTutors = function(day, tutorsString) {
         return;
     }
     
-    const tutors = tutorsString.split(',');
+    let tutors = [];
+    if (tutorsString.indexOf('|||') !== -1) {
+        tutors = tutorsString.split('|||');
+    } else {
+        tutors = tutorsString.split(',');
+    }
+    
     if (tutors.length > 0) {
-        firstSelect.value = tutors[0];
+        firstSelect.value = tutors[0].trim();
     }
     
     for(let i = 1; i < tutors.length; i++) {
         const newRow = rows[0].cloneNode(true);
         const select = newRow.querySelector('select');
-        select.value = tutors[i];
+        select.value = tutors[i].trim();
         const btn = newRow.querySelector('button');
         btn.textContent = 'x';
         btn.classList.replace('btn-success', 'btn-danger');
