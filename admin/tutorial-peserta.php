@@ -28,12 +28,13 @@ if (isset($_GET['ajax_jurusan'])) {
     $jurusan = $_GET['ajax_jurusan'];
     $stmt = $pdo->prepare("
         SELECT u.id as user_id, u.nim, u.nama_lengkap, 
-               tr.id as reg_id,
-               (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
-               tr.hari_pilihan 
+               MAX(tr.id) as reg_id,
+               (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
+               MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
         LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id 
         WHERE u.program_studi = ? AND u.role = 'mahasiswa'
+        GROUP BY u.id
         ORDER BY u.nama_lengkap
     ");
     $stmt->execute([$jurusan]);
@@ -184,22 +185,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $gelombang = $active_gel['gelombang'] ?? 'gel1';
 
             if ($user_id > 0 && $hari_pilihan !== '') {
-                $dayLower = strtolower($hari_pilihan);
-                $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
-                
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
-                $stmtCount->execute([$hari_pilihan]);
-                $terisi = $stmtCount->fetchColumn();
-                $sisaKuota = $totalKuota - $terisi;
-                
-                if ($sisaKuota <= 0) {
-                    $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
-                    $msgType = 'danger';
+                $stmtCek = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE user_id = ?");
+                $stmtCek->execute([$user_id]);
+                if ($stmtCek->fetchColumn() > 0) {
+                    $message = 'Mahasiswa ini sudah terdaftar sebelumnya.';
+                    $msgType = 'warning';
                 } else {
-                    $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
-                    $stmtInsert->execute([$user_id, $hari_pilihan, $gelombang]);
-                    $message = 'Mahasiswa berhasil didaftarkan.';
-                    $msgType = 'success';
+                    $dayLower = strtolower($hari_pilihan);
+                    $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
+                    
+                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
+                    $stmtCount->execute([$hari_pilihan]);
+                    $terisi = $stmtCount->fetchColumn();
+                    $sisaKuota = $totalKuota - $terisi;
+                    
+                    if ($sisaKuota <= 0) {
+                        $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                        $msgType = 'danger';
+                    } else {
+                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
+                        $stmtInsert->execute([$user_id, $hari_pilihan, $gelombang]);
+                        $message = 'Mahasiswa berhasil didaftarkan.';
+                        $msgType = 'success';
+                    }
                 }
             } else {
                 $message = 'Data tidak valid.';
@@ -374,16 +382,18 @@ $registrations = $pdo->query("
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations GROUP BY user_id)
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
 $allStudents = $pdo->query("
     SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, 
-           tr.id as reg_id, tr.hari_pilihan,
-           (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered
+           MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
+           (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
     LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id
     WHERE u.role = 'mahasiswa'
+    GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -392,6 +402,7 @@ $allRegistrations = $pdo->query("
     SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
+    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations GROUP BY user_id)
     ORDER BY tr.created_at DESC
 ")->fetchAll();
 
