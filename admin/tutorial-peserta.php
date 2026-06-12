@@ -440,7 +440,7 @@ function addQETutorRow(day) {
                 <label style="display: block; font-weight: 600; color: #1e3a8a; margin-bottom: 12px;">Mode Pembagian Mahasiswa:</label>
                 
                 <label style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; cursor: pointer;">
-                    <input type="radio" name="generate_mode" value="fill_first" id="modeFillFirst" style="margin-top: 4px;">
+                    <input type="radio" name="generate_mode" value="fill_first" id="modeFillFirst" checked style="margin-top: 4px;">
                     <div>
                         <span style="font-weight: 500; color: #334155;">Utamakan memenuhi kuota per kelas</span>
                         <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
@@ -450,7 +450,7 @@ function addQETutorRow(day) {
                 </label>
                 
                 <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
-                    <input type="radio" name="generate_mode" value="distribute_evenly" id="modeDistribute" checked style="margin-top: 4px;">
+                    <input type="radio" name="generate_mode" value="distribute_evenly" id="modeDistribute" style="margin-top: 4px;">
                     <div>
                         <span style="font-weight: 500; color: #334155;">Utamakan meratakan jumlah mahasiswa</span>
                         <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
@@ -481,15 +481,19 @@ function addQETutorRow(day) {
 <?php
 // Siapkan data untuk grafik statistik
 $statsKelas = [];
+$statsLabels = [];
 foreach ($registrations as $r) {
     $kelas = sanitize($r['nama_kelas']);
-    if (!isset($statsKelas[$kelas])) {
-        $statsKelas[$kelas] = 0;
+    $tutor = sanitize($r['dosen_pengampu'] ?: '-');
+    $key = $kelas . '|' . $tutor;
+    if (!isset($statsKelas[$key])) {
+        $statsKelas[$key] = 0;
+        $statsLabels[$key] = [$kelas, "(" . $tutor . ")"];
     }
-    $statsKelas[$kelas]++;
+    $statsKelas[$key]++;
 }
 ksort($statsKelas); // Urutkan nama kelas
-$chartLabels = json_encode(array_keys($statsKelas));
+$chartLabels = json_encode(array_values($statsLabels));
 $chartData = json_encode(array_values($statsKelas));
 ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -507,9 +511,16 @@ $chartData = json_encode(array_values($statsKelas));
                 <canvas id="scheduleChart"></canvas>
             </div>
             <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    var ctx = document.getElementById('scheduleChart').getContext('2d');
-                    var chart = new Chart(ctx, {
+                (function() {
+                    var canvas = document.getElementById('scheduleChart');
+                    if (!canvas) return;
+                    
+                    if (window.scheduleChartInstance) {
+                        window.scheduleChartInstance.destroy();
+                    }
+                    
+                    var ctx = canvas.getContext('2d');
+                    window.scheduleChartInstance = new Chart(ctx, {
                         type: 'bar',
                         data: {
                             labels: <?= $chartLabels ?>,
@@ -533,6 +544,13 @@ $chartData = json_encode(array_values($statsKelas));
                                 }
                             },
                             scales: {
+                                x: {
+                                    ticks: {
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                },
                                 y: {
                                     beginAtZero: true,
                                     ticks: {
@@ -542,7 +560,7 @@ $chartData = json_encode(array_values($statsKelas));
                             }
                         }
                     });
-                });
+                })();
             </script>
         <?php endif; ?>
     </div>
