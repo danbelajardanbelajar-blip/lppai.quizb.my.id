@@ -113,6 +113,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
                 $msgType = 'success';
             }
+
+        /* ---- HAPUS MASSAL DARI KELAS ---- */
+        } elseif ($action === 'bulk_delete') {
+            $regIds = $_POST['reg_ids'] ?? [];
+            if (!empty($regIds) && is_array($regIds)) {
+                $placeholders = implode(',', array_fill(0, count($regIds), '?'));
+                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE id IN ($placeholders)")
+                    ->execute($regIds);
+                $message = count($regIds) . ' peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -291,7 +302,13 @@ include __DIR__ . '/../includes/header.php';
 
         <div id="bulkActionsContainer" style="margin-bottom: 16px; display: none;">
             <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAll" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Centang Semua</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btnBulkDelete" style="margin-left:8px;">🗑️ Hapus</button>
         </div>
+        
+        <form id="formBulkDelete" method="POST" style="display:none;">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="bulk_delete">
+        </form>
 
         <div class="table-responsive" id="tableResponsiveContainer" style="display: none;">
             <table id="participantTable">
@@ -509,6 +526,41 @@ function closeEditModal() {
                         checkboxes.forEach(function(cb) {
                             cb.checked = newCheckedState;
                         });
+                    }
+                });
+            }
+
+            // Logic untuk Bulk Delete
+            var btnBulkDelete = document.getElementById('btnBulkDelete');
+            if (btnBulkDelete) {
+                btnBulkDelete.addEventListener('click', function() {
+                    var checkedBoxes = [];
+                    if ($.fn.DataTable.isDataTable(tableEl)) {
+                        var dt = tableEl.DataTable();
+                        $(dt.rows({ search: 'applied' }).nodes()).find('.check-peserta:checked').each(function() {
+                            checkedBoxes.push(this.value);
+                        });
+                    } else {
+                        document.querySelectorAll('#participantTable tbody .check-peserta:checked').forEach(function(cb) {
+                            checkedBoxes.push(cb.value);
+                        });
+                    }
+                    
+                    if (checkedBoxes.length === 0) {
+                        alert('Silakan centang minimal satu peserta terlebih dahulu.');
+                        return;
+                    }
+                    
+                    if (confirm('Yakin ingin mengeluarkan ' + checkedBoxes.length + ' peserta yang dicentang dari kelas ini?')) {
+                        var form = document.getElementById('formBulkDelete');
+                        checkedBoxes.forEach(function(id) {
+                            var input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'reg_ids[]';
+                            input.value = id;
+                            form.appendChild(input);
+                        });
+                        form.submit();
                     }
                 });
             }
