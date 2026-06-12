@@ -447,8 +447,8 @@ include __DIR__ . '/../includes/header.php';
 </style>
 
 <div class="custom-tabs">
-    <button class="custom-tab active" onclick="openTutorialTab(event, 'tab-pendaftar')">📝 Data Pendaftar</button>
-    <button class="custom-tab" onclick="openTutorialTab(event, 'tab-kolektif')">🎓 Pendaftaran Kolektif</button>
+    <button class="custom-tab active" onclick="openTutorialTab(event, 'tab-kolektif')">🎓 Pendaftaran Kolektif</button>
+    <button class="custom-tab" onclick="openTutorialTab(event, 'tab-pendaftar')">📝 Data Pendaftar</button>
     <button class="custom-tab" onclick="openTutorialTab(event, 'tab-pengaturan')">⚙️ Pengaturan & Generate</button>
     <button class="custom-tab" onclick="openTutorialTab(event, 'tab-peserta')">👥 Hasil Plotting & Jadwal</button>
 </div>
@@ -465,7 +465,7 @@ function openTutorialTab(evt, tabId) {
 }
 </script>
 
-<div id="tab-pendaftar" class="tab-content active">
+<div id="tab-pendaftar" class="tab-content">
 
 <!-- ===================================================
      CARD: DATA PENDAFTAR TUTORIAL
@@ -537,7 +537,7 @@ function openTutorialTab(evt, tabId) {
 
 </div> <!-- End of tab-pendaftar -->
 
-<div id="tab-kolektif" class="tab-content">
+<div id="tab-kolektif" class="tab-content active">
 <!-- ===================================================
      CARD: PENDAFTARAN KOLEKTIF
      =================================================== -->
@@ -910,136 +910,7 @@ $chartData = json_encode(array_values($statsKelas));
     </div>
 </div>
 
-<!-- Modal Edit Pendaftar -->
-<div id="editPendaftarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Edit Data Pendaftar</h3>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-            <input type="hidden" name="action" value="edit_pendaftaran">
-            <input type="hidden" name="reg_id" id="edit_pendaftar_reg_id" value="">
-            
-            <div class="form-group" style="margin-bottom:24px;">
-                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
-                <select name="hari_pilihan" id="edit_pendaftar_hari" required
-                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
-                    <option value="">-- Pilih Hari --</option>
-                    <?php 
-                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                    foreach ($days as $day): 
-                        $dayLower = strtolower($day);
-                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
-                        $terisi = $registeredCounts[$day] ?? 0;
-                        $sisa = $kuota - $terisi;
-                        $isFull = $sisa <= 0;
-                    ?>
-                    <option value="<?= $day ?>">
-                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:12px;">
-                <button type="button" class="btn btn-secondary" onclick="closeEditPendaftarModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Simpan Perubahan</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Modal Daftarkan Single Mahasiswa -->
-<div id="addSingleRegistrationModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Daftarkan Mahasiswa</h3>
-        <p style="margin-bottom:16px; font-size:14px; color:#64748b;">Mendaftarkan: <strong id="add_single_nama_lengkap" style="color:#0f172a;"></strong></p>
-        <form method="POST">
-            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-            <input type="hidden" name="action" value="add_single_registration">
-            <input type="hidden" name="user_id" id="add_single_user_id" value="">
-            
-            <div class="form-group" style="margin-bottom:24px;">
-                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
-                <select name="hari_pilihan" required
-                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
-                    <option value="">-- Pilih Hari --</option>
-                    <?php 
-                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                    foreach ($days as $day): 
-                        $dayLower = strtolower($day);
-                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
-                        $terisi = $registeredCounts[$day] ?? 0;
-                        $sisa = $kuota - $terisi;
-                        $isFull = $sisa <= 0;
-                    ?>
-                    <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
-                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:12px;">
-                <button type="button" class="btn btn-secondary" onclick="closeAddSingleRegistrationModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
-                <button type="submit" class="btn btn-success" style="padding:8px 16px; background:#10b981; border:none;">Daftarkan</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-function openAddSingleRegistrationModal(userId, namaLengkap) {
-    document.getElementById('add_single_user_id').value = userId;
-    document.getElementById('add_single_nama_lengkap').textContent = namaLengkap;
-    document.getElementById('addSingleRegistrationModal').style.display = 'flex';
-}
-
-function closeAddSingleRegistrationModal() {
-    document.getElementById('addSingleRegistrationModal').style.display = 'none';
-}
-
-document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeAddSingleRegistrationModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Mahasiswa berhasil didaftarkan.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        setTimeout(() => window.location.reload(), 1500);
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
-    });
-});
-
-document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeEditPendaftarModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Pilihan hari berhasil diperbarui.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        setTimeout(() => window.location.reload(), 1500);
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mengedit pendaftaran.');
-    });
-});
-</script>
 
 <div class="card" style="margin-top: 30px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
@@ -1426,6 +1297,137 @@ function closeEditModal() {
     }, 500);
 
 })();
+</script>
+
+<!-- Modal Edit Pendaftar -->
+<div id="editPendaftarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Edit Data Pendaftar</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_pendaftaran">
+            <input type="hidden" name="reg_id" id="edit_pendaftar_reg_id" value="">
+            
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
+                <select name="hari_pilihan" id="edit_pendaftar_hari" required
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Hari --</option>
+                    <?php 
+                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    foreach ($days as $day): 
+                        $dayLower = strtolower($day);
+                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                        $terisi = $registeredCounts[$day] ?? 0;
+                        $sisa = $kuota - $terisi;
+                        $isFull = $sisa <= 0;
+                    ?>
+                    <option value="<?= $day ?>">
+                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditPendaftarModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Daftarkan Single Mahasiswa -->
+<div id="addSingleRegistrationModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Daftarkan Mahasiswa</h3>
+        <p style="margin-bottom:16px; font-size:14px; color:#64748b;">Mendaftarkan: <strong id="add_single_nama_lengkap" style="color:#0f172a;"></strong></p>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="add_single_registration">
+            <input type="hidden" name="user_id" id="add_single_user_id" value="">
+            
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
+                <select name="hari_pilihan" required
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Hari --</option>
+                    <?php 
+                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    foreach ($days as $day): 
+                        $dayLower = strtolower($day);
+                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                        $terisi = $registeredCounts[$day] ?? 0;
+                        $sisa = $kuota - $terisi;
+                        $isFull = $sisa <= 0;
+                    ?>
+                    <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
+                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddSingleRegistrationModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-success" style="padding:8px 16px; background:#10b981; border:none;">Daftarkan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddSingleRegistrationModal(userId, namaLengkap) {
+    document.getElementById('add_single_user_id').value = userId;
+    document.getElementById('add_single_nama_lengkap').textContent = namaLengkap;
+    document.getElementById('addSingleRegistrationModal').style.display = 'flex';
+}
+
+function closeAddSingleRegistrationModal() {
+    document.getElementById('addSingleRegistrationModal').style.display = 'none';
+}
+
+document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    fetch('', { method: 'POST', body: formData })
+    .then(res => res.text())
+    .then(html => {
+        closeAddSingleRegistrationModal();
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: 'Mahasiswa berhasil didaftarkan.',
+            timer: 1500,
+            showConfirmButton: false
+        });
+        setTimeout(() => window.location.reload(), 1500);
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
+    });
+});
+
+document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    fetch('', { method: 'POST', body: formData })
+    .then(res => res.text())
+    .then(html => {
+        closeEditPendaftarModal();
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: 'Pilihan hari berhasil diperbarui.',
+            timer: 1500,
+            showConfirmButton: false
+        });
+        setTimeout(() => window.location.reload(), 1500);
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan saat mengedit pendaftaran.');
+    });
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
