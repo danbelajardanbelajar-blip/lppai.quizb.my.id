@@ -98,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
         }
     }
 }
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
