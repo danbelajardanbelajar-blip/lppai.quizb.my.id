@@ -74,6 +74,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+        
+        // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel tutors
+        $pdo->exec("
+            UPDATE tutorial_classes tc
+            JOIN tutors t ON t.nama LIKE CONCAT('%', tc.dosen_pengampu, '%') AND t.nama != tc.dosen_pengampu
+            SET tc.dosen_pengampu = t.nama
+        ");
+        
         $pdo->commit();
         
         // Redirect ke halaman pilih ruangan
