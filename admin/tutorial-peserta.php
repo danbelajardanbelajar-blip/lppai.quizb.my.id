@@ -231,23 +231,16 @@ $active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DE
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
     try {
-        $stmtCount = $pdo->prepare("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE gelombang = ? GROUP BY hari_pilihan");
-        $stmtCount->execute([$active_gel['gelombang']]);
+        // Coba hitung berdasarkan hari_pilihan dari SEMUA registrasi aktif
+        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations GROUP BY hari_pilihan");
         foreach ($stmtCount->fetchAll() as $row) {
-            $hari = ucfirst(strtolower($row['hari_pilihan']));
+            $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
             if (isset($registeredCounts[$hari])) {
-                $registeredCounts[$hari] = $row['cnt'];
+                $registeredCounts[$hari] += $row['cnt'];
             }
         }
     } catch (Exception $e) {
-        // Fallback jika tidak ada kolom gelombang di tutorial_registrations
-        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations GROUP BY hari_pilihan");
-        foreach ($stmtCount->fetchAll() as $row) {
-            $hari = ucfirst(strtolower($row['hari_pilihan']));
-            if (isset($registeredCounts[$hari])) {
-                $registeredCounts[$hari] = $row['cnt'];
-            }
-        }
+        // Abaikan error
     }
 }
 
