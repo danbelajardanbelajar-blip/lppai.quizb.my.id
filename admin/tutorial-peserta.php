@@ -135,7 +135,7 @@ foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrati
 }
 
 $registrations = $pdo->query("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.mata_kuliah, tc.gelombang, tc.hari
+    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.mata_kuliah, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -318,6 +318,7 @@ include __DIR__ . '/../includes/header.php';
         <div style="flex:1; max-width:300px;">
             <select id="filterKelasBottom"
                 style="width:100%;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;font-weight:500;color:#334155;box-shadow:0 1px 2px rgba(0,0,0,0.05);cursor:pointer;">
+                <option value="ALL">-- Tampilkan Semua Kelas --</option>
                 <option value="">-- Pilih Kelas --</option>
                 <?php foreach ($classes as $c): ?>
                     <option value="<?= $c['id'] ?>">
@@ -338,67 +339,19 @@ include __DIR__ . '/../includes/header.php';
             <table id="participantTable">
                 <thead>
                     <tr>
-                        <th>No</th>
-                        <th>Nama</th>
-                        <th>NIM</th>
-                        <th>Prodi</th>
-                        <th>Kelas</th>
-                        <th>Hari</th>
-                        <th>Gel.</th>
-                        <th>Status</th>
-                        <th>Nilai</th>
-                        <th>Aksi</th>
+                        <th>Nama Kelas</th>
+                        <th>Nama Dosen</th>
+                        <th>Nama Mahasiswa</th>
+                        <th>Nama Ruang</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($registrations as $i => $r): ?>
+                    <?php foreach ($registrations as $r): ?>
                     <tr data-class-id="<?= $r['tutorial_class_id'] ?>">
-                        <td><?= $i + 1 ?></td>
-                        <td><strong><?= sanitize($r['nama_lengkap']) ?></strong></td>
-                        <td><?= sanitize($r['nim']) ?></td>
-                        <td><?= sanitize($r['program_studi']) ?></td>
-                        <td><?= sanitize($r['nama_kelas']) ?> — <?= sanitize($r['mata_kuliah']) ?></td>
-                        <td><?= sanitize($r['hari'] ?? '-') ?></td>
-                        <td><span class="badge badge-primary"><?= $gelLabels[$r['gelombang']] ?></span></td>
-                        <td>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="update_status">
-                                <input type="hidden" name="reg_id" value="<?= $r['id'] ?>">
-                                <select name="status" onchange="this.form.submit()"
-                                    style="padding:4px 8px;border-radius:6px;border:1px solid #ddd;font-size:12px;">
-                                    <?php foreach (['terdaftar','aktif','lulus','tidak_lulus','mengundurkan_diri'] as $st): ?>
-                                        <option value="<?= $st ?>" <?= $r['status'] === $st ? 'selected' : '' ?>>
-                                            <?= ucfirst(str_replace('_',' ',$st)) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <input type="hidden" name="nilai" value="<?= $r['nilai_akhir'] ?? '' ?>">
-                            </form>
-                        </td>
-                        <td>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="update_status">
-                                <input type="hidden" name="reg_id" value="<?= $r['id'] ?>">
-                                <input type="hidden" name="status" value="<?= $r['status'] ?>">
-                                <input type="number" name="nilai" step="0.1" min="0" max="100"
-                                    value="<?= $r['nilai_akhir'] ?? '' ?>"
-                                    style="width:70px;padding:4px;border-radius:6px;border:1px solid #ddd;font-size:12px;"
-                                    onchange="this.form.submit()" placeholder="-">
-                            </form>
-                        </td>
-                        <td>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="reg_id" value="<?= $r['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-danger"
-                                    data-confirm="Hapus data ini?"
-                                    data-table="tutorial_registrations"
-                                    data-id="<?= $r['id'] ?>">Hapus</button>
-                            </form>
-                        </td>
+                        <td><strong><?= sanitize($r['nama_kelas']) ?></strong></td>
+                        <td><?= sanitize($r['dosen_pengampu'] ?: '-') ?></td>
+                        <td><?= sanitize($r['nama_lengkap']) ?></td>
+                        <td><span class="badge badge-success"><?= sanitize($r['ruangan'] ?: 'Belum Ada Ruang') ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -488,7 +441,7 @@ include __DIR__ . '/../includes/header.php';
                 if (settings.nTable.id !== 'participantTable') return true;
                 
                 var selectedClassId = filterKelasBottom.value;
-                if (!selectedClassId) return false;
+                if (!selectedClassId || selectedClassId === 'ALL') return true;
                 
                 var tr = settings.aoData[dataIndex].nTr;
                 var rowClassId = tr.getAttribute('data-class-id');
@@ -505,7 +458,7 @@ include __DIR__ . '/../includes/header.php';
                 var emptyState = document.getElementById('tableEmptyState');
                 var tableDiv = document.getElementById('tableResponsiveContainer');
                 
-                if (!selectedClassId) {
+                if (selectedClassId === '') {
                     if (emptyState) {
                         emptyState.style.display = 'flex';
                         emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
