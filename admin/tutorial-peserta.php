@@ -74,12 +74,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
 
-        /* ---- HAPUS ---- */
-        } elseif ($action === 'delete') {
-            $regId = (int)($_POST['reg_id'] ?? 0);
-            $pdo->prepare("DELETE FROM tutorial_registrations WHERE id = ?")->execute([$regId]);
-            $message = 'Data berhasil dihapus.';
-            $msgType = 'success';
+        /* ---- EDIT PESERTA & KELAS ---- */
+        } elseif ($action === 'edit_peserta') {
+            $regId  = (int)($_POST['reg_id'] ?? 0);
+            $newClassId = (int)($_POST['tutorial_class_id'] ?? 0);
+            $newDosen = trim($_POST['dosen_pengampu'] ?? '');
+            $newRuangan = trim($_POST['ruangan'] ?? '');
+            
+            if ($regId > 0 && $newClassId > 0) {
+                // Pindahkan mahasiswa
+                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ? WHERE id = ?")
+                    ->execute([$newClassId, $regId]);
+                
+                // Update detail kelas (Dosen & Ruangan) jika diisi
+                $pdo->prepare("UPDATE tutorial_classes SET dosen_pengampu = ?, ruangan = ? WHERE id = ?")
+                    ->execute([$newDosen, $newRuangan, $newClassId]);
+                
+                $message = 'Data peserta dan kelas berhasil diperbarui.';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -201,6 +214,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama Dosen</th>
                         <th>Nama Mahasiswa</th>
                         <th>Nama Ruang</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -210,6 +224,19 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= sanitize($r['dosen_pengampu'] ?: '-') ?></td>
                         <td><?= sanitize($r['nama_lengkap']) ?></td>
                         <td><span class="badge badge-success"><?= sanitize($r['ruangan'] ?: 'Belum Ada Ruang') ?></span></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-warning" style="margin-right:4px;"
+                                onclick="openEditModal(<?= $r['id'] ?>, <?= $r['tutorial_class_id'] ?>, '<?= htmlspecialchars($r['dosen_pengampu'] ?: '', ENT_QUOTES) ?>', '<?= htmlspecialchars($r['ruangan'] ?: '', ENT_QUOTES) ?>')">
+                                Edit
+                            </button>
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="reg_id" value="<?= $r['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    data-confirm="Hapus data ini?">Hapus</button>
+                            </form>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -218,7 +245,68 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Modal Edit Peserta -->
+<div id="editPesertaModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Edit Penempatan Peserta</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_peserta">
+            <input type="hidden" name="reg_id" id="edit_reg_id" value="">
+            
+            <div class="form-group" style="margin-bottom:16px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Nama Kelas</label>
+                <select name="tutorial_class_id" id="edit_class_id" required
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <?php foreach ($classes as $c): ?>
+                        <option value="<?= $c['id'] ?>"><?= sanitize($c['nama_kelas']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Nama Dosen</label>
+                <select name="dosen_pengampu" id="edit_dosen"
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Dosen --</option>
+                    <?php foreach ($tutorsList as $t): ?>
+                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Nama Ruang</label>
+                <select name="ruangan" id="edit_ruangan"
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Ruangan --</option>
+                    <?php foreach ($roomsList as $rm): ?>
+                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openEditModal(regId, classId, dosen, ruangan) {
+    document.getElementById('edit_reg_id').value = regId;
+    document.getElementById('edit_class_id').value = classId;
+    document.getElementById('edit_dosen').value = dosen;
+    document.getElementById('edit_ruangan').value = ruangan;
+    document.getElementById('editPesertaModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editPesertaModal').style.display = 'none';
+}
+
 (function () {
     var filterKelasBottom = document.getElementById('filterKelasBottom');
 
