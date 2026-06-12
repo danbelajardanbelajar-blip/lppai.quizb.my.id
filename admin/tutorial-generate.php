@@ -61,6 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->beginTransaction();
 
+    // Ambil daftar nama dosen dari tabel tutors
+    $tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
+
     try {
         foreach ($hariList as $hari) {
             $hariLower = strtolower($hari);
