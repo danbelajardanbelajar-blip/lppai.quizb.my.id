@@ -375,7 +375,15 @@ $registrations = $pdo->query("
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
-")->fetchAll();
+$allStudents = $pdo->query("
+    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, 
+           tr.id as reg_id, tr.hari_pilihan,
+           (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered
+    FROM users u
+    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id
+    WHERE u.role = 'mahasiswa'
+    ORDER BY u.program_studi, u.nama_lengkap
+")->fetchAll(PDO::FETCH_ASSOC);
 
 $allRegistrations = $pdo->query("
     SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
@@ -575,81 +583,58 @@ function openTutorialTab(evt, tabId) {
             <button type="submit" class="btn btn-success" style="background-color: #10b981; width: auto;" data-confirm="Yakin ingin mendaftarkan semua mahasiswa jurusan ini ke hari yang dipilih?">✅ Daftarkan Kolektif Sekarang</button>
         </form>
 
-        <!-- Container untuk menampilkan daftar mahasiswa -->
-        <div id="previewJurusanContainer" style="display: none; margin-top: 24px; border-top: 1px solid #a7f3d0; padding-top: 20px;">
-            <h5 style="color: #064e3b; font-weight: 600; margin-bottom: 12px; font-size: 15px;">Daftar Mahasiswa: <span id="previewJurusanLabel"></span></h5>
-            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
-                <table class="table no-datatable" style="margin-bottom: 0;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
-                        <tr>
-                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">NIM</th>
-                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
-                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
-                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody id="previewJurusanBody">
-                        <!-- Akan diisi oleh JS -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    </div>
+</div>
 
+<div class="card" style="margin-bottom: 24px; border: 1px solid #cbd5e1;">
+    <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600;">
+        <span style="font-size:18px;">👥</span> Daftar Seluruh Mahasiswa
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table" id="tableSemuaMahasiswa">
+                <thead>
+                    <tr>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">NIM</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Jurusan</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allStudents as $m): ?>
+                        <?php 
+                        $isReg = $m['is_registered'] == 1;
+                        ?>
+                        <tr>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['nim'] ?: '-') ?></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><strong><?= sanitize($m['nama_lengkap']) ?></strong></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['program_studi'] ?: '-') ?></td>
+                            <td style="padding: 10px 16px; text-align: center;">
+                                <?php if ($isReg): ?>
+                                    <span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (<?= sanitize($m['hari_pilihan']) ?>)</span>
+                                <?php else: ?>
+                                    <span class="badge badge-warning" style="font-size:11px;">Belum Mendaftar</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="padding: 10px 16px; text-align: center;">
+                                <?php if ($isReg): ?>
+                                    <button type="button" class="btn btn-sm btn-warning" style="padding:4px 8px; font-size:11px;" 
+                                            onclick="openEditPendaftarModal(<?= (int)$m['reg_id'] ?>, <?= htmlspecialchars(json_encode($m['hari_pilihan'] ?: ''), ENT_QUOTES) ?>)">Edit</button>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-sm btn-success" style="padding:4px 8px; font-size:11px; background:#10b981; border-color:#10b981;" 
+                                            onclick="openAddSingleRegistrationModal(<?= (int)$m['user_id'] ?>, <?= htmlspecialchars(json_encode($m['nama_lengkap']), ENT_QUOTES) ?>)">Daftarkan</button>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 </div> <!-- End of tab-kolektif -->
-
-<script>
-document.querySelector('select[name="jurusan"]').addEventListener('change', function() {
-    const jurusan = this.value;
-    const container = document.getElementById('previewJurusanContainer');
-    const tbody = document.getElementById('previewJurusanBody');
-    const label = document.getElementById('previewJurusanLabel');
-    
-    if (!jurusan) {
-        container.style.display = 'none';
-        return;
-    }
-    
-    label.textContent = jurusan;
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Memuat data...</td></tr>';
-    container.style.display = 'block';
-    
-    fetch('tutorial-peserta.php?ajax_jurusan=' + encodeURIComponent(jurusan))
-        .then(res => res.json())
-        .then(data => {
-            if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748b;">Tidak ada mahasiswa di jurusan ini.</td></tr>';
-                return;
-            }
-            
-            let html = '';
-            data.forEach(m => {
-                let statusBadge = m.is_registered == 1 
-                    ? `<span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (${m.hari_pilihan})</span>`
-                    : '<span class="badge badge-warning" style="font-size:11px;">Belum Mendaftar</span>';
-                    
-                let aksiBtn = '';
-                if (m.is_registered == 1) {
-                    aksiBtn = `<button type="button" class="btn btn-sm btn-warning" style="padding:4px 8px; font-size:11px;" onclick="openEditPendaftarModal(${m.reg_id}, '${m.hari_pilihan}')">Edit</button>`;
-                } else {
-                    aksiBtn = `<button type="button" class="btn btn-sm btn-success" style="padding:4px 8px; font-size:11px; background:#10b981; border-color:#10b981;" onclick="openAddSingleRegistrationModal(${m.user_id}, '${m.nama_lengkap.replace(/'/g, "\\'")}')">Daftarkan</button>`;
-                }
-
-                html += `<tr>
-                    <td style="padding: 10px 16px; font-size: 13px;">${m.nim || '-'}</td>
-                    <td style="padding: 10px 16px; font-size: 13px;"><strong>${m.nama_lengkap}</strong></td>
-                    <td style="padding: 10px 16px; text-align: center;">${statusBadge}</td>
-                    <td style="padding: 10px 16px; text-align: center;">${aksiBtn}</td>
-                </tr>`;
-            });
-            tbody.innerHTML = html;
-        })
-        .catch(err => {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#ef4444;">Gagal memuat data.</td></tr>';
-        });
-});
-</script>
 
 <div id="tab-pengaturan" class="tab-content">
 
@@ -1072,7 +1057,7 @@ document.querySelector('#addSingleRegistrationModal form').addEventListener('sub
             timer: 1500,
             showConfirmButton: false
         });
-        document.querySelector('select[name="jurusan"]').dispatchEvent(new Event('change'));
+        setTimeout(() => window.location.reload(), 1500);
     })
     .catch(err => {
         alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
@@ -1093,13 +1078,7 @@ document.querySelector('#editPendaftarModal form').addEventListener('submit', fu
             timer: 1500,
             showConfirmButton: false
         });
-        const container = document.getElementById('previewJurusanContainer');
-        if (container && container.style.display !== 'none') {
-            document.querySelector('select[name="jurusan"]').dispatchEvent(new Event('change'));
-        } else {
-            // Optional: If they edit from the Data Pendaftar tab, reload page to refresh DataTables
-            window.location.reload();
-        }
+        setTimeout(() => window.location.reload(), 1500);
     })
     .catch(err => {
         alert('Terjadi kesalahan saat mengedit pendaftaran.');
