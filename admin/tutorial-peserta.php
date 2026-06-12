@@ -163,145 +163,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- ===================================================
-     CARD: TAMBAH PESERTA
-     =================================================== --><div class="card">
-    <div class="card-header">➕ Buat Kelas & Tambah Peserta</div>
-    <div class="card-body">
-        <form method="POST" id="assignForm" data-no-spa>
-            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-            <input type="hidden" name="action" value="assign">
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:24px;background:#f8fafc;padding:20px;border-radius:12px;border:1px solid #e2e8f0;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Nama Kelas *</label>
-                    <input type="text" name="nama_kelas" placeholder="Kelas A" required
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                </div>
-
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Dosen Pengampu</label>
-                    <select name="dosen_pengampu"
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Pilih Dosen --</option>
-                        <?php foreach ($tutorsList as $t): ?>
-                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Hari</label>
-                    <select name="hari"
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Pilih Hari --</option>
-                        <option value="Senin">Senin</option>
-                        <option value="Selasa">Selasa</option>
-                        <option value="Rabu">Rabu</option>
-                        <option value="Kamis">Kamis</option>
-                        <option value="Jumat">Jumat</option>
-                        <option value="Sabtu">Sabtu</option>
-                        <option value="Ahad">Ahad</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Jam</label>
-                    <select name="jam"
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Pilih Jam --</option>
-                        <option value="08:00-09:30">08:00 - 09:30</option>
-                        <option value="10:00-11:30">10:00 - 11:30</option>
-                        <option value="13:00-14:30">13:00 - 14:30</option>
-                        <option value="15:30-17:00">15:30 - 17:00</option>
-                        <option value="18:30-20:00">18:30 - 20:00</option>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Ruangan</label>
-                    <select name="ruangan"
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                        <option value="">-- Pilih Ruangan --</option>
-                        <?php foreach ($roomsList as $rm): ?>
-                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Kuota</label>
-                    <input type="number" name="kuota" min="0" placeholder="30"
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                </div>
-            </div>
-
-            <!-- Baris 2: Daftar Mahasiswa dengan Checkbox -->
-            <div class="form-group" style="margin-bottom:20px;">
-                <label style="margin-bottom:8px;display:block;">
-                    Pilih Mahasiswa <span style="color:#ef4444;">*</span>
-                    <span id="selectedCount" style="margin-left:8px;font-size:12px;font-weight:400;color:#6b7280;">
-                        (0 dipilih)
-                    </span>
-                </label>
-
-                <!-- Search + Pilih Semua -->
-                <div style="display:flex;gap:16px;margin-bottom:12px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:12px 16px;border-radius:10px;border:1px solid #e5e7eb;">
-                    <div style="flex:1;min-width:250px;position:relative;">
-                        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;">🔍</span>
-                        <input type="text" id="searchMhs" placeholder="Cari nama atau NIM..."
-                            style="width:100%;padding:10px 12px 10px 36px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;transition:all 0.2s;">
-                    </div>
-                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1e293b;white-space:nowrap;user-select:none;background:#fff;padding:8px 16px;border-radius:8px;border:1.5px solid #e5e7eb;transition:all 0.2s;" onmouseover="this.style.borderColor='#cbd5e1'" onmouseout="this.style.borderColor='#e5e7eb'">
-                        <input type="checkbox" id="selectAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
-                        Pilih Semua Mahasiswa
-                    </label>
-                </div>
-
-                <!-- List mahasiswa -->
-                <div id="studentList"
-                    style="border:1.5px solid #e5e7eb;border-radius:10px;max-height:320px;overflow-y:auto;background:#fafafa;">
-
-                    <?php if (empty($students)): ?>
-                        <div style="padding:40px 24px;text-align:center;color:#64748b;display:flex;flex-direction:column;align-items:center;gap:12px;">
-                            <div style="font-size:48px;color:#cbd5e1;">👥</div>
-                            <h3 style="margin:0;font-size:16px;font-weight:600;color:#334155;">Belum ada data mahasiswa</h3>
-                            <p style="margin:0;font-size:14px;">Tambahkan data mahasiswa terlebih dahulu di menu Kelola Pengguna.</p>
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($students as $s): ?>
-                        <label class="student-row"
-                            data-nama="<?= strtolower(htmlspecialchars($s['nama_lengkap'], ENT_QUOTES)) ?>"
-                            data-nim="<?= strtolower(htmlspecialchars($s['nim'] ?? '', ENT_QUOTES)) ?>"
-                            style="display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background .15s;">
-                            <input type="checkbox" name="user_ids[]" value="<?= $s['id'] ?>"
-                                class="student-cb"
-                                style="width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--primary);">
-                            <div style="flex:1;min-width:0;">
-                                <div style="font-weight:600;font-size:14px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                                    <?= sanitize($s['nama_lengkap']) ?>
-                                </div>
-                                <div style="font-size:12px;color:#6b7280;">
-                                    <?= sanitize($s['nim'] ?? '-') ?>
-                                    <?php if (!empty($s['program_studi'])): ?>
-                                        · <?= sanitize($s['program_studi']) ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </label>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px;padding-top:20px;border-top:1px solid #e5e7eb;">
-                <button type="submit" class="btn btn-primary" style="width:auto;display:flex;align-items:center;gap:8px;padding:10px 20px;">
-                    <span style="font-size:16px;">📋</span> Buat Kelas & Tambah Peserta
-                </button>
-                <button type="button" class="btn btn-secondary" style="width:auto;display:flex;align-items:center;gap:8px;padding:10px 20px;background:#f1f5f9;color:#475569;border:none;" onclick="clearSelection()" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
-                    <span style="font-size:16px;">✕</span> Batal Pilihan
-                </button>
-                <span id="submitHint" style="font-size:13px;font-weight:500;color:#64748b;margin-left:8px;"></span>
-            </div>
-        </form>
-    </div>
-</div>
 
 <!-- ===================================================
      CARD: DAFTAR PESERTA
@@ -356,76 +218,9 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<style>
-.student-row:hover { background: #f0f9ff; }
-.student-row:has(.student-cb:checked) { background: #eff6ff; }
-.student-row:last-child { border-bottom: none; }
-#studentList::-webkit-scrollbar { width: 6px; }
-#studentList::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
-#studentList::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-</style>
-
 <script>
 (function () {
-    var searchInput  = document.getElementById('searchMhs');
-    var selectAll    = document.getElementById('selectAll');
-    var countBadge   = document.getElementById('selectedCount');
-    var submitHint   = document.getElementById('submitHint');
     var filterKelasBottom = document.getElementById('filterKelasBottom');
-
-    /* ---- Helper: semua baris yang saat ini terlihat ---- */
-    function visibleRows() {
-        return Array.from(document.querySelectorAll('.student-row'))
-            .filter(function(row) { return row.style.display !== 'none'; });
-    }
-
-    /* ---- Update badge hitungan ---- */
-    function updateCount() {
-        var checked = document.querySelectorAll('.student-cb:checked').length;
-        countBadge.textContent = '(' + checked + ' dipilih)';
-        submitHint.textContent = checked > 0
-            ? checked + ' mahasiswa akan dimasukkan ke kelas yang akan dibuat.'
-            : '';
-
-        // Sinkronisasi checkbox "pilih semua"
-        var vis = visibleRows();
-        if (vis.length === 0) {
-            selectAll.indeterminate = false;
-            selectAll.checked = false;
-        } else {
-            var visChecked = vis.filter(function(r) {
-                return r.querySelector('.student-cb').checked;
-            }).length;
-            selectAll.indeterminate = visChecked > 0 && visChecked < vis.length;
-            selectAll.checked = visChecked === vis.length;
-        }
-    }
-
-    /* ---- Filter teks ---- */
-    searchInput.addEventListener('input', function () {
-        var q = this.value.toLowerCase().trim();
-        document.querySelectorAll('.student-row').forEach(function(row) {
-            var match = !q
-                || row.dataset.nama.includes(q)
-                || row.dataset.nim.includes(q);
-            row.style.display = match ? '' : 'none';
-        });
-        updateCount();
-    });
-
-    /* ---- Pilih Semua (hanya baris terlihat) ---- */
-    selectAll.addEventListener('change', function () {
-        var check = this.checked;
-        visibleRows().forEach(function(row) {
-            row.querySelector('.student-cb').checked = check;
-        });
-        updateCount();
-    });
-
-    /* ---- Checkbox individual ---- */
-    document.getElementById('studentList').addEventListener('change', function(e) {
-        if (e.target.classList.contains('student-cb')) updateCount();
-    });
 
     /* ---- Filter tabel bawah berdasarkan Kelas Tutorial yang dipilih ---- */
     setTimeout(function() {
@@ -490,26 +285,7 @@ include __DIR__ . '/../includes/header.php';
         }
     }, 500);
 
-    /* ---- Validasi sebelum submit ---- */
-    document.getElementById('assignForm').addEventListener('submit', function(e) {
-        var anyCheck = document.querySelector('.student-cb:checked');
-        if (!anyCheck) {
-            e.preventDefault();
-            alert('Pilih minimal satu mahasiswa.');
-        }
-    });
-
-    updateCount();
 })();
-
-function clearSelection() {
-    document.querySelectorAll('.student-cb').forEach(function(cb) { cb.checked = false; });
-    document.getElementById('selectAll').checked = false;
-    document.getElementById('searchMhs').value = '';
-    document.querySelectorAll('.student-row').forEach(function(r) { r.style.display = ''; });
-    document.getElementById('selectedCount').textContent = '(0 dipilih)';
-    document.getElementById('submitHint').textContent = '';
-}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
