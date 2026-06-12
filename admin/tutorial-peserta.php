@@ -290,6 +290,68 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
 <?php endif; ?>
 
+<style>
+.custom-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 0;
+    overflow-x: auto;
+}
+.custom-tab {
+    padding: 12px 20px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.custom-tab:hover {
+    color: #3b82f6;
+    background: #f8fafc;
+}
+.custom-tab.active {
+    color: #3b82f6;
+    border-bottom-color: #3b82f6;
+}
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.tab-content.active {
+    display: block;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<div class="custom-tabs">
+    <button class="custom-tab active" onclick="openTutorialTab(event, 'tab-pendaftar')">📝 Data Pendaftar</button>
+    <button class="custom-tab" onclick="openTutorialTab(event, 'tab-pengaturan')">⚙️ Pengaturan & Generate</button>
+    <button class="custom-tab" onclick="openTutorialTab(event, 'tab-peserta')">👥 Hasil Plotting & Jadwal</button>
+</div>
+
+<script>
+function openTutorialTab(evt, tabId) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.custom-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    evt.currentTarget.classList.add('active');
+    
+    // Trigger window resize so Chart.js recalculates canvas size properly when it becomes visible
+    window.dispatchEvent(new Event('resize'));
+}
+</script>
+
+<div id="tab-pendaftar" class="tab-content active">
+
 <!-- ===================================================
      CARD: DATA PENDAFTAR TUTORIAL
      =================================================== -->
@@ -357,6 +419,10 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+</div> <!-- End of tab-pendaftar -->
+
+<div id="tab-pengaturan" class="tab-content">
 
 <!-- ===================================================
      CARD: PENGATURAN DOSEN DAN KUOTA
@@ -563,6 +629,10 @@ function addQETutorRow(day) {
 
 
 
+</div> <!-- End of tab-pengaturan -->
+
+<div id="tab-peserta" class="tab-content">
+
 <!-- ===================================================
      CARD: DAFTAR PESERTA
      =================================================== -->
@@ -731,6 +801,8 @@ $chartData = json_encode(array_values($statsKelas));
         </div>
     </div>
 </div>
+
+</div> <!-- End of tab-peserta -->
 
 <!-- Modal Edit Peserta -->
 <div id="editPesertaModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
