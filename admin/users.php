@@ -97,6 +97,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$newPass, $id]);
             $message = 'Password berhasil direset ke tanggal lahir (ddmmyyyy): <strong>' . sanitize($passwordRaw) . '</strong>.';
             $msgType = 'success';
+
+        } elseif ($action === 'login_as') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id !== (int)$_SESSION['user_id']) {
+                $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt->execute([$id]);
+                $user = $stmt->fetch();
+                if ($user) {
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
+                    $_SESSION['nim'] = $user['nim'];
+                    $_SESSION['role'] = $user['role'];
+                    $_SESSION['program_studi'] = $user['program_studi'];
+                    $_SESSION['fakultas'] = $user['fakultas'];
+                    header('Location: ' . BASE_URL . '/dashboard.php');
+                    exit;
+                }
+            }
         }
     }
 }
@@ -305,6 +324,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                                 <button type="submit" class="btn btn-sm btn-secondary"
                                     data-confirm="Reset password ke tanggal lahir (ddmmyyyy)?">🔑 Reset Pass</button>
                             </form>
+                            <!-- Login As -->
+                            <?php if ($u['id'] !== $_SESSION['user_id']): ?>
+                            <form method="POST" style="display:inline;margin-right:4px;" data-no-spa>
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="login_as">
+                                <input type="hidden" name="id" value="<?= $u['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-info" style="background-color:#0ea5e9;color:white;"
+                                    data-confirm="Login sebagai <?= htmlspecialchars($u['nama_lengkap'], ENT_QUOTES) ?>?">🚪 Login As</button>
+                            </form>
+                            <?php endif; ?>
                             <!-- Hapus (tidak bisa hapus diri sendiri) -->
                             <?php if ($u['id'] !== $_SESSION['user_id']): ?>
                             <form method="POST" style="display:inline;">
