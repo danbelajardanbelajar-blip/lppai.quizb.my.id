@@ -320,8 +320,27 @@ include __DIR__ . '/../includes/header.php';
                 foreach ($days as $day):
                     $dayLower = strtolower($day);
                     $tutorsStr = $active_gel["tutors_$dayLower"] ?? '';
-                    $delimiter = (strpos($tutorsStr, '|||') !== false) ? '|||' : ',';
-                    $currentTutors = array_filter(array_map('trim', explode($delimiter, $tutorsStr)));
+                    // Kami menggunakan ||| secara eksklusif untuk menghindari bug koma pada nama dosen
+                    // Jika data lama masih pakai koma, pengguna cukup menyimpannya ulang.
+                    if ($tutorsStr !== '' && strpos($tutorsStr, '|||') === false && strpos($tutorsStr, ',') !== false) {
+                        // Coba deteksi jika ini adalah 1 nama dosen yang memang mengandung koma
+                        $isSingleTutorWithComma = false;
+                        foreach($tutorsList as $t) {
+                            if ($t['nama'] === trim($tutorsStr)) {
+                                $isSingleTutorWithComma = true;
+                                break;
+                            }
+                        }
+                        if ($isSingleTutorWithComma) {
+                            $currentTutors = [$tutorsStr];
+                        } else {
+                            // Kemungkinan data lama (banyak dosen dengan koma)
+                            $currentTutors = array_filter(array_map('trim', explode(',', $tutorsStr)));
+                        }
+                    } else {
+                        $currentTutors = array_filter(array_map('trim', explode('|||', $tutorsStr)));
+                    }
+                    
                     $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                     $terisi = $registeredCounts[$day] ?? 0;
                     $sisaKuota = $totalKuota - $terisi;
@@ -332,7 +351,7 @@ include __DIR__ . '/../includes/header.php';
                     <div id="qe_tutors_<?= $dayLower ?>_container" class="tutor-container" data-day="<?= $dayLower ?>">
                         <?php foreach($currentTutors as $idx => $tName): ?>
                         <div class="tutor-row" style="display:flex; gap:4px; margin-bottom:4px;">
-                            <select name="tutors_<?= $dayLower ?>[]" class="tutor-select" style="flex:1; padding:6px; border:1.5px solid #e5e7eb; border-radius:6px; font-size:13px;">
+                            <select name="tutors_<?= $dayLower ?>[]" class="tutor-select" style="flex:1; padding:6px; border:1.5px solid #e5e7eb; border-radius:6px; font-size:13px;" onchange="calculateQEKuota('<?= $dayLower ?>')">
                                 <option value="">- Tutor -</option>
                                 <?php foreach($tutorsList as $t): ?>
                                 <option value="<?= sanitize($t['nama']) ?>" <?= ($t['nama'] === $tName) ? 'selected' : '' ?>><?= sanitize($t['nama']) ?></option>
@@ -341,14 +360,14 @@ include __DIR__ . '/../includes/header.php';
                             <?php if ($idx === 0): ?>
                             <button type="button" class="btn btn-sm btn-success add-tutor-btn" onclick="addQETutorRow('<?= $dayLower ?>')" style="padding:0 8px;">+</button>
                             <?php else: ?>
-                            <button type="button" class="btn btn-sm btn-danger remove-tutor-btn" onclick="this.parentElement.remove()" style="padding:0 8px;">×</button>
+                            <button type="button" class="btn btn-sm btn-danger remove-tutor-btn" onclick="this.parentElement.remove(); calculateQEKuota('<?= $dayLower ?>');" style="padding:0 8px;">×</button>
                             <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
                     
                     <div style="font-size:12px; color:#64748b; margin-top:-4px;">Kuota:</div>
-                    <input type="number" name="kuota_<?= $dayLower ?>" value="<?= $totalKuota ?>" min="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:14px;background:#fff;">
+                    <input type="number" name="kuota_<?= $dayLower ?>" id="qe_kuota_<?= $dayLower ?>" value="<?= $totalKuota ?>" min="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:14px;background:#fff;">
                     
                     <div style="font-size:12px; margin-top:2px; font-weight:600; color: <?= $sisaKuota < 0 ? '#ef4444' : '#10b981' ?>;">
                         Sisa Kuota: <?= $sisaKuota ?>
@@ -363,6 +382,17 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+function calculateQEKuota(day) {
+    const container = document.getElementById('qe_tutors_' + day + '_container');
+    const selects = container.querySelectorAll('select');
+    let validTutors = 0;
+    selects.forEach(sel => {
+        if (sel.value.trim() !== '') validTutors++;
+    });
+    const kuotaInput = document.getElementById('qe_kuota_' + day);
+    if (kuotaInput) kuotaInput.value = validTutors * 30;
+}
+
 function addQETutorRow(day) {
     const container = document.getElementById('qe_tutors_' + day + '_container');
     const firstSelect = container.querySelector('.tutor-select').cloneNode(true);
@@ -379,7 +409,10 @@ function addQETutorRow(day) {
     removeBtn.className = 'btn btn-sm btn-danger remove-tutor-btn';
     removeBtn.style.padding = '0 8px';
     removeBtn.innerHTML = '×';
-    removeBtn.onclick = function() { div.remove(); };
+    removeBtn.onclick = function() { 
+        div.remove(); 
+        calculateQEKuota(day);
+    };
     
     div.appendChild(firstSelect);
     div.appendChild(removeBtn);
