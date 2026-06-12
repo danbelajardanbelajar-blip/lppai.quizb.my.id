@@ -313,7 +313,7 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
 </div>
 
 <script>
-function calculateQuota(day, isEdit) {
+window.calculateQuota = function(day, isEdit) {
     const prefix = isEdit ? 'edit_' : '';
     const container = document.getElementById(prefix + 'tutors_' + day + '_container');
     const selects = container.querySelectorAll('select');
@@ -323,9 +323,9 @@ function calculateQuota(day, isEdit) {
     });
     const kuotaInput = document.getElementById(prefix + 'kuota_' + day);
     if (kuotaInput) kuotaInput.value = validTutors * 30;
-}
+};
 
-function addTutorRow(day, isEdit) {
+window.addTutorRow = function(day, isEdit) {
     const prefix = isEdit ? 'edit_' : '';
     const container = document.getElementById(prefix + 'tutors_' + day + '_container');
     const rows = container.querySelectorAll('.tutor-row');
@@ -339,12 +339,12 @@ function addTutorRow(day, isEdit) {
     btn.classList.replace('btn-success', 'btn-danger');
     btn.onclick = function() {
         newRow.remove();
-        calculateQuota(day, isEdit);
+        window.calculateQuota(day, isEdit);
     };
     container.appendChild(newRow);
-}
+};
 
-function populateTutors(day, tutorsString) {
+window.populateTutors = function(day, tutorsString) {
     const isEdit = true;
     const prefix = 'edit_';
     const container = document.getElementById(prefix + 'tutors_' + day + '_container');
@@ -358,7 +358,7 @@ function populateTutors(day, tutorsString) {
     firstSelect.value = '';
     
     if (!tutorsString) {
-        calculateQuota(day, isEdit);
+        window.calculateQuota(day, isEdit);
         return;
     }
     
@@ -376,33 +376,33 @@ function populateTutors(day, tutorsString) {
         btn.classList.replace('btn-success', 'btn-danger');
         btn.onclick = function() {
             newRow.remove();
-            calculateQuota(day, isEdit);
+            window.calculateQuota(day, isEdit);
         };
         container.appendChild(newRow);
     }
-    calculateQuota(day, isEdit);
-}
+    window.calculateQuota(day, isEdit);
+};
 
-function openGelombangModal(d) {
+window.openGelombangModal = function(d) {
     document.getElementById('edit_id').value = d.id;
     document.getElementById('edit_semester_tipe').value = d.semester || '';
     document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
     document.getElementById('edit_gelombang').value = d.gelombang || '';
     
     // We update the kuota inputs dynamically based on the tutors list
-    populateTutors('senin', d.tutors_senin);
-    populateTutors('selasa', d.tutors_selasa);
-    populateTutors('rabu', d.tutors_rabu);
-    populateTutors('kamis', d.tutors_kamis);
-    populateTutors('jumat', d.tutors_jumat);
+    window.populateTutors('senin', d.tutors_senin);
+    window.populateTutors('selasa', d.tutors_selasa);
+    window.populateTutors('rabu', d.tutors_rabu);
+    window.populateTutors('kamis', d.tutors_kamis);
+    window.populateTutors('jumat', d.tutors_jumat);
 
     document.getElementById('editGelombangModal').classList.add('show');
-}
+};
 
-function closeGelombangModal() {
+window.closeGelombangModal = function() {
     var m = document.getElementById('editGelombangModal');
     if (m) m.classList.remove('show');
-}
+};
 
 if (!window._editGelombangBound) {
     window._editGelombangBound = true;
@@ -411,7 +411,7 @@ if (!window._editGelombangBound) {
         var btn = e.target.closest('.btn-edit-gelombang');
         if (btn) {
             var d = btn.dataset;
-            openGelombangModal({
+            window.openGelombangModal({
                 id: d.id,
                 semester: d.semester,
                 tahun_ajaran: d.tahun_ajaran,
@@ -426,17 +426,17 @@ if (!window._editGelombangBound) {
         }
 
         if (e.target.closest('.btn-close-modal')) {
-            closeGelombangModal();
+            window.closeGelombangModal();
             return;
         }
 
         if (e.target && e.target.id === 'editGelombangModal') {
-            closeGelombangModal();
+            window.closeGelombangModal();
         }
     });
 
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeGelombangModal();
+        if (e.key === 'Escape') window.closeGelombangModal();
     });
 }
 </script>
