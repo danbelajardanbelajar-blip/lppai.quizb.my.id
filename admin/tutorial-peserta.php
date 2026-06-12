@@ -478,6 +478,76 @@ function addQETutorRow(day) {
 <!-- ===================================================
      CARD: DAFTAR PESERTA
      =================================================== -->
+<?php
+// Siapkan data untuk grafik statistik
+$statsKelas = [];
+foreach ($registrations as $r) {
+    $kelas = sanitize($r['nama_kelas']);
+    if (!isset($statsKelas[$kelas])) {
+        $statsKelas[$kelas] = 0;
+    }
+    $statsKelas[$kelas]++;
+}
+ksort($statsKelas); // Urutkan nama kelas
+$chartLabels = json_encode(array_keys($statsKelas));
+$chartData = json_encode(array_values($statsKelas));
+?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="card" style="margin-top: 30px;">
+    <div class="card-header" style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
+        <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
+            <span style="font-size:20px;">📊</span> Grafik Statistik Distribusi Mahasiswa
+        </span>
+    </div>
+    <div class="card-body" style="padding: 20px;">
+        <?php if(empty($statsKelas)): ?>
+            <div style="text-align: center; color: #64748b; font-style: italic;">Data belum tersedia untuk grafik ini.</div>
+        <?php else: ?>
+            <div style="position: relative; height: 300px; width: 100%;">
+                <canvas id="scheduleChart"></canvas>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var ctx = document.getElementById('scheduleChart').getContext('2d');
+                    var chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: <?= $chartLabels ?>,
+                            datasets: [{
+                                label: 'Jumlah Mahasiswa',
+                                data: <?= $chartData ?>,
+                                backgroundColor: '#4f46e5',
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+            </script>
+        <?php endif; ?>
+    </div>
+</div>
+
 <div class="card" style="margin-top: 30px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
         <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
