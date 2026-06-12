@@ -58,6 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
 
+            // Siapkan helper untuk resolve nama asli tutor
+            $realTutorNames = [];
+            $stmtFindTutor = $pdo->prepare("SELECT nama FROM tutors WHERE nama LIKE CONCAT('%', ?, '%') LIMIT 1");
+
             if ($generateMode === 'fill_first') {
                 $tutorIndex = 0;
                 $classIndex = 0;
@@ -67,13 +71,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $chunk = array_splice($students, 0, $minPerClass);
                     $tutor = $tutors[$tutorIndex % $C];
                     
-                    if (isset($tutorClassMap[$tutor])) {
-                        $classId = $tutorClassMap[$tutor];
+                    if (!isset($realTutorNames[$tutor])) {
+                        $stmtFindTutor->execute([$tutor]);
+                        $realName = $stmtFindTutor->fetchColumn();
+                        $realTutorNames[$tutor] = $realName ? $realName : $tutor;
+                    }
+                    $tutorReal = $realTutorNames[$tutor];
+                    
+                    if (isset($tutorClassMap[$tutorReal])) {
+                        $classId = $tutorClassMap[$tutorReal];
                     } else {
                         $namaKelas = "Kelas $hari " . chr(65 + $classIndex); // Kelas Senin A, Kelas Senin B, ...
-                        $stmtInsertClass->execute([$namaKelas, $tutor, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                        $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
                         $classId = $pdo->lastInsertId();
-                        $tutorClassMap[$tutor] = $classId;
+                        $tutorClassMap[$tutorReal] = $classId;
                         $classIndex++;
                     }
                     
@@ -95,13 +106,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $chunk = array_splice($students, 0, $studentsPerClass);
                     $tutor = $tutors[$i];
 
-                    if (isset($tutorClassMap[$tutor])) {
-                        $classId = $tutorClassMap[$tutor];
+                    if (!isset($realTutorNames[$tutor])) {
+                        $stmtFindTutor->execute([$tutor]);
+                        $realName = $stmtFindTutor->fetchColumn();
+                        $realTutorNames[$tutor] = $realName ? $realName : $tutor;
+                    }
+                    $tutorReal = $realTutorNames[$tutor];
+
+                    if (isset($tutorClassMap[$tutorReal])) {
+                        $classId = $tutorClassMap[$tutorReal];
                     } else {
                         $namaKelas = "Kelas $hari " . chr(65 + $classIndex);
-                        $stmtInsertClass->execute([$namaKelas, $tutor, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                        $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
                         $classId = $pdo->lastInsertId();
-                        $tutorClassMap[$tutor] = $classId;
+                        $tutorClassMap[$tutorReal] = $classId;
                         $classIndex++;
                     }
 
