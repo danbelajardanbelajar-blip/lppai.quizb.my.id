@@ -16,6 +16,9 @@ $pdo->exec("CREATE TABLE IF NOT EXISTS master_gelombang (
 )");
 try {
     $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN kuota_senin INT DEFAULT 0, ADD COLUMN kuota_selasa INT DEFAULT 0, ADD COLUMN kuota_rabu INT DEFAULT 0, ADD COLUMN kuota_kamis INT DEFAULT 0, ADD COLUMN kuota_jumat INT DEFAULT 0");
+} catch (Exception $e) {}
+
+try {
     $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN tutors_senin VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_selasa VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_rabu VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_kamis VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_jumat VARCHAR(1000) DEFAULT NULL");
 } catch (Exception $e) {}
 
