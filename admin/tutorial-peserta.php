@@ -124,6 +124,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = count($regIds) . ' peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
                 $msgType = 'success';
             }
+        /* ---- UPDATE TUTORS & KUOTA ---- */
+        } elseif ($action === 'update_tutors_kuota') {
+            $active_gel_id = (int)($_POST['gel_id'] ?? 0);
+            if ($active_gel_id > 0) {
+                $kuota_senin = (int)($_POST['kuota_senin'] ?? 0);
+                $kuota_selasa = (int)($_POST['kuota_selasa'] ?? 0);
+                $kuota_rabu = (int)($_POST['kuota_rabu'] ?? 0);
+                $kuota_kamis = (int)($_POST['kuota_kamis'] ?? 0);
+                $kuota_jumat = (int)($_POST['kuota_jumat'] ?? 0);
+                
+                $tutors_senin = isset($_POST['tutors_senin']) && is_array($_POST['tutors_senin']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_senin']))) : '';
+                $tutors_selasa = isset($_POST['tutors_selasa']) && is_array($_POST['tutors_selasa']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_selasa']))) : '';
+                $tutors_rabu = isset($_POST['tutors_rabu']) && is_array($_POST['tutors_rabu']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_rabu']))) : '';
+                $tutors_kamis = isset($_POST['tutors_kamis']) && is_array($_POST['tutors_kamis']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_kamis']))) : '';
+                $tutors_jumat = isset($_POST['tutors_jumat']) && is_array($_POST['tutors_jumat']) ? implode(',', array_filter(array_map('trim', $_POST['tutors_jumat']))) : '';
+                
+                $pdo->prepare("UPDATE master_gelombang SET kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
+                    ->execute([$kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat, $tutors_senin, $tutors_selasa, $tutors_rabu, $tutors_kamis, $tutors_jumat, $active_gel_id]);
+                
+                $message = 'Pengaturan Dosen dan Kuota berhasil disimpan.';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -142,6 +164,30 @@ $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
 $tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
+
+$active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+$registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+if ($active_gel) {
+    try {
+        $stmtCount = $pdo->prepare("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE gelombang = ? GROUP BY hari_pilihan");
+        $stmtCount->execute([$active_gel['gelombang']]);
+        foreach ($stmtCount->fetchAll() as $row) {
+            $hari = ucfirst(strtolower($row['hari_pilihan']));
+            if (isset($registeredCounts[$hari])) {
+                $registeredCounts[$hari] = $row['cnt'];
+            }
+        }
+    } catch (Exception $e) {
+        // Fallback jika tidak ada kolom gelombang di tutorial_registrations
+        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations GROUP BY hari_pilihan");
+        foreach ($stmtCount->fetchAll() as $row) {
+            $hari = ucfirst(strtolower($row['hari_pilihan']));
+            if (isset($registeredCounts[$hari])) {
+                $registeredCounts[$hari] = $row['cnt'];
+            }
+        }
+    }
+}
 
 // Kumpulkan hari unik dari kelas yang ada
 $hariList = [];
@@ -255,6 +301,90 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- ===================================================
+     CARD: PENGATURAN DOSEN DAN KUOTA
+     =================================================== -->
+<?php if ($active_gel): ?>
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header">👨‍🏫 Pengaturan Dosen & Kuota (Gelombang Aktif)</div>
+    <div class="card-body">
+        <form method="POST" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="update_tutors_kuota">
+            <input type="hidden" name="gel_id" value="<?= $active_gel['id'] ?>">
+            
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+                <?php
+                $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                foreach ($days as $day):
+                    $dayLower = strtolower($day);
+                    $currentTutors = array_filter(array_map('trim', explode(',', $active_gel["tutors_$dayLower"] ?? '')));
+                    $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
+                    $terisi = $registeredCounts[$day] ?? 0;
+                    $sisaKuota = $totalKuota - $terisi;
+                    if (empty($currentTutors)) $currentTutors = ['']; // Minimal 1 row kosong
+                ?>
+                <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; gap:8px;">
+                    <label style="font-weight:bold; font-size:14px; text-transform:capitalize;"><?= $day ?></label>
+                    <div id="qe_tutors_<?= $dayLower ?>_container" class="tutor-container" data-day="<?= $dayLower ?>">
+                        <?php foreach($currentTutors as $idx => $tName): ?>
+                        <div class="tutor-row" style="display:flex; gap:4px; margin-bottom:4px;">
+                            <select name="tutors_<?= $dayLower ?>[]" class="tutor-select" style="flex:1; padding:6px; border:1.5px solid #e5e7eb; border-radius:6px; font-size:13px;">
+                                <option value="">- Tutor -</option>
+                                <?php foreach($tutorsList as $t): ?>
+                                <option value="<?= sanitize($t['nama']) ?>" <?= ($t['nama'] === $tName) ? 'selected' : '' ?>><?= sanitize($t['nama']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php if ($idx === 0): ?>
+                            <button type="button" class="btn btn-sm btn-success add-tutor-btn" onclick="addQETutorRow('<?= $dayLower ?>')" style="padding:0 8px;">+</button>
+                            <?php else: ?>
+                            <button type="button" class="btn btn-sm btn-danger remove-tutor-btn" onclick="this.parentElement.remove()" style="padding:0 8px;">×</button>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    
+                    <div style="font-size:12px; color:#64748b; margin-top:-4px;">Kuota:</div>
+                    <input type="number" name="kuota_<?= $dayLower ?>" value="<?= $totalKuota ?>" min="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:14px;background:#fff;">
+                    
+                    <div style="font-size:12px; margin-top:2px; font-weight:600; color: <?= $sisaKuota < 0 ? '#ef4444' : '#10b981' ?>;">
+                        Sisa Kuota: <?= $sisaKuota ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="margin-top:16px;">💾 Simpan Pengaturan</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function addQETutorRow(day) {
+    const container = document.getElementById('qe_tutors_' + day + '_container');
+    const firstSelect = container.querySelector('.tutor-select').cloneNode(true);
+    firstSelect.value = '';
+    
+    const div = document.createElement('div');
+    div.className = 'tutor-row';
+    div.style.display = 'flex';
+    div.style.gap = '4px';
+    div.style.marginBottom = '4px';
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-sm btn-danger remove-tutor-btn';
+    removeBtn.style.padding = '0 8px';
+    removeBtn.innerHTML = '×';
+    removeBtn.onclick = function() { div.remove(); };
+    
+    div.appendChild(firstSelect);
+    div.appendChild(removeBtn);
+    container.appendChild(div);
+}
+</script>
+<?php endif; ?>
 
 <!-- ===================================================
      CARD: GENERATE JADWAL

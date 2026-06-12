@@ -1,4 +1,4 @@
 <?php
-$pdo = new PDO('sqlite:database.sqlite');
-$gel = $pdo->query('SELECT tutors_senin, tutors_selasa, tutors_rabu, tutors_kamis, tutors_jumat FROM master_gelombang ORDER BY id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-print_r($gel);
+$pdo = new PDO('mysql:host=localhost;dbname=quic1934_lppai;charset=utf8mb4', 'quic1934_zenhkm', '03Maret1990');
+$stmt = $pdo->query("DESCRIBE tutorial_registrations");
+print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
