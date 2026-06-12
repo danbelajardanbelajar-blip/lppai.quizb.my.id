@@ -102,6 +102,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Data penempatan berhasil diperbarui.';
                 $msgType = 'success';
             }
+
+        /* ---- HAPUS DARI KELAS ---- */
+        } elseif ($action === 'delete') {
+            $regId = (int)($_POST['reg_id'] ?? 0);
+            if ($regId > 0) {
+                // Set tutorial_class_id menjadi NULL agar mahasiswa keluar dari kelas
+                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE id = ?")
+                    ->execute([$regId]);
+                $message = 'Peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
+                $msgType = 'success';
+            }
         }
     }
 }
