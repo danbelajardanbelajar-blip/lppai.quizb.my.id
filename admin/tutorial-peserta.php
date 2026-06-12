@@ -316,30 +316,35 @@ include __DIR__ . '/../includes/header.php';
             
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
                 <?php
+                // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
+                function parseLegacyTutors($tutorsStr, $tutorsList) {
+                    if ($tutorsStr === '') return [];
+                    if (strpos($tutorsStr, '|||') !== false) {
+                        return array_filter(array_map('trim', explode('|||', $tutorsStr)));
+                    }
+                    
+                    // Sort by length desc
+                    $list = $tutorsList;
+                    usort($list, function($a, $b) { return strlen($b['nama']) - strlen($a['nama']); });
+                    
+                    $tempStr = $tutorsStr;
+                    $matched = [];
+                    foreach ($list as $t) {
+                        $nama = $t['nama'];
+                        while (($pos = strpos($tempStr, $nama)) !== false) {
+                            $matched[$pos] = $nama;
+                            $tempStr = substr_replace($tempStr, str_repeat('#', strlen($nama)), $pos, strlen($nama));
+                        }
+                    }
+                    ksort($matched);
+                    return array_values($matched);
+                }
+
                 $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                 foreach ($days as $day):
                     $dayLower = strtolower($day);
                     $tutorsStr = $active_gel["tutors_$dayLower"] ?? '';
-                    // Kami menggunakan ||| secara eksklusif untuk menghindari bug koma pada nama dosen
-                    // Jika data lama masih pakai koma, pengguna cukup menyimpannya ulang.
-                    if ($tutorsStr !== '' && strpos($tutorsStr, '|||') === false && strpos($tutorsStr, ',') !== false) {
-                        // Coba deteksi jika ini adalah 1 nama dosen yang memang mengandung koma
-                        $isSingleTutorWithComma = false;
-                        foreach($tutorsList as $t) {
-                            if ($t['nama'] === trim($tutorsStr)) {
-                                $isSingleTutorWithComma = true;
-                                break;
-                            }
-                        }
-                        if ($isSingleTutorWithComma) {
-                            $currentTutors = [$tutorsStr];
-                        } else {
-                            // Kemungkinan data lama (banyak dosen dengan koma)
-                            $currentTutors = array_filter(array_map('trim', explode(',', $tutorsStr)));
-                        }
-                    } else {
-                        $currentTutors = array_filter(array_map('trim', explode('|||', $tutorsStr)));
-                    }
+                    $currentTutors = parseLegacyTutors($tutorsStr, $tutorsList);
                     
                     $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                     $terisi = $registeredCounts[$day] ?? 0;

@@ -28,6 +28,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tahun_ajaran = $gel['tahun_ajaran'];
     $gelombang_name = $gel['gelombang'];
 
+    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
+    if (!function_exists('parseLegacyTutors')) {
+        function parseLegacyTutors($tutorsStr, $tutorsList) {
+            if ($tutorsStr === '') return [];
+            if (strpos($tutorsStr, '|||') !== false) {
+                return array_filter(array_map('trim', explode('|||', $tutorsStr)));
+            }
+            $list = $tutorsList;
+            usort($list, function($a, $b) { return strlen($b['nama']) - strlen($a['nama']); });
+            $tempStr = $tutorsStr;
+            $matched = [];
+            foreach ($list as $t) {
+                $nama = $t['nama'];
+                while (($pos = strpos($tempStr, $nama)) !== false) {
+                    $matched[$pos] = $nama;
+                    $tempStr = substr_replace($tempStr, str_repeat('#', strlen($nama)), $pos, strlen($nama));
+                }
+            }
+            ksort($matched);
+            return array_values($matched);
+        }
+    }
+
     $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
     
     // Siapkan statement untuk membuat kelas
@@ -42,8 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($hariList as $hari) {
             $hariLower = strtolower($hari);
             $tutorsString = $gel['tutors_'.$hariLower] ?? '';
-            $delimiter = (strpos($tutorsString, '|||') !== false) ? '|||' : ',';
-            $tutors = array_filter(array_map('trim', explode($delimiter, $tutorsString)));
+            $tutors = parseLegacyTutors($tutorsString, $tutorsList);
             
             // Cari mahasiswa yang sudah mendaftar di hari ini tetapi belum masuk kelas
             // dan pastikan mereka terdaftar pada gelombang yang aktif ini

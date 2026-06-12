@@ -198,7 +198,30 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($gelombangData as $g): ?>
+                    <?php
+                    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
+                    if (!function_exists('parseLegacyTutors')) {
+                        function parseLegacyTutors($tutorsStr, $tutorsList) {
+                            if ($tutorsStr === '') return [];
+                            if (strpos($tutorsStr, '|||') !== false) {
+                                return array_filter(array_map('trim', explode('|||', $tutorsStr)));
+                            }
+                            $list = $tutorsList;
+                            usort($list, function($a, $b) { return strlen($b['nama']) - strlen($a['nama']); });
+                            $tempStr = $tutorsStr;
+                            $matched = [];
+                            foreach ($list as $t) {
+                                $nama = $t['nama'];
+                                while (($pos = strpos($tempStr, $nama)) !== false) {
+                                    $matched[$pos] = $nama;
+                                    $tempStr = substr_replace($tempStr, str_repeat('#', strlen($nama)), $pos, strlen($nama));
+                                }
+                            }
+                            ksort($matched);
+                            return array_values($matched);
+                        }
+                    }
+                    foreach ($gelombangData as $g): ?>
                     <tr>
                         <td><strong><?= sanitize($g['tahun_ajaran']) ?></strong></td>
                         <td><?= sanitize($g['semester']) ?></td>
@@ -225,11 +248,11 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                                 data-kuota_rabu="<?= $g['kuota_rabu'] ?? 0 ?>"
                                 data-kuota_kamis="<?= $g['kuota_kamis'] ?? 0 ?>"
                                 data-kuota_jumat="<?= $g['kuota_jumat'] ?? 0 ?>"
-                                data-tutors_senin="<?= htmlspecialchars($g['tutors_senin'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tutors_selasa="<?= htmlspecialchars($g['tutors_selasa'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tutors_rabu="<?= htmlspecialchars($g['tutors_rabu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tutors_kamis="<?= htmlspecialchars($g['tutors_kamis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tutors_jumat="<?= htmlspecialchars($g['tutors_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_senin="<?= htmlspecialchars(implode('|||', parseLegacyTutors($g['tutors_senin'] ?? '', $tutorsList)), ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_selasa="<?= htmlspecialchars(implode('|||', parseLegacyTutors($g['tutors_selasa'] ?? '', $tutorsList)), ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_rabu="<?= htmlspecialchars(implode('|||', parseLegacyTutors($g['tutors_rabu'] ?? '', $tutorsList)), ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_kamis="<?= htmlspecialchars(implode('|||', parseLegacyTutors($g['tutors_kamis'] ?? '', $tutorsList)), ENT_QUOTES, 'UTF-8') ?>"
+                                data-tutors_jumat="<?= htmlspecialchars(implode('|||', parseLegacyTutors($g['tutors_jumat'] ?? '', $tutorsList)), ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
                             </button>
