@@ -506,13 +506,19 @@ function openTutorialTab(evt, tabId) {
                     <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Hari Tutorial:</label>
                     <select name="hari_pilihan" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                         <option value="">-- Pilih Hari --</option>
-                        <option value="Senin">Senin</option>
-                        <option value="Selasa">Selasa</option>
-                        <option value="Rabu">Rabu</option>
-                        <option value="Kamis">Kamis</option>
-                        <option value="Jumat">Jumat</option>
-                        <option value="Sabtu">Sabtu</option>
-                        <option value="Ahad">Ahad</option>
+                        <?php 
+                        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                        foreach ($days as $day): 
+                            $dayLower = strtolower($day);
+                            $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                            $terisi = $registeredCounts[$day] ?? 0;
+                            $sisa = $kuota - $terisi;
+                            $isFull = $sisa <= 0;
+                        ?>
+                        <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
+                            <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                        </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -624,13 +630,19 @@ function openTutorialTab(evt, tabId) {
                 <select name="hari_pilihan" id="edit_pendaftar_hari" required
                     style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
                     <option value="">-- Pilih Hari --</option>
-                    <option value="Senin">Senin</option>
-                    <option value="Selasa">Selasa</option>
-                    <option value="Rabu">Rabu</option>
-                    <option value="Kamis">Kamis</option>
-                    <option value="Jumat">Jumat</option>
-                    <option value="Sabtu">Sabtu</option>
-                    <option value="Ahad">Ahad</option>
+                    <?php 
+                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    foreach ($days as $day): 
+                        $dayLower = strtolower($day);
+                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                        $terisi = $registeredCounts[$day] ?? 0;
+                        $sisa = $kuota - $terisi;
+                        $isFull = $sisa <= 0;
+                    ?>
+                    <option value="<?= $day ?>">
+                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                    </option>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
