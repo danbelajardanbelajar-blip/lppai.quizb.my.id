@@ -153,6 +153,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Pilihan hari pendaftar berhasil diperbarui.';
                 $msgType = 'success';
             }
+            
+        /* ---- PENDAFTARAN KOLEKTIF ---- */
+        } elseif ($action === 'pendaftaran_kolektif') {
+            $jurusan = trim($_POST['jurusan'] ?? '');
+            $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
+            $gelombang = $active_gel['gelombang'] ?? 'gel1';
+
+            if ($jurusan !== '' && $hari_pilihan !== '') {
+                $stmt = $pdo->prepare("
+                    SELECT id FROM users 
+                    WHERE program_studi = ? 
+                      AND id NOT IN (SELECT user_id FROM tutorial_registrations)
+                ");
+                $stmt->execute([$jurusan]);
+                $usersToRegister = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                if (empty($usersToRegister)) {
+                    $message = 'Tidak ada mahasiswa di jurusan ' . htmlspecialchars($jurusan) . ' yang belum mendaftar.';
+                    $msgType = 'warning';
+                } else {
+                    $added = 0;
+                    $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
+                    foreach ($usersToRegister as $uid) {
+                        $stmtInsert->execute([$uid, $hari_pilihan, $gelombang]);
+                        $added++;
+                    }
+                    $message = "$added mahasiswa dari jurusan $jurusan berhasil didaftarkan kolektif pada hari $hari_pilihan.";
+                    $msgType = 'success';
+                }
+            } else {
+                $message = 'Silakan pilih jurusan dan hari.';
+                $msgType = 'danger';
+            }
         /* ---- UPDATE TUTORS & KUOTA ---- */
         } elseif ($action === 'update_tutors_kuota') {
             $active_gel_id = (int)($_POST['gel_id'] ?? 0);
@@ -283,6 +316,8 @@ $allRegistrations = $pdo->query("
     ORDER BY tr.created_at DESC
 ")->fetchAll();
 
+$listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -334,6 +369,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="custom-tabs">
     <button class="custom-tab active" onclick="openTutorialTab(event, 'tab-pendaftar')">📝 Data Pendaftar</button>
+    <button class="custom-tab" onclick="openTutorialTab(event, 'tab-kolektif')">🎓 Pendaftaran Kolektif</button>
     <button class="custom-tab" onclick="openTutorialTab(event, 'tab-pengaturan')">⚙️ Pengaturan & Generate</button>
     <button class="custom-tab" onclick="openTutorialTab(event, 'tab-peserta')">👥 Hasil Plotting & Jadwal</button>
 </div>
@@ -421,6 +457,52 @@ function openTutorialTab(evt, tabId) {
 </div>
 
 </div> <!-- End of tab-pendaftar -->
+
+<div id="tab-kolektif" class="tab-content">
+<!-- ===================================================
+     CARD: PENDAFTARAN KOLEKTIF
+     =================================================== -->
+<div class="card" style="margin-bottom: 24px; border: 2px dashed #10b981; background-color: #ecfdf5;">
+    <div class="card-header" style="background-color: transparent; color: #065f46; font-weight: 600;">🎓 Pendaftaran Kolektif per Jurusan</div>
+    <div class="card-body">
+        <p style="color: #064e3b; font-size: 14px; margin-top: 0; margin-bottom: 16px;">Gunakan fitur ini untuk mendaftarkan semua mahasiswa di suatu jurusan yang belum mendaftar, ke dalam tutorial dengan pilihan hari yang sama secara otomatis.</p>
+        <form method="POST" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="pendaftaran_kolektif">
+            
+            <div style="background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #a7f3d0; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
+                
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Jurusan:</label>
+                    <select name="jurusan" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <option value="">-- Pilih Jurusan --</option>
+                        <?php foreach ($listJurusan as $jur): ?>
+                            <option value="<?= sanitize($jur) ?>"><?= sanitize($jur) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Hari Tutorial:</label>
+                    <select name="hari_pilihan" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                        <option value="">-- Pilih Hari --</option>
+                        <option value="Senin">Senin</option>
+                        <option value="Selasa">Selasa</option>
+                        <option value="Rabu">Rabu</option>
+                        <option value="Kamis">Kamis</option>
+                        <option value="Jumat">Jumat</option>
+                        <option value="Sabtu">Sabtu</option>
+                        <option value="Ahad">Ahad</option>
+                    </select>
+                </div>
+
+            </div>
+            
+            <button type="submit" class="btn btn-success" style="background-color: #10b981; width: auto;" data-confirm="Yakin ingin mendaftarkan semua mahasiswa jurusan ini ke hari yang dipilih?">✅ Daftarkan Kolektif Sekarang</button>
+        </form>
+    </div>
+</div>
+</div> <!-- End of tab-kolektif -->
 
 <div id="tab-pengaturan" class="tab-content">
 
