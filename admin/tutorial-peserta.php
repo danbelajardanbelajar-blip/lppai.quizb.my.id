@@ -121,14 +121,29 @@ foreach ($classes as $c) {
 }
 sort($hariList);
 
-// Kumpulkan tutor unik dari kelas yang ada
-$tutorList = [];
+// Kumpulkan tutor unik dari kelas yang ada dan gabungkan dengan tabel tutors
+$allTutors = [];
+foreach ($tutorsList as $t) {
+    $allTutors[] = $t['nama'];
+}
 foreach ($classes as $c) {
-    if (!empty($c['dosen_pengampu']) && !in_array($c['dosen_pengampu'], $tutorList)) {
-        $tutorList[] = $c['dosen_pengampu'];
+    if (!empty($c['dosen_pengampu']) && !in_array($c['dosen_pengampu'], $allTutors)) {
+        $allTutors[] = $c['dosen_pengampu'];
     }
 }
-sort($tutorList);
+sort($allTutors);
+
+// Kumpulkan ruangan unik dari kelas yang ada dan gabungkan dengan tabel rooms
+$allRooms = [];
+foreach ($roomsList as $rm) {
+    $allRooms[] = $rm['ruang'];
+}
+foreach ($classes as $c) {
+    if (!empty($c['ruangan']) && !in_array($c['ruangan'], $allRooms)) {
+        $allRooms[] = $c['ruangan'];
+    }
+}
+sort($allRooms);
 
 // Build lookup: class_id → hari, untuk filter JS
 $classHariMap = [];
@@ -269,8 +284,8 @@ include __DIR__ . '/../includes/header.php';
                 <select name="dosen_pengampu" id="edit_dosen"
                     style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
                     <option value="">-- Pilih Dosen --</option>
-                    <?php foreach ($tutorsList as $t): ?>
-                        <option value="<?= sanitize($t['nama']) ?>"><?= sanitize($t['nama']) ?></option>
+                    <?php foreach ($allTutors as $tName): ?>
+                        <option value="<?= sanitize($tName) ?>"><?= sanitize($tName) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -280,8 +295,8 @@ include __DIR__ . '/../includes/header.php';
                 <select name="ruangan" id="edit_ruangan"
                     style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
                     <option value="">-- Pilih Ruangan --</option>
-                    <?php foreach ($roomsList as $rm): ?>
-                        <option value="<?= sanitize($rm['ruang']) ?>"><?= sanitize($rm['ruang']) ?></option>
+                    <?php foreach ($allRooms as $rmName): ?>
+                        <option value="<?= sanitize($rmName) ?>"><?= sanitize($rmName) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
