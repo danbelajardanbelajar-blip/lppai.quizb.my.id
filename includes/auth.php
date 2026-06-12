@@ -83,3 +83,28 @@ function verifyCsrf($token) {
 function sanitize($input) {
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
+
+// Global handler for Return to Admin
+if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
+    if (isset($_SESSION['admin_login_as'])) {
+        $adminId = $_SESSION['admin_login_as'];
+        $pdo = getDBConnection();
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$adminId]);
+        $user = $stmt->fetch();
+        if ($user) {
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
+            $_SESSION['nim'] = $user['nim'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['program_studi'] = $user['program_studi'];
+            $_SESSION['fakultas'] = $user['fakultas'];
+            unset($_SESSION['admin_login_as']);
+            header('Location: ' . BASE_URL . '/admin/users.php');
+            exit;
+        }
+    }
+    header('Location: ' . BASE_URL . '/dashboard.php');
+    exit;
+}

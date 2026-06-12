@@ -328,12 +328,12 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                             </form>
                             <!-- Login As -->
                             <?php if ($u['id'] !== $_SESSION['user_id']): ?>
-                            <form method="POST" style="display:inline;margin-right:4px;" data-no-spa>
+                            <form method="POST" target="_blank" style="display:inline;margin-right:4px;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="action" value="login_as">
                                 <input type="hidden" name="id" value="<?= $u['id'] ?>">
                                 <button type="submit" class="btn btn-sm btn-info" style="background-color:#0ea5e9;color:white;"
-                                    data-confirm="Login sebagai <?= htmlspecialchars($u['nama_lengkap'], ENT_QUOTES) ?>?">🚪 Login As</button>
+                                    data-confirm="Buka tab baru dan login sebagai <?= htmlspecialchars($u['nama_lengkap'], ENT_QUOTES) ?>?">🚪 Login As</button>
                             </form>
                             <?php endif; ?>
                             <!-- Hapus (tidak bisa hapus diri sendiri) -->
