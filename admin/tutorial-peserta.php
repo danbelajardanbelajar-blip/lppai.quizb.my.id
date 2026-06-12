@@ -22,6 +22,24 @@ $isMessageHtml = false;
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
 $active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
 
+// AJAX API Endpoint: Ambil daftar mahasiswa berdasarkan jurusan
+if (isset($_GET['ajax_jurusan'])) {
+    header('Content-Type: application/json');
+    $jurusan = $_GET['ajax_jurusan'];
+    $stmt = $pdo->prepare("
+        SELECT u.nim, u.nama_lengkap, 
+               (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
+               tr.hari_pilihan 
+        FROM users u 
+        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id 
+        WHERE u.program_studi = ? AND u.role = 'mahasiswa'
+        ORDER BY u.nama_lengkap
+    ");
+    $stmt->execute([$jurusan]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+    exit;
+}
+
 /* =============================================================
    POST HANDLERS
    ============================================================= */
@@ -526,9 +544,73 @@ function openTutorialTab(evt, tabId) {
             
             <button type="submit" class="btn btn-success" style="background-color: #10b981; width: auto;" data-confirm="Yakin ingin mendaftarkan semua mahasiswa jurusan ini ke hari yang dipilih?">✅ Daftarkan Kolektif Sekarang</button>
         </form>
+
+        <!-- Container untuk menampilkan daftar mahasiswa -->
+        <div id="previewJurusanContainer" style="display: none; margin-top: 24px; border-top: 1px solid #a7f3d0; padding-top: 20px;">
+            <h5 style="color: #064e3b; font-weight: 600; margin-bottom: 12px; font-size: 15px;">Daftar Mahasiswa: <span id="previewJurusanLabel"></span></h5>
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+                <table class="table" style="margin-bottom: 0;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 1;">
+                        <tr>
+                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">NIM</th>
+                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
+                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewJurusanBody">
+                        <!-- Akan diisi oleh JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 </div>
 </div> <!-- End of tab-kolektif -->
+
+<script>
+document.querySelector('select[name="jurusan"]').addEventListener('change', function() {
+    const jurusan = this.value;
+    const container = document.getElementById('previewJurusanContainer');
+    const tbody = document.getElementById('previewJurusanBody');
+    const label = document.getElementById('previewJurusanLabel');
+    
+    if (!jurusan) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    label.textContent = jurusan;
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Memuat data...</td></tr>';
+    container.style.display = 'block';
+    
+    fetch('tutorial-peserta.php?ajax_jurusan=' + encodeURIComponent(jurusan))
+        .then(res => res.json())
+        .then(data => {
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Tidak ada mahasiswa di jurusan ini.</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            data.forEach(m => {
+                let statusBadge = m.is_registered == 1 
+                    ? `<span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (${m.hari_pilihan})</span>`
+                    : '<span class="badge badge-warning" style="font-size:11px;">Belum Mendaftar</span>';
+                    
+                html += `<tr>
+                    <td style="padding: 10px 16px; font-size: 13px;">${m.nim || '-'}</td>
+                    <td style="padding: 10px 16px; font-size: 13px;"><strong>${m.nama_lengkap}</strong></td>
+                    <td style="padding: 10px 16px; text-align: center;">${statusBadge}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        })
+        .catch(err => {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#ef4444;">Gagal memuat data.</td></tr>';
+        });
+});
+</script>
 
 <div id="tab-pengaturan" class="tab-content">
 
