@@ -289,10 +289,15 @@ include __DIR__ . '/../includes/header.php';
             <p>Daftar peserta akan muncul setelah Anda memilih kelas tutorial di atas.</p>
         </div>
 
+        <div id="bulkActionsContainer" style="margin-bottom: 16px; display: none;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAll" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Centang Semua</button>
+        </div>
+
         <div class="table-responsive" id="tableResponsiveContainer" style="display: none;">
             <table id="participantTable">
                 <thead>
                     <tr>
+                        <th style="width: 40px; text-align: center;">Pilih</th>
                         <th>Nama Kelas</th>
                         <th>Nama Dosen</th>
                         <th>Nama Mahasiswa</th>
@@ -303,6 +308,9 @@ include __DIR__ . '/../includes/header.php';
                 <tbody>
                     <?php foreach ($registrations as $r): ?>
                     <tr data-class-id="<?= $r['tutorial_class_id'] ?>">
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="check-peserta" name="reg_ids[]" value="<?= $r['id'] ?>" style="width: 18px; height: 18px; cursor: pointer;">
+                        </td>
                         <td><strong><?= sanitize($r['nama_kelas']) ?></strong></td>
                         <td><?= sanitize($r['dosen_pengampu'] ?: '-') ?></td>
                         <td><?= sanitize($r['nama_lengkap']) ?></td>
@@ -451,6 +459,8 @@ function closeEditModal() {
                     }
                     if (tableDiv) tableDiv.style.display = 'none';
                     if (countBadge) countBadge.textContent = '0';
+                    var bulkContainer = document.getElementById('bulkActionsContainer');
+                    if (bulkContainer) bulkContainer.style.display = 'none';
                 } else {
                     if ($.fn.DataTable.isDataTable(tableEl)) {
                         var info = tableEl.DataTable().page.info();
@@ -462,13 +472,18 @@ function closeEditModal() {
                             emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
                             emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
                             if (tableDiv) tableDiv.style.display = 'none';
+                            var bulkContainer = document.getElementById('bulkActionsContainer');
+                            if (bulkContainer) bulkContainer.style.display = 'none';
                         } else {
                             if (emptyState) emptyState.style.display = 'none';
                             if (tableDiv) tableDiv.style.display = 'block';
+                            var bulkContainer = document.getElementById('bulkActionsContainer');
+                            if (bulkContainer) bulkContainer.style.display = 'block';
                         }
-                    } else {
                         if (emptyState) emptyState.style.display = 'none';
                         if (tableDiv) tableDiv.style.display = 'block';
+                        var bulkContainer = document.getElementById('bulkActionsContainer');
+                        if (bulkContainer) bulkContainer.style.display = 'block';
                     }
                 }
             });
@@ -476,6 +491,27 @@ function closeEditModal() {
             setTimeout(function() {
                 filterKelasBottom.dispatchEvent(new Event('change'));
             }, 100);
+
+            // Logic untuk Check All
+            var btnCheckAll = document.getElementById('btnCheckAll');
+            if (btnCheckAll) {
+                btnCheckAll.addEventListener('click', function() {
+                    var isChecked = this.getAttribute('data-checked') === 'true';
+                    var newCheckedState = !isChecked;
+                    this.setAttribute('data-checked', newCheckedState);
+                    this.innerHTML = newCheckedState ? '☐ Batal Centang' : '☑️ Centang Semua';
+                    
+                    if ($.fn.DataTable.isDataTable(tableEl)) {
+                        var dt = tableEl.DataTable();
+                        $(dt.rows({ search: 'applied' }).nodes()).find('.check-peserta').prop('checked', newCheckedState);
+                    } else {
+                        var checkboxes = document.querySelectorAll('#participantTable tbody .check-peserta');
+                        checkboxes.forEach(function(cb) {
+                            cb.checked = newCheckedState;
+                        });
+                    }
+                });
+            }
         }
     }, 500);
 
