@@ -22,6 +22,12 @@ $currentUser = getCurrentUser();
     <?= EXTRA_HEAD ?>
 </head>
 <body>
+<?php if (isset($_SESSION['admin_login_as'])): ?>
+<div style="background-color:#f59e0b; color:#fff; padding:12px 20px; text-align:center; font-weight:600; position:sticky; top:0; z-index:99999; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; justify-content:center; align-items:center; gap:16px; font-size:14px;">
+    <span>⚠️ Mode Penyamaran: Anda sedang masuk sebagai <strong><?= sanitize($currentUser['nama_lengkap']) ?></strong>.</span>
+    <a href="<?= BASE_URL ?>/api/return-admin.php" style="background:#b45309; color:#fff; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:13px; border:1px solid #92400e; transition:0.2s;">🔙 Kembali ke Admin</a>
+</div>
+<?php endif; ?>
 <div class="app-wrapper">
     <div class="sidebar-overlay"></div>
     <?php include __DIR__ . '/sidebar.php'; ?>

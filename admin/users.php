@@ -105,6 +105,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt->execute([$id]);
                 $user = $stmt->fetch();
                 if ($user) {
+                    $_SESSION['admin_login_as'] = $_SESSION['user_id']; // Simpan sesi admin
+                    
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
                     $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
