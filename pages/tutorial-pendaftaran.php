@@ -162,7 +162,7 @@ foreach ($gelombangs as $gelKey => $g):
                     <select name="hari_pilihan" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
                         <option value="">-- Pilih Hari --</option>
                         <?php 
-                        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+                        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         foreach ($days as $day): 
                         ?>
                         <option value="<?= $day ?>"><?= $day ?></option>
