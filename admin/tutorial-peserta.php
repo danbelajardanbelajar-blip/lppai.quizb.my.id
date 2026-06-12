@@ -262,11 +262,44 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" style="border: 2px dashed #3b82f6; background-color: #eff6ff;">
     <div class="card-header" style="background-color: transparent; color: #1e40af;">⚡ Generate Jadwal</div>
     <div class="card-body">
-        <p style="color: #1e3a8a; font-size: 14px; margin-top: 0;">Sistem akan membagi rata mahasiswa yang belum memiliki kelas ke dalam kelas yang tersedia, menugaskan dosen secara otomatis, dan mempersiapkan kelas untuk penempatan ruangan.</p>
+        <p style="color: #1e3a8a; font-size: 14px; margin-top: 0; margin-bottom: 16px;">Sistem akan membagi mahasiswa yang belum memiliki kelas ke dalam kelas yang tersedia, menugaskan dosen secara otomatis, dan mempersiapkan kelas untuk penempatan ruangan.</p>
         <form method="POST" action="tutorial-generate.php" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            
+            <div style="background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #bfdbfe; margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; color: #1e3a8a; margin-bottom: 12px;">Mode Pembagian Mahasiswa:</label>
+                
+                <label style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 12px; cursor: pointer;">
+                    <input type="radio" name="generate_mode" value="fill_first" id="modeFillFirst" style="margin-top: 4px;">
+                    <div>
+                        <span style="font-weight: 500; color: #334155;">Utamakan memenuhi kuota per kelas</span>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+                            Jumlah mahasiswa per kelas minimal <input type="number" name="min_per_class" id="minPerClass" value="30" min="1" style="width: 60px; padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center;"> lalu buat kelas baru.
+                        </div>
+                    </div>
+                </label>
+                
+                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer;">
+                    <input type="radio" name="generate_mode" value="distribute_evenly" id="modeDistribute" checked style="margin-top: 4px;">
+                    <div>
+                        <span style="font-weight: 500; color: #334155;">Utamakan meratakan jumlah mahasiswa</span>
+                        <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
+                            Membagi rata jumlah mahasiswa kepada seluruh dosen yang aktif pada hari tersebut.
+                        </div>
+                    </div>
+                </label>
+            </div>
+            
             <button type="submit" class="btn btn-primary" style="background-color: #2563eb; width: auto;">🚀 Generate Jadwal secara otomatis</button>
         </form>
+        <script>
+            document.getElementById('modeFillFirst').addEventListener('change', function() {
+                document.getElementById('minPerClass').focus();
+            });
+            document.getElementById('minPerClass').addEventListener('click', function() {
+                document.getElementById('modeFillFirst').checked = true;
+            });
+        </script>
     </div>
 </div>
 

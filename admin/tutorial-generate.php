@@ -14,6 +14,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die('Sesi tidak valid.');
     }
 
+    $generateMode = $_POST['generate_mode'] ?? 'distribute_evenly';
+    $minPerClass = (int)($_POST['min_per_class'] ?? 30);
+    if ($minPerClass < 1) $minPerClass = 1;
+
     // Dapatkan data gelombang terakhir yang dibuat
     $gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
     if (!$gel) {
@@ -54,23 +58,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
 
-            // Bagi mahasiswa rata
-            $studentsPerClass = ceil($N / $C);
+            if ($generateMode === 'fill_first') {
+                $tutorIndex = 0;
+                $classIndex = 0;
+                while (!empty($students)) {
+                    $chunk = array_splice($students, 0, $minPerClass);
+                    $tutor = $tutors[$tutorIndex % $C];
+                    $namaKelas = "Kelas $hari " . chr(65 + $classIndex); // Kelas Senin A, Kelas Senin B, ...
+                    
+                    $stmtInsertClass->execute([$namaKelas, $tutor, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                    $classId = $pdo->lastInsertId();
+                    
+                    foreach ($chunk as $regId) {
+                        $stmtUpdateReg->execute([$classId, $regId]);
+                    }
+                    
+                    $tutorIndex++;
+                    $classIndex++;
+                }
+            } else {
+                // Mode distribute_evenly (meratakan)
+                $studentsPerClass = ceil($N / $C);
 
-            for ($i = 0; $i < $C; $i++) {
-                if (empty($students)) break;
+                for ($i = 0; $i < $C; $i++) {
+                    if (empty($students)) break;
 
-                $chunk = array_splice($students, 0, $studentsPerClass);
-                $tutor = $tutors[$i];
-                $namaKelas = "Kelas $hari " . chr(65 + $i); // Kelas Senin A, Kelas Senin B, ...
+                    $chunk = array_splice($students, 0, $studentsPerClass);
+                    $tutor = $tutors[$i];
+                    $namaKelas = "Kelas $hari " . chr(65 + $i);
 
-                // Buat kelas
-                $stmtInsertClass->execute([$namaKelas, $tutor, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
-                $classId = $pdo->lastInsertId();
+                    // Buat kelas
+                    $stmtInsertClass->execute([$namaKelas, $tutor, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                    $classId = $pdo->lastInsertId();
 
-                // Masukkan mahasiswa ke kelas ini
-                foreach ($chunk as $regId) {
-                    $stmtUpdateReg->execute([$classId, $regId]);
+                    // Masukkan mahasiswa ke kelas ini
+                    foreach ($chunk as $regId) {
+                        $stmtUpdateReg->execute([$classId, $regId]);
+                    }
                 }
             }
         }
