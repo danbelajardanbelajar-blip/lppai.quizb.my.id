@@ -483,8 +483,8 @@ function addQETutorRow(day) {
 $statsKelas = [];
 $statsLabels = [];
 foreach ($registrations as $r) {
-    $kelas = sanitize($r['nama_kelas']);
-    $tutor = sanitize($r['dosen_pengampu'] ?: '-');
+    $kelas = $r['nama_kelas'];
+    $tutor = $r['dosen_pengampu'] ?: '-';
     $key = $kelas . '|' . $tutor;
     if (!isset($statsKelas[$key])) {
         $statsKelas[$key] = 0;
