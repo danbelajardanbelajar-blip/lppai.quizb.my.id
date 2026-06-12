@@ -726,55 +726,7 @@ function openTutorialTab(evt, tabId) {
 </div>
 
 
-
-document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeAddSingleRegistrationModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Mahasiswa berhasil didaftarkan.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        document.querySelector('select[name="jurusan"]').dispatchEvent(new Event('change'));
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
-    });
-});
-
-document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeEditPendaftarModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Pilihan hari berhasil diperbarui.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        const container = document.getElementById('previewJurusanContainer');
-        if (container && container.style.display !== 'none') {
-            document.querySelector('select[name="jurusan"]').dispatchEvent(new Event('change'));
-        } else {
-            // Optional: If they edit from the Data Pendaftar tab, reload page to refresh DataTables
-            window.location.reload();
-        }
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mengedit pendaftaran.');
-    });
-});
-
+<script>
 function calculateQEKuota(day) {
     const container = document.getElementById('qe_tutors_' + day + '_container');
     const selects = container.querySelectorAll('select');
