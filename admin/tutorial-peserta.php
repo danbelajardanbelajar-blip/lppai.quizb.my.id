@@ -178,12 +178,60 @@ $registrations = $pdo->query("
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
+$allRegistrations = $pdo->query("
+    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
+    FROM tutorial_registrations tr
+    JOIN users u ON tr.user_id = u.id
+    ORDER BY tr.created_at DESC
+")->fetchAll();
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
 <?php if ($message): ?>
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
 <?php endif; ?>
+
+<!-- ===================================================
+     CARD: DATA PENDAFTAR TUTORIAL
+     =================================================== -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600;">
+        <span style="font-size:18px;">📝</span> Data Pendaftar Tutorial
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table" id="tablePendaftar">
+                <thead>
+                    <tr>
+                        <th>Nama Mahasiswa</th>
+                        <th>NIM</th>
+                        <th>Jurusan</th>
+                        <th>Pilihan Hari</th>
+                        <th>Status Kelas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($allRegistrations as $reg): ?>
+                    <tr>
+                        <td><strong><?= sanitize($reg['nama_lengkap']) ?></strong></td>
+                        <td><?= sanitize($reg['nim'] ?: '-') ?></td>
+                        <td><?= sanitize($reg['program_studi'] ?: '-') ?></td>
+                        <td><span class="badge badge-primary"><?= sanitize($reg['hari_pilihan'] ?: 'Belum Memilih') ?></span></td>
+                        <td>
+                            <?php if ($reg['tutorial_class_id']): ?>
+                                <span class="badge badge-success">Sudah diplot</span>
+                            <?php else: ?>
+                                <span class="badge badge-warning">Menunggu</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <!-- ===================================================
      CARD: GENERATE JADWAL
@@ -333,10 +381,25 @@ function closeEditModal() {
 (function () {
     var filterKelasBottom = document.getElementById('filterKelasBottom');
 
-    /* ---- Filter tabel bawah berdasarkan Kelas Tutorial yang dipilih ---- */
     setTimeout(function() {
         if (window.jQuery && window.jQuery.fn.DataTable) {
             var $ = window.jQuery;
+            
+            // Inisialisasi DataTable untuk Data Pendaftar
+            $('#tablePendaftar').DataTable({
+                "pageLength": 10,
+                "language": {
+                    "search": "Cari:",
+                    "lengthMenu": "Tampilkan _MENU_ data",
+                    "info": "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+                    "paginate": {
+                        "first": "Pertama",
+                        "last": "Terakhir",
+                        "next": "Selanjutnya",
+                        "previous": "Sebelumnya"
+                    }
+                }
+            });
             var tableEl = $('#participantTable');
             
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
