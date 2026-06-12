@@ -18,14 +18,24 @@ if (empty($unassignedClasses)) {
     exit;
 }
 
-// Hitung max rooms needed (max classes on a single day)
+// Hitung max rooms needed (berdasarkan jumlah tutor unik per hari)
 $countsPerDay = [];
 foreach ($unassignedClasses as $c) {
     $d = $c['hari'];
-    if (!isset($countsPerDay[$d])) $countsPerDay[$d] = 0;
-    $countsPerDay[$d]++;
+    $t = $c['dosen_pengampu'] ?: 'NO_TUTOR_' . $c['id']; // Jika tidak ada tutor, beri ID unik agar butuh ruang sendiri
+    if (!isset($countsPerDay[$d])) {
+        $countsPerDay[$d] = [];
+    }
+    $countsPerDay[$d][$t] = true;
 }
-$maxRoomsNeeded = empty($countsPerDay) ? 0 : max($countsPerDay);
+
+$maxRoomsNeeded = 0;
+foreach ($countsPerDay as $d => $tutorsArray) {
+    $roomsForThisDay = count($tutorsArray);
+    if ($roomsForThisDay > $maxRoomsNeeded) {
+        $maxRoomsNeeded = $roomsForThisDay;
+    }
+}
 $totalUnassigned = count($unassignedClasses);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'assign_rooms') {
@@ -52,10 +62,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 
                 foreach ($classesByDay as $day => $classes) {
                     $roomIndex = 0;
+                    $assignedRoomsForTutor = []; // Melacak ruangan yang sudah diberikan ke tutor di hari ini
                     foreach ($classes as $c) {
-                        $roomIdOrName = $selectedRooms[$roomIndex];
+                        $tutor = $c['dosen_pengampu'];
+                        if (!empty($tutor) && isset($assignedRoomsForTutor[$tutor])) {
+                            // Jika tutor yang sama sudah punya ruangan di hari ini, gunakan ruangan tersebut
+                            $roomIdOrName = $assignedRoomsForTutor[$tutor];
+                        } else {
+                            // Berikan ruangan baru
+                            $roomIdOrName = $selectedRooms[$roomIndex];
+                            if (!empty($tutor)) {
+                                $assignedRoomsForTutor[$tutor] = $roomIdOrName;
+                            }
+                            $roomIndex++;
+                        }
+                        
                         $stmtUpdate->execute([$roomIdOrName, $c['id']]);
-                        $roomIndex++;
                     }
                 }
                 
