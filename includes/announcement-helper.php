@@ -179,9 +179,8 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                         <strong style="color:var(--text-muted);font-size:12px;">KELAS</strong>
                         <p style="font-size:18px;font-weight:700;"><?= sanitize($myClass['nama_kelas']) ?></p>
                     </div>
-                    <div>
-                        <strong style="color:var(--text-muted);font-size:12px;">MATA KULIAH</strong>
-                        <p style="font-size:16px;"><?= sanitize($myClass['mata_kuliah']) ?></p>
+
+
                     </div>
                     <div>
                         <strong style="color:var(--text-muted);font-size:12px;">DOSEN</strong>
@@ -209,7 +208,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                         <thead>
                             <tr>
                                 <th>Kelas</th>
-                                <th>Mata Kuliah</th>
+
                                 <th>Dosen</th>
                                 <th>Hari</th>
                                 <th>Jam</th>
@@ -221,7 +220,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                             <?php foreach ($classes as $c): ?>
                             <tr>
                                 <td><?= sanitize($c['nama_kelas']) ?></td>
-                                <td><?= sanitize($c['mata_kuliah']) ?></td>
+
                                 <td><?= sanitize($c['dosen_pengampu']) ?></td>
                                 <td><?= sanitize($c['hari']) ?></td>
                                 <td><?= sanitize($c['jam']) ?></td>
@@ -247,7 +246,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                     <?php if ($myGraduation['status'] === 'lulus'): ?>
                         <span style="font-size:48px;">🎉</span>
                         <h2 style="color:#28a745;margin:10px 0;">SELAMAT, ANDA LULUS!</h2>
-                        <p>Kelas: <?= sanitize($myGraduation['nama_kelas']) ?> - <?= sanitize($myGraduation['mata_kuliah']) ?></p>
+                        <p>Kelas: <?= sanitize($myGraduation['nama_kelas']) ?></p>
                         <?php if ($myGraduation['nilai_akhir']): ?>
                         <p style="font-size:24px;font-weight:700;color:var(--primary);">Nilai: <?= number_format($myGraduation['nilai_akhir'], 1) ?></p>
                         <?php endif; ?>

@@ -53,10 +53,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="card-body">
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;">
-                    <div>
-                        <strong style="color:var(--text-muted);font-size:12px;">MATA KULIAH</strong>
-                        <p style="font-size:15px;margin-top:4px;font-weight:bold;"><?= sanitize($res['mata_kuliah']) ?></p>
-                    </div>
+
                     <div>
                         <strong style="color:var(--text-muted);font-size:12px;">KELAS</strong>
                         <p style="font-size:15px;margin-top:4px;"><?= sanitize($res['nama_kelas']) ?></p>

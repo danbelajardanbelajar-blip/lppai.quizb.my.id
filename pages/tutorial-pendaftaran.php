@@ -131,7 +131,7 @@ foreach ($gelombangs as $gelKey => $g):
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px;">
                     <?php if ($sudahDaftar['tutorial_class_id']): ?>
                         <div><strong style="font-size:12px;color:#166534;">KELAS</strong><p style="margin:4px 0 0;font-weight:bold;"><?= sanitize($sudahDaftar['nama_kelas']) ?></p></div>
-                        <div><strong style="font-size:12px;color:#166534;">MATA KULIAH</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['mata_kuliah']) ?></p></div>
+
                         <div><strong style="font-size:12px;color:#166534;">DOSEN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['dosen_pengampu'] ?: '-') ?></p></div>
                         <div><strong style="font-size:12px;color:#166534;">JADWAL</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['hari']) ?>, <?= sanitize($sudahDaftar['jam']) ?></p></div>
                         <div><strong style="font-size:12px;color:#166534;">RUANGAN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['ruangan'] ?: '-') ?></p></div>

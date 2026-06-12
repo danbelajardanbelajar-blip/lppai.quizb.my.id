@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         /* ---- BUAT KELAS & TAMBAH PESERTA ---- */
         if ($action === 'assign') {
             $namaKelas  = trim($_POST['nama_kelas'] ?? '');
-            $mataKuliah = trim($_POST['mata_kuliah'] ?? '');
+            $mataKuliah = '-';
             $dosen      = trim($_POST['dosen_pengampu'] ?? '');
             $hari       = trim($_POST['hari'] ?? '');
             $jam        = trim($_POST['jam'] ?? '');
@@ -37,8 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $tahun = date('Y');
             $semester = $tahun . '/' . ($tahun+1) . '-Ganjil';
 
-            if (empty($namaKelas) || empty($mataKuliah) || empty($userIds)) {
-                $message = 'Isi Nama Kelas, Mata Kuliah, dan pilih minimal satu mahasiswa.';
+                if (empty($namaKelas) || empty($userIds)) {
+                    $message = 'Isi Nama Kelas dan pilih minimal satu mahasiswa.';
                 $msgType = 'danger';
             } else {
                 $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?,?)")
@@ -178,11 +178,7 @@ include __DIR__ . '/../includes/header.php';
                     <input type="text" name="nama_kelas" placeholder="Kelas A" required
                         style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Mata Kuliah *</label>
-                    <input type="text" name="mata_kuliah" placeholder="Bahasa Arab Dasar" required
-                        style="width:100%;padding:11px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;">
-                </div>
+
                 <div class="form-group" style="margin-bottom:0;">
                     <label>Dosen Pengampu</label>
                     <select name="dosen_pengampu"
@@ -322,7 +318,7 @@ include __DIR__ . '/../includes/header.php';
                 <option value="">-- Pilih Kelas --</option>
                 <?php foreach ($classes as $c): ?>
                     <option value="<?= $c['id'] ?>">
-                        <?= sanitize($c['nama_kelas']) ?> - <?= sanitize($c['mata_kuliah']) ?>
+                        <?= sanitize($c['nama_kelas']) ?>
                     </option>
                 <?php endforeach; ?>
             </select>

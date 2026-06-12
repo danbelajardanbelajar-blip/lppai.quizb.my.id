@@ -73,10 +73,7 @@ include __DIR__ . '/../includes/header.php';
                             <strong style="color:var(--text-muted);font-size:12px;">KELAS</strong>
                             <p style="font-size:18px;font-weight:700;margin-top:4px;color:var(--primary);"><?= sanitize($reg['nama_kelas']) ?></p>
                         </div>
-                        <div>
-                            <strong style="color:var(--text-muted);font-size:12px;">MATA KULIAH</strong>
-                            <p style="font-size:15px;margin-top:4px;"><?= sanitize($reg['mata_kuliah']) ?></p>
-                        </div>
+
                         <div>
                             <strong style="color:var(--text-muted);font-size:12px;">DOSEN</strong>
                             <p style="font-size:15px;margin-top:4px;"><?= sanitize($reg['dosen_pengampu'] ?: '-') ?></p>

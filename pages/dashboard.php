@@ -86,7 +86,6 @@ include __DIR__ . '/../includes/header.php';
                 <thead>
                     <tr>
                         <th>Kelas</th>
-                        <th>Mata Kuliah</th>
                         <th>Gelombang</th>
                         <th>Jadwal</th>
                         <th>Ruangan</th>
@@ -98,7 +97,6 @@ include __DIR__ . '/../includes/header.php';
                     <?php foreach ($tutorialRegs as $reg): ?>
                     <tr>
                         <td><?= sanitize($reg['nama_kelas']) ?></td>
-                        <td><?= sanitize($reg['mata_kuliah']) ?></td>
                         <td>
                             <?php
                             $gelLabels = ['gel1' => 'Gelombang 1', 'gel2' => 'Gelombang 2', 'mandiri' => 'Mandiri'];
