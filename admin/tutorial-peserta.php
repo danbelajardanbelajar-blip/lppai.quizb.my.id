@@ -27,7 +27,8 @@ if (isset($_GET['ajax_jurusan'])) {
     header('Content-Type: application/json');
     $jurusan = $_GET['ajax_jurusan'];
     $stmt = $pdo->prepare("
-        SELECT u.nim, u.nama_lengkap, 
+        SELECT u.id as user_id, u.nim, u.nama_lengkap, 
+               tr.id as reg_id,
                (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
                tr.hari_pilihan 
         FROM users u 
@@ -176,6 +177,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
             
+        /* ---- PENDAFTARAN SINGLE (DARI TABEL KOLEKTIF) ---- */
+        } elseif ($action === 'add_single_registration') {
+            $user_id = (int)($_POST['user_id'] ?? 0);
+            $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
+            $gelombang = $active_gel['gelombang'] ?? 'gel1';
+
+            if ($user_id > 0 && $hari_pilihan !== '') {
+                $dayLower = strtolower($hari_pilihan);
+                $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
+                
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
+                $stmtCount->execute([$hari_pilihan]);
+                $terisi = $stmtCount->fetchColumn();
+                $sisaKuota = $totalKuota - $terisi;
+                
+                if ($sisaKuota <= 0) {
+                    $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                    $msgType = 'danger';
+                } else {
+                    $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
+                    $stmtInsert->execute([$user_id, $hari_pilihan, $gelombang]);
+                    $message = 'Mahasiswa berhasil didaftarkan.';
+                    $msgType = 'success';
+                }
+            } else {
+                $message = 'Data tidak valid.';
+                $msgType = 'danger';
+            }
+
         /* ---- PENDAFTARAN KOLEKTIF ---- */
         } elseif ($action === 'pendaftaran_kolektif') {
             $jurusan = trim($_POST['jurusan'] ?? '');
@@ -555,6 +585,7 @@ function openTutorialTab(evt, tabId) {
                             <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">NIM</th>
                             <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
                             <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
+                            <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="previewJurusanBody">
@@ -588,7 +619,7 @@ document.querySelector('select[name="jurusan"]').addEventListener('change', func
         .then(res => res.json())
         .then(data => {
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#64748b;">Tidak ada mahasiswa di jurusan ini.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748b;">Tidak ada mahasiswa di jurusan ini.</td></tr>';
                 return;
             }
             
@@ -598,16 +629,24 @@ document.querySelector('select[name="jurusan"]').addEventListener('change', func
                     ? `<span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (${m.hari_pilihan})</span>`
                     : '<span class="badge badge-warning" style="font-size:11px;">Belum Mendaftar</span>';
                     
+                let aksiBtn = '';
+                if (m.is_registered == 1) {
+                    aksiBtn = `<button type="button" class="btn btn-sm btn-warning" style="padding:4px 8px; font-size:11px;" onclick="openEditPendaftarModal(${m.reg_id}, '${m.hari_pilihan}')">Edit</button>`;
+                } else {
+                    aksiBtn = `<button type="button" class="btn btn-sm btn-success" style="padding:4px 8px; font-size:11px; background:#10b981; border-color:#10b981;" onclick="openAddSingleRegistrationModal(${m.user_id}, '${m.nama_lengkap.replace(/'/g, "\\'")}')">Daftarkan</button>`;
+                }
+
                 html += `<tr>
                     <td style="padding: 10px 16px; font-size: 13px;">${m.nim || '-'}</td>
                     <td style="padding: 10px 16px; font-size: 13px;"><strong>${m.nama_lengkap}</strong></td>
                     <td style="padding: 10px 16px; text-align: center;">${statusBadge}</td>
+                    <td style="padding: 10px 16px; text-align: center;">${aksiBtn}</td>
                 </tr>`;
             });
             tbody.innerHTML = html;
         })
         .catch(err => {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px; color:#ef4444;">Gagal memuat data.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px; color:#ef4444;">Gagal memuat data.</td></tr>';
         });
 });
 </script>
@@ -736,7 +775,56 @@ document.querySelector('select[name="jurusan"]').addEventListener('change', func
     </div>
 </div>
 
+<!-- Modal Daftarkan Single Mahasiswa -->
+<div id="addSingleRegistrationModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Daftarkan Mahasiswa</h3>
+        <p style="margin-bottom:16px; font-size:14px; color:#64748b;">Mendaftarkan: <strong id="add_single_nama_lengkap" style="color:#0f172a;"></strong></p>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="add_single_registration">
+            <input type="hidden" name="user_id" id="add_single_user_id" value="">
+            
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
+                <select name="hari_pilihan" required
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Hari --</option>
+                    <?php 
+                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    foreach ($days as $day): 
+                        $dayLower = strtolower($day);
+                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                        $terisi = $registeredCounts[$day] ?? 0;
+                        $sisa = $kuota - $terisi;
+                        $isFull = $sisa <= 0;
+                    ?>
+                    <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
+                        <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddSingleRegistrationModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-success" style="padding:8px 16px; background:#10b981; border:none;">Daftarkan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+function openAddSingleRegistrationModal(userId, namaLengkap) {
+    document.getElementById('add_single_user_id').value = userId;
+    document.getElementById('add_single_nama_lengkap').textContent = namaLengkap;
+    document.getElementById('addSingleRegistrationModal').style.display = 'flex';
+}
+
+function closeAddSingleRegistrationModal() {
+    document.getElementById('addSingleRegistrationModal').style.display = 'none';
+}
+
 function calculateQEKuota(day) {
     const container = document.getElementById('qe_tutors_' + day + '_container');
     const selects = container.querySelectorAll('select');
