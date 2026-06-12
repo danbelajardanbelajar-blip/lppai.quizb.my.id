@@ -553,7 +553,7 @@ function openTutorialTab(evt, tabId) {
                 
                 <div style="flex: 1; min-width: 250px;">
                     <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Jurusan:</label>
-                    <select name="jurusan" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <select name="jurusan" id="selectJurusanKolektif" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                         <option value="">-- Pilih Jurusan --</option>
                         <?php foreach ($listJurusan as $jur): ?>
                             <option value="<?= sanitize($jur) ?>"><?= sanitize($jur) ?></option>
@@ -1290,6 +1290,37 @@ function closeEditModal() {
                             form.appendChild(input);
                         });
                         form.submit();
+                    }
+                });
+            }
+            
+            // Inisialisasi DataTable untuk Semua Mahasiswa
+            var tableSemua = $('#tableSemuaMahasiswa').DataTable({
+                "destroy": true,
+                "pageLength": 10,
+                "language": {
+                    "search": "Cari Mahasiswa:",
+                    "lengthMenu": "Tampilkan _MENU_ data",
+                    "info": "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+                    "paginate": {
+                        "first": "Pertama",
+                        "last": "Terakhir",
+                        "next": "Selanjutnya",
+                        "previous": "Sebelumnya"
+                    }
+                }
+            });
+
+            // Filter berdasarkan Jurusan yang dipilih di tab Kolektif
+            var selectJurusan = document.getElementById('selectJurusanKolektif');
+            if (selectJurusan) {
+                selectJurusan.addEventListener('change', function() {
+                    var val = this.value;
+                    // Kolom Jurusan ada di index 2 (NIM, Nama Lengkap, Jurusan, Status, Aksi)
+                    if (val) {
+                        tableSemua.column(2).search('^' + $.fn.dataTable.util.escapeRegex(val) + '$', true, false).draw();
+                    } else {
+                        tableSemua.column(2).search('').draw();
                     }
                 });
             }
