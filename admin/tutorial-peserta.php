@@ -1228,20 +1228,27 @@ function closeEditModal() {
             // Fitur Checkbox untuk tabel Data Pendaftar Tutorial
             const checkAllPendaftarBtn = document.getElementById('btnCheckAllPendaftar');
             const bulkDeletePendaftarBtn = document.getElementById('btnBulkDeletePendaftar');
-            const checkPendaftarBoxes = document.querySelectorAll('.check-pendaftar');
             const bulkActionsPendaftarContainer = document.getElementById('bulkActionsPendaftarContainer');
 
+            function getPendaftarNodes() {
+                if (window.jQuery && $.fn.DataTable.isDataTable($('#tablePendaftar'))) {
+                    return $('#tablePendaftar').DataTable().rows({ search: 'applied' }).nodes();
+                }
+                return document;
+            }
+
             function updateBulkPendaftarButtons() {
-                const anyChecked = Array.from(checkPendaftarBoxes).some(c => c.checked);
-                if (checkPendaftarBoxes.length > 0) {
+                const checkedCount = $(getPendaftarNodes()).find('.check-pendaftar:checked').length;
+                const totalCount = $(getPendaftarNodes()).find('.check-pendaftar').length;
+                if (totalCount > 0) {
                     bulkActionsPendaftarContainer.style.display = 'block';
-                    bulkDeletePendaftarBtn.style.display = anyChecked ? 'inline-block' : 'none';
+                    bulkDeletePendaftarBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
                 } else {
                     bulkActionsPendaftarContainer.style.display = 'none';
                 }
             }
 
-            if (checkPendaftarBoxes.length > 0) {
+            if (document.querySelectorAll('.check-pendaftar').length > 0) {
                 bulkActionsPendaftarContainer.style.display = 'block';
             }
 
@@ -1250,11 +1257,7 @@ function closeEditModal() {
                     const isChecked = this.getAttribute('data-checked') === 'true';
                     const newValue = !isChecked;
                     
-                    checkPendaftarBoxes.forEach(chk => {
-                        if (chk.offsetParent !== null) {
-                            chk.checked = newValue;
-                        }
-                    });
+                    $(getPendaftarNodes()).find('.check-pendaftar').prop('checked', newValue);
                     
                     this.setAttribute('data-checked', newValue);
                     this.innerHTML = newValue ? '🔳 Hapus Centang' : '☑️ Centang Semua';
@@ -1263,24 +1266,35 @@ function closeEditModal() {
                 });
             }
 
-            checkPendaftarBoxes.forEach(chk => {
-                chk.addEventListener('change', updateBulkPendaftarButtons);
-            });
+            // Delegasikan event change agar checkbox di halaman lain (pagination) tetap berfungsi
+            if (window.jQuery) {
+                $('#tablePendaftar').on('change', '.check-pendaftar', updateBulkPendaftarButtons);
+            } else {
+                document.querySelectorAll('.check-pendaftar').forEach(chk => {
+                    chk.addEventListener('change', updateBulkPendaftarButtons);
+                });
+            }
 
             if (bulkDeletePendaftarBtn) {
                 bulkDeletePendaftarBtn.addEventListener('click', function() {
-                    if (!confirm('Hapus semua pendaftar yang dicentang secara permanen?')) return;
+                    const checked = $(getPendaftarNodes()).find('.check-pendaftar:checked');
                     
-                    const checked = document.querySelectorAll('.check-pendaftar:checked');
+                    if (checked.length === 0) {
+                        alert('Silakan centang minimal satu pendaftar terlebih dahulu.');
+                        return;
+                    }
+
+                    if (!confirm('Hapus ' + checked.length + ' pendaftar yang dicentang secara permanen?')) return;
+                    
                     const form = document.getElementById('formBulkDeletePendaftar');
                     if (form) {
                         form.innerHTML = `<input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                           <input type="hidden" name="action" value="bulk_delete_registration">`;
-                        checked.forEach(chk => {
+                        checked.each(function() {
                             const input = document.createElement('input');
                             input.type = 'hidden';
                             input.name = 'reg_ids[]';
-                            input.value = chk.value;
+                            input.value = this.value;
                             form.appendChild(input);
                         });
                         form.submit();
