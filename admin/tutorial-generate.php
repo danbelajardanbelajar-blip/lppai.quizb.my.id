@@ -91,7 +91,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($generateMode === 'fill_first') {
                 $tutorIndex = 0;
                 $classIndex = 0;
-                $tutorClassMap = [];
                 
                 while (!empty($students)) {
                     $chunk = array_splice($students, 0, $minPerClass);
@@ -104,15 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $tutorReal = $realTutorNames[$tutor];
                     
-                    if (isset($tutorClassMap[$tutorReal])) {
-                        $classId = $tutorClassMap[$tutorReal];
-                    } else {
-                        $namaKelas = "Kelas $hari " . chr(65 + $classIndex); // Kelas Senin A, Kelas Senin B, ...
-                        $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
-                        $classId = $pdo->lastInsertId();
-                        $tutorClassMap[$tutorReal] = $classId;
-                        $classIndex++;
-                    }
+                    $namaKelas = "Kelas $hari " . chr(65 + $classIndex); // Kelas Senin A, Kelas Senin B, ...
+                    $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                    $classId = $pdo->lastInsertId();
+                    $classIndex++;
                     
                     foreach ($chunk as $regId) {
                         $stmtUpdateReg->execute([$classId, $regId]);
@@ -122,14 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 // Mode distribute_evenly (meratakan)
-                $studentsPerClass = ceil($N / $C);
-                $tutorClassMap = [];
                 $classIndex = 0;
+                $remainingStudents = $N;
 
                 for ($i = 0; $i < $C; $i++) {
                     if (empty($students)) break;
 
+                    $remainingTutors = $C - $i;
+                    $studentsPerClass = ceil($remainingStudents / $remainingTutors);
                     $chunk = array_splice($students, 0, $studentsPerClass);
+                    $remainingStudents -= count($chunk);
+
                     $tutor = $tutors[$i];
 
                     if (!isset($realTutorNames[$tutor])) {
@@ -139,15 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                     $tutorReal = $realTutorNames[$tutor];
 
-                    if (isset($tutorClassMap[$tutorReal])) {
-                        $classId = $tutorClassMap[$tutorReal];
-                    } else {
-                        $namaKelas = "Kelas $hari " . chr(65 + $classIndex);
-                        $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
-                        $classId = $pdo->lastInsertId();
-                        $tutorClassMap[$tutorReal] = $classId;
-                        $classIndex++;
-                    }
+                    $namaKelas = "Kelas $hari " . chr(65 + $classIndex);
+                    $stmtInsertClass->execute([$namaKelas, $tutorReal, $hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+                    $classId = $pdo->lastInsertId();
+                    $classIndex++;
 
                     // Masukkan mahasiswa ke kelas ini
                     foreach ($chunk as $regId) {
