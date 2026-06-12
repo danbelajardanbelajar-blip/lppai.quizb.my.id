@@ -150,6 +150,20 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- ===================================================
+     CARD: GENERATE JADWAL
+     =================================================== -->
+<div class="card" style="border: 2px dashed #3b82f6; background-color: #eff6ff;">
+    <div class="card-header" style="background-color: transparent; color: #1e40af;">⚡ Generate Jadwal</div>
+    <div class="card-body">
+        <p style="color: #1e3a8a; font-size: 14px; margin-top: 0;">Sistem akan membagi rata mahasiswa yang belum memiliki kelas ke dalam kelas yang tersedia, menugaskan dosen secara otomatis, dan mempersiapkan kelas untuk penempatan ruangan.</p>
+        <form method="POST" action="tutorial-generate.php" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <button type="submit" class="btn btn-primary" style="background-color: #2563eb; width: auto;">🚀 Generate Jadwal secara otomatis</button>
+        </form>
+    </div>
+</div>
+
+<!-- ===================================================
      CARD: TAMBAH PESERTA
      =================================================== --><div class="card">
     <div class="card-header">➕ Buat Kelas & Tambah Peserta</div>
