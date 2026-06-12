@@ -375,6 +375,8 @@ $registrations = $pdo->query("
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
+")->fetchAll();
+
 $allStudents = $pdo->query("
     SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, 
            tr.id as reg_id, tr.hari_pilihan,
@@ -384,6 +386,7 @@ $allStudents = $pdo->query("
     WHERE u.role = 'mahasiswa'
     ORDER BY u.program_studi, u.nama_lengkap
 ")->fetchAll(PDO::FETCH_ASSOC);
+
 
 $allRegistrations = $pdo->query("
     SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
