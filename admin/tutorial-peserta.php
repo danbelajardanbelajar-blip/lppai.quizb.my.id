@@ -1425,14 +1425,8 @@ document.querySelector('#addSingleRegistrationModal form').addEventListener('sub
     .then(res => res.text())
     .then(html => {
         closeAddSingleRegistrationModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Mahasiswa berhasil didaftarkan.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        setTimeout(() => window.location.reload(), 1500);
+        alert('Mahasiswa berhasil didaftarkan.');
+        window.location.reload();
     })
     .catch(err => {
         alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
@@ -1446,14 +1440,8 @@ document.querySelector('#editPendaftarModal form').addEventListener('submit', fu
     .then(res => res.text())
     .then(html => {
         closeEditPendaftarModal();
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil',
-            text: 'Pilihan hari berhasil diperbarui.',
-            timer: 1500,
-            showConfirmButton: false
-        });
-        setTimeout(() => window.location.reload(), 1500);
+        alert('Pilihan hari berhasil diperbarui.');
+        window.location.reload();
     })
     .catch(err => {
         alert('Terjadi kesalahan saat mengedit pendaftaran.');
