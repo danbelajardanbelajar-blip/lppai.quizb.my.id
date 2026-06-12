@@ -387,6 +387,7 @@ function closeEditModal() {
             
             // Inisialisasi DataTable untuk Data Pendaftar
             $('#tablePendaftar').DataTable({
+                "destroy": true,
                 "pageLength": 10,
                 "language": {
                     "search": "Cari:",
