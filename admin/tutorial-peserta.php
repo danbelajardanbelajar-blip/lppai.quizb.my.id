@@ -161,26 +161,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $gelombang = $active_gel['gelombang'] ?? 'gel1';
 
             if ($jurusan !== '' && $hari_pilihan !== '') {
-                $stmt = $pdo->prepare("
-                    SELECT id FROM users 
-                    WHERE program_studi = ? 
-                      AND id NOT IN (SELECT user_id FROM tutorial_registrations)
-                ");
-                $stmt->execute([$jurusan]);
-                $usersToRegister = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-                if (empty($usersToRegister)) {
-                    $message = 'Tidak ada mahasiswa di jurusan ' . htmlspecialchars($jurusan) . ' yang belum mendaftar.';
-                    $msgType = 'warning';
+                $dayLower = strtolower($hari_pilihan);
+                $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
+                
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
+                $stmtCount->execute([$hari_pilihan]);
+                $terisi = $stmtCount->fetchColumn();
+                $sisaKuota = $totalKuota - $terisi;
+                
+                if ($sisaKuota <= 0) {
+                    $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh. Silakan tambah kuota hari tersebut di tab Pengaturan.";
+                    $msgType = 'danger';
                 } else {
-                    $added = 0;
-                    $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
-                    foreach ($usersToRegister as $uid) {
-                        $stmtInsert->execute([$uid, $hari_pilihan, $gelombang]);
-                        $added++;
+                    $stmt = $pdo->prepare("
+                        SELECT id, nama_lengkap FROM users 
+                        WHERE program_studi = ? 
+                          AND id NOT IN (SELECT user_id FROM tutorial_registrations)
+                    ");
+                    $stmt->execute([$jurusan]);
+                    $usersToRegister = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    if (empty($usersToRegister)) {
+                        $message = 'Tidak ada mahasiswa di jurusan ' . htmlspecialchars($jurusan) . ' yang belum mendaftar.';
+                        $msgType = 'warning';
+                    } else {
+                        $toRegister = array_slice($usersToRegister, 0, $sisaKuota);
+                        $failedToRegister = array_slice($usersToRegister, $sisaKuota);
+                        $added = 0;
+                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
+                        foreach ($toRegister as $u) {
+                            $stmtInsert->execute([$u['id'], $hari_pilihan, $gelombang]);
+                            $added++;
+                        }
+                        
+                        if (!empty($failedToRegister)) {
+                            $failedNames = array_map(function($u) { return "<li><strong>" . htmlspecialchars($u['nama_lengkap']) . "</strong></li>"; }, $failedToRegister);
+                            $failedCount = count($failedToRegister);
+                            $message = "Hanya $added mahasiswa jurusan $jurusan yang didaftarkan. <br><br><strong>$failedCount mahasiswa berikut gagal didaftarkan karena kuota hari $hari_pilihan penuh:</strong><ul style='margin-top: 8px; margin-bottom: 12px; padding-left: 20px; max-height: 150px; overflow-y: auto; border: 1px solid #fcd34d; background: #fffbeb; border-radius: 6px; padding: 10px 10px 10px 30px;'>" . implode('', $failedNames) . "</ul><em>👉 Tips: Pilih jurusan yang sama dan pilih <b>Hari Lain</b> pada form di bawah untuk langsung mendaftarkan sisa mahasiswa ini.</em>";
+                            $msgType = 'warning';
+                        } else {
+                            $message = "$added mahasiswa dari jurusan $jurusan berhasil didaftarkan kolektif pada hari $hari_pilihan.";
+                            $msgType = 'success';
+                        }
                     }
-                    $message = "$added mahasiswa dari jurusan $jurusan berhasil didaftarkan kolektif pada hari $hari_pilihan.";
-                    $msgType = 'success';
                 }
             } else {
                 $message = 'Silakan pilih jurusan dan hari.';

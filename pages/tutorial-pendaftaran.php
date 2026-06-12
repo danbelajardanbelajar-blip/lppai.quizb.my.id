@@ -32,6 +32,19 @@ $gelombangs = [
     'mandiri' => ['label' => 'Tutorial Mandiri',              'annType' => 'pendaftaran_mandiri']
 ];
 
+// Ambil data kuota dari master_gelombang
+$active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+$registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+if ($active_gel) {
+    $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations GROUP BY hari_pilihan");
+    foreach ($stmtCount->fetchAll() as $row) {
+        $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
+        if (isset($registeredCounts[$hari])) {
+            $registeredCounts[$hari] += $row['cnt'];
+        }
+    }
+}
+
 // Handle Form Submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
     $token        = $_POST['csrf_token'] ?? '';
@@ -53,7 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
             $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
             $msgType = 'danger';
         } else {
-            // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
+            $dayLower = strtolower($hari_pilihan);
+            $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
+            $terisi = $registeredCounts[$hari_pilihan] ?? 0;
+            
+            if ($terisi >= $totalKuota) {
+                $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                $msgType = 'danger';
+            } else {
+                // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
             $stmtReg = $pdo->prepare("
                 SELECT tr.id FROM tutorial_registrations tr 
                 LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
@@ -68,6 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
                 $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang]);
                 $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
                 $msgType = 'success';
+                
+                // Update counter lokal agar UI segera merefleksikan perubahan
+                if (isset($registeredCounts[$hari_pilihan])) {
+                    $registeredCounts[$hari_pilihan]++;
+                }
             }
         }
     }
@@ -164,8 +190,15 @@ foreach ($gelombangs as $gelKey => $g):
                         <?php 
                         $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         foreach ($days as $day): 
+                            $dayLower = strtolower($day);
+                            $kuota = $active_gel["kuota_$dayLower"] ?? 0;
+                            $terisi = $registeredCounts[$day] ?? 0;
+                            $sisa = $kuota - $terisi;
+                            $isFull = $sisa <= 0;
                         ?>
-                        <option value="<?= $day ?>"><?= $day ?></option>
+                        <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
+                            <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
+                        </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
