@@ -226,7 +226,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><span class="badge badge-success"><?= sanitize($r['ruangan'] ?: 'Belum Ada Ruang') ?></span></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-warning" style="margin-right:4px;"
-                                onclick="openEditModal(<?= $r['id'] ?>, <?= $r['tutorial_class_id'] ?>, '<?= htmlspecialchars($r['dosen_pengampu'] ?: '', ENT_QUOTES) ?>', '<?= htmlspecialchars($r['ruangan'] ?: '', ENT_QUOTES) ?>')">
+                                onclick="openEditModal(<?= (int)$r['id'] ?>, <?= (int)$r['tutorial_class_id'] ?>, <?= htmlspecialchars(json_encode($r['dosen_pengampu'] ?: ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($r['ruangan'] ?: ''), ENT_QUOTES) ?>)">
                                 Edit
                             </button>
                             <form method="POST" style="display:inline;">
