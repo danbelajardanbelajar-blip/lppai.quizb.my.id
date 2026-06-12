@@ -840,7 +840,7 @@ table tbody tr.removing {
 }
 
 /* =================== CONFIRM DIALOG =================== */
-#confirm-backdrop {
+#confirm-backdrop, #alert-backdrop {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.55);
@@ -851,9 +851,9 @@ table tbody tr.removing {
     padding: 20px;
     backdrop-filter: blur(4px);
 }
-#confirm-backdrop.show { display: flex; }
+#confirm-backdrop.show, #alert-backdrop.show { display: flex; }
 
-#confirm-dialog {
+#confirm-dialog, #alert-dialog {
     background: #fff;
     border-radius: 20px;
     padding: 36px 28px 28px;
@@ -868,10 +868,10 @@ table tbody tr.removing {
     to   { opacity: 1; transform: scale(1); }
 }
 
-#confirm-dialog .confirm-icon { font-size: 46px; margin-bottom: 14px; line-height: 1; }
-#confirm-dialog h4 { font-size: 17px; font-weight: 800; color: var(--text-dark); margin-bottom: 8px; }
-#confirm-dialog p  { font-size: 14px; color: var(--text-muted); margin-bottom: 26px; line-height: 1.6; }
-#confirm-dialog .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+#confirm-dialog .confirm-icon, #alert-dialog .confirm-icon { font-size: 46px; margin-bottom: 14px; line-height: 1; }
+#confirm-dialog h4, #alert-dialog h4 { font-size: 17px; font-weight: 800; color: var(--text-dark); margin-bottom: 8px; }
+#confirm-dialog p, #alert-dialog p  { font-size: 14px; color: var(--text-muted); margin-bottom: 26px; line-height: 1.6; }
+#confirm-dialog .confirm-actions, #alert-dialog .confirm-actions { display: flex; gap: 10px; justify-content: center; }
 
 /* =================== DATATABLES OVERRIDE =================== */
 .dataTables_wrapper { font-family: inherit; }

@@ -116,6 +116,77 @@ function showConfirm(message, onConfirm, type) {
 }
 
 /* =============================================
+   ALERT DIALOG
+   ============================================= */
+function showAlert(message, type, onClose) {
+    type = type || 'info';
+
+    var icons = {
+        danger: '❌',
+        warning: '⚠️',
+        info: 'ℹ️',
+        success: '✅'
+    };
+
+    var btnColors = {
+        danger: 'background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff',
+        warning: 'background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff',
+        info: 'background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff',
+        success: 'background:linear-gradient(135deg,#1a5632,#2d7a4a);color:#fff'
+    };
+
+    var titles = {
+        danger: 'Gagal',
+        warning: 'Peringatan',
+        info: 'Informasi',
+        success: 'Berhasil'
+    };
+
+    var backdrop = document.getElementById('alert-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.id = 'alert-backdrop';
+        backdrop.innerHTML =
+            '<div id="alert-dialog">' +
+            '<div class="confirm-icon" id="alert-icon"></div>' +
+            '<h4 id="alert-title"></h4>' +
+            '<p id="alert-message"></p>' +
+            '<div class="confirm-actions">' +
+            '<button id="alert-ok" class="btn btn-sm" style="min-width:100px;">OK</button>' +
+            '</div></div>';
+        document.body.appendChild(backdrop);
+    }
+
+    var iconEl = document.getElementById('alert-icon');
+    var titleEl = document.getElementById('alert-title');
+    var msgEl = document.getElementById('alert-message');
+    var okBtn = document.getElementById('alert-ok');
+
+    if (iconEl) iconEl.textContent = icons[type] || 'ℹ️';
+    if (titleEl) titleEl.textContent = titles[type] || 'Informasi';
+    if (msgEl) msgEl.innerHTML = message;
+    if (okBtn) okBtn.setAttribute('style', (btnColors[type] || btnColors.info) + ';min-width:100px;');
+
+    backdrop.classList.add('show');
+
+    function close() {
+        backdrop.classList.remove('show');
+    }
+
+    var newOk = okBtn.cloneNode(true);
+    okBtn.parentNode.replaceChild(newOk, okBtn);
+
+    newOk.addEventListener('click', function() {
+        close();
+        if (onClose) onClose();
+    });
+
+    backdrop.addEventListener('click', function(e) {
+        if (e.target === backdrop) close();
+    });
+}
+
+/* =============================================
    GLOBAL DATATABLES
    ============================================= */
 function isDataTablesReady() {
@@ -210,7 +281,7 @@ function ajaxDelete(table, id, csrfToken, rowEl, successMsg) {
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (!data.success) {
-            showToast(data.message || 'Gagal menghapus data.', 'danger');
+            showAlert(data.message || 'Gagal menghapus data.', 'danger');
             return;
         }
 
@@ -229,10 +300,10 @@ function ajaxDelete(table, id, csrfToken, rowEl, successMsg) {
             }, 420);
         }
 
-        showToast(successMsg || data.message, 'success');
+        showAlert(successMsg || data.message, 'success');
     })
     .catch(function(err) {
-        showToast('Network error: ' + err.message, 'danger');
+        showAlert('Network error: ' + err.message, 'danger');
     });
 }
 
@@ -270,7 +341,7 @@ var SPA = {
                 self.loading = false;
             })
             .catch(function(err) {
-                showToast('Gagal memuat halaman: ' + err.message, 'danger');
+                showAlert('Gagal memuat halaman: ' + err.message, 'danger');
                 contentArea.style.opacity = '1';
                 self.loading = false;
             });
@@ -308,7 +379,7 @@ var SPA = {
                 self.loading = false;
             })
             .catch(function(err) {
-                showToast('Error: ' + err.message, 'danger');
+                showAlert('Error: ' + err.message, 'danger');
                 contentArea.style.opacity = '1';
                 self.loading = false;
             });
@@ -355,7 +426,7 @@ var SPA = {
                 if (el.classList.contains('alert-success')) type = 'success';
                 else if (el.classList.contains('alert-danger')) type = 'danger';
                 else if (el.classList.contains('alert-warning')) type = 'warning';
-                showToast(el.innerHTML, type, 6000);
+                showAlert(el.innerHTML, type);
                 el.remove();
             });
 
@@ -428,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (el.classList.contains('alert-success')) type = 'success';
         else if (el.classList.contains('alert-danger')) type = 'danger';
         else if (el.classList.contains('alert-warning')) type = 'warning';
-        showToast(el.innerHTML, type, 6000);
+        showAlert(el.innerHTML, type);
         el.remove();
     });
 
