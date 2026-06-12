@@ -124,6 +124,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = count($regIds) . ' peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
                 $msgType = 'success';
             }
+        
+        /* ---- HAPUS PENDAFTARAN TOTAL ---- */
+        } elseif ($action === 'delete_registration') {
+            $regId = (int)($_POST['reg_id'] ?? 0);
+            if ($regId > 0) {
+                $pdo->prepare("DELETE FROM tutorial_registrations WHERE id = ?")->execute([$regId]);
+                $message = 'Data pendaftar berhasil dihapus sepenuhnya.';
+                $msgType = 'success';
+            }
+
+        /* ---- HAPUS MASSAL PENDAFTARAN TOTAL ---- */
+        } elseif ($action === 'bulk_delete_registration') {
+            $regIds = $_POST['reg_ids'] ?? [];
+            if (!empty($regIds) && is_array($regIds)) {
+                $placeholders = implode(',', array_fill(0, count($regIds), '?'));
+                $pdo->prepare("DELETE FROM tutorial_registrations WHERE id IN ($placeholders)")->execute($regIds);
+                $message = count($regIds) . ' pendaftar berhasil dihapus sepenuhnya.';
+                $msgType = 'success';
+            }
+            
+        /* ---- EDIT PENDAFTARAN ---- */
+        } elseif ($action === 'edit_pendaftaran') {
+            $regId = (int)($_POST['reg_id'] ?? 0);
+            $newHariPilihan = trim($_POST['hari_pilihan'] ?? '');
+            if ($regId > 0 && $newHariPilihan !== '') {
+                $pdo->prepare("UPDATE tutorial_registrations SET hari_pilihan = ? WHERE id = ?")->execute([$newHariPilihan, $regId]);
+                $message = 'Pilihan hari pendaftar berhasil diperbarui.';
+                $msgType = 'success';
+            }
         /* ---- UPDATE TUTORS & KUOTA ---- */
         } elseif ($action === 'update_tutors_kuota') {
             $active_gel_id = (int)($_POST['gel_id'] ?? 0);
@@ -269,20 +298,35 @@ include __DIR__ . '/../includes/header.php';
         <span style="font-size:18px;">📝</span> Data Pendaftar Tutorial
     </div>
     <div class="card-body">
+        <div id="bulkActionsPendaftarContainer" style="margin-bottom: 16px; display: none;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAllPendaftar" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Centang Semua</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btnBulkDeletePendaftar" style="margin-left:8px;">🗑️ Hapus</button>
+        </div>
+        
+        <form id="formBulkDeletePendaftar" method="POST" style="display:none;">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="bulk_delete_registration">
+        </form>
+
         <div class="table-responsive">
             <table class="table" id="tablePendaftar">
                 <thead>
                     <tr>
+                        <th style="width: 40px; text-align: center;">Pilih</th>
                         <th>Nama Mahasiswa</th>
                         <th>NIM</th>
                         <th>Jurusan</th>
                         <th>Pilihan Hari</th>
                         <th>Status Kelas</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($allRegistrations as $reg): ?>
                     <tr>
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="check-pendaftar" name="reg_ids[]" value="<?= $reg['id'] ?>" style="width: 18px; height: 18px; cursor: pointer;">
+                        </td>
                         <td><strong><?= sanitize($reg['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($reg['nim'] ?: '-') ?></td>
                         <td><?= sanitize($reg['program_studi'] ?: '-') ?></td>
@@ -293,6 +337,18 @@ include __DIR__ . '/../includes/header.php';
                             <?php else: ?>
                                 <span class="badge badge-warning">Menunggu</span>
                             <?php endif; ?>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-warning" style="margin-right:4px;"
+                                onclick="openEditPendaftarModal(<?= (int)$reg['id'] ?>, <?= htmlspecialchars(json_encode($reg['hari_pilihan'] ?: ''), ENT_QUOTES) ?>)">
+                                Edit
+                            </button>
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="delete_registration">
+                                <input type="hidden" name="reg_id" value="<?= $reg['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-danger" data-confirm="Hapus pendaftar ini sepenuhnya?">Hapus</button>
+                            </form>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -382,6 +438,38 @@ include __DIR__ . '/../includes/header.php';
             </div>
             
             <button type="submit" class="btn btn-primary" style="margin-top:16px;">💾 Simpan Pengaturan</button>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit Pendaftar -->
+<div id="editPendaftarModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Edit Data Pendaftar</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_pendaftaran">
+            <input type="hidden" name="reg_id" id="edit_pendaftar_reg_id" value="">
+            
+            <div class="form-group" style="margin-bottom:24px;">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
+                <select name="hari_pilihan" id="edit_pendaftar_hari" required
+                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="">-- Pilih Hari --</option>
+                    <option value="Senin">Senin</option>
+                    <option value="Selasa">Selasa</option>
+                    <option value="Rabu">Rabu</option>
+                    <option value="Kamis">Kamis</option>
+                    <option value="Jumat">Jumat</option>
+                    <option value="Sabtu">Sabtu</option>
+                    <option value="Ahad">Ahad</option>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditPendaftarModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Simpan Perubahan</button>
+            </div>
         </form>
     </div>
 </div>
@@ -704,6 +792,16 @@ function openEditModal(regId, classId, dosen, ruangan) {
     document.getElementById('editPesertaModal').style.display = 'flex';
 }
 
+function openEditPendaftarModal(regId, hariPilihan) {
+    document.getElementById('edit_pendaftar_reg_id').value = regId;
+    document.getElementById('edit_pendaftar_hari').value = hariPilihan;
+    document.getElementById('editPendaftarModal').style.display = 'flex';
+}
+
+function closeEditPendaftarModal() {
+    document.getElementById('editPendaftarModal').style.display = 'none';
+}
+
 document.getElementById('edit_class_id').addEventListener('change', function() {
     var classId = this.value;
     document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
@@ -825,30 +923,96 @@ function closeEditModal() {
             var btnBulkDelete = document.getElementById('btnBulkDelete');
             if (btnBulkDelete) {
                 btnBulkDelete.addEventListener('click', function() {
-                    var checkedBoxes = [];
+                    var checked = [];
                     if ($.fn.DataTable.isDataTable(tableEl)) {
-                        var dt = tableEl.DataTable();
-                        $(dt.rows({ search: 'applied' }).nodes()).find('.check-peserta:checked').each(function() {
-                            checkedBoxes.push(this.value);
+                        $(tableEl.DataTable().rows({ search: 'applied' }).nodes()).find('.check-peserta:checked').each(function() {
+                            checked.push(this);
                         });
                     } else {
                         document.querySelectorAll('#participantTable tbody .check-peserta:checked').forEach(function(cb) {
-                            checkedBoxes.push(cb.value);
+                            checked.push(cb);
                         });
                     }
                     
-                    if (checkedBoxes.length === 0) {
+                    if (checked.length === 0) {
                         alert('Silakan centang minimal satu peserta terlebih dahulu.');
                         return;
                     }
                     
-                    if (confirm('Yakin ingin mengeluarkan ' + checkedBoxes.length + ' peserta yang dicentang dari kelas ini?')) {
+                    if (confirm('Yakin ingin mengeluarkan ' + checked.length + ' peserta yang dicentang dari kelas ini?')) {
                         var form = document.getElementById('formBulkDelete');
-                        checkedBoxes.forEach(function(id) {
-                            var input = document.createElement('input');
+                        if (form) {
+                            form.innerHTML = `<input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                              <input type="hidden" name="action" value="bulk_delete">`;
+                            checked.forEach(chk => {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'reg_ids[]';
+                                input.value = chk.value;
+                                form.appendChild(input);
+                            });
+                            form.submit();
+                        }
+                    }
+                });
+            }
+            
+            // Fitur Checkbox untuk tabel Data Pendaftar Tutorial
+            const checkAllPendaftarBtn = document.getElementById('btnCheckAllPendaftar');
+            const bulkDeletePendaftarBtn = document.getElementById('btnBulkDeletePendaftar');
+            const checkPendaftarBoxes = document.querySelectorAll('.check-pendaftar');
+            const bulkActionsPendaftarContainer = document.getElementById('bulkActionsPendaftarContainer');
+
+            function updateBulkPendaftarButtons() {
+                const anyChecked = Array.from(checkPendaftarBoxes).some(c => c.checked);
+                if (checkPendaftarBoxes.length > 0) {
+                    bulkActionsPendaftarContainer.style.display = 'block';
+                    bulkDeletePendaftarBtn.style.display = anyChecked ? 'inline-block' : 'none';
+                } else {
+                    bulkActionsPendaftarContainer.style.display = 'none';
+                }
+            }
+
+            if (checkPendaftarBoxes.length > 0) {
+                bulkActionsPendaftarContainer.style.display = 'block';
+            }
+
+            if (checkAllPendaftarBtn) {
+                checkAllPendaftarBtn.addEventListener('click', function() {
+                    const isChecked = this.getAttribute('data-checked') === 'true';
+                    const newValue = !isChecked;
+                    
+                    checkPendaftarBoxes.forEach(chk => {
+                        if (chk.offsetParent !== null) {
+                            chk.checked = newValue;
+                        }
+                    });
+                    
+                    this.setAttribute('data-checked', newValue);
+                    this.innerHTML = newValue ? '🔳 Hapus Centang' : '☑️ Centang Semua';
+                    
+                    updateBulkPendaftarButtons();
+                });
+            }
+
+            checkPendaftarBoxes.forEach(chk => {
+                chk.addEventListener('change', updateBulkPendaftarButtons);
+            });
+
+            if (bulkDeletePendaftarBtn) {
+                bulkDeletePendaftarBtn.addEventListener('click', function() {
+                    if (!confirm('Hapus semua pendaftar yang dicentang secara permanen?')) return;
+                    
+                    const checked = document.querySelectorAll('.check-pendaftar:checked');
+                    const form = document.getElementById('formBulkDeletePendaftar');
+                    if (form) {
+                        form.innerHTML = `<input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                          <input type="hidden" name="action" value="bulk_delete_registration">`;
+                        checked.forEach(chk => {
+                            const input = document.createElement('input');
                             input.type = 'hidden';
                             input.name = 'reg_ids[]';
-                            input.value = id;
+                            input.value = chk.value;
                             form.appendChild(input);
                         });
                         form.submit();
