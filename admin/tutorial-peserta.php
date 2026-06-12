@@ -86,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'edit_peserta') {
             $regId  = (int)($_POST['reg_id'] ?? 0);
             $newClassId = (int)($_POST['tutorial_class_id'] ?? 0);
-            $newDosen = trim($_POST['dosen_pengampu'] ?? '');
             $newRuangan = trim($_POST['ruangan'] ?? '');
             
             if ($regId > 0 && $newClassId > 0) {
@@ -94,11 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ? WHERE id = ?")
                     ->execute([$newClassId, $regId]);
                 
-                // Update detail kelas (Dosen & Ruangan) jika diisi
-                $pdo->prepare("UPDATE tutorial_classes SET dosen_pengampu = ?, ruangan = ? WHERE id = ?")
-                    ->execute([$newDosen, $newRuangan, $newClassId]);
+                // Update ruangan kelas jika diisi
+                if ($newRuangan !== '') {
+                    $pdo->prepare("UPDATE tutorial_classes SET ruangan = ? WHERE id = ?")
+                        ->execute([$newRuangan, $newClassId]);
+                }
                 
-                $message = 'Data peserta dan kelas berhasil diperbarui.';
+                $message = 'Data penempatan berhasil diperbarui.';
                 $msgType = 'success';
             }
         }
@@ -337,13 +338,9 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="form-group" style="margin-bottom:16px;">
                 <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Nama Dosen</label>
-                <select name="dosen_pengampu" id="edit_dosen"
-                    style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
-                    <option value="">-- Pilih Dosen --</option>
-                    <?php foreach ($allTutors as $tName): ?>
-                        <option value="<?= sanitize($tName) ?>"><?= sanitize($tName) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <div id="display_dosen" style="padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px; background-color:#f1f5f9; color:#475569; min-height:42px; font-weight:500;">
+                    -
+                </div>
             </div>
 
             <div class="form-group" style="margin-bottom:24px;">
@@ -366,13 +363,24 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+var classDosenMap = {
+<?php foreach ($classes as $c): ?>
+    "<?= $c['id'] ?>": <?= json_encode($c['dosen_pengampu'] ?: '-') ?>,
+<?php endforeach; ?>
+};
+
 function openEditModal(regId, classId, dosen, ruangan) {
     document.getElementById('edit_reg_id').value = regId;
     document.getElementById('edit_class_id').value = classId;
-    document.getElementById('edit_dosen').value = dosen;
+    document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
     document.getElementById('edit_ruangan').value = ruangan;
     document.getElementById('editPesertaModal').style.display = 'flex';
 }
+
+document.getElementById('edit_class_id').addEventListener('change', function() {
+    var classId = this.value;
+    document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
+});
 
 function closeEditModal() {
     document.getElementById('editPesertaModal').style.display = 'none';
