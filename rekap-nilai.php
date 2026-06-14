@@ -18,26 +18,25 @@ $action = $_GET['action'] ?? '';
 if ($isAdmin || $isDosen) {
     // 1. Fetch daftar kelas untuk Dropdown Filter
     if ($isAdmin) {
-        $stmt = $pdo->query("SELECT id, nama_kelas, gelombang, hari, dosen_pengampu FROM tutorial_classes ORDER BY gelombang ASC, nama_kelas ASC");
-        $classes = $stmt->fetchAll();
+        $stmt = $pdo->query("
+            SELECT tc.nama_kelas, tc.gelombang, COUNT(tr.id) as jml_mhs
+            FROM tutorial_classes tc
+            LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
+            GROUP BY tc.gelombang, tc.nama_kelas
+            ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
+        ");
+        $unique_classes = $stmt->fetchAll();
     } else {
-        $stmt = $pdo->prepare("SELECT id, nama_kelas, gelombang, hari, dosen_pengampu FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY gelombang ASC, nama_kelas ASC");
+        $stmt = $pdo->prepare("
+            SELECT tc.nama_kelas, tc.gelombang, COUNT(tr.id) as jml_mhs
+            FROM tutorial_classes tc
+            LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
+            WHERE tc.dosen_pengampu = ?
+            GROUP BY tc.gelombang, tc.nama_kelas
+            ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
+        ");
         $stmt->execute([$user['nama_lengkap']]);
-        $classes = $stmt->fetchAll();
-    }
-    
-    // Gabungkan duplikat nama kelas (jika ada) untuk dropdown agar rapi
-    $unique_classes = [];
-    foreach ($classes as $c) {
-        $key = $c['gelombang'] . '_' . $c['nama_kelas'];
-        if (!isset($unique_classes[$key])) {
-            $unique_classes[$key] = [
-                'nama_kelas' => $c['nama_kelas'],
-                'gelombang' => $c['gelombang'],
-                'ids' => []
-            ];
-        }
-        $unique_classes[$key]['ids'][] = $c['id'];
+        $unique_classes = $stmt->fetchAll();
     }
     
     $filter_class = $_GET['class_name'] ?? '';
@@ -175,18 +174,17 @@ include __DIR__ . '/includes/header.php';
     <div class="card" style="margin-bottom:20px;">
         <div class="card-body">
             <form method="GET" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                <div style="flex:1; min-width:250px;">
+                <div style="flex:1;">
                     <label style="display:block; margin-bottom:5px; font-weight:bold;">Filter Kelas</label>
-                    <select name="class_name" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;">
+                    <select name="class_name" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
                         <option value="">-- Tampilkan Semua Kelas --</option>
-                        <?php foreach($unique_classes as $key => $c): ?>
+                        <?php foreach($unique_classes as $c): ?>
                             <option value="<?= sanitize($c['nama_kelas']) ?>" <?= $filter_class == $c['nama_kelas'] ? 'selected' : '' ?>>
-                                <?= sanitize($c['nama_kelas']) ?> (Gel. <?= sanitize($c['gelombang']) ?>)
+                                <?= sanitize($c['nama_kelas']) ?> (Gel. <?= sanitize($c['gelombang']) ?>) - <?= sanitize($c['jml_mhs']) ?> Mahasiswa
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary">🔍 Filter Data</button>
             </form>
         </div>
     </div>
