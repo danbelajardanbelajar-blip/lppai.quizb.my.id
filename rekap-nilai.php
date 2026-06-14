@@ -18,10 +18,10 @@ $action = $_GET['action'] ?? '';
 if ($isAdmin || $isDosen) {
     // Fetch classes for dropdown
     if ($isAdmin) {
-        $stmt = $pdo->query("SELECT id, nama_kelas FROM tutorial_classes ORDER BY nama_kelas ASC");
+        $stmt = $pdo->query("SELECT id, nama_kelas, gelombang, dosen_pengampu, hari FROM tutorial_classes ORDER BY gelombang ASC, nama_kelas ASC");
         $classes = $stmt->fetchAll();
     } else {
-        $stmt = $pdo->prepare("SELECT id, nama_kelas FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY nama_kelas ASC");
+        $stmt = $pdo->prepare("SELECT id, nama_kelas, gelombang, dosen_pengampu, hari FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY gelombang ASC, nama_kelas ASC");
         $stmt->execute([$user['nama_lengkap']]);
         $classes = $stmt->fetchAll();
     }
@@ -160,7 +160,7 @@ include __DIR__ . '/includes/header.php';
                         <option value="">-- Pilih Kelas --</option>
                         <?php foreach($classes as $c): ?>
                             <option value="<?= $c['id'] ?>" <?= $class_id == $c['id'] ? 'selected' : '' ?>>
-                                <?= sanitize($c['nama_kelas']) ?>
+                                <?= sanitize($c['nama_kelas']) ?> - Gel. <?= sanitize($c['gelombang'] ?? '-') ?> (<?= sanitize($c['hari'] ?? '-') ?>, <?= sanitize($c['dosen_pengampu'] ?? 'Tanpa Dosen') ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
