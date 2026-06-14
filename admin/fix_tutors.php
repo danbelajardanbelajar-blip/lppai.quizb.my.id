@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/auth.php';
 $pdo = getDBConnection();
 $classes = $pdo->query('SELECT id, dosen_pengampu FROM tutorial_classes')->fetchAll(PDO::FETCH_ASSOC);
-$tutors = $pdo->query('SELECT nama FROM tutors')->fetchAll(PDO::FETCH_COLUMN);
+$tutors = $pdo->query("SELECT nama_lengkap as nama FROM users WHERE role = 'dosen'")->fetchAll(PDO::FETCH_COLUMN);
 
 foreach ($classes as $c) {
     if (!$c['dosen_pengampu']) continue;

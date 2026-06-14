@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pdo->beginTransaction();
 
     // Ambil daftar nama dosen dari tabel tutors
-    $tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
+    $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
 
     try {
         foreach ($hariList as $hari) {
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Siapkan helper untuk resolve nama asli tutor
             $realTutorNames = [];
-            $stmtFindTutor = $pdo->prepare("SELECT nama FROM tutors WHERE nama LIKE CONCAT('%', ?, '%') LIMIT 1");
+            $stmtFindTutor = $pdo->prepare("SELECT nama_lengkap as nama FROM users WHERE role = 'dosen' AND nama_lengkap LIKE CONCAT('%', ?, '%') LIMIT 1");
 
             if ($generateMode === 'fill_first') {
                 $tutorIndex = 0;

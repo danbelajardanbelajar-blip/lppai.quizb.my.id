@@ -4,6 +4,7 @@
  */
 $currentPage = basename($_SERVER['PHP_SELF']);
 $isAdmin = isset($currentUser) && $currentUser['role'] === 'admin';
+$isDosen = isset($currentUser) && $currentUser['role'] === 'dosen';
 
 function menuActive($page) {
     global $currentPage;
@@ -60,10 +61,17 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/ruangan.php" class="page-nav <?= menuActive('ruangan.php') ?>">
                 <span class="icon">🏢</span> Kelola Ruangan
             </a>
-            <a href="<?= BASE_URL ?>/admin/tutor.php" class="page-nav <?= menuActive('tutor.php') ?>">
-                <span class="icon">👨‍🏫</span> Kelola Tutor
+        <?php elseif ($isDosen): ?>
+            <!-- DOSEN MENU -->
+            <div class="menu-label">Dashboard</div>
+            <a href="<?= BASE_URL ?>/dosen/dashboard.php" class="page-nav <?= menuActive('dashboard.php') ?>">
+                <span class="icon">🏠</span> Dashboard Dosen
             </a>
 
+            <div class="menu-label">Akademik</div>
+            <a href="<?= BASE_URL ?>/dosen/kelas.php" class="page-nav <?= menuActive('kelas.php') ?>">
+                <span class="icon">🏫</span> Kelas Anda
+            </a>
         <?php else: ?>
             <!-- MAHASISWA MENU -->
             <div class="menu-label">Dashboard</div>

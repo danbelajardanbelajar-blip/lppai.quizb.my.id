@@ -96,7 +96,7 @@ $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)',
 
 include __DIR__ . '/../includes/header.php';
 
-$tutorsList = $pdo->query("SELECT id, nama FROM tutors ORDER BY nama ASC")->fetchAll();
+$tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
 function renderTutorSelect($day, $tutorsList, $isEdit = false) {
     $idPrefix = $isEdit ? 'edit_' : '';
     ?>
