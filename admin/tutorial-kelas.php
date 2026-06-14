@@ -38,6 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $pdo->prepare("DELETE FROM master_gelombang WHERE id = ?")->execute([$id]);
             $message = 'Gelombang berhasil dihapus.';
             $msgType = 'success';
+        } elseif ($action === 'reset_all') {
+            // Hapus semua data di tutorial_classes dan tutorial_registrations
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0; TRUNCATE TABLE tutorial_registrations; TRUNCATE TABLE tutorial_classes; SET FOREIGN_KEY_CHECKS = 1;");
+            $message = 'Seluruh data Kelas dan Peserta berhasil dikosongkan secara permanen!';
+            $msgType = 'success';
         } elseif ($action === 'create_gelombang') {
             $semester = $_POST['semester_tipe'] ?? '';
             $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
@@ -176,7 +181,14 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
 
 <!-- ── Daftar Gelombang ──────────────────────────────────────────── -->
 <div class="card">
-    <div class="card-header">📋 Daftar Gelombang Pendaftaran (<?= count($gelombangData) ?>)</div>
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>📋 Daftar Gelombang Pendaftaran (<?= count($gelombangData) ?>)</span>
+        <form method="POST" onsubmit="return confirm('PERINGATAN BAHAYA!\n\nApakah Anda yakin ingin MENGHAPUS SELURUH KELAS DAN PESERTA yang sudah ada di sistem?\nTindakan ini tidak dapat dibatalkan!');" style="margin:0;">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="reset_all">
+            <button type="submit" class="btn btn-sm btn-danger">⚠️ Kosongkan Semua Kelas & Peserta</button>
+        </form>
+    </div>
     <div class="card-body">
         <?php if (empty($gelombangData)): ?>
             <div class="empty-state">
