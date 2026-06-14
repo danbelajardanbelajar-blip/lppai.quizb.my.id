@@ -112,6 +112,11 @@ CREATE TABLE tutorial_registrations (
     user_id INT NOT NULL,
     tutorial_class_id INT NOT NULL,
     status ENUM('terdaftar', 'aktif', 'lulus', 'tidak_lulus', 'mengundurkan_diri') DEFAULT 'terdaftar',
+    nilai_thaharah DECIMAL(5,2) DEFAULT NULL,
+    nilai_shalat DECIMAL(5,2) DEFAULT NULL,
+    nilai_surat_pendek DECIMAL(5,2) DEFAULT NULL,
+    nilai_amaliyah DECIMAL(5,2) DEFAULT NULL,
+    nilai_jenazah DECIMAL(5,2) DEFAULT NULL,
     nilai_akhir DECIMAL(5,2) DEFAULT NULL,
     keterangan TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -120,7 +125,12 @@ CREATE TABLE tutorial_registrations (
 ) ENGINE=InnoDB;
 
 -- Jika database sudah ada, jalankan ALTER ini:
--- ALTER TABLE tutorial_registrations ADD COLUMN keterangan TEXT DEFAULT NULL AFTER nilai_akhir;
+-- ALTER TABLE tutorial_registrations 
+-- ADD COLUMN nilai_thaharah DECIMAL(5,2) DEFAULT NULL AFTER status,
+-- ADD COLUMN nilai_shalat DECIMAL(5,2) DEFAULT NULL AFTER nilai_thaharah,
+-- ADD COLUMN nilai_surat_pendek DECIMAL(5,2) DEFAULT NULL AFTER nilai_shalat,
+-- ADD COLUMN nilai_amaliyah DECIMAL(5,2) DEFAULT NULL AFTER nilai_surat_pendek,
+-- ADD COLUMN nilai_jenazah DECIMAL(5,2) DEFAULT NULL AFTER nilai_amaliyah;
 
 -- Tabel Tutorial Attendance
 CREATE TABLE tutorial_attendance (

@@ -38,13 +38,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // Simpan Nilai
         if ($action === 'save_nilai') {
-            $nilai_data = $_POST['nilai'] ?? [];
+            $nilai_th = $_POST['thaharah'] ?? [];
+            $nilai_sh = $_POST['shalat'] ?? [];
+            $nilai_sp = $_POST['surat_pendek'] ?? [];
+            $nilai_am = $_POST['amaliyah'] ?? [];
+            $nilai_jz = $_POST['jenazah'] ?? [];
+            
             try {
                 $pdo->beginTransaction();
-                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_akhir = ? WHERE id = ? AND tutorial_class_id = ?");
-                foreach ($nilai_data as $reg_id => $nilai_akhir) {
-                    $val = $nilai_akhir === '' ? null : (float)$nilai_akhir;
-                    $updateStmt->execute([$val, $reg_id, $class_id]);
+                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_akhir=? WHERE id=? AND tutorial_class_id=?");
+                
+                foreach ($nilai_th as $reg_id => $val_th) {
+                    $v1 = $val_th === '' ? null : (float)$val_th;
+                    $v2 = ($nilai_sh[$reg_id] ?? '') === '' ? null : (float)$nilai_sh[$reg_id];
+                    $v3 = ($nilai_sp[$reg_id] ?? '') === '' ? null : (float)$nilai_sp[$reg_id];
+                    $v4 = ($nilai_am[$reg_id] ?? '') === '' ? null : (float)$nilai_am[$reg_id];
+                    $v5 = ($nilai_jz[$reg_id] ?? '') === '' ? null : (float)$nilai_jz[$reg_id];
+                    
+                    $sum = 0; $count = 0;
+                    if($v1 !== null) { $sum += $v1; $count++; }
+                    if($v2 !== null) { $sum += $v2; $count++; }
+                    if($v3 !== null) { $sum += $v3; $count++; }
+                    if($v4 !== null) { $sum += $v4; $count++; }
+                    if($v5 !== null) { $sum += $v5; $count++; }
+                    
+                    $akhir = $count > 0 ? ($sum / $count) : null;
+                    
+                    $updateStmt->execute([$v1, $v2, $v3, $v4, $v5, $akhir, $reg_id, $class_id]);
                 }
                 $pdo->commit();
                 $message = 'Nilai berhasil disimpan.';
@@ -88,7 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Get registered students
 $stmt = $pdo->prepare("
-    SELECT tr.id as reg_id, tr.user_id, tr.status, tr.nilai_akhir, u.nama_lengkap, u.nim, u.program_studi
+    SELECT tr.id as reg_id, tr.user_id, tr.status, tr.nilai_akhir, 
+           tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah,
+           u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     WHERE tr.tutorial_class_id = ?
@@ -179,34 +201,31 @@ include __DIR__ . '/../includes/header.php';
                         <table>
                             <thead>
                                 <tr>
-                                    <th width="50">No</th>
-                                    <th>NIM</th>
-                                    <th>Nama Mahasiswa</th>
-                                    <th>Program Studi</th>
-                                    <th>Status</th>
-                                    <th width="150">Nilai Akhir (0-100)</th>
+                                    <th width="40">No</th>
+                                    <th>Mahasiswa</th>
+                                    <th>Thaharah</th>
+                                    <th>Shalat</th>
+                                    <th>Srt Pdk</th>
+                                    <th>Amaliyah</th>
+                                    <th>Jenazah</th>
+                                    <th>Rata-Rata</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php $no=1; foreach($students as $s): ?>
                                 <tr>
                                     <td align="center"><?= $no++ ?></td>
-                                    <td><?= sanitize($s['nim']) ?></td>
-                                    <td><strong><?= sanitize($s['nama_lengkap']) ?></strong></td>
-                                    <td><?= sanitize($s['program_studi']) ?></td>
                                     <td>
-                                        <?php
-                                        $bg = '#e2e8f0'; $col = '#475569';
-                                        if($s['status']=='aktif' || $s['status']=='terdaftar') { $bg='#dcfce7'; $col='#166534'; }
-                                        elseif($s['status']=='lulus') { $bg='#dbeafe'; $col='#1e40af'; }
-                                        elseif($s['status']=='tidak_lulus' || $s['status']=='mengundurkan_diri') { $bg='#fee2e2'; $col='#991b1b'; }
-                                        ?>
-                                        <span class="badge" style="background:<?= $bg ?>;color:<?= $col ?>;">
-                                            <?= str_replace('_', ' ', strtoupper($s['status'])) ?>
-                                        </span>
+                                        <strong><?= sanitize($s['nama_lengkap']) ?></strong><br>
+                                        <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?></small>
                                     </td>
-                                    <td>
-                                        <input type="number" step="0.01" min="0" max="100" name="nilai[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_akhir'] ?? '') ?>" style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px;">
+                                    <td><input type="number" step="0.01" min="0" max="100" name="thaharah[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_thaharah'] ?? '') ?>" style="width:70px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;"></td>
+                                    <td><input type="number" step="0.01" min="0" max="100" name="shalat[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_shalat'] ?? '') ?>" style="width:70px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;"></td>
+                                    <td><input type="number" step="0.01" min="0" max="100" name="surat_pendek[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_surat_pendek'] ?? '') ?>" style="width:70px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;"></td>
+                                    <td><input type="number" step="0.01" min="0" max="100" name="amaliyah[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_amaliyah'] ?? '') ?>" style="width:70px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;"></td>
+                                    <td><input type="number" step="0.01" min="0" max="100" name="jenazah[<?= $s['reg_id'] ?>]" value="<?= htmlspecialchars($s['nilai_jenazah'] ?? '') ?>" style="width:70px; padding:6px; border:1px solid #cbd5e1; border-radius:4px;"></td>
+                                    <td align="center">
+                                        <strong><?= $s['nilai_akhir'] !== null ? number_format($s['nilai_akhir'], 2) : '-' ?></strong>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -228,7 +247,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="card-body" style="background:#f8fafc; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
             <div style="font-weight:bold; margin-right:10px;">Pilih Pertemuan:</div>
             <?php
-            $max_pertemuan = 16;
+            $max_pertemuan = 8;
             for($i=1; $i<=$max_pertemuan; $i++): 
                 $isFilled = false;
                 foreach($meetings as $m) {
