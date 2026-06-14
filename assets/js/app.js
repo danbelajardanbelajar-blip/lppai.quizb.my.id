@@ -365,11 +365,20 @@ var SPA = {
         contentArea.style.transition = 'opacity 0.2s ease';
         contentArea.style.opacity = '0.3';
 
-        fetch(action, {
+        var fetchOptions = {
             method: method,
-            body: formData,
             headers: { 'X-Requested-With': 'SPA' }
-        })
+        };
+
+        if (method === 'GET' || method === 'HEAD') {
+            var params = new URLSearchParams(formData);
+            var separator = action.indexOf('?') !== -1 ? '&' : '?';
+            action = action + separator + params.toString();
+        } else {
+            fetchOptions.body = formData;
+        }
+
+        fetch(action, fetchOptions)
             .then(function(r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.text();
