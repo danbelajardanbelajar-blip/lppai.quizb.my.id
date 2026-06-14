@@ -45,8 +45,8 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/tutorial-peserta.php" class="page-nav <?= menuActive('tutorial-peserta.php') ?>">
                 <span class="icon">📋</span> Data Peserta Tutorial
             </a>
-            <a href="<?= BASE_URL ?>/admin/tutorial-hasil.php" class="page-nav <?= menuActive('tutorial-hasil.php') ?>">
-                <span class="icon">🎓</span> Kelola Hasil Tutorial
+            <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
+                <span class="icon">🎓</span> Rekapitulasi Nilai
             </a>
 
             <div class="menu-label">Pengumuman</div>
@@ -72,6 +72,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/dosen/kelas.php" class="page-nav <?= menuActive('kelas.php') ?>">
                 <span class="icon">🏫</span> Kelas Anda
             </a>
+            <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
+                <span class="icon">🎓</span> Rekapitulasi Nilai
+            </a>
         <?php else: ?>
             <!-- MAHASISWA MENU -->
             <div class="menu-label">Dashboard</div>
@@ -96,6 +99,9 @@ function menuActive($page) {
             </a>
             <a href="<?= BASE_URL ?>/tutorial-pembagian.php" class="page-nav <?= menuActive('tutorial-pembagian.php') ?>">
                 <span class="icon">🏫</span> Pembagian Kelas
+            </a>
+            <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
+                <span class="icon">📋</span> Rincian Nilai
             </a>
             <a href="<?= BASE_URL ?>/tutorial-kelulusan.php" class="page-nav <?= menuActive('tutorial-kelulusan.php') ?>">
                 <span class="icon">🎓</span> Kelulusan Tutorial
