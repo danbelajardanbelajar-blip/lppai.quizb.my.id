@@ -85,7 +85,6 @@ include __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr>
                             <th>Nama Kelas</th>
-                            <th>Mata Kuliah</th>
                             <th>Jadwal</th>
                             <th>Ruangan</th>
                             <th>Semester</th>
@@ -96,7 +95,6 @@ include __DIR__ . '/../includes/header.php';
                         <?php foreach ($recentClasses as $kelas): ?>
                         <tr>
                             <td><strong><?= sanitize($kelas['nama_kelas']) ?></strong></td>
-                            <td><?= sanitize($kelas['mata_kuliah']) ?></td>
                             <td>
                                 <span class="badge" style="background:#e0f2fe;color:#0284c7;">
                                     <?= sanitize($kelas['hari']) ?>, <?= sanitize($kelas['jam']) ?>

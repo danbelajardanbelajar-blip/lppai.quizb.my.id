@@ -22,7 +22,7 @@ $gelombangs = [
 
 // Ambil semua registrasi mahasiswa ini
 $stmt = $pdo->prepare("
-    SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan, tc.gelombang
+    SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan, tc.gelombang
     FROM tutorial_registrations tr
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tr.user_id = ?

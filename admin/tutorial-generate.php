@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
     
     // Siapkan statement untuk membuat kelas
-    $stmtInsertClass = $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?, 'Bahasa Arab Dasar', ?, ?, '13.00 - 14.30', NULL, ?, ?, 30)");
+    $stmtInsertClass = $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?, ?, ?, '13.00 - 14.30', NULL, ?, ?, 30)");
     
     // Siapkan statement untuk update class id mahasiswa
     $stmtUpdateReg = $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ? WHERE id = ?");

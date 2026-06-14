@@ -10,6 +10,10 @@ try {
                 ADD COLUMN IF NOT EXISTS nilai_amaliyah DECIMAL(5,2) DEFAULT NULL AFTER nilai_surat_pendek,
                 ADD COLUMN IF NOT EXISTS nilai_jenazah DECIMAL(5,2) DEFAULT NULL AFTER nilai_amaliyah,
                 ADD COLUMN IF NOT EXISTS nilai_detail TEXT DEFAULT NULL AFTER nilai_akhir");
+    
+    // Drop mata_kuliah from tutorial_classes
+    $pdo->exec("ALTER TABLE tutorial_classes DROP COLUMN IF EXISTS mata_kuliah");
+    
     echo "Added detailed grade columns to tutorial_registrations successfully.<br>";
 } catch (PDOException $e) {
     echo "Error adding columns: " . $e->getMessage() . "<br>";

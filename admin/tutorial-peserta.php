@@ -56,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         /* ---- BUAT KELAS & TAMBAH PESERTA ---- */
         if ($action === 'assign') {
             $namaKelas  = trim($_POST['nama_kelas'] ?? '');
-            $mataKuliah = '-';
             $dosen      = trim($_POST['dosen_pengampu'] ?? '');
             $hari       = trim($_POST['hari'] ?? '');
             $jam        = trim($_POST['jam'] ?? '');
@@ -73,8 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $message = 'Isi Nama Kelas dan pilih minimal satu mahasiswa.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?,?)")
-                    ->execute([$namaKelas, $mataKuliah, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
+                $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?)")
+                    ->execute([$namaKelas, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
                 
                 $classId = (int)$pdo->lastInsertId();
 
@@ -378,7 +377,7 @@ foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrati
 }
 
 $registrations = $pdo->query("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.mata_kuliah, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id

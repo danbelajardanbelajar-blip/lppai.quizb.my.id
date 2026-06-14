@@ -18,10 +18,10 @@ $action = $_GET['action'] ?? '';
 if ($isAdmin || $isDosen) {
     // Fetch classes for dropdown
     if ($isAdmin) {
-        $stmt = $pdo->query("SELECT id, nama_kelas, mata_kuliah FROM tutorial_classes ORDER BY nama_kelas ASC");
+        $stmt = $pdo->query("SELECT id, nama_kelas FROM tutorial_classes ORDER BY nama_kelas ASC");
         $classes = $stmt->fetchAll();
     } else {
-        $stmt = $pdo->prepare("SELECT id, nama_kelas, mata_kuliah FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY nama_kelas ASC");
+        $stmt = $pdo->prepare("SELECT id, nama_kelas FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY nama_kelas ASC");
         $stmt->execute([$user['nama_lengkap']]);
         $classes = $stmt->fetchAll();
     }
@@ -125,7 +125,7 @@ if ($isAdmin || $isDosen) {
 } else {
     // Mahasiswa Logic
     $stmt = $pdo->prepare("
-        SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.dosen_pengampu
+        SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu
         FROM tutorial_registrations tr
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
         WHERE tr.user_id = ?
@@ -160,7 +160,7 @@ include __DIR__ . '/includes/header.php';
                         <option value="">-- Pilih Kelas --</option>
                         <?php foreach($classes as $c): ?>
                             <option value="<?= $c['id'] ?>" <?= $class_id == $c['id'] ? 'selected' : '' ?>>
-                                <?= sanitize($c['nama_kelas']) ?> - <?= sanitize($c['mata_kuliah']) ?>
+                                <?= sanitize($c['nama_kelas']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

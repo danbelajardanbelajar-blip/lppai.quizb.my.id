@@ -25,7 +25,7 @@ $stmt->execute([$user['id']]);
 $pretesRegistered = $stmt->fetchColumn();
 
 // Get tutorial registrations
-$stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? ORDER BY tr.created_at DESC");
+$stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? ORDER BY tr.created_at DESC");
 $stmt->execute([$user['id']]);
 $tutorialRegs = $stmt->fetchAll();
 

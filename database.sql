@@ -95,7 +95,6 @@ CREATE TABLE announcements (
 CREATE TABLE tutorial_classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nama_kelas VARCHAR(100) NOT NULL,
-    mata_kuliah VARCHAR(150) NOT NULL,
     dosen_pengampu VARCHAR(150) DEFAULT NULL,
     hari VARCHAR(20) DEFAULT NULL,
     jam VARCHAR(30) DEFAULT NULL,
@@ -172,12 +171,12 @@ INSERT INTO pretes_schedules (periode, tanggal, waktu_mulai, waktu_selesai, ruan
 ('2025/2026-Ganjil', '2026-05-11', '08:00:00', '10:00:00', 'Gedung B Lantai 2 - Ruang 201', 40, 5);
 
 -- Tutorial Classes dummy
-INSERT INTO tutorial_classes (nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES
-('Kelas A', 'Bahasa Arab Dasar', 'Dr. Abdul Rahman', 'Senin', '08:00 - 09:30', 'Ruang 101', 'gel1', '2025/2026-Ganjil', 30),
-('Kelas B', 'Bahasa Arab Dasar', 'Ustadz Hamid', 'Selasa', '10:00 - 11:30', 'Ruang 102', 'gel1', '2025/2026-Ganjil', 30),
-('Kelas A', 'Bahasa Arab Lanjutan', 'Dr. Fatimah', 'Rabu', '13:00 - 14:30', 'Ruang 201', 'gel2', '2025/2026-Genap', 25),
-('Kelas B', 'Bahasa Arab Lanjutan', 'Dr. Yusuf', 'Kamis', '08:00 - 09:30', 'Ruang 202', 'gel2', '2025/2026-Genap', 25),
-('Kelas Mandiri A', 'Baca Tulis Al-Quran', 'Ustadz Ali', 'Jumat', '08:00 - 09:30', 'Ruang 301', 'mandiri', '2025/2026', 20);
+INSERT INTO tutorial_classes (nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES
+( 'Tutorial Thaharah A', 'Fulan', 'Senin', '08.00 - 09.30', 'Ruang 101', 'gel1', 'Genap 2023/2024', 30),
+( 'Tutorial Shalat B', 'Fulana', 'Selasa', '10.00 - 11.30', 'Ruang 102', 'gel1', 'Genap 2023/2024', 35),
+('Kelas A', 'Dr. Fatimah', 'Rabu', '13:00 - 14:30', 'Ruang 201', 'gel2', '2025/2026-Genap', 25),
+('Kelas B', 'Dr. Yusuf', 'Kamis', '08:00 - 09:30', 'Ruang 202', 'gel2', '2025/2026-Genap', 25),
+('Kelas Mandiri A', 'Ustadz Ali', 'Jumat', '08:00 - 09:30', 'Ruang 301', 'mandiri', '2025/2026', 20);
 
 -- Announcements dummy
 INSERT INTO announcements (judul, konten, tipe, is_active, created_by) VALUES

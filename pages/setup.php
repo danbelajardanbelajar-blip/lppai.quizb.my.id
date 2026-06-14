@@ -119,7 +119,6 @@ try {
         CREATE TABLE IF NOT EXISTS tutorial_classes (
             id INT AUTO_INCREMENT PRIMARY KEY,
             nama_kelas VARCHAR(100) NOT NULL,
-            mata_kuliah VARCHAR(150) NOT NULL,
             dosen_pengampu VARCHAR(150) DEFAULT NULL,
             hari VARCHAR(20) DEFAULT NULL,
             jam VARCHAR(30) DEFAULT NULL,
@@ -185,12 +184,12 @@ try {
     echo "<p>✅ Jadwal pretes dummy berhasil dibuat.</p>";
 
     // Insert Tutorial Classes
-    $pdo->exec("INSERT IGNORE INTO tutorial_classes (id, nama_kelas, mata_kuliah, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES
-        (1, 'Kelas A', 'Bahasa Arab Dasar', 'Dr. Abdul Rahman', 'Senin', '08:00-09:30', 'Ruang 101', 'gel1', '2025/2026-Ganjil', 30),
-        (2, 'Kelas B', 'Bahasa Arab Dasar', 'Ustadz Hamid', 'Selasa', '10:00-11:30', 'Ruang 102', 'gel1', '2025/2026-Ganjil', 30),
-        (3, 'Kelas A', 'Bahasa Arab Lanjutan', 'Dr. Fatimah', 'Rabu', '13:00-14:30', 'Ruang 201', 'gel2', '2025/2026-Genap', 25),
-        (4, 'Kelas B', 'Bahasa Arab Lanjutan', 'Dr. Yusuf', 'Kamis', '08:00-09:30', 'Ruang 202', 'gel2', '2025/2026-Genap', 25),
-        (5, 'Kelas Mandiri A', 'Baca Tulis Al-Quran', 'Ustadz Ali', 'Jumat', '08:00-09:30', 'Ruang 301', 'mandiri', '2025/2026', 20)
+    $pdo->exec("INSERT IGNORE INTO tutorial_classes (id, nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES
+        (1, 'Kelas A', 'Dr. Abdul Rahman', 'Senin', '08:00 - 09:30', 'Ruang 101', 'gel1', '2025/2026-Ganjil', 30),
+        (2, 'Kelas B', 'Ustadz Hamid', 'Selasa', '10:00 - 11:30', 'Ruang 102', 'gel1', '2025/2026-Ganjil', 30),
+        (3, 'Kelas A', 'Dr. Fatimah', 'Rabu', '13:00 - 14:30', 'Ruang 201', 'gel2', '2025/2026-Genap', 25),
+        (4, 'Kelas B', 'Dr. Yusuf', 'Kamis', '08:00 - 09:30', 'Ruang 202', 'gel2', '2025/2026-Genap', 25),
+        (5, 'Kelas Mandiri A', 'Ustadz Ali', 'Jumat', '08:00 - 09:30', 'Ruang 301', 'mandiri', '2025/2026', 20)
     ");
     echo "<p>✅ Kelas tutorial dummy berhasil dibuat.</p>";
 

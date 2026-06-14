@@ -22,7 +22,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
 
         // Get user's class assignment
         $stmt = $pdo->prepare("
-            SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan
+            SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan
             FROM tutorial_registrations tr
             JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
             WHERE tr.user_id = ? AND tc.gelombang = ?
@@ -38,7 +38,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
 
     if (strpos($tipe, 'kelulusan') !== false) {
         $stmt = $pdo->prepare("
-            SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, u.nama_lengkap, u.nim, u.program_studi
+            SELECT tr.*, tc.nama_kelas, u.nama_lengkap, u.nim, u.program_studi
             FROM tutorial_registrations tr
             JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
             JOIN users u ON tr.user_id = u.id
@@ -49,7 +49,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
         $graduationResults = $stmt->fetchAll();
 
         $stmt = $pdo->prepare("
-            SELECT tr.*, tc.nama_kelas, tc.mata_kuliah
+            SELECT tr.*, tc.nama_kelas
             FROM tutorial_registrations tr
             JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
             WHERE tr.user_id = ? AND tc.gelombang = ?

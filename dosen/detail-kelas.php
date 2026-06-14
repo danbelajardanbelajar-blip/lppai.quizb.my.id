@@ -187,7 +187,6 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <h2 style="margin-bottom:10px;"><?= sanitize($kelas['nama_kelas']) ?></h2>
         <div style="display:flex; flex-wrap:wrap; gap:20px; color:#475569; font-size:14px;">
-            <div><strong>Mata Kuliah:</strong> <?= sanitize($kelas['mata_kuliah']) ?></div>
             <div><strong>Jadwal:</strong> <?= sanitize($kelas['hari']) ?>, <?= sanitize($kelas['jam']) ?></div>
             <div><strong>Ruangan:</strong> <?= sanitize($kelas['ruangan']) ?></div>
             <div><strong>Semester:</strong> <?= sanitize($kelas['semester']) ?></div>

@@ -125,7 +125,7 @@ foreach ($gelombangs as $gelKey => $g):
 
     // Cek registrasi user di gelombang ini
     $stmtReg = $pdo->prepare("
-        SELECT tr.*, tc.nama_kelas, tc.mata_kuliah, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan 
+        SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan 
         FROM tutorial_registrations tr
         LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
         WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
