@@ -29,7 +29,7 @@ if ($isAdmin || $isDosen) {
                    AVG(tr.nilai_akhir) as avg_akhir
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
-            GROUP BY tc.id
+            GROUP BY tc.gelombang, tc.nama_kelas
             ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
         ");
         $classes_summary = $stmt->fetchAll();
@@ -46,7 +46,7 @@ if ($isAdmin || $isDosen) {
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
             WHERE tc.dosen_pengampu = ?
-            GROUP BY tc.id
+            GROUP BY tc.gelombang, tc.nama_kelas
             ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
         ");
         $stmt->execute([$user['nama_lengkap']]);
@@ -74,14 +74,12 @@ if ($isAdmin || $isDosen) {
         $sheet->setCellValue('B1', 'Gelombang');
         $sheet->setCellValue('C1', 'Nama Kelas');
         $sheet->setCellValue('D1', 'Hari');
-        $sheet->setCellValue('E1', 'Dosen Pengampu');
-        $sheet->setCellValue('F1', 'Jml Mhs');
-        $sheet->setCellValue('G1', 'Rata-rata Thaharah');
-        $sheet->setCellValue('H1', 'Rata-rata Shalat');
-        $sheet->setCellValue('I1', 'Rata-rata Srt Pendek');
-        $sheet->setCellValue('J1', 'Rata-rata Amaliyah');
-        $sheet->setCellValue('K1', 'Rata-rata Jenazah');
-        $sheet->setCellValue('L1', 'Rata-rata Akhir');
+        $sheet->setCellValue('E1', 'Rata-rata Thaharah');
+        $sheet->setCellValue('F1', 'Rata-rata Shalat');
+        $sheet->setCellValue('G1', 'Rata-rata Srt Pendek');
+        $sheet->setCellValue('H1', 'Rata-rata Amaliyah');
+        $sheet->setCellValue('I1', 'Rata-rata Jenazah');
+        $sheet->setCellValue('J1', 'Rata-rata Akhir');
         
         // Style headers
         $headerStyle = [
@@ -89,7 +87,7 @@ if ($isAdmin || $isDosen) {
             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2E8F0']],
             'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]
         ];
-        $sheet->getStyle('A1:L1')->applyFromArray($headerStyle);
+        $sheet->getStyle('A1:J1')->applyFromArray($headerStyle);
         
         $row = 2;
         $no = 1;
@@ -98,20 +96,18 @@ if ($isAdmin || $isDosen) {
             $sheet->setCellValueExplicit('B'.$row, $c['gelombang'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             $sheet->setCellValue('C'.$row, $c['nama_kelas']);
             $sheet->setCellValue('D'.$row, $c['hari']);
-            $sheet->setCellValue('E'.$row, $c['dosen_pengampu']);
-            $sheet->setCellValue('F'.$row, $c['total_mahasiswa']);
-            $sheet->setCellValue('G'.$row, $c['avg_thaharah'] !== null ? round($c['avg_thaharah'], 2) : '-');
-            $sheet->setCellValue('H'.$row, $c['avg_shalat'] !== null ? round($c['avg_shalat'], 2) : '-');
-            $sheet->setCellValue('I'.$row, $c['avg_surat_pendek'] !== null ? round($c['avg_surat_pendek'], 2) : '-');
-            $sheet->setCellValue('J'.$row, $c['avg_amaliyah'] !== null ? round($c['avg_amaliyah'], 2) : '-');
-            $sheet->setCellValue('K'.$row, $c['avg_jenazah'] !== null ? round($c['avg_jenazah'], 2) : '-');
-            $sheet->setCellValue('L'.$row, $c['avg_akhir'] !== null ? round($c['avg_akhir'], 2) : '-');
+            $sheet->setCellValue('E'.$row, $c['avg_thaharah'] !== null ? round($c['avg_thaharah'], 2) : '-');
+            $sheet->setCellValue('F'.$row, $c['avg_shalat'] !== null ? round($c['avg_shalat'], 2) : '-');
+            $sheet->setCellValue('G'.$row, $c['avg_surat_pendek'] !== null ? round($c['avg_surat_pendek'], 2) : '-');
+            $sheet->setCellValue('H'.$row, $c['avg_amaliyah'] !== null ? round($c['avg_amaliyah'], 2) : '-');
+            $sheet->setCellValue('I'.$row, $c['avg_jenazah'] !== null ? round($c['avg_jenazah'], 2) : '-');
+            $sheet->setCellValue('J'.$row, $c['avg_akhir'] !== null ? round($c['avg_akhir'], 2) : '-');
             
-            $sheet->getStyle('A'.$row.':L'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$row.':J'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
             $row++;
         }
         
-        foreach(range('A','L') as $col) {
+        foreach(range('A','J') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
         
@@ -177,10 +173,6 @@ include __DIR__ . '/includes/header.php';
                                 <th>Gel.</th>
                                 <th>Nama Kelas</th>
                                 <th>Hari</th>
-                                <?php if($isAdmin): ?>
-                                <th>Dosen Pengampu</th>
-                                <?php endif; ?>
-                                <th>Jml Mhs</th>
                                 <th>Rata Thaharah</th>
                                 <th>Rata Shalat</th>
                                 <th>Rata Srt Pdk</th>
@@ -196,10 +188,6 @@ include __DIR__ . '/includes/header.php';
                                 <td align="center"><?= sanitize($c['gelombang']) ?></td>
                                 <td><strong><?= sanitize($c['nama_kelas']) ?></strong></td>
                                 <td><?= sanitize($c['hari']) ?></td>
-                                <?php if($isAdmin): ?>
-                                <td><?= sanitize($c['dosen_pengampu']) ?></td>
-                                <?php endif; ?>
-                                <td align="center"><?= $c['total_mahasiswa'] ?></td>
                                 <td align="center"><?= $c['avg_thaharah'] !== null ? number_format($c['avg_thaharah'], 1) : '-' ?></td>
                                 <td align="center"><?= $c['avg_shalat'] !== null ? number_format($c['avg_shalat'], 1) : '-' ?></td>
                                 <td align="center"><?= $c['avg_surat_pendek'] !== null ? number_format($c['avg_surat_pendek'], 1) : '-' ?></td>
