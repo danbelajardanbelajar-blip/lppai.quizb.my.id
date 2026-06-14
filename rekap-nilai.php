@@ -19,7 +19,7 @@ if ($isAdmin || $isDosen) {
     // 1. Fetch daftar kelas untuk Dropdown Filter
     if ($isAdmin) {
         $stmt = $pdo->query("
-            SELECT tc.nama_kelas, tc.gelombang, COUNT(tr.id) as jml_mhs
+            SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
             GROUP BY tc.gelombang, tc.nama_kelas
@@ -28,7 +28,7 @@ if ($isAdmin || $isDosen) {
         $unique_classes = $stmt->fetchAll();
     } else {
         $stmt = $pdo->prepare("
-            SELECT tc.nama_kelas, tc.gelombang, COUNT(tr.id) as jml_mhs
+            SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
             WHERE tc.dosen_pengampu = ?
@@ -180,7 +180,7 @@ include __DIR__ . '/includes/header.php';
                         <option value="">-- Tampilkan Semua Kelas --</option>
                         <?php foreach($unique_classes as $c): ?>
                             <option value="<?= sanitize($c['nama_kelas']) ?>" <?= $filter_class == $c['nama_kelas'] ? 'selected' : '' ?>>
-                                <?= sanitize($c['nama_kelas']) ?> (Gel. <?= sanitize($c['gelombang']) ?>) - <?= sanitize($c['jml_mhs']) ?> Mahasiswa
+                                <?= sanitize($c['nama_kelas']) ?> (Gel. <?= sanitize($c['gelombang']) ?>) - <?= sanitize($c['dosen_pengampu'] ?: 'Tanpa Dosen') ?> - <?= sanitize($c['jml_mhs']) ?> Mahasiswa
                             </option>
                         <?php endforeach; ?>
                     </select>
