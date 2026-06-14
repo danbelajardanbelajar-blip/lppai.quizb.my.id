@@ -8,12 +8,16 @@ requireAdmin();
 
 $pdo = getDBConnection();
 
-// Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel tutors
-$pdo->exec("
-    UPDATE tutorial_classes tc
-    JOIN tutors t ON t.nama LIKE CONCAT('%', tc.dosen_pengampu, '%') AND t.nama != tc.dosen_pengampu
-    SET tc.dosen_pengampu = t.nama
-");
+// Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users (role = dosen)
+try {
+    $pdo->exec("
+        UPDATE tutorial_classes tc
+        JOIN users u ON u.nama_lengkap LIKE CONCAT('%', tc.dosen_pengampu, '%') AND u.nama_lengkap != tc.dosen_pengampu AND u.role = 'dosen'
+        SET tc.dosen_pengampu = u.nama_lengkap
+    ");
+} catch(PDOException $e) {
+    // Ignore if errors
+}
 
 $message = '';
 $msgType = '';
