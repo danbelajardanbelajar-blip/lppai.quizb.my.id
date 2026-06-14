@@ -84,7 +84,13 @@ require_once __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <div class="card" style="margin-bottom: 24px;">
-    <div class="card-header" style="background-color: #3b82f6; color: white;">📊 Data Nilai Keseluruhan (Master)</div>
+    <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span>📊 Data Nilai Keseluruhan (Master)</span>
+        <div>
+            <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm btn-light" style="color: #3b82f6; font-weight: 600; border: none;" data-no-spa="true">📄 Download Template</a>
+            <button type="button" class="btn btn-sm btn-warning" style="font-weight: 600;" onclick="document.getElementById('importModal').style.display='flex'">📥 Import Nilai Excel</button>
+        </div>
+    </div>
     <div class="card-body">
         <p style="margin-top: 0; color: #64748b; font-size: 14px; margin-bottom: 20px;">
             Halaman ini menampilkan <strong>seluruh mahasiswa dari semua angkatan</strong>. Data diproses menggunakan *Server-Side Processing* sehingga aman untuk memuat puluhan ribu data tanpa membebani memori.
@@ -179,6 +185,27 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Modal Import -->
+<div id="importModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:9999;">
+    <div style="background:#fff; padding:24px; border-radius:8px; width:100%; max-width:400px;">
+        <h3 style="margin-top:0;">Import Nilai via Excel</h3>
+        <p style="font-size:14px; color:#64748b; margin-bottom: 20px;">Pastikan Anda menggunakan template Excel terbaru yang diunduh dari halaman ini agar formatnya sesuai.</p>
+        
+        <form id="formImport">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+            <div style="margin-bottom: 16px;">
+                <label><strong>Pilih File (.xls / .xlsx)</strong></label>
+                <input type="file" name="csv_file" class="form-control" accept=".xls,.xlsx" required>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('importModal').style.display='none'">Batal</button>
+                <button type="submit" class="btn btn-success" id="btnProsesImport">Proses Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 
@@ -245,14 +272,46 @@ $(document).ready(function() {
         hitungNilaiAkhir();
     });
     */
-});
 
-// Menutup modal jika klik di luar
-window.onclick = function(event) {
-    if (event.target == document.getElementById('modalEditNilai')) {
-        document.getElementById('modalEditNilai').style.display = "none";
+    // Menutup modal jika klik di luar
+    window.onclick = function(event) {
+        if (event.target == document.getElementById('modalEditNilai')) {
+            document.getElementById('modalEditNilai').style.display = "none";
+        }
     }
-}
+    
+    // Form import AJAX handler
+    $('#formImport').on('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const btn = $('#btnProsesImport');
+        btn.prop('disabled', true).text('Memproses...');
+        
+        $.ajax({
+            url: '<?= BASE_URL ?>/admin/ajax-import-nilai.php',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                btn.prop('disabled', false).text('Proses Import');
+                if (res.success) {
+                    alert('Import Berhasil!\n' + res.message);
+                    document.getElementById('importModal').style.display='none';
+                    $('#tableKelolaNilai').DataTable().ajax.reload(null, false);
+                } else {
+                    alert('Gagal: ' + res.message);
+                }
+            },
+            error: function(err) {
+                btn.prop('disabled', false).text('Proses Import');
+                alert('Terjadi kesalahan koneksi saat import.');
+                console.error(err);
+            }
+        });
+    });
+
+});
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
