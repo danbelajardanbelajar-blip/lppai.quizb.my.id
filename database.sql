@@ -118,6 +118,7 @@ CREATE TABLE tutorial_registrations (
     nilai_amaliyah DECIMAL(5,2) DEFAULT NULL,
     nilai_jenazah DECIMAL(5,2) DEFAULT NULL,
     nilai_akhir DECIMAL(5,2) DEFAULT NULL,
+    nilai_detail TEXT DEFAULT NULL,
     keterangan TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -130,7 +131,8 @@ CREATE TABLE tutorial_registrations (
 -- ADD COLUMN nilai_shalat DECIMAL(5,2) DEFAULT NULL AFTER nilai_thaharah,
 -- ADD COLUMN nilai_surat_pendek DECIMAL(5,2) DEFAULT NULL AFTER nilai_shalat,
 -- ADD COLUMN nilai_amaliyah DECIMAL(5,2) DEFAULT NULL AFTER nilai_surat_pendek,
--- ADD COLUMN nilai_jenazah DECIMAL(5,2) DEFAULT NULL AFTER nilai_amaliyah;
+-- ADD COLUMN nilai_jenazah DECIMAL(5,2) DEFAULT NULL AFTER nilai_amaliyah,
+-- ADD COLUMN nilai_detail TEXT DEFAULT NULL AFTER nilai_akhir;
 
 -- Tabel Tutorial Attendance
 CREATE TABLE tutorial_attendance (
