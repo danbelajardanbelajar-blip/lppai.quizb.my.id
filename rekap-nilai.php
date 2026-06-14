@@ -71,14 +71,26 @@ if ($isAdmin || $isDosen) {
     
     // 3. EXPORT LOGIC
     if ($action === 'export') {
-        $vendorPath = __DIR__ . '/vendor/autoload.php';
-        if (!file_exists($vendorPath)) {
-            $vendorPath2 = __DIR__ . '/../vendor/autoload.php';
-            if (file_exists($vendorPath2)) {
-                $vendorPath = $vendorPath2;
-            } else {
-                die("<div style='padding:20px; color:red; font-family:sans-serif;'>Library Excel (PhpSpreadsheet) tidak ditemukan. Pastikan Anda telah menginstall PhpSpreadsheet via composer.</div>");
+        $possible_paths = [
+            __DIR__ . '/vendor/autoload.php',
+            __DIR__ . '/../vendor/autoload.php',
+            __DIR__ . '/../../vendor/autoload.php',
+            __DIR__ . '/../../../vendor/autoload.php',
+            $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php',
+            $_SERVER['DOCUMENT_ROOT'] . '/../vendor/autoload.php',
+            '/public_html/vendor/autoload.php'
+        ];
+        
+        $vendorPath = null;
+        foreach ($possible_paths as $path) {
+            if (file_exists($path)) {
+                $vendorPath = $path;
+                break;
             }
+        }
+        
+        if (!$vendorPath) {
+            die("<div style='padding:20px; color:red; font-family:sans-serif;'>Library Excel (PhpSpreadsheet) tidak ditemukan di server. Harap pastikan folder vendor ada di public_html.</div>");
         }
         
         require_once $vendorPath;
