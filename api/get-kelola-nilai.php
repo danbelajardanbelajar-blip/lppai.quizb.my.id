@@ -2,8 +2,7 @@
 /**
  * API untuk Server-Side Processing Halaman Kelola Nilai Master
  */
-require_once __DIR__ . '/../includes/db.php';
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     http_response_code(403);
