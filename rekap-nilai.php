@@ -40,6 +40,7 @@ if ($isAdmin || $isDosen) {
     }
     
     $filter_class = $_GET['class_name'] ?? '';
+    $filter_ta = $_GET['tahun_ajaran'] ?? '';
     $students = [];
     
     // 2. Build Query untuk mengambil mahasiswa (Filtered)
@@ -61,6 +62,10 @@ if ($isAdmin || $isDosen) {
     if ($filter_class !== '') {
         $sql .= " AND tc.nama_kelas = ?";
         $params[] = $filter_class;
+    }
+    if ($filter_ta !== '') {
+        $sql .= " AND tc.semester LIKE ?";
+        $params[] = $filter_ta . '%';
     }
     
     $sql .= " ORDER BY tc.gelombang ASC, tc.nama_kelas ASC, u.nama_lengkap ASC";
@@ -186,7 +191,22 @@ include __DIR__ . '/includes/header.php';
     <div class="card" style="margin-bottom:20px;">
         <div class="card-body">
             <form method="GET" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                <div style="flex:1;">
+                <div style="flex:1; min-width: 200px;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Tahun Ajaran</label>
+                    <select name="tahun_ajaran" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
+                        <option value="">-- Semua Tahun Ajaran --</option>
+                        <?php
+                        $startYear = 2025;
+                        $endYear = 2050;
+                        for ($y = $startYear; $y < $endYear; $y++) {
+                            $label = $y . '-' . ($y + 1);
+                            $selected = ($filter_ta === $label) ? 'selected' : '';
+                            echo "<option value=\"$label\" $selected>$label</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div style="flex:1; min-width: 200px;">
                     <label style="display:block; margin-bottom:5px; font-weight:bold;">Filter Kelas</label>
                     <select name="class_name" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
                         <option value="">-- Tampilkan Semua Kelas --</option>
@@ -203,8 +223,8 @@ include __DIR__ . '/includes/header.php';
     
     <div class="card">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>Daftar Nilai Mahasiswa: <strong><?= $filter_class !== '' ? sanitize($filter_class) : 'Semua Kelas' ?></strong></span>
-            <a href="?class_name=<?= urlencode($filter_class) ?>&action=export" class="btn btn-sm btn-success" data-no-spa="true">📄 Export Excel</a>
+            <span>Daftar Nilai Mahasiswa: <strong><?= $filter_class !== '' ? sanitize($filter_class) : 'Semua Kelas' ?> <?= $filter_ta !== '' ? '('.sanitize($filter_ta).')' : '' ?></strong></span>
+            <a href="?class_name=<?= urlencode($filter_class) ?>&tahun_ajaran=<?= urlencode($filter_ta) ?>&action=export" class="btn btn-sm btn-success" data-no-spa="true">📄 Export Excel</a>
         </div>
         <div class="card-body">
             <?php if (empty($students)): ?>

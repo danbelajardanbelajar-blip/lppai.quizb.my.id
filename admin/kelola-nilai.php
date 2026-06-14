@@ -15,6 +15,18 @@ $pdo = getDBConnection();
 $message = '';
 $msgType = '';
 
+// Auto-migrate: add tahun_ajaran if it doesn't exist
+try {
+    $pdo->query("SELECT tahun_ajaran FROM tutorial_registrations LIMIT 1");
+} catch(PDOException $e) {
+    try {
+        $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER status");
+    } catch(PDOException $ex) {
+        // ignore
+    }
+}
+
+
 // Proses Simpan Nilai
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_nilai') {
     $token = $_POST['csrf_token'] ?? '';
@@ -25,6 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $userId = (int)($_POST['user_id'] ?? 0);
         $regId = (int)($_POST['reg_id'] ?? 0);
         
+        $ta = $_POST['tahun_ajaran'] ?? null;
+        if ($ta === '') $ta = null;
+
         $thaharah = ($_POST['nilai_thaharah'] !== '') ? (float)$_POST['nilai_thaharah'] : null;
         $shalat = ($_POST['nilai_shalat'] !== '') ? (float)$_POST['nilai_shalat'] : null;
         $srt = ($_POST['nilai_surat_pendek'] !== '') ? (float)$_POST['nilai_surat_pendek'] : null;
@@ -37,21 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // UPDATE yang sudah ada
                 $stmt = $pdo->prepare("
                     UPDATE tutorial_registrations 
-                    SET nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
+                    SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
                         nilai_amaliyah=?, nilai_jenazah=?, nilai_akhir=? 
                     WHERE id=?
                 ");
-                $stmt->execute([$thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir, $regId]);
+                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir, $regId]);
                 $message = "Nilai mahasiswa berhasil diperbarui.";
                 $msgType = "success";
             } else {
                 // INSERT baru untuk mahasiswa lawas (belum pernah mendaftar kelas)
                 $stmt = $pdo->prepare("
                     INSERT INTO tutorial_registrations 
-                    (user_id, status, gelombang, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_akhir)
-                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?)
+                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_akhir)
+                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$userId, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir]);
+                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir]);
                 $message = "Nilai mahasiswa berhasil disimpan (Riwayat baru telah dibuat).";
                 $msgType = "success";
             }
@@ -84,6 +99,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>NIM</th>
                         <th>Nama Mahasiswa</th>
                         <th>Jurusan</th>
+                        <th>Tahun Ajaran</th>
                         <th>Thaharah</th>
                         <th>Shalat</th>
                         <th>Srt Pendek</th>
@@ -111,6 +127,21 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="background-color:#f1f5f9; padding:12px; border-radius:6px; margin-bottom:16px;">
                 <strong>Nama:</strong> <span id="displayNama"></span><br>
                 <strong>NIM:</strong> <span id="displayNim"></span>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label><strong>Tahun Ajaran</strong></label>
+                <select name="tahun_ajaran" id="editTa" class="form-control">
+                    <option value="">-- Kosong --</option>
+                    <?php
+                    $startYear = 2017;
+                    $endYear = 2050;
+                    for ($y = $startYear; $y < $endYear; $y++) {
+                        $label = $y . '-' . ($y + 1);
+                        echo "<option value=\"$label\">$label</option>";
+                    }
+                    ?>
+                </select>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
@@ -169,7 +200,7 @@ $(document).ready(function() {
         },
         "columnDefs": [
             { "orderable": false, "targets": [0, 10] }, // Disable sorting pada No dan Aksi
-            { "className": "text-center", "targets": [4,5,6,7,8,9] }
+            { "className": "text-center", "targets": [4,5,6,7,8,9,10] }
         ]
     });
 
@@ -181,6 +212,7 @@ $(document).ready(function() {
         $('#editRegId').val(btn.data('reg-id'));
         $('#displayNama').text(btn.data('nama'));
         $('#displayNim').text(btn.data('nim'));
+        $('#editTa').val(btn.data('ta'));
         
         $('#editThaharah').val(btn.data('thaharah'));
         $('#editShalat').val(btn.data('shalat'));
