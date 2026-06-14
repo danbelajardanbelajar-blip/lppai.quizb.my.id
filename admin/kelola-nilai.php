@@ -158,7 +158,7 @@ $(document).ready(function() {
         "processing": true,
         "serverSide": true,
         "ajax": {
-            "url": "<?= BASE_URL ?>/api/get-kelola-nilai.php",
+            "url": "<?= BASE_URL ?>/admin/ajax-kelola-nilai.php",
             "type": "POST"
         },
         "pageLength": 25,
