@@ -4,7 +4,7 @@
 CREATE DATABASE IF NOT EXISTS lppai_corner CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE lppai_corner;
 
--- Tabel Users (Mahasiswa + Admin)
+-- Tabel Users (Mahasiswa + Admin + Dosen)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -16,7 +16,7 @@ CREATE TABLE users (
     program_studi VARCHAR(100) DEFAULT NULL,
     fakultas VARCHAR(100) DEFAULT NULL,
     tanggal_lahir DATE DEFAULT NULL,
-    role ENUM('mahasiswa', 'admin') NOT NULL DEFAULT 'mahasiswa',
+    role ENUM('mahasiswa', 'admin', 'dosen') NOT NULL DEFAULT 'mahasiswa',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -121,6 +121,20 @@ CREATE TABLE tutorial_registrations (
 
 -- Jika database sudah ada, jalankan ALTER ini:
 -- ALTER TABLE tutorial_registrations ADD COLUMN keterangan TEXT DEFAULT NULL AFTER nilai_akhir;
+
+-- Tabel Tutorial Attendance
+CREATE TABLE tutorial_attendance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tutorial_class_id INT NOT NULL,
+    user_id INT NOT NULL,
+    pertemuan_ke INT NOT NULL,
+    tanggal DATE NOT NULL,
+    status_hadir ENUM('hadir', 'absen', 'izin', 'sakit') DEFAULT 'hadir',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tutorial_class_id) REFERENCES tutorial_classes(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_attendance (tutorial_class_id, user_id, pertemuan_ke)
+) ENGINE=InnoDB;
 
 -- =====================
 -- DATA DUMMY

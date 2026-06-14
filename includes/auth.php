@@ -15,6 +15,10 @@ function isAdmin() {
     return isLoggedIn() && isset($_SESSION['role']) && $_SESSION['role'] === 'admin';
 }
 
+function isDosen() {
+    return isLoggedIn() && isset($_SESSION['role']) && $_SESSION['role'] === 'dosen';
+}
+
 function requireLogin() {
     if (!isLoggedIn()) {
         header('Location: ' . BASE_URL . '/index.php');
@@ -25,6 +29,14 @@ function requireLogin() {
 function requireAdmin() {
     requireLogin();
     if (!isAdmin()) {
+        header('Location: ' . BASE_URL . '/dashboard.php');
+        exit;
+    }
+}
+
+function requireDosen() {
+    requireLogin();
+    if (!isDosen()) {
         header('Location: ' . BASE_URL . '/dashboard.php');
         exit;
     }

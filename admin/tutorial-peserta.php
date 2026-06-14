@@ -465,7 +465,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-function openTutorialTab(evt, tabId) {
+window.openTutorialTab = function(evt, tabId) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.custom-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
@@ -1055,32 +1055,32 @@ var classDosenMap = {
 <?php endforeach; ?>
 };
 
-function openEditModal(regId, classId, dosen, ruangan) {
+window.openEditModal = function(regId, classId, dosen, ruangan) {
     document.getElementById('edit_reg_id').value = regId;
     document.getElementById('edit_class_id').value = classId;
     document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
     document.getElementById('edit_ruangan').value = ruangan;
     document.getElementById('editPesertaModal').style.display = 'flex';
-}
+};
 
-function openEditPendaftarModal(regId, hariPilihan) {
+window.openEditPendaftarModal = function(regId, hariPilihan) {
     document.getElementById('edit_pendaftar_reg_id').value = regId;
     document.getElementById('edit_pendaftar_hari').value = hariPilihan;
     document.getElementById('editPendaftarModal').style.display = 'flex';
-}
+};
 
-function closeEditPendaftarModal() {
+window.closeEditPendaftarModal = function() {
     document.getElementById('editPendaftarModal').style.display = 'none';
-}
+};
 
 document.getElementById('edit_class_id').addEventListener('change', function() {
     var classId = this.value;
     document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
 });
 
-function closeEditModal() {
+window.closeEditModal = function() {
     document.getElementById('editPesertaModal').style.display = 'none';
-}
+};
 
 (function () {
     var filterKelasBottom = document.getElementById('filterKelasBottom');
@@ -1419,15 +1419,15 @@ function closeEditModal() {
 </div>
 
 <script>
-function openAddSingleRegistrationModal(userId, namaLengkap) {
+window.openAddSingleRegistrationModal = function(userId, namaLengkap) {
     document.getElementById('add_single_user_id').value = userId;
     document.getElementById('add_single_nama_lengkap').textContent = namaLengkap;
     document.getElementById('addSingleRegistrationModal').style.display = 'flex';
-}
+};
 
-function closeAddSingleRegistrationModal() {
+window.closeAddSingleRegistrationModal = function() {
     document.getElementById('addSingleRegistrationModal').style.display = 'none';
-}
+};
 
 document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
     e.preventDefault();

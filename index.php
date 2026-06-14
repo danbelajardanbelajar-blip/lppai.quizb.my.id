@@ -8,6 +8,8 @@ require_once __DIR__ . '/includes/auth.php';
 if (isLoggedIn()) {
     if (isAdmin()) {
         header('Location: ' . BASE_URL . '/admin/dashboard.php');
+    } elseif (isDosen()) {
+        header('Location: ' . BASE_URL . '/dosen/dashboard.php');
     } else {
         header('Location: ' . BASE_URL . '/dashboard.php');
     }
@@ -28,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (loginUser($username, $password)) {
         if (isAdmin()) {
             header('Location: ' . BASE_URL . '/admin/dashboard.php');
+        } elseif (isDosen()) {
+            header('Location: ' . BASE_URL . '/dosen/dashboard.php');
         } else {
             header('Location: ' . BASE_URL . '/dashboard.php');
         }
