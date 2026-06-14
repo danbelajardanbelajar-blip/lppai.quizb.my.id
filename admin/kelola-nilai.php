@@ -76,8 +76,8 @@ require_once __DIR__ . '/../includes/header.php';
         </p>
 
         <div class="table-responsive">
-            <!-- Tambahkan width:100% dan class display agar DataTables merender dengan benar -->
-            <table id="tableKelolaNilai" class="display" style="width:100%">
+            <!-- Tambahkan width:100% dan class display no-datatable agar DataTables merender dengan benar tanpa konflik -->
+            <table id="tableKelolaNilai" class="display no-datatable" style="width:100%">
                 <thead>
                     <tr>
                         <th style="width: 40px;">No</th>
