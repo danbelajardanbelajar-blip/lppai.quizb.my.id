@@ -48,6 +48,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">🎓</span> Rekapitulasi Nilai
             </a>
+            <a href="<?= BASE_URL ?>/admin/kelola-nilai.php" class="page-nav <?= menuActive('kelola-nilai.php') ?>">
+                <span class="icon">📊</span> Kelola Nilai (Master)
+            </a>
 
             <div class="menu-label">Pengumuman</div>
             <a href="<?= BASE_URL ?>/admin/pengumuman.php" class="page-nav <?= menuActive('pengumuman.php') ?>">
