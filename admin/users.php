@@ -27,23 +27,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $prodi   = trim($_POST['program_studi'] ?? '');
             $role    = $_POST['role'] ?? 'mahasiswa';
 
-            if (empty($nim) || empty($nama) || empty($tglLahir)) {
-                $message = 'NIM, nama lengkap, dan tanggal lahir harus diisi.';
+            if (empty($nim) || empty($nama)) {
+                $message = 'NIM/Username dan nama lengkap harus diisi.';
                 $msgType = 'danger';
             } else {
                 $username = $nim;
                 $check = $pdo->prepare("SELECT id FROM users WHERE username = ?");
                 $check->execute([$username]);
                 if ($check->fetch()) {
-                    $message = 'NIM sudah terdaftar.';
+                    $message = 'Username/NIM sudah terdaftar.';
                     $msgType = 'danger';
                 } else {
                     $dt = DateTime::createFromFormat('Y-m-d', $tglLahir);
-                    $passwordRaw = $dt ? $dt->format('dmY') : str_replace('-', '', $tglLahir);
+                    if ($dt) {
+                        $passwordRaw = $dt->format('dmY');
+                    } elseif (!empty($tglLahir)) {
+                        $passwordRaw = str_replace('-', '', $tglLahir);
+                    } else {
+                        $passwordRaw = '123456'; // Default password if no birth date
+                    }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
                     $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?)")
                         ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tglLahir, $role]);
-                    $message = "User berhasil ditambahkan! Login: Username=<strong>$nim</strong>, Password=<strong>$passwordRaw</strong> (ddmmyyyy)";
+                    $message = "User berhasil ditambahkan! Login: Username=<strong>$nim</strong>, Password=<strong>$passwordRaw</strong>";
                     $msgType = 'success';
                 }
             }
@@ -55,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $noHp    = trim($_POST['no_hp'] ?? '');
             $prodi   = trim($_POST['program_studi'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
-            $role    = in_array($_POST['role'] ?? '', ['mahasiswa', 'admin']) ? $_POST['role'] : 'mahasiswa';
+            $role    = in_array($_POST['role'] ?? '', ['mahasiswa', 'admin', 'dosen']) ? $_POST['role'] : 'mahasiswa';
 
             if ($id <= 0 || empty($nama)) {
                 $message = 'Nama tidak boleh kosong.';
@@ -238,16 +244,24 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
             </div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;">
                 <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" id="create_role" onchange="toggleFields()">
+                        <option value="mahasiswa">Mahasiswa</option>
+                        <option value="dosen">Dosen / Tutor</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Nama Lengkap *</label>
                     <input type="text" name="nama_lengkap" required placeholder="Nama lengkap">
                 </div>
                 <div class="form-group">
-                    <label>NIM * <small style="color:#888;">(digunakan sebagai username login)</small></label>
-                    <input type="text" name="nim" required placeholder="Nomor Induk Mahasiswa">
+                    <label id="label_nim">NIM * <small style="color:#888;">(digunakan sebagai username login)</small></label>
+                    <input type="text" name="nim" required placeholder="Nomor Induk / Username">
                 </div>
                 <div class="form-group">
-                    <label>Tanggal Lahir * <small style="color:#888;">(digunakan sebagai password)</small></label>
-                    <input type="date" name="tanggal_lahir" required>
+                    <label>Tanggal Lahir <small style="color:#888;">(opsional, digunakan untuk default password)</small></label>
+                    <input type="date" name="tanggal_lahir">
                 </div>
                 <div class="form-group">
                     <label>Email</label>
@@ -257,18 +271,29 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <label>No. HP</label>
                     <input type="text" name="no_hp" placeholder="No. HP">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="group_prodi">
                     <label>Program Studi</label>
                     <input type="text" name="program_studi" placeholder="Program studi">
                 </div>
-                <div class="form-group">
-                    <label>Role</label>
-                    <select name="role">
-                        <option value="mahasiswa">Mahasiswa</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
             </div>
+
+            <script>
+                function toggleFields() {
+                    const role = document.getElementById('create_role').value;
+                    const prodi = document.getElementById('group_prodi');
+                    const labelNim = document.getElementById('label_nim');
+                    
+                    if (role === 'mahasiswa') {
+                        prodi.style.display = 'block';
+                        labelNim.innerHTML = 'NIM * <small style="color:#888;">(digunakan sebagai username login)</small>';
+                    } else {
+                        prodi.style.display = 'none';
+                        labelNim.innerHTML = 'Username / NIP * <small style="color:#888;">(digunakan sebagai username login)</small>';
+                    }
+                }
+                // Run on load
+                document.addEventListener('DOMContentLoaded', toggleFields);
+            </script>
 
             <button type="submit" class="btn btn-primary" style="width:auto;margin-top:10px;">👤 Tambah User</button>
         </form>
@@ -301,7 +326,12 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <td><?= !empty($u['tanggal_lahir']) ? date('d/m/Y', strtotime($u['tanggal_lahir'])) : '-' ?></td>
                         <td><?= sanitize($u['program_studi'] ?? '-') ?></td>
                         <td>
-                            <span class="badge <?= $u['role'] === 'admin' ? 'badge-danger' : 'badge-primary' ?>">
+                            <?php 
+                            $badgeClass = 'badge-primary';
+                            if ($u['role'] === 'admin') $badgeClass = 'badge-danger';
+                            if ($u['role'] === 'dosen') $badgeClass = 'badge-success'; // assuming success is green
+                            ?>
+                            <span class="badge <?= $badgeClass ?>">
                                 <?= ucfirst($u['role']) ?>
                             </span>
                         </td>
@@ -403,6 +433,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <label>Role</label>
                     <select name="role" id="edit_user_role">
                         <option value="mahasiswa">Mahasiswa</option>
+                        <option value="dosen">Dosen / Tutor</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
