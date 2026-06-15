@@ -193,7 +193,7 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Modal Import -->
-<div id="importModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; overflow-y:auto;">
+<div id="importModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1050; overflow-y:auto;">
     <div style="background:#fff; margin:10% auto; padding:24px; border-radius:8px; width:90%; max-width:400px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
         <h3 style="margin-top:0;">Import Nilai via Excel</h3>
         <p style="font-size:14px; color:#64748b; margin-bottom: 20px;">Pastikan Anda menggunakan template Excel terbaru yang diunduh dari halaman ini agar formatnya sesuai.</p>
@@ -328,16 +328,17 @@ $(document).ready(function() {
                 }
 
                 if (res.success) {
+                    document.getElementById('importModal').style.display='none';
+                    $('#formImport')[0].reset();
+                    $('#tableKelolaNilai').DataTable().ajax.reload(null, false);
                     Swal.fire({
                         title: 'Import Selesai!',
                         html: res.message.replace(/\n/g, '<br>'),
                         icon: 'success',
                         confirmButtonText: 'Tutup'
                     });
-                    document.getElementById('importModal').style.display='none';
-                    $('#formImport')[0].reset();
-                    $('#tableKelolaNilai').DataTable().ajax.reload(null, false);
                 } else {
+                    document.getElementById('importModal').style.display='none';
                     Swal.fire({
                         title: 'Gagal!',
                         html: (res.message || 'Terjadi kesalahan tidak diketahui.').replace(/\n/g, '<br>'),
@@ -349,6 +350,7 @@ $(document).ready(function() {
             error: function(err) {
                 $('#loadingOverlay').css('display', 'none');
                 btn.prop('disabled', false).text('Proses Import');
+                document.getElementById('importModal').style.display='none';
                 Swal.fire({
                     title: 'Kesalahan Koneksi',
                     text: 'Terjadi kesalahan jaringan atau server saat import.',
