@@ -117,6 +117,7 @@ CREATE TABLE tutorial_registrations (
     nilai_surat_pendek DECIMAL(5,2) DEFAULT NULL,
     nilai_amaliyah DECIMAL(5,2) DEFAULT NULL,
     nilai_jenazah DECIMAL(5,2) DEFAULT NULL,
+    nilai_ujian_tulis DECIMAL(5,2) DEFAULT NULL,
     nilai_akhir DECIMAL(5,2) DEFAULT NULL,
     nilai_detail TEXT DEFAULT NULL,
     keterangan TEXT DEFAULT NULL,
@@ -132,6 +133,7 @@ CREATE TABLE tutorial_registrations (
 -- ADD COLUMN nilai_surat_pendek DECIMAL(5,2) DEFAULT NULL AFTER nilai_shalat,
 -- ADD COLUMN nilai_amaliyah DECIMAL(5,2) DEFAULT NULL AFTER nilai_surat_pendek,
 -- ADD COLUMN nilai_jenazah DECIMAL(5,2) DEFAULT NULL AFTER nilai_amaliyah,
+-- ADD COLUMN nilai_ujian_tulis DECIMAL(5,2) DEFAULT NULL AFTER nilai_jenazah,
 -- ADD COLUMN nilai_detail TEXT DEFAULT NULL AFTER nilai_akhir;
 
 -- Tabel Tutorial Attendance

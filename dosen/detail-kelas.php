@@ -48,6 +48,9 @@ $materi_list = [
     ],
     'jenazah' => [
         'j1' => 'Merawat Jenazah', 'j2' => 'Tata Cara Shalat Jenazah', 'j3' => 'Tata Cara Mengkafani Jenazah', 'j4' => 'Tata Cara Memandikan Jenazah'
+    ],
+    'ujian_tulis' => [
+        'ut1' => 'Nilai Ujian Tulis'
     ]
 ];
 
@@ -81,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $avg_sp = calcAvg($detail, array_keys($materi_list['surat_pendek']));
             $avg_am = calcAvg($detail, array_keys($materi_list['amaliyah']));
             $avg_jz = calcAvg($detail, array_keys($materi_list['jenazah']));
+            $avg_ut = calcAvg($detail, array_keys($materi_list['ujian_tulis']));
 
             // Calculate akhir
             $sum_akhir = 0; $count_akhir = 0;
@@ -89,12 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if($avg_sp !== null) { $sum_akhir += $avg_sp; $count_akhir++; }
             if($avg_am !== null) { $sum_akhir += $avg_am; $count_akhir++; }
             if($avg_jz !== null) { $sum_akhir += $avg_jz; $count_akhir++; }
+            if($avg_ut !== null) { $sum_akhir += $avg_ut; $count_akhir++; }
             $avg_akhir = $count_akhir > 0 ? ($sum_akhir / $count_akhir) : null;
 
             try {
                 $json_detail = json_encode($detail);
-                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_akhir=? WHERE id=? AND tutorial_class_id=?");
-                $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_akhir, $reg_id, $class_id]);
+                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=?, nilai_akhir=? WHERE id=? AND tutorial_class_id=?");
+                $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $avg_akhir, $reg_id, $class_id]);
                 
                 $message = 'Nilai rincian berhasil disimpan.';
                 $msgType = 'success';
@@ -136,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // Get registered students
 $stmt = $pdo->prepare("
     SELECT tr.id as reg_id, tr.user_id, tr.status, tr.nilai_akhir, 
-           tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_detail,
+           tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_detail,
            u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
@@ -226,6 +231,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>Srt Pdk</th>
                                 <th>Amaliyah</th>
                                 <th>Jenazah</th>
+                                <th>UT</th>
                                 <th>Rata-Rata</th>
                                 <th>Aksi</th>
                             </tr>
@@ -243,6 +249,7 @@ include __DIR__ . '/../includes/header.php';
                                 <td align="center"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
+                                <td align="center"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
                                 <td align="center">
                                     <strong><?= $s['nilai_akhir'] !== null ? number_format($s['nilai_akhir'], 2) : '-' ?></strong>
                                 </td>
@@ -278,7 +285,8 @@ include __DIR__ . '/../includes/header.php';
                         'shalat' => 'Ketuntasan Hafalan Bacaan Shalat',
                         'surat_pendek' => 'Ketuntasan Hafalan Surat Pendek',
                         'amaliyah' => 'Ketuntasan Hafalan Amaliyah',
-                        'jenazah' => 'Ketuntasan Praktek Merawat Jenazah'
+                        'jenazah' => 'Ketuntasan Praktek Merawat Jenazah',
+                        'ujian_tulis' => 'Nilai Ujian Tulis'
                     ];
                     foreach($categories as $cat_key => $cat_name):
                     ?>

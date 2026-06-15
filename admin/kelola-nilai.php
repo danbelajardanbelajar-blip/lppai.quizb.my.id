@@ -45,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $srt = ($_POST['nilai_surat_pendek'] !== '') ? (float)$_POST['nilai_surat_pendek'] : null;
         $amaliyah = ($_POST['nilai_amaliyah'] !== '') ? (float)$_POST['nilai_amaliyah'] : null;
         $jenazah = ($_POST['nilai_jenazah'] !== '') ? (float)$_POST['nilai_jenazah'] : null;
+        $ut = ($_POST['nilai_ujian_tulis'] !== '') ? (float)$_POST['nilai_ujian_tulis'] : null;
         $akhir = ($_POST['nilai_akhir'] !== '') ? (float)$_POST['nilai_akhir'] : null;
 
         if ($userId > 0) {
@@ -53,20 +54,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt = $pdo->prepare("
                     UPDATE tutorial_registrations 
                     SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
-                        nilai_amaliyah=?, nilai_jenazah=?, nilai_akhir=? 
+                        nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=?, nilai_akhir=? 
                     WHERE id=?
                 ");
-                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir, $regId]);
+                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir, $regId]);
                 $message = "Nilai mahasiswa berhasil diperbarui.";
                 $msgType = "success";
             } else {
                 // INSERT baru untuk mahasiswa lawas (belum pernah mendaftar kelas)
                 $stmt = $pdo->prepare("
                     INSERT INTO tutorial_registrations 
-                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_akhir)
-                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
+                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis, nilai_akhir)
+                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir]);
+                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir]);
                 $message = "Nilai mahasiswa berhasil disimpan (Riwayat baru telah dibuat).";
                 $msgType = "success";
             }
@@ -113,6 +114,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>Srt Pendek</th>
                         <th>Amaliyah</th>
                         <th>Jenazah</th>
+                        <th>UT</th>
                         <th>Akhir</th>
                         <th>Aksi</th>
                     </tr>
@@ -174,6 +176,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="number" step="0.01" name="nilai_jenazah" id="editJenazah" class="form-control">
                 </div>
                 <div>
+                    <label>Ujian Tulis</label>
+                    <input type="number" step="0.01" name="nilai_ujian_tulis" id="editUt" class="form-control">
+                </div>
+                <div style="grid-column: span 2;">
                     <label><strong>Nilai Akhir</strong></label>
                     <input type="number" step="0.01" name="nilai_akhir" id="editAkhir" class="form-control" style="background-color:#eff6ff; font-weight:bold;">
                 </div>
@@ -228,8 +234,8 @@ $(document).ready(function() {
             "processing": "Sedang memuat data..."
         },
         "columnDefs": [
-            { "orderable": false, "targets": [0, 13] }, // Disable sorting pada No dan Aksi
-            { "className": "text-center", "targets": [4,5,6,7,8,9,10,11,12,13] }
+            { "orderable": false, "targets": [0, 14] }, // Disable sorting pada No dan Aksi
+            { "className": "text-center", "targets": [4,5,6,7,8,9,10,11,12,13,14] }
         ]
     });
 
@@ -248,6 +254,7 @@ $(document).ready(function() {
         $('#editSrt').val(btn.data('srt'));
         $('#editAmaliyah').val(btn.data('amaliyah'));
         $('#editJenazah').val(btn.data('jenazah'));
+        $('#editUt').val(btn.data('ut'));
         $('#editAkhir').val(btn.data('akhir'));
         
         $('#modalEditNilai').css('display', 'block');
@@ -260,8 +267,9 @@ $(document).ready(function() {
         let p = parseFloat($('#editSrt').val()) || 0;
         let a = parseFloat($('#editAmaliyah').val()) || 0;
         let j = parseFloat($('#editJenazah').val()) || 0;
+        let ut = parseFloat($('#editUt').val()) || 0;
         
-        let components = [t, s, p, a, j].filter(v => v > 0);
+        let components = [t, s, p, a, j, ut].filter(v => v > 0);
         if(components.length > 0) {
             let avg = components.reduce((a, b) => a + b, 0) / components.length;
             $('#editAkhir').val(avg.toFixed(2));
@@ -270,7 +278,7 @@ $(document).ready(function() {
 
     // Bisa diaktifkan jika ingin otomatis terhitung saat diedit
     /*
-    $('#editThaharah, #editShalat, #editSrt, #editAmaliyah, #editJenazah').on('input', function() {
+    $('#editThaharah, #editShalat, #editSrt, #editAmaliyah, #editJenazah, #editUt').on('input', function() {
         hitungNilaiAkhir();
     });
     */

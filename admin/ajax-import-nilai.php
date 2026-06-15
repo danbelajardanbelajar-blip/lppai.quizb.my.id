@@ -99,6 +99,7 @@ try {
         elseif (str_contains($h, 'pendek') || str_contains($h, 'srt')) $colMap['srt_pendek'] = $idx;
         elseif (str_contains($h, 'amaliyah')) $colMap['amaliyah'] = $idx;
         elseif (str_contains($h, 'jenazah')) $colMap['jenazah'] = $idx;
+        elseif (str_contains($h, 'tulis') || str_contains($h, 'ut')) $colMap['ut'] = $idx;
         elseif (str_contains($h, 'akhir')) $colMap['akhir'] = $idx;
     }
 
@@ -122,13 +123,13 @@ try {
     $stmtUpdate = $pdo->prepare("
         UPDATE tutorial_registrations 
         SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
-            nilai_amaliyah=?, nilai_jenazah=?, nilai_akhir=? 
+            nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=?, nilai_akhir=? 
         WHERE id=?
     ");
     $stmtInsert = $pdo->prepare("
         INSERT INTO tutorial_registrations 
-        (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_akhir)
-        VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
+        (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis, nilai_akhir)
+        VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
     ");
 
     foreach (array_slice($rows, 1) as $rowNum => $row) {
@@ -179,15 +180,16 @@ try {
         $srt = isset($colMap['srt_pendek']) && trim((string)$row[$colMap['srt_pendek']]) !== '' ? (float)trim($row[$colMap['srt_pendek']]) : null;
         $amaliyah = isset($colMap['amaliyah']) && trim((string)$row[$colMap['amaliyah']]) !== '' ? (float)trim($row[$colMap['amaliyah']]) : null;
         $jenazah = isset($colMap['jenazah']) && trim((string)$row[$colMap['jenazah']]) !== '' ? (float)trim($row[$colMap['jenazah']]) : null;
+        $ut = isset($colMap['ut']) && trim((string)$row[$colMap['ut']]) !== '' ? (float)trim($row[$colMap['ut']]) : null;
         $akhir = isset($colMap['akhir']) && trim((string)$row[$colMap['akhir']]) !== '' ? (float)trim($row[$colMap['akhir']]) : null;
 
         $stmtFindReg->execute([$userId]);
         $regId = $stmtFindReg->fetchColumn();
 
         if ($regId) {
-            $stmtUpdate->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir, $regId]);
+            $stmtUpdate->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir, $regId]);
         } else {
-            $stmtInsert->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $akhir]);
+            $stmtInsert->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir]);
         }
         $imported++;
     }

@@ -114,7 +114,8 @@ if ($isAdmin || $isDosen) {
         $sheet->setCellValue('I1', 'Surat Pendek');
         $sheet->setCellValue('J1', 'Amaliyah');
         $sheet->setCellValue('K1', 'Jenazah');
-        $sheet->setCellValue('L1', 'Nilai Akhir');
+        $sheet->setCellValue('L1', 'Ujian Tulis');
+        $sheet->setCellValue('M1', 'Nilai Akhir');
         
         // Style headers
         $headerStyle = [
@@ -122,7 +123,7 @@ if ($isAdmin || $isDosen) {
             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2E8F0']],
             'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]
         ];
-        $sheet->getStyle('A1:L1')->applyFromArray($headerStyle);
+        $sheet->getStyle('A1:M1')->applyFromArray($headerStyle);
         
         $row = 2;
         $no = 1;
@@ -138,13 +139,14 @@ if ($isAdmin || $isDosen) {
             $sheet->setCellValue('I'.$row, $s['nilai_surat_pendek'] ?? '-');
             $sheet->setCellValue('J'.$row, $s['nilai_amaliyah'] ?? '-');
             $sheet->setCellValue('K'.$row, $s['nilai_jenazah'] ?? '-');
-            $sheet->setCellValue('L'.$row, $s['nilai_akhir'] ?? '-');
+            $sheet->setCellValue('L'.$row, $s['nilai_ujian_tulis'] ?? '-');
+            $sheet->setCellValue('M'.$row, $s['nilai_akhir'] ?? '-');
             
-            $sheet->getStyle('A'.$row.':L'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$row.':M'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
             $row++;
         }
         
-        foreach(range('A','L') as $col) {
+        foreach(range('A','M') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
         
@@ -244,6 +246,7 @@ include __DIR__ . '/includes/header.php';
                                 <th>Srt Pdk</th>
                                 <th>Amaliyah</th>
                                 <th>Jenazah</th>
+                                <th>UT</th>
                                 <th>Rata-Rata Akhir</th>
                             </tr>
                         </thead>
@@ -260,6 +263,7 @@ include __DIR__ . '/includes/header.php';
                                 <td align="center"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
+                                <td align="center"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
                                 <td align="center">
                                     <span class="badge badge-primary" style="font-size:14px;">
                                         <?= $s['nilai_akhir'] !== null ? number_format($s['nilai_akhir'], 2) : '-' ?>
@@ -298,6 +302,7 @@ include __DIR__ . '/includes/header.php';
                                 <li>Surat Pendek: <strong><?= $mc['nilai_surat_pendek'] !== null ? number_format($mc['nilai_surat_pendek'], 1) : '-' ?></strong></li>
                                 <li>Amaliyah: <strong><?= $mc['nilai_amaliyah'] !== null ? number_format($mc['nilai_amaliyah'], 1) : '-' ?></strong></li>
                                 <li>Jenazah: <strong><?= $mc['nilai_jenazah'] !== null ? number_format($mc['nilai_jenazah'], 1) : '-' ?></strong></li>
+                                <li>Ujian Tulis: <strong><?= $mc['nilai_ujian_tulis'] !== null ? number_format($mc['nilai_ujian_tulis'], 1) : '-' ?></strong></li>
                             </ul>
                         </div>
                         <div style="text-align:center; padding:15px 30px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">

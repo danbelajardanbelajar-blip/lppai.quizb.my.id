@@ -36,7 +36,8 @@ $columns = [
     9 => 'nilai_surat_pendek',
     10 => 'nilai_amaliyah',
     11 => 'nilai_jenazah',
-    12 => 'nilai_akhir'
+    12 => 'nilai_ujian_tulis',
+    13 => 'nilai_akhir'
 ];
 
 $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
@@ -71,7 +72,7 @@ $dataQuery = "
     SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
-           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_akhir
+           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_akhir
     $fromClause
     ORDER BY $orderBy $orderDir
     LIMIT $length OFFSET $start
@@ -102,6 +103,7 @@ foreach ($data as $i => $row) {
         data-srt="' . ($row['nilai_surat_pendek'] ?? '') . '"
         data-amaliyah="' . ($row['nilai_amaliyah'] ?? '') . '"
         data-jenazah="' . ($row['nilai_jenazah'] ?? '') . '"
+        data-ut="' . ($row['nilai_ujian_tulis'] ?? '') . '"
         data-akhir="' . ($row['nilai_akhir'] ?? '') . '"
     >✏️ Edit</button>';
 
@@ -118,6 +120,7 @@ foreach ($data as $i => $row) {
         $row['nilai_surat_pendek'] ?? '-',
         $row['nilai_amaliyah'] ?? '-',
         $row['nilai_jenazah'] ?? '-',
+        $row['nilai_ujian_tulis'] ?? '-',
         '<strong>' . ($row['nilai_akhir'] ?? '-') . '</strong>',
         $editBtn
     ];
