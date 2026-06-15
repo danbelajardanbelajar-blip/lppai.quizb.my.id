@@ -2,7 +2,7 @@
 /**
  * Script untuk menghapus data user mahasiswa yang salah import (nama: Mahasiswa {NIM})
  */
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/config/database.php';
 $pdo = getDBConnection();
 
 try {
