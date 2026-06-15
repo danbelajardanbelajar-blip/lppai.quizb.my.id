@@ -3,9 +3,15 @@
  * LPPAI Corner - Authentication Helper
  */
 
-session_start();
-
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/SessionDatabaseHandler.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    $pdo = getDBConnection();
+    $sessionHandler = new SessionDatabaseHandler($pdo);
+    session_set_save_handler($sessionHandler, true);
+    session_start();
+}
 
 function isLoggedIn() {
     return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);

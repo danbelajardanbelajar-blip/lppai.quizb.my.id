@@ -188,3 +188,10 @@ INSERT INTO announcements (judul, konten, tipe, is_active, created_by) VALUES
 ('Pengumuman Kelulusan Tutorial Gelombang 2', 'Hasil kelulusan tutorial gelombang 2 semester genap 2025/2026.', 'kelulusan_gel2', 1, 1),
 ('Pendaftaran Tutorial Mandiri', 'Pendaftaran tutorial mandiri untuk mahasiswa yang belum lulus pada gelombang 1 dan 2.', 'pendaftaran_mandiri', 1, 1),
 ('Pembagian Kelas Tutorial Mandiri', 'Berikut pembagian kelas tutorial mandiri.', 'pembagian_kelas_mandiri', 1, 1);
+
+-- Tabel Sessions
+CREATE TABLE IF NOT EXISTS sessions (
+    id VARCHAR(128) NOT NULL PRIMARY KEY,
+    data TEXT NOT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

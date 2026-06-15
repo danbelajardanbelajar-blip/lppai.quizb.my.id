@@ -6,8 +6,7 @@
 
 // ── Handler AJAX: verifikasi password (harus di paling atas, sebelum HTML) ──
 if (isset($_POST['action']) && $_POST['action'] === 'verify_password') {
-    if (session_status() === PHP_SESSION_NONE) session_start();
-    require_once __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../includes/auth.php';
     ob_clean();
     header('Content-Type: application/json; charset=utf-8');
 

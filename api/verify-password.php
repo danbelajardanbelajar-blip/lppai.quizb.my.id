@@ -12,21 +12,12 @@
 
 ob_start(); // tangkap semua output sebelum header JSON
 
-// Mulai session hanya jika belum aktif
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once __DIR__ . '/../config/database.php';  // BASE_URL, APP_NAME, getDBConnection()
-
-// Fungsi helper minimal (tidak pakai auth.php agar tidak double session_start)
-function _isLoggedIn()  { return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']); }
-function _verifyCsrf($t){ return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $t); }
+require_once __DIR__ . '/../includes/auth.php';
 
 ob_clean(); // buang semua output PHP sebelum header
 header('Content-Type: application/json; charset=utf-8');
 
-if (!_isLoggedIn()) {
+if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['ok' => false, 'message' => 'Tidak terautentikasi.']);
     exit;
@@ -39,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $token = $_POST['csrf_token'] ?? '';
-if (!_verifyCsrf($token)) {
+if (!verifyCsrf($token)) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'message' => 'Token tidak valid. Muat ulang halaman dan coba lagi.']);
     exit;
