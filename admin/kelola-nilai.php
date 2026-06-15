@@ -87,7 +87,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <span>📊 Data Nilai Keseluruhan (Master)</span>
         <div>
-            <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm btn-light" style="color: #3b82f6; font-weight: 600; border: none;" data-no-spa="true">📄 Download Template</a>
+            <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
             <button type="button" class="btn btn-sm btn-warning" style="font-weight: 600;" onclick="document.getElementById('importModal').style.display='flex'">📥 Import Nilai Excel</button>
         </div>
     </div>
