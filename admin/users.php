@@ -143,7 +143,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-header">📥 Import Pengguna dari Excel</div>
     <div class="card-body" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-        <a href="<?= BASE_URL ?>/api/download-template.php" class="btn btn-primary" style="width:auto;">
+        <a href="<?= BASE_URL ?>/admin/download-template-users.php" class="btn btn-primary" style="width:auto;">
             📄 Download Template Excel
         </a>
         <button type="button" class="btn btn-primary" style="width:auto;background:#2d7a4a;"
@@ -200,7 +200,7 @@ document.getElementById('form-import').addEventListener('submit', function(e) {
     btn.textContent = 'Memproses...';
     document.getElementById('loadingOverlay').style.display = 'flex';
 
-    fetch('<?= BASE_URL ?>/api/import-users.php', { method: 'POST', body: formData })
+    fetch('<?= BASE_URL ?>/admin/ajax-import-users.php', { method: 'POST', body: formData })
     .then(r => r.text())
     .then(text => {
         document.getElementById('loadingOverlay').style.display = 'none';
