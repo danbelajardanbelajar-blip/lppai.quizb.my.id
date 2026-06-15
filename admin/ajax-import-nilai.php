@@ -91,6 +91,7 @@ try {
     $colMap = [];
     foreach ($header as $idx => $h) {
         if (str_contains($h, 'nim')) $colMap['nim'] = $idx;
+        elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir')) $colMap['tanggal_lahir'] = $idx;
         elseif (str_contains($h, 'tahun') || str_contains($h, 'ajaran')) $colMap['tahun_ajaran'] = $idx;
         elseif (str_contains($h, 'thaharah')) $colMap['thaharah'] = $idx;
         elseif (str_contains($h, 'shalat')) $colMap['shalat'] = $idx;
@@ -113,6 +114,7 @@ try {
     // Prepared statements
     $stmtFindUser = $pdo->prepare("SELECT id FROM users WHERE nim = ? AND role = 'mahasiswa' LIMIT 1");
     $stmtFindReg = $pdo->prepare("SELECT id FROM tutorial_registrations WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+    $stmtUpdateUser = $pdo->prepare("UPDATE users SET tanggal_lahir = ? WHERE id = ?");
     
     $stmtUpdate = $pdo->prepare("
         UPDATE tutorial_registrations 
@@ -144,6 +146,23 @@ try {
 
         $ta = trim((string)($row[$colMap['tahun_ajaran'] ?? -1] ?? ''));
         if ($ta === '') $ta = null;
+
+        $tglLahirRaw = trim((string)($row[$colMap['tanggal_lahir'] ?? -1] ?? ''));
+        $tglLahir = null;
+        if ($tglLahirRaw !== '') {
+            if (is_numeric($tglLahirRaw)) {
+                try {
+                    $tglLahir = \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($tglLahirRaw)->format('Y-m-d');
+                } catch (Exception $e) {
+                    $tglLahir = $tglLahirRaw;
+                }
+            } else {
+                $tglLahir = date('Y-m-d', strtotime($tglLahirRaw));
+            }
+            if ($tglLahir) {
+                $stmtUpdateUser->execute([$tglLahir, $userId]);
+            }
+        }
 
         $thaharah = isset($colMap['thaharah']) && trim((string)$row[$colMap['thaharah']]) !== '' ? (float)trim($row[$colMap['thaharah']]) : null;
         $shalat = isset($colMap['shalat']) && trim((string)$row[$colMap['shalat']]) !== '' ? (float)trim($row[$colMap['shalat']]) : null;

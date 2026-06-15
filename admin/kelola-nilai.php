@@ -105,6 +105,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>NIM</th>
                         <th>Nama Mahasiswa</th>
                         <th>Jurusan</th>
+                        <th>Tanggal Lahir</th>
                         <th>Tahun Ajaran</th>
                         <th>Thaharah</th>
                         <th>Shalat</th>
@@ -226,8 +227,8 @@ $(document).ready(function() {
             "processing": "Sedang memuat data..."
         },
         "columnDefs": [
-            { "orderable": false, "targets": [0, 10] }, // Disable sorting pada No dan Aksi
-            { "className": "text-center", "targets": [4,5,6,7,8,9,10] }
+            { "orderable": false, "targets": [0, 12] }, // Disable sorting pada No dan Aksi
+            { "className": "text-center", "targets": [4,5,6,7,8,9,10,11,12] }
         ]
     });
 

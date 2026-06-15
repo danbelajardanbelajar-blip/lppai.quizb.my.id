@@ -49,13 +49,14 @@ $sheet = $spreadsheet->getActiveSheet();
 $headers = [
     'A1' => 'NIM',
     'B1' => 'Nama Mahasiswa (Opsional)',
-    'C1' => 'Tahun Ajaran (Misal: 2025-2026)',
-    'D1' => 'Thaharah',
-    'E1' => 'Shalat',
-    'F1' => 'Srt Pendek',
-    'G1' => 'Amaliyah',
-    'H1' => 'Jenazah',
-    'I1' => 'Nilai Akhir'
+    'C1' => 'Tanggal Lahir (Opsional)',
+    'D1' => 'Tahun Ajaran (Misal: 2025-2026)',
+    'E1' => 'Thaharah',
+    'F1' => 'Shalat',
+    'G1' => 'Srt Pendek',
+    'H1' => 'Amaliyah',
+    'I1' => 'Jenazah',
+    'J1' => 'Nilai Akhir'
 ];
 
 foreach ($headers as $cell => $val) {
@@ -72,26 +73,27 @@ $styleArray = [
     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
 ];
-$sheet->getStyle('A1:I1')->applyFromArray($styleArray);
+$sheet->getStyle('A1:J1')->applyFromArray($styleArray);
 
 // Auto width
-foreach(range('A','I') as $col) {
+foreach(range('A','J') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
 // Add some dummy data to row 2 as an example (but keep it simple or empty)
 $sheet->setCellValue('A2', '2024010001');
 $sheet->setCellValue('B2', 'Ahmad Fauzi');
-$sheet->setCellValue('C2', '2025-2026');
-$sheet->setCellValue('D2', '80');
-$sheet->setCellValue('E2', '85');
-$sheet->setCellValue('F2', '90');
-$sheet->setCellValue('G2', '88');
-$sheet->setCellValue('H2', '75');
-$sheet->setCellValue('I2', '83.6');
+$sheet->setCellValue('C2', '2000-12-31');
+$sheet->setCellValue('D2', '2025-2026');
+$sheet->setCellValue('E2', '80');
+$sheet->setCellValue('F2', '85');
+$sheet->setCellValue('G2', '90');
+$sheet->setCellValue('H2', '88');
+$sheet->setCellValue('I2', '75');
+$sheet->setCellValue('J2', '83.6');
 
-$sheet->getStyle('A2:I2')->getFont()->setItalic(true);
-$sheet->getStyle('A2:I2')->getFont()->getColor()->setARGB('FF666666');
+$sheet->getStyle('A2:J2')->getFont()->setItalic(true);
+$sheet->getStyle('A2:J2')->getFont()->getColor()->setARGB('FF666666');
 
 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 $filename = 'Template_Import_Nilai_Master.xlsx';
