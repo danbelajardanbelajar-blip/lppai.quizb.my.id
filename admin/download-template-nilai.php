@@ -49,16 +49,17 @@ $sheet = $spreadsheet->getActiveSheet();
 $headers = [
     'A1' => 'NIM',
     'B1' => 'Nama Mahasiswa (Opsional)',
-    'C1' => 'Tempat Lahir (Opsional)',
-    'D1' => 'Tanggal Lahir (Opsional)',
-    'E1' => 'Tahun Ajaran (Misal: 2025-2026)',
-    'F1' => 'Thaharah',
-    'G1' => 'Shalat',
-    'H1' => 'Srt Pendek',
-    'I1' => 'Amaliyah',
-    'J1' => 'Jenazah',
-    'K1' => 'Ujian Tulis',
-    'L1' => 'Nilai Akhir'
+    'C1' => 'Jurusan (Opsional)',
+    'D1' => 'Tempat Lahir (Opsional)',
+    'E1' => 'Tanggal Lahir (Opsional)',
+    'F1' => 'Tahun Ajaran (Misal: 2025-2026)',
+    'G1' => 'Thaharah',
+    'H1' => 'Shalat',
+    'I1' => 'Srt Pendek',
+    'J1' => 'Amaliyah',
+    'K1' => 'Jenazah',
+    'L1' => 'Ujian Tulis',
+    'M1' => 'Nilai Akhir'
 ];
 
 foreach ($headers as $cell => $val) {
@@ -75,29 +76,30 @@ $styleArray = [
     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
 ];
-$sheet->getStyle('A1:L1')->applyFromArray($styleArray);
+$sheet->getStyle('A1:M1')->applyFromArray($styleArray);
 
 // Auto width
-foreach(range('A','L') as $col) {
+foreach(range('A','M') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
 // Add some dummy data to row 2 as an example (but keep it simple or empty)
 $sheet->setCellValue('A2', '2024010001');
 $sheet->setCellValue('B2', 'Ahmad Fauzi');
-$sheet->setCellValue('C2', 'Jakarta');
-$sheet->setCellValue('D2', '2000-12-31');
-$sheet->setCellValue('E2', '2025-2026');
-$sheet->setCellValue('F2', '80');
-$sheet->setCellValue('G2', '85');
-$sheet->setCellValue('H2', '90');
-$sheet->setCellValue('I2', '88');
-$sheet->setCellValue('J2', '75');
-$sheet->setCellValue('K2', '80');
-$sheet->setCellValue('L2', '83.0');
+$sheet->setCellValue('C2', 'Teknik Informatika');
+$sheet->setCellValue('D2', 'Jakarta');
+$sheet->setCellValue('E2', '2000-12-31');
+$sheet->setCellValue('F2', '2025-2026');
+$sheet->setCellValue('G2', '80');
+$sheet->setCellValue('H2', '85');
+$sheet->setCellValue('I2', '90');
+$sheet->setCellValue('J2', '88');
+$sheet->setCellValue('K2', '75');
+$sheet->setCellValue('L2', '80');
+$sheet->setCellValue('M2', '83.0');
 
-$sheet->getStyle('A2:L2')->getFont()->setItalic(true);
-$sheet->getStyle('A2:L2')->getFont()->getColor()->setARGB('FF666666');
+$sheet->getStyle('A2:M2')->getFont()->setItalic(true);
+$sheet->getStyle('A2:M2')->getFont()->getColor()->setARGB('FF666666');
 
 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 $filename = 'Template_Import_Nilai_Master.xlsx';
