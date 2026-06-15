@@ -98,6 +98,7 @@ $colMap = [];
 foreach ($headerRow as $idx => $h) {
     if (str_contains($h, 'nim')) $colMap['nim'] = $idx;
     elseif (str_contains($h, 'nama')) $colMap['nama_lengkap'] = $idx;
+    elseif (str_contains($h, 'tempat')) $colMap['tempat_lahir'] = $idx;
     elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir') || str_contains($h, 'tgl')) $colMap['tanggal_lahir'] = $idx;
     elseif (str_contains($h, 'email')) $colMap['email'] = $idx;
     elseif (str_contains($h, 'hp') || str_contains($h, 'phone') || str_contains($h, 'telp')) $colMap['no_hp'] = $idx;
@@ -122,6 +123,7 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
 
     $nim = trim((string)($row[$colMap['nim']] ?? ''));
     $nama = trim((string)($row[$colMap['nama_lengkap']] ?? ''));
+    $tmptLahir = trim((string)($row[$colMap['tempat_lahir'] ?? -1] ?? ''));
     $tglRaw = trim((string)($row[$colMap['tanggal_lahir']] ?? ''));
     $email = trim((string)($row[$colMap['email'] ?? -1] ?? ''));
     $noHp = trim((string)($row[$colMap['no_hp'] ?? -1] ?? ''));
@@ -173,8 +175,8 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
 
     // Insert (cost 8 agar lebih cepat saat import bulk)
     $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tglLahirDB, $role]);
+    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $tglLahirDB, $role]);
     $imported++;
 }
 

@@ -60,14 +60,14 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Import Pengguna');
 
 // === HEADER ROW ===
-$headers = ['NIM', 'Nama Lengkap', 'Tanggal Lahir (ddmmyyyy)', 'Email', 'No. HP', 'Program Studi', 'Role (mahasiswa/admin)'];
+$headers = ['NIM', 'Nama Lengkap', 'Tempat Lahir', 'Tanggal Lahir (ddmmyyyy)', 'Email', 'No. HP', 'Program Studi', 'Role (mahasiswa/admin)'];
 foreach ($headers as $col => $title) {
     $cell = chr(65 + $col) . '1';
     $sheet->setCellValue($cell, $title);
 }
 
 // Style header
-$sheet->getStyle('A1:G1')->applyFromArray([
+$sheet->getStyle('A1:H1')->applyFromArray([
     'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1a5632']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -77,28 +77,30 @@ $sheet->getStyle('A1:G1')->applyFromArray([
 // === CONTOH DATA ===
 $sheet->setCellValue('A2', '2024010006');
 $sheet->setCellValue('B2', 'Contoh Mahasiswa');
-$sheet->setCellValue('C2', '01031990');
-$sheet->setCellValue('D2', 'contoh@mail.com');
-$sheet->setCellValue('E2', '081234567895');
-$sheet->setCellValue('F2', 'Teknik Informatika');
-$sheet->setCellValue('G2', 'mahasiswa');
+$sheet->setCellValue('C2', 'Jakarta');
+$sheet->setCellValue('D2', '01031990');
+$sheet->setCellValue('E2', 'contoh@mail.com');
+$sheet->setCellValue('F2', '081234567895');
+$sheet->setCellValue('G2', 'Teknik Informatika');
+$sheet->setCellValue('H2', 'mahasiswa');
 
 $sheet->setCellValue('A3', '2024010007');
 $sheet->setCellValue('B3', 'Contoh Kedua');
-$sheet->setCellValue('C3', '15051995');
-$sheet->setCellValue('D3', 'contoh2@mail.com');
-$sheet->setCellValue('E3', '081234567896');
-$sheet->setCellValue('F3', 'Manajemen');
-$sheet->setCellValue('G3', 'mahasiswa');
+$sheet->setCellValue('C3', 'Bandung');
+$sheet->setCellValue('D3', '15051995');
+$sheet->setCellValue('E3', 'contoh2@mail.com');
+$sheet->setCellValue('F3', '081234567896');
+$sheet->setCellValue('G3', 'Manajemen');
+$sheet->setCellValue('H3', 'mahasiswa');
 
 // Style data rows
-$sheet->getStyle('A2:G3')->applyFromArray([
+$sheet->getStyle('A2:H3')->applyFromArray([
     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
 ]);
-$sheet->getStyle('A2:G3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('f0fff4');
+$sheet->getStyle('A2:H3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('f0fff4');
 
 // Auto width kolom
-foreach (range('A', 'G') as $col) {
+foreach (range('A', 'H') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 

@@ -180,50 +180,74 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99999; flex-direction:column; align-items:center; justify-content:center; color:#fff;">
+    <div style="border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 4px solid #fff; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+    <h3 style="margin-top:20px; font-weight:600; color:#fff;">Sedang Memproses Data...</h3>
+    <p>Mohon jangan menutup halaman ini.</p>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.getElementById('form-import').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);
     const btn = document.getElementById('btn-import');
-    const result = document.getElementById('import-result');
     btn.disabled = true;
-    btn.textContent = 'Mengimport...';
-    result.style.display = 'none';
+    btn.textContent = 'Memproses...';
+    document.getElementById('loadingOverlay').style.display = 'flex';
 
     fetch('<?= BASE_URL ?>/api/import-users.php', { method: 'POST', body: formData })
     .then(r => r.text())
     .then(text => {
-        result.style.display = 'block';
+        document.getElementById('loadingOverlay').style.display = 'none';
         let data;
         try { data = JSON.parse(text); }
-        catch(e) {
-            result.style.background = '#f8d7da';
-            result.style.color = '#721c24';
-            result.innerHTML = '<strong>❌ Server Error (bukan JSON):</strong><br><pre style="font-size:11px;white-space:pre-wrap;margin-top:8px;">' + text.substring(0, 1000) + '</pre>';
+        catch(err) {
+            Swal.fire({
+                title: 'Server Error!',
+                text: 'Respon server tidak valid.',
+                icon: 'error'
+            });
             return;
         }
+        
         if (data.success) {
-            result.style.background = '#d4edda';
-            result.style.color = '#155724';
-            let html = '<strong>✅ ' + data.message + '</strong>';
+            document.getElementById('modal-import').style.display = 'none';
+            document.getElementById('form-import').reset();
+            let htmlMsg = data.message.replace(/\n/g, '<br>');
             if (data.errors && data.errors.length > 0) {
-                html += '<ul style="margin-top:8px;padding-left:20px;">';
-                data.errors.forEach(err => html += '<li>' + err + '</li>');
-                html += '</ul>';
+                htmlMsg += '<div style="margin-top:12px; text-align:left; font-size:13px; max-height:150px; overflow-y:auto; background:#f8d7da; color:#721c24; padding:8px; border-radius:6px;"><ul>';
+                data.errors.forEach(err => htmlMsg += '<li>' + err + '</li>');
+                htmlMsg += '</ul></div>';
             }
-            result.innerHTML = html;
-            if (data.imported > 0) setTimeout(() => location.reload(), 2000);
+            Swal.fire({
+                title: 'Import Selesai!',
+                html: htmlMsg,
+                icon: 'success',
+                confirmButtonText: 'Tutup'
+            }).then(() => {
+                location.reload();
+            });
         } else {
-            result.style.background = '#f8d7da';
-            result.style.color = '#721c24';
-            result.innerHTML = '<strong>❌ ' + data.message + '</strong>';
+            Swal.fire({
+                title: 'Gagal!',
+                html: data.message.replace(/\n/g, '<br>'),
+                icon: 'error',
+                confirmButtonText: 'Tutup'
+            });
         }
     })
     .catch(err => {
-        result.style.display = 'block';
-        result.style.background = '#f8d7da';
-        result.style.color = '#721c24';
-        result.innerHTML = '<strong>❌ Network error: ' + err.message + '</strong>';
+        document.getElementById('loadingOverlay').style.display = 'none';
+        Swal.fire({
+            title: 'Network Error!',
+            text: err.message,
+            icon: 'error'
+        });
     })
     .finally(() => { btn.disabled = false; btn.textContent = '📤 Mulai Import'; });
 });
