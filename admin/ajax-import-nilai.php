@@ -146,12 +146,6 @@ try {
         $stmtFindUser->execute([$nim]);
         $userId = $stmtFindUser->fetchColumn();
 
-        if (!$userId) {
-            $errors[] = "Baris $dataRow: Mahasiswa dengan NIM '$nim' tidak ditemukan di sistem.";
-            $skipped++;
-            continue;
-        }
-
         $ta = trim((string)($row[$colMap['tahun_ajaran'] ?? -1] ?? ''));
         if ($ta === '') $ta = null;
 
@@ -172,18 +166,34 @@ try {
         $tmptLahir = trim((string)($row[$colMap['tempat_lahir'] ?? -1] ?? ''));
         $jurusan = trim((string)($row[$colMap['jurusan'] ?? -1] ?? ''));
         
-        // Update user fields if provided
-        if ($jurusan !== '' || $tmptLahir !== '' || $tglLahir !== null) {
-            $updates = [];
-            $params = [];
-            if ($jurusan !== '') { $updates[] = "program_studi = ?"; $params[] = $jurusan; }
-            if ($tmptLahir !== '') { $updates[] = "tempat_lahir = ?"; $params[] = $tmptLahir; }
-            if ($tglLahir !== null) { $updates[] = "tanggal_lahir = ?"; $params[] = $tglLahir; }
+        if (!$userId) {
+            $nama_lengkap = trim((string)($row[$colMap['nama']] ?? ''));
+            if ($nama_lengkap === '') $nama_lengkap = "Mahasiswa " . $nim;
             
-            if (!empty($updates)) {
-                $params[] = $userId;
-                $sqlUser = "UPDATE users SET " . implode(", ", $updates) . " WHERE id = ?";
-                $pdo->prepare($sqlUser)->execute($params);
+            try {
+                $password = password_hash($nim, PASSWORD_DEFAULT);
+                $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
+                $stmtInsertUser->execute([$nim, $password, $nama_lengkap, $nim, ($jurusan!==''?$jurusan:null), ($tmptLahir!==''?$tmptLahir:null), $tglLahir]);
+                $userId = $pdo->lastInsertId();
+            } catch (Exception $e) {
+                $errors[] = "Baris $dataRow: Gagal membuat akun otomatis untuk NIM '$nim'. (" . $e->getMessage() . ")";
+                $skipped++;
+                continue;
+            }
+        } else {
+            // Update user fields if provided
+            if ($jurusan !== '' || $tmptLahir !== '' || $tglLahir !== null) {
+                $updates = [];
+                $params = [];
+                if ($jurusan !== '') { $updates[] = "program_studi = ?"; $params[] = $jurusan; }
+                if ($tmptLahir !== '') { $updates[] = "tempat_lahir = ?"; $params[] = $tmptLahir; }
+                if ($tglLahir !== null) { $updates[] = "tanggal_lahir = ?"; $params[] = $tglLahir; }
+                
+                if (!empty($updates)) {
+                    $params[] = $userId;
+                    $sqlUser = "UPDATE users SET " . implode(", ", $updates) . " WHERE id = ?";
+                    $pdo->prepare($sqlUser)->execute($params);
+                }
             }
         }
 
