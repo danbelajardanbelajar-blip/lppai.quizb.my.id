@@ -58,8 +58,7 @@ $headers = [
     'I1' => 'Srt Pendek',
     'J1' => 'Amaliyah',
     'K1' => 'Jenazah',
-    'L1' => 'Ujian Tulis',
-    'M1' => 'Nilai Akhir'
+    'L1' => 'Ujian Tulis'
 ];
 
 foreach ($headers as $cell => $val) {
@@ -76,10 +75,10 @@ $styleArray = [
     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
 ];
-$sheet->getStyle('A1:M1')->applyFromArray($styleArray);
+$sheet->getStyle('A1:L1')->applyFromArray($styleArray);
 
 // Auto width
-foreach(range('A','M') as $col) {
+foreach(range('A','L') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
@@ -96,10 +95,9 @@ $sheet->setCellValue('I2', '90');
 $sheet->setCellValue('J2', '88');
 $sheet->setCellValue('K2', '75');
 $sheet->setCellValue('L2', '80');
-$sheet->setCellValue('M2', '83.0');
 
-$sheet->getStyle('A2:M2')->getFont()->setItalic(true);
-$sheet->getStyle('A2:M2')->getFont()->getColor()->setARGB('FF666666');
+$sheet->getStyle('A2:L2')->getFont()->setItalic(true);
+$sheet->getStyle('A2:L2')->getFont()->getColor()->setARGB('FF666666');
 
 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 $filename = 'Template_Import_Nilai_Master.xlsx';

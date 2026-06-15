@@ -140,7 +140,17 @@ if ($isAdmin || $isDosen) {
             $sheet->setCellValue('J'.$row, $s['nilai_amaliyah'] ?? '-');
             $sheet->setCellValue('K'.$row, $s['nilai_jenazah'] ?? '-');
             $sheet->setCellValue('L'.$row, $s['nilai_ujian_tulis'] ?? '-');
-            $sheet->setCellValue('M'.$row, $s['nilai_akhir'] ?? '-');
+            
+            $sum = 0; $count = 0;
+            if ($s['nilai_thaharah'] !== null) { $sum += (float)$s['nilai_thaharah']; $count++; }
+            if ($s['nilai_shalat'] !== null) { $sum += (float)$s['nilai_shalat']; $count++; }
+            if ($s['nilai_surat_pendek'] !== null) { $sum += (float)$s['nilai_surat_pendek']; $count++; }
+            if ($s['nilai_amaliyah'] !== null) { $sum += (float)$s['nilai_amaliyah']; $count++; }
+            if ($s['nilai_jenazah'] !== null) { $sum += (float)$s['nilai_jenazah']; $count++; }
+            if ($s['nilai_ujian_tulis'] !== null) { $sum += (float)$s['nilai_ujian_tulis']; $count++; }
+            $calc_akhir = $count > 0 ? round($sum / $count, 2) : '-';
+            
+            $sheet->setCellValue('M'.$row, $calc_akhir);
             
             $sheet->getStyle('A'.$row.':M'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
             $row++;
@@ -266,7 +276,16 @@ include __DIR__ . '/includes/header.php';
                                 <td align="center"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
                                 <td align="center">
                                     <span class="badge badge-primary" style="font-size:14px;">
-                                        <?= $s['nilai_akhir'] !== null ? number_format($s['nilai_akhir'], 2) : '-' ?>
+                                        <?php
+                                        $sum = 0; $count = 0;
+                                        if ($s['nilai_thaharah'] !== null) { $sum += (float)$s['nilai_thaharah']; $count++; }
+                                        if ($s['nilai_shalat'] !== null) { $sum += (float)$s['nilai_shalat']; $count++; }
+                                        if ($s['nilai_surat_pendek'] !== null) { $sum += (float)$s['nilai_surat_pendek']; $count++; }
+                                        if ($s['nilai_amaliyah'] !== null) { $sum += (float)$s['nilai_amaliyah']; $count++; }
+                                        if ($s['nilai_jenazah'] !== null) { $sum += (float)$s['nilai_jenazah']; $count++; }
+                                        if ($s['nilai_ujian_tulis'] !== null) { $sum += (float)$s['nilai_ujian_tulis']; $count++; }
+                                        echo $count > 0 ? number_format(round($sum / $count, 2), 2) : '-';
+                                        ?>
                                     </span>
                                 </td>
                             </tr>
@@ -308,7 +327,16 @@ include __DIR__ . '/includes/header.php';
                         <div style="text-align:center; padding:15px 30px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
                             <div style="font-size:12px; color:#64748b; font-weight:bold; margin-bottom:5px;">NILAI AKHIR</div>
                             <div style="font-size:32px; font-weight:900; color:var(--primary);">
-                                <?= $mc['nilai_akhir'] !== null ? number_format($mc['nilai_akhir'], 2) : '-' ?>
+                                <?php
+                                $sum = 0; $count = 0;
+                                if ($mc['nilai_thaharah'] !== null) { $sum += (float)$mc['nilai_thaharah']; $count++; }
+                                if ($mc['nilai_shalat'] !== null) { $sum += (float)$mc['nilai_shalat']; $count++; }
+                                if ($mc['nilai_surat_pendek'] !== null) { $sum += (float)$mc['nilai_surat_pendek']; $count++; }
+                                if ($mc['nilai_amaliyah'] !== null) { $sum += (float)$mc['nilai_amaliyah']; $count++; }
+                                if ($mc['nilai_jenazah'] !== null) { $sum += (float)$mc['nilai_jenazah']; $count++; }
+                                if ($mc['nilai_ujian_tulis'] !== null) { $sum += (float)$mc['nilai_ujian_tulis']; $count++; }
+                                echo $count > 0 ? number_format(round($sum / $count, 2), 2) : '-';
+                                ?>
                             </div>
                         </div>
                     </div>

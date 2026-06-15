@@ -118,7 +118,6 @@ CREATE TABLE tutorial_registrations (
     nilai_amaliyah DECIMAL(5,2) DEFAULT NULL,
     nilai_jenazah DECIMAL(5,2) DEFAULT NULL,
     nilai_ujian_tulis DECIMAL(5,2) DEFAULT NULL,
-    nilai_akhir DECIMAL(5,2) DEFAULT NULL,
     nilai_detail TEXT DEFAULT NULL,
     keterangan TEXT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

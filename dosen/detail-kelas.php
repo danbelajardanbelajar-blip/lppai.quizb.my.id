@@ -86,20 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $avg_jz = calcAvg($detail, array_keys($materi_list['jenazah']));
             $avg_ut = calcAvg($detail, array_keys($materi_list['ujian_tulis']));
 
-            // Calculate akhir
-            $sum_akhir = 0; $count_akhir = 0;
-            if($avg_th !== null) { $sum_akhir += $avg_th; $count_akhir++; }
-            if($avg_sh !== null) { $sum_akhir += $avg_sh; $count_akhir++; }
-            if($avg_sp !== null) { $sum_akhir += $avg_sp; $count_akhir++; }
-            if($avg_am !== null) { $sum_akhir += $avg_am; $count_akhir++; }
-            if($avg_jz !== null) { $sum_akhir += $avg_jz; $count_akhir++; }
-            if($avg_ut !== null) { $sum_akhir += $avg_ut; $count_akhir++; }
-            $avg_akhir = $count_akhir > 0 ? ($sum_akhir / $count_akhir) : null;
-
             try {
                 $json_detail = json_encode($detail);
-                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=?, nilai_akhir=? WHERE id=? AND tutorial_class_id=?");
-                $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $avg_akhir, $reg_id, $class_id]);
+                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? WHERE id=? AND tutorial_class_id=?");
+                $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $reg_id, $class_id]);
                 
                 $message = 'Nilai rincian berhasil disimpan.';
                 $msgType = 'success';
@@ -140,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Get registered students
 $stmt = $pdo->prepare("
-    SELECT tr.id as reg_id, tr.user_id, tr.status, tr.nilai_akhir, 
+    SELECT tr.id as reg_id, tr.user_id, tr.status, 
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_detail,
            u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
@@ -251,7 +241,18 @@ include __DIR__ . '/../includes/header.php';
                                 <td align="center"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
                                 <td align="center">
-                                    <strong><?= $s['nilai_akhir'] !== null ? number_format($s['nilai_akhir'], 2) : '-' ?></strong>
+                                    <strong>
+                                        <?php
+                                        $sum = 0; $count = 0;
+                                        if ($s['nilai_thaharah'] !== null) { $sum += (float)$s['nilai_thaharah']; $count++; }
+                                        if ($s['nilai_shalat'] !== null) { $sum += (float)$s['nilai_shalat']; $count++; }
+                                        if ($s['nilai_surat_pendek'] !== null) { $sum += (float)$s['nilai_surat_pendek']; $count++; }
+                                        if ($s['nilai_amaliyah'] !== null) { $sum += (float)$s['nilai_amaliyah']; $count++; }
+                                        if ($s['nilai_jenazah'] !== null) { $sum += (float)$s['nilai_jenazah']; $count++; }
+                                        if ($s['nilai_ujian_tulis'] !== null) { $sum += (float)$s['nilai_ujian_tulis']; $count++; }
+                                        echo $count > 0 ? number_format(round($sum / $count, 2), 2) : '-';
+                                        ?>
+                                    </strong>
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-primary" onclick="openNilaiModal(<?= $s['reg_id'] ?>, '<?= htmlspecialchars(addslashes($s['nama_lengkap'])) ?>', '<?= htmlspecialchars(addslashes($s['nilai_detail'] ?? '{}')) ?>')">✏️ Input Rinci</button>

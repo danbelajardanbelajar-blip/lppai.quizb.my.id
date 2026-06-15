@@ -46,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $amaliyah = ($_POST['nilai_amaliyah'] !== '') ? (float)$_POST['nilai_amaliyah'] : null;
         $jenazah = ($_POST['nilai_jenazah'] !== '') ? (float)$_POST['nilai_jenazah'] : null;
         $ut = ($_POST['nilai_ujian_tulis'] !== '') ? (float)$_POST['nilai_ujian_tulis'] : null;
-        $akhir = ($_POST['nilai_akhir'] !== '') ? (float)$_POST['nilai_akhir'] : null;
 
         if ($userId > 0) {
             if ($regId > 0) {
@@ -54,20 +53,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt = $pdo->prepare("
                     UPDATE tutorial_registrations 
                     SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
-                        nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=?, nilai_akhir=? 
+                        nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? 
                     WHERE id=?
                 ");
-                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir, $regId]);
+                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
                 $message = "Nilai mahasiswa berhasil diperbarui.";
                 $msgType = "success";
             } else {
                 // INSERT baru untuk mahasiswa lawas (belum pernah mendaftar kelas)
                 $stmt = $pdo->prepare("
                     INSERT INTO tutorial_registrations 
-                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis, nilai_akhir)
-                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
+                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
+                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $akhir]);
+                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
                 $message = "Nilai mahasiswa berhasil disimpan (Riwayat baru telah dibuat).";
                 $msgType = "success";
             }
@@ -180,8 +179,8 @@ require_once __DIR__ . '/../includes/header.php';
                     <input type="number" step="0.01" name="nilai_ujian_tulis" id="editUt" class="form-control">
                 </div>
                 <div style="grid-column: span 2;">
-                    <label><strong>Nilai Akhir</strong></label>
-                    <input type="number" step="0.01" name="nilai_akhir" id="editAkhir" class="form-control" style="background-color:#eff6ff; font-weight:bold;">
+                    <label><strong>Nilai Akhir (Otomatis)</strong></label>
+                    <input type="number" step="0.01" id="editAkhir" class="form-control" style="background-color:#eff6ff; font-weight:bold;" readonly>
                 </div>
             </div>
 

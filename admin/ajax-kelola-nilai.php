@@ -37,7 +37,7 @@ $columns = [
     10 => 'nilai_amaliyah',
     11 => 'nilai_jenazah',
     12 => 'nilai_ujian_tulis',
-    13 => 'nilai_akhir'
+    13 => '((IFNULL(tr.nilai_thaharah,0) + IFNULL(tr.nilai_shalat,0) + IFNULL(tr.nilai_surat_pendek,0) + IFNULL(tr.nilai_amaliyah,0) + IFNULL(tr.nilai_jenazah,0) + IFNULL(tr.nilai_ujian_tulis,0)) / NULLIF((IF(tr.nilai_thaharah IS NULL,0,1) + IF(tr.nilai_shalat IS NULL,0,1) + IF(tr.nilai_surat_pendek IS NULL,0,1) + IF(tr.nilai_amaliyah IS NULL,0,1) + IF(tr.nilai_jenazah IS NULL,0,1) + IF(tr.nilai_ujian_tulis IS NULL,0,1)), 0))'
 ];
 
 $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
@@ -72,7 +72,7 @@ $dataQuery = "
     SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
-           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_akhir
+           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis
     $fromClause
     ORDER BY $orderBy $orderDir
     LIMIT $length OFFSET $start
@@ -91,7 +91,15 @@ $response = [
 ];
 
 foreach ($data as $i => $row) {
-    // Tombol Edit Modal
+    $sum = 0; $count = 0;
+    if ($row['nilai_thaharah'] !== null) { $sum += (float)$row['nilai_thaharah']; $count++; }
+    if ($row['nilai_shalat'] !== null) { $sum += (float)$row['nilai_shalat']; $count++; }
+    if ($row['nilai_surat_pendek'] !== null) { $sum += (float)$row['nilai_surat_pendek']; $count++; }
+    if ($row['nilai_amaliyah'] !== null) { $sum += (float)$row['nilai_amaliyah']; $count++; }
+    if ($row['nilai_jenazah'] !== null) { $sum += (float)$row['nilai_jenazah']; $count++; }
+    if ($row['nilai_ujian_tulis'] !== null) { $sum += (float)$row['nilai_ujian_tulis']; $count++; }
+    $nilai_akhir = $count > 0 ? round($sum / $count, 2) : null;
+
     $editBtn = '<button class="btn btn-sm btn-warning btn-edit-nilai" 
         data-user-id="' . $row['user_id'] . '"
         data-reg-id="' . ($row['reg_id'] ?: 0) . '"
@@ -104,7 +112,7 @@ foreach ($data as $i => $row) {
         data-amaliyah="' . ($row['nilai_amaliyah'] ?? '') . '"
         data-jenazah="' . ($row['nilai_jenazah'] ?? '') . '"
         data-ut="' . ($row['nilai_ujian_tulis'] ?? '') . '"
-        data-akhir="' . ($row['nilai_akhir'] ?? '') . '"
+        data-akhir="' . ($nilai_akhir ?? '') . '"
     >✏️ Edit</button>';
 
     $response['data'][] = [
@@ -121,7 +129,7 @@ foreach ($data as $i => $row) {
         $row['nilai_amaliyah'] ?? '-',
         $row['nilai_jenazah'] ?? '-',
         $row['nilai_ujian_tulis'] ?? '-',
-        '<strong>' . ($row['nilai_akhir'] ?? '-') . '</strong>',
+        '<strong>' . ($nilai_akhir ?? '-') . '</strong>',
         $editBtn
     ];
 }
