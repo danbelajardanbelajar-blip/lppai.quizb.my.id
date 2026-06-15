@@ -244,42 +244,48 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
             <div style="margin-bottom:12px;padding:12px;background:#e8f5e9;border-radius:10px;font-size:13px;color:#155724;">
                 ℹ️ <strong>Username otomatis = NIM</strong>, <strong>Password otomatis = tanggal lahir format ddmmyyyy</strong> (contoh: 01031990)
             </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;">
-                <div class="form-group">
-                    <label>Role</label>
-                    <select name="role" id="create_role" onchange="toggleFields()">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Role</label>
+                    <select name="role" id="create_role" class="form-control" onchange="toggleFields()">
                         <option value="mahasiswa">Mahasiswa</option>
                         <option value="dosen">Dosen / Tutor</option>
                         <option value="admin">Admin</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Nama Lengkap *</label>
-                    <input type="text" name="nama_lengkap" required placeholder="Nama lengkap">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Nama Lengkap *</label>
+                    <input type="text" name="nama_lengkap" class="form-control" required placeholder="Nama lengkap">
                 </div>
-                <div class="form-group">
-                    <label id="label_nim">NIM * <small style="color:#888;">(digunakan sebagai username login)</small></label>
-                    <input type="text" name="nim" required placeholder="Nomor Induk / Username">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label" id="label_nim">NIM * <small style="color:#888;">(sebagai username)</small></label>
+                    <input type="text" name="nim" class="form-control" required placeholder="Nomor Induk / Username">
                 </div>
-                <div class="form-group">
-                    <label>Tempat Lahir</label>
-                    <input type="text" name="tempat_lahir" placeholder="Tempat lahir">
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Tempat Lahir</label>
+                    <input type="text" name="tempat_lahir" class="form-control" placeholder="Tempat lahir">
                 </div>
-                <div class="form-group">
-                    <label>Tanggal Lahir <small style="color:#888;">(opsional, digunakan untuk default password)</small></label>
-                    <input type="date" name="tanggal_lahir">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Tanggal Lahir <small style="color:#888;">(opsional)</small></label>
+                    <input type="date" name="tanggal_lahir" class="form-control">
                 </div>
-                <div class="form-group">
-                    <label>Email</label>
-                    <input type="email" name="email" placeholder="Email">
+                <div class="col-md-4 mb-3" id="group_prodi">
+                    <label class="form-label">Program Studi</label>
+                    <input type="text" name="program_studi" class="form-control" placeholder="Program studi">
                 </div>
-                <div class="form-group">
-                    <label>No. HP</label>
-                    <input type="text" name="no_hp" placeholder="No. HP">
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="Email">
                 </div>
-                <div class="form-group" id="group_prodi">
-                    <label>Program Studi</label>
-                    <input type="text" name="program_studi" placeholder="Program studi">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">No. HP</label>
+                    <input type="text" name="no_hp" class="form-control" placeholder="No. HP">
                 </div>
             </div>
 
