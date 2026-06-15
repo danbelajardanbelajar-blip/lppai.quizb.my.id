@@ -130,6 +130,7 @@ $info->getColumnDimension('B')->setWidth(70);
 
 $spreadsheet->setActiveSheetIndex(0);
 
+if (ob_get_length()) ob_end_clean();
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="template_import_pengguna.xlsx"');
 header('Cache-Control: no-cache');
