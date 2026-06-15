@@ -91,6 +91,7 @@ try {
     $colMap = [];
     foreach ($header as $idx => $h) {
         if (str_contains($h, 'nim')) $colMap['nim'] = $idx;
+        elseif (str_contains($h, 'nama')) $colMap['nama'] = $idx;
         elseif (str_contains($h, 'jurusan') || str_contains($h, 'prodi')) $colMap['jurusan'] = $idx;
         elseif (str_contains($h, 'tempat') || str_contains($h, 'tmpt')) $colMap['tempat_lahir'] = $idx;
         elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir')) $colMap['tanggal_lahir'] = $idx;
