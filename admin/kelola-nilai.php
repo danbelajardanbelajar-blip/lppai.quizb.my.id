@@ -237,7 +237,7 @@ $(document).ready(function() {
             "url": "<?= BASE_URL ?>/admin/ajax-kelola-nilai.php",
             "type": "POST"
         },
-        "pageLength": 25,
+        "pageLength": 10,
         "lengthMenu": [[10, 25, 50, 100, 500], [10, 25, 50, 100, 500]],
         "language": {
             "url": "//cdn.datatables.net/plug-ins/1.13.8/i18n/id.json",
