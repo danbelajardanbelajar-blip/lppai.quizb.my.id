@@ -28,14 +28,15 @@ $columns = [
     1 => 'u.nim',
     2 => 'u.nama_lengkap',
     3 => 'u.program_studi',
-    4 => 'u.tanggal_lahir',
-    5 => 'tr.tahun_ajaran',
-    6 => 'nilai_thaharah',
-    7 => 'nilai_shalat',
-    8 => 'nilai_surat_pendek',
-    9 => 'nilai_amaliyah',
-    10 => 'nilai_jenazah',
-    11 => 'nilai_akhir'
+    4 => 'u.tempat_lahir',
+    5 => 'u.tanggal_lahir',
+    6 => 'tr.tahun_ajaran',
+    7 => 'nilai_thaharah',
+    8 => 'nilai_shalat',
+    9 => 'nilai_surat_pendek',
+    10 => 'nilai_amaliyah',
+    11 => 'nilai_jenazah',
+    12 => 'nilai_akhir'
 ];
 
 $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
@@ -67,7 +68,7 @@ $recordsFiltered = $stmtFiltered->fetchColumn();
 
 // 3. Get Data with Pagination
 $dataQuery = "
-    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tanggal_lahir,
+    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_akhir
@@ -109,6 +110,7 @@ foreach ($data as $i => $row) {
         htmlspecialchars($row['nim'] ?: '-'),
         '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
         htmlspecialchars($row['program_studi'] ?: '-'),
+        htmlspecialchars($row['tempat_lahir'] ?: '-'),
         htmlspecialchars($row['tanggal_lahir'] ?: '-'),
         htmlspecialchars($row['tahun_ajaran'] ?: '-'),
         $row['nilai_thaharah'] ?? '-',

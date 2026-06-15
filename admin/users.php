@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $nama    = trim($_POST['nama_lengkap'] ?? '');
             $nim     = trim($_POST['nim'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
+            $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $email   = trim($_POST['email'] ?? '');
             $noHp    = trim($_POST['no_hp'] ?? '');
             $prodi   = trim($_POST['program_studi'] ?? '');
@@ -47,8 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $passwordRaw = '123456'; // Default password if no birth date
                     }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?)")
-                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tglLahir, $role]);
+                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $role]);
                     $message = "User berhasil ditambahkan! Login: Username=<strong>$nim</strong>, Password=<strong>$passwordRaw</strong>";
                     $msgType = 'success';
                 }
@@ -60,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email   = trim($_POST['email'] ?? '');
             $noHp    = trim($_POST['no_hp'] ?? '');
             $prodi   = trim($_POST['program_studi'] ?? '');
+            $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
             $role    = in_array($_POST['role'] ?? '', ['mahasiswa', 'admin', 'dosen']) ? $_POST['role'] : 'mahasiswa';
 
@@ -71,8 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($id === (int)$_SESSION['user_id'] && $role !== 'admin') {
                     $role = 'admin'; // proteksi: admin tidak bisa turunkan role sendiri
                 }
-                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tanggal_lahir = ?, role = ? WHERE id = ?")
-                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tglLahir ?: null, $role, $id]);
+                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, role = ? WHERE id = ?")
+                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $role, $id]);
                 $message = 'Data pengguna berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -260,6 +262,10 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <input type="text" name="nim" required placeholder="Nomor Induk / Username">
                 </div>
                 <div class="form-group">
+                    <label>Tempat Lahir</label>
+                    <input type="text" name="tempat_lahir" placeholder="Tempat lahir">
+                </div>
+                <div class="form-group">
                     <label>Tanggal Lahir <small style="color:#888;">(opsional, digunakan untuk default password)</small></label>
                     <input type="date" name="tanggal_lahir">
                 </div>
@@ -311,6 +317,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <th>No</th>
                         <th>NIM (Username)</th>
                         <th>Nama</th>
+                        <th>Tempat Lahir</th>
                         <th>Tgl Lahir (Password)</th>
                         <th>Prodi</th>
                         <th>Role</th>
@@ -323,6 +330,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <td><?= $i + 1 ?></td>
                         <td><strong><?= sanitize($u['nim'] ?? $u['username']) ?></strong></td>
                         <td><?= sanitize($u['nama_lengkap']) ?></td>
+                        <td><?= sanitize($u['tempat_lahir'] ?? '-') ?></td>
                         <td><?= !empty($u['tanggal_lahir']) ? date('d/m/Y', strtotime($u['tanggal_lahir'])) : '-' ?></td>
                         <td><?= sanitize($u['program_studi'] ?? '-') ?></td>
                         <td>
@@ -343,6 +351,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                                 data-email="<?= htmlspecialchars($u['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-no-hp="<?= htmlspecialchars($u['no_hp'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-prodi="<?= htmlspecialchars($u['program_studi'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-tmpt-lahir="<?= htmlspecialchars($u['tempat_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-tgl-lahir="<?= htmlspecialchars($u['tanggal_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-role="<?= htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
@@ -426,6 +435,10 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <input type="text" name="program_studi" id="edit_user_prodi" placeholder="Program studi">
                 </div>
                 <div class="form-group">
+                    <label>Tempat Lahir</label>
+                    <input type="text" name="tempat_lahir" id="edit_user_tmptlahir" placeholder="Tempat lahir">
+                </div>
+                <div class="form-group">
                     <label>Tanggal Lahir</label>
                     <input type="date" name="tanggal_lahir" id="edit_user_tgllahir">
                 </div>
@@ -449,12 +462,13 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </div>
 
 <script>
-function openUserModal(id, nama, email, noHp, prodi, tglLahir, role) {
+function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, role) {
     document.getElementById('edit_user_id').value       = id;
     document.getElementById('edit_user_nama').value     = nama;
     document.getElementById('edit_user_email').value    = email;
     document.getElementById('edit_user_nohp').value     = noHp;
     document.getElementById('edit_user_prodi').value    = prodi;
+    document.getElementById('edit_user_tmptlahir').value= tmptLahir;
     document.getElementById('edit_user_tgllahir').value = tglLahir;
     document.getElementById('edit_user_role').value     = role;
     document.getElementById('editUserModal').classList.add('show');
@@ -472,7 +486,7 @@ if (!window._editUserBound) {
         var btn = e.target.closest('.btn-edit-user');
         if (btn) {
             var d = btn.dataset;
-            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tglLahir, d.role);
+            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.role);
             return;
         }
         if (e.target && e.target.id === 'editUserModal') closeUserModal();

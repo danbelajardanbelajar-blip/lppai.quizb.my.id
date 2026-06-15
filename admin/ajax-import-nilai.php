@@ -91,6 +91,7 @@ try {
     $colMap = [];
     foreach ($header as $idx => $h) {
         if (str_contains($h, 'nim')) $colMap['nim'] = $idx;
+        elseif (str_contains($h, 'tempat') || str_contains($h, 'tmpt')) $colMap['tempat_lahir'] = $idx;
         elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir')) $colMap['tanggal_lahir'] = $idx;
         elseif (str_contains($h, 'tahun') || str_contains($h, 'ajaran')) $colMap['tahun_ajaran'] = $idx;
         elseif (str_contains($h, 'thaharah')) $colMap['thaharah'] = $idx;
@@ -114,7 +115,9 @@ try {
     // Prepared statements
     $stmtFindUser = $pdo->prepare("SELECT id FROM users WHERE nim = ? AND role = 'mahasiswa' LIMIT 1");
     $stmtFindReg = $pdo->prepare("SELECT id FROM tutorial_registrations WHERE user_id = ? ORDER BY id DESC LIMIT 1");
-    $stmtUpdateUser = $pdo->prepare("UPDATE users SET tanggal_lahir = ? WHERE id = ?");
+    $stmtUpdateUserTgl = $pdo->prepare("UPDATE users SET tanggal_lahir = ? WHERE id = ?");
+    $stmtUpdateUserTmpt = $pdo->prepare("UPDATE users SET tempat_lahir = ? WHERE id = ?");
+    $stmtUpdateUserTmptTgl = $pdo->prepare("UPDATE users SET tempat_lahir = ?, tanggal_lahir = ? WHERE id = ?");
     
     $stmtUpdate = $pdo->prepare("
         UPDATE tutorial_registrations 
@@ -159,9 +162,16 @@ try {
             } else {
                 $tglLahir = date('Y-m-d', strtotime($tglLahirRaw));
             }
-            if ($tglLahir) {
-                $stmtUpdateUser->execute([$tglLahir, $userId]);
-            }
+        }
+        
+        $tmptLahir = trim((string)($row[$colMap['tempat_lahir'] ?? -1] ?? ''));
+        
+        if ($tmptLahir !== '' && $tglLahir !== null) {
+            $stmtUpdateUserTmptTgl->execute([$tmptLahir, $tglLahir, $userId]);
+        } elseif ($tmptLahir !== '') {
+            $stmtUpdateUserTmpt->execute([$tmptLahir, $userId]);
+        } elseif ($tglLahir !== null) {
+            $stmtUpdateUserTgl->execute([$tglLahir, $userId]);
         }
 
         $thaharah = isset($colMap['thaharah']) && trim((string)$row[$colMap['thaharah']]) !== '' ? (float)trim($row[$colMap['thaharah']]) : null;

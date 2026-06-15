@@ -15,6 +15,7 @@ CREATE TABLE users (
     no_hp VARCHAR(20) DEFAULT NULL,
     program_studi VARCHAR(100) DEFAULT NULL,
     fakultas VARCHAR(100) DEFAULT NULL,
+    tempat_lahir VARCHAR(100) DEFAULT NULL,
     tanggal_lahir DATE DEFAULT NULL,
     role ENUM('mahasiswa', 'admin', 'dosen') NOT NULL DEFAULT 'mahasiswa',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
