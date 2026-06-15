@@ -213,8 +213,19 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Loading Overlay -->
+<div id="loadingOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:99999; flex-direction:column; align-items:center; justify-content:center; color:#fff;">
+    <div style="border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 4px solid #fff; width: 50px; height: 50px; animation: spin 1s linear infinite;"></div>
+    <h3 style="margin-top:20px; font-weight:600; color:#fff;">Sedang Memproses Data...</h3>
+    <p>Mohon jangan menutup halaman ini.</p>
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
 $(document).ready(function() {
@@ -295,6 +306,7 @@ $(document).ready(function() {
         const formData = new FormData(this);
         const btn = $('#btnProsesImport');
         btn.prop('disabled', true).text('Memproses...');
+        $('#loadingOverlay').css('display', 'flex');
         
         $.ajax({
             url: '<?= BASE_URL ?>/admin/ajax-import-nilai.php',
@@ -303,18 +315,46 @@ $(document).ready(function() {
             processData: false,
             contentType: false,
             success: function(res) {
+                $('#loadingOverlay').css('display', 'none');
                 btn.prop('disabled', false).text('Proses Import');
+                
+                // Cek jika response berupa string JSON (misal tidak di-parse otomatis)
+                if (typeof res === 'string') {
+                    try {
+                        res = JSON.parse(res);
+                    } catch(e) {
+                        console.error('Invalid JSON response:', res);
+                    }
+                }
+
                 if (res.success) {
-                    alert('Import Berhasil!\n' + res.message);
+                    Swal.fire({
+                        title: 'Import Selesai!',
+                        html: res.message.replace(/\n/g, '<br>'),
+                        icon: 'success',
+                        confirmButtonText: 'Tutup'
+                    });
                     document.getElementById('importModal').style.display='none';
+                    $('#formImport')[0].reset();
                     $('#tableKelolaNilai').DataTable().ajax.reload(null, false);
                 } else {
-                    alert('Gagal: ' + res.message);
+                    Swal.fire({
+                        title: 'Gagal!',
+                        html: (res.message || 'Terjadi kesalahan tidak diketahui.').replace(/\n/g, '<br>'),
+                        icon: 'error',
+                        confirmButtonText: 'Tutup'
+                    });
                 }
             },
             error: function(err) {
+                $('#loadingOverlay').css('display', 'none');
                 btn.prop('disabled', false).text('Proses Import');
-                alert('Terjadi kesalahan koneksi saat import.');
+                Swal.fire({
+                    title: 'Kesalahan Koneksi',
+                    text: 'Terjadi kesalahan jaringan atau server saat import.',
+                    icon: 'error',
+                    confirmButtonText: 'Tutup'
+                });
                 console.error(err);
             }
         });
