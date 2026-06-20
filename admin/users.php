@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email   = trim($_POST['email'] ?? '');
             $noHp    = trim($_POST['no_hp'] ?? '');
             $prodi   = trim($_POST['program_studi'] ?? '');
+            $ta      = trim($_POST['tahun_ajaran'] ?? '');
             $role    = $_POST['role'] ?? 'mahasiswa';
 
             if (empty($nim) || empty($nama)) {
@@ -48,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $passwordRaw = '123456'; // Default password if no birth date
                     }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?)")
-                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $role]);
+                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, tahun_ajaran, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $ta, $role]);
                     $message = "User berhasil ditambahkan! Login: Username=<strong>$nim</strong>, Password=<strong>$passwordRaw</strong>";
                     $msgType = 'success';
                 }
@@ -63,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $prodi   = trim($_POST['program_studi'] ?? '');
             $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
+            $ta      = trim($_POST['tahun_ajaran'] ?? '');
             $role    = in_array($_POST['role'] ?? '', ['mahasiswa', 'admin', 'dosen']) ? $_POST['role'] : 'mahasiswa';
 
             if ($id <= 0 || empty($nama)) {
@@ -73,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($id === (int)$_SESSION['user_id'] && $role !== 'admin') {
                     $role = 'admin'; // proteksi: admin tidak bisa turunkan role sendiri
                 }
-                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, role = ? WHERE id = ?")
-                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $role, $id]);
+                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, tahun_ajaran = ?, role = ? WHERE id = ?")
+                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $ta ?: null, $role, $id]);
                 $message = 'Data pengguna berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -297,6 +299,10 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <label>Program Studi</label>
                     <input type="text" name="program_studi" placeholder="Program studi">
                 </div>
+                <div class="form-group" id="group_ta">
+                    <label>Tahun Ajaran</label>
+                    <input type="text" name="tahun_ajaran" placeholder="Contoh: 2026-2027">
+                </div>
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" name="email" placeholder="Email">
@@ -311,13 +317,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                 function toggleFields() {
                     const role = document.getElementById('create_role').value;
                     const prodi = document.getElementById('group_prodi');
+                    const ta = document.getElementById('group_ta');
                     const labelNim = document.getElementById('label_nim');
                     
                     if (role === 'mahasiswa') {
                         prodi.style.display = 'block';
+                        ta.style.display = 'block';
                         labelNim.innerHTML = 'NIM * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     } else {
                         prodi.style.display = 'none';
+                        ta.style.display = 'none';
                         labelNim.innerHTML = 'Username / NIP * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     }
                 }
@@ -344,6 +353,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <th>Tempat Lahir</th>
                         <th>Tgl Lahir (Password)</th>
                         <th>Prodi</th>
+                        <th>Tahun Ajaran</th>
                         <th>Role</th>
                         <th>Aksi</th>
                     </tr>
@@ -357,6 +367,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <td><?= sanitize($u['tempat_lahir'] ?? '-') ?></td>
                         <td><?= !empty($u['tanggal_lahir']) ? date('d/m/Y', strtotime($u['tanggal_lahir'])) : '-' ?></td>
                         <td><?= sanitize($u['program_studi'] ?? '-') ?></td>
+                        <td><?= sanitize($u['tahun_ajaran'] ?? '-') ?></td>
                         <td>
                             <?php 
                             $badgeClass = 'badge-primary';
@@ -377,6 +388,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                                 data-prodi="<?= htmlspecialchars($u['program_studi'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-tmpt-lahir="<?= htmlspecialchars($u['tempat_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-tgl-lahir="<?= htmlspecialchars($u['tanggal_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-ta="<?= htmlspecialchars($u['tahun_ajaran'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                 data-role="<?= htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
@@ -459,6 +471,10 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <input type="text" name="program_studi" id="edit_user_prodi" placeholder="Program studi">
                 </div>
                 <div class="form-group">
+                    <label>Tahun Ajaran</label>
+                    <input type="text" name="tahun_ajaran" id="edit_user_ta" placeholder="Contoh: 2026-2027">
+                </div>
+                <div class="form-group">
                     <label>Tempat Lahir</label>
                     <input type="text" name="tempat_lahir" id="edit_user_tmptlahir" placeholder="Tempat lahir">
                 </div>
@@ -486,7 +502,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </div>
 
 <script>
-function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, role) {
+function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, ta, role) {
     document.getElementById('edit_user_id').value       = id;
     document.getElementById('edit_user_nama').value     = nama;
     document.getElementById('edit_user_email').value    = email;
@@ -494,6 +510,7 @@ function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, role) 
     document.getElementById('edit_user_prodi').value    = prodi;
     document.getElementById('edit_user_tmptlahir').value= tmptLahir;
     document.getElementById('edit_user_tgllahir').value = tglLahir;
+    document.getElementById('edit_user_ta').value       = ta;
     document.getElementById('edit_user_role').value     = role;
     document.getElementById('editUserModal').classList.add('show');
 }
@@ -510,7 +527,7 @@ if (!window._editUserBound) {
         var btn = e.target.closest('.btn-edit-user');
         if (btn) {
             var d = btn.dataset;
-            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.role);
+            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.ta, d.role);
             return;
         }
         if (e.target && e.target.id === 'editUserModal') closeUserModal();
