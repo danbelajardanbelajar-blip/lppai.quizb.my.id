@@ -76,7 +76,7 @@ $students  = $pdo->query("
     WHERE u.role = 'mahasiswa' 
     ORDER BY u.nama_lengkap
 ")->fetchAll();
-$schedules = $pdo->query("SELECT * FROM pretes_schedules ORDER BY tanggal DESC")->fetchAll();
+$schedules = $pdo->query("SELECT * FROM pretes_schedules WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') ORDER BY tanggal DESC")->fetchAll();
 
 $results = $pdo->query("
     SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, ps.periode, ps.tanggal as tgl_pretes

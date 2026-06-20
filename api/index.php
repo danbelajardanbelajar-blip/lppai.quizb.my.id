@@ -48,7 +48,7 @@ switch ($action) {
         break;
 
     case 'pretes_schedules':
-        $stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' ORDER BY tanggal, waktu_mulai");
+        $stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' AND (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') ORDER BY tanggal, waktu_mulai");
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         break;
 
@@ -66,10 +66,10 @@ switch ($action) {
     case 'tutorial_classes':
         $gelombang = $_GET['gelombang'] ?? '';
         if ($gelombang) {
-            $stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE gelombang = ? ORDER BY nama_kelas");
+            $stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE gelombang = ? AND (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%') ORDER BY nama_kelas");
             $stmt->execute([$gelombang]);
         } else {
-            $stmt = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, nama_kelas");
+            $stmt = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%') ORDER BY gelombang, nama_kelas");
         }
         echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
         break;

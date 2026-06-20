@@ -22,6 +22,7 @@ if ($isAdmin || $isDosen) {
             SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
+            WHERE (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
             GROUP BY tc.gelombang, tc.nama_kelas
             ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
         ");
@@ -31,7 +32,7 @@ if ($isAdmin || $isDosen) {
             SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
             FROM tutorial_classes tc
             LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
-            WHERE tc.dosen_pengampu = ?
+            WHERE tc.dosen_pengampu = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
             GROUP BY tc.gelombang, tc.nama_kelas
             ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
         ");
@@ -53,10 +54,10 @@ if ($isAdmin || $isDosen) {
     $params = [];
     
     if ($isDosen) {
-        $sql .= " WHERE tc.dosen_pengampu = ?";
+        $sql .= " WHERE tc.dosen_pengampu = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')";
         $params[] = $user['nama_lengkap'];
     } else {
-        $sql .= " WHERE 1=1";
+        $sql .= " WHERE (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')";
     }
     
     if ($filter_class !== '') {
@@ -176,7 +177,7 @@ if ($isAdmin || $isDosen) {
         SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu
         FROM tutorial_registrations tr
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-        WHERE tr.user_id = ?
+        WHERE tr.user_id = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
         ORDER BY tr.created_at DESC
     ");
     $stmt->execute([$user['id']]);
@@ -208,7 +209,7 @@ include __DIR__ . '/includes/header.php';
                     <select name="tahun_ajaran" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
                         <option value="">-- Semua Tahun Ajaran --</option>
                         <?php
-                        $startYear = 2025;
+                        $startYear = 2026;
                         $endYear = 2050;
                         for ($y = $startYear; $y < $endYear; $y++) {
                             $label = $y . '-' . ($y + 1);

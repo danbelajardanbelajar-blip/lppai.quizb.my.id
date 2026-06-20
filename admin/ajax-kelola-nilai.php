@@ -45,10 +45,11 @@ $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
 // Base Query
 $fromClause = "
     FROM users u
-    LEFT JOIN tutorial_registrations tr ON tr.id = (
+    JOIN tutorial_registrations tr ON tr.id = (
         SELECT MAX(id) FROM tutorial_registrations WHERE user_id = u.id
     )
-    WHERE u.role = 'mahasiswa'
+    WHERE u.role = 'mahasiswa' 
+    AND CAST(SUBSTRING(tr.tahun_ajaran, 1, 4) AS UNSIGNED) < 2026
 ";
 
 $whereParams = [];
@@ -59,7 +60,7 @@ if ($searchValue !== '') {
 }
 
 // 1. Get Total Records (without filtering)
-$stmtTotal = $pdo->query("SELECT COUNT(id) FROM users WHERE role = 'mahasiswa'");
+$stmtTotal = $pdo->query("SELECT COUNT(u.id) $fromClause");
 $recordsTotal = $stmtTotal->fetchColumn();
 
 // 2. Get Filtered Records

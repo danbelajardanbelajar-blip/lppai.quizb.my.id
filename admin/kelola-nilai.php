@@ -1,8 +1,8 @@
 <?php
 /**
- * LPPAI Corner - Kelola Nilai Master (Semua Angkatan)
+ * LPPAI Corner - Kelola Nilai Lama (Semua Angkatan)
  */
-define('PAGE_TITLE', 'Kelola Nilai (Master)');
+define('PAGE_TITLE', 'Kelola Nilai (Lama)');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
@@ -85,7 +85,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span>📊 Data Nilai Keseluruhan (Master)</span>
+        <span>📊 Data Nilai Lama (Di bawah 2026)</span>
         <div>
             <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
             <button type="button" class="btn btn-sm btn-warning" style="font-weight: 600;" onclick="document.getElementById('importModal').style.display='block'">📥 Import Nilai Excel</button>
@@ -93,7 +93,7 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         <p style="margin-top: 0; color: #64748b; font-size: 14px; margin-bottom: 20px;">
-            Halaman ini menampilkan <strong>seluruh mahasiswa dari semua angkatan</strong>. Data diproses menggunakan *Server-Side Processing* sehingga aman untuk memuat puluhan ribu data tanpa membebani memori.
+            Halaman ini khusus menampilkan <strong>mahasiswa dengan periode lama (di bawah 2026/2027)</strong>.
         </p>
 
         <div class="table-responsive">
@@ -144,8 +144,8 @@ require_once __DIR__ . '/../includes/header.php';
                     <option value="">-- Kosong --</option>
                     <?php
                     $startYear = 2017;
-                    $endYear = 2050;
-                    for ($y = $startYear; $y < $endYear; $y++) {
+                    $endYear = 2025;
+                    for ($y = $startYear; $y <= $endYear; $y++) {
                         $label = $y . '-' . ($y + 1);
                         echo "<option value=\"$label\">$label</option>";
                     }

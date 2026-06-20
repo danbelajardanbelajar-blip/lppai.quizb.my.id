@@ -10,7 +10,7 @@ $user = getCurrentUser();
 $pdo = getDBConnection();
 
 // Get tutorial classes taught by this dosen
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_classes WHERE dosen_pengampu = ?");
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%')");
 $stmt->execute([$user['nama_lengkap']]);
 $totalClasses = $stmt->fetchColumn();
 
@@ -25,7 +25,7 @@ $stmt->execute([$user['nama_lengkap']]);
 $totalStudents = $stmt->fetchColumn();
 
 // Get recent classes
-$stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE dosen_pengampu = ? ORDER BY created_at DESC LIMIT 5");
+$stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%') ORDER BY created_at DESC LIMIT 5");
 $stmt->execute([$user['nama_lengkap']]);
 $recentClasses = $stmt->fetchAll();
 

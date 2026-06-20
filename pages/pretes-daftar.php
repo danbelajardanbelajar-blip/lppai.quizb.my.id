@@ -12,7 +12,7 @@ $message = '';
 $msgType = '';
 
 // Get active schedules
-$stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' AND tanggal >= CURDATE() ORDER BY tanggal, waktu_mulai");
+$stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' AND (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') AND tanggal >= CURDATE() ORDER BY tanggal, waktu_mulai");
 $schedules = $stmt->fetchAll();
 
 // Check if user already registered
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dafta
             $existingReg = $stmt->fetch();
 
             // Refresh daftar jadwal
-            $stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' AND tanggal >= CURDATE() ORDER BY tanggal, waktu_mulai");
+            $stmt = $pdo->query("SELECT * FROM pretes_schedules WHERE status = 'aktif' AND (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') AND tanggal >= CURDATE() ORDER BY tanggal, waktu_mulai");
             $schedules = $stmt->fetchAll();
         }
     }

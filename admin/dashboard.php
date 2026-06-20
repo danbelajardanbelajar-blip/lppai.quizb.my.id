@@ -10,8 +10,8 @@ $pdo = getDBConnection();
 
 // Stats
 $totalMahasiswa = $pdo->query("SELECT COUNT(*) FROM users WHERE role='mahasiswa'")->fetchColumn();
-$totalPretes = $pdo->query("SELECT COUNT(*) FROM pretes_registrations")->fetchColumn();
-$totalTutorial = $pdo->query("SELECT COUNT(*) FROM tutorial_registrations")->fetchColumn();
+$totalPretes = $pdo->query("SELECT COUNT(*) FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')")->fetchColumn();
+$totalTutorial = $pdo->query("SELECT COUNT(*) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%')")->fetchColumn();
 $totalKelas = $pdo->query("SELECT COUNT(*) FROM tutorial_classes")->fetchColumn();
 $totalPengumuman = $pdo->query("SELECT COUNT(*) FROM announcements WHERE is_active=1")->fetchColumn();
 $lulusPretes = $pdo->query("SELECT COUNT(*) FROM pretes_results WHERE status_lulus='lulus'")->fetchColumn();

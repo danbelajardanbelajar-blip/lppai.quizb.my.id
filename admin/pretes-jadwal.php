@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$schedules = $pdo->query("SELECT * FROM pretes_schedules ORDER BY tanggal DESC, waktu_mulai")->fetchAll();
+$schedules = $pdo->query("SELECT * FROM pretes_schedules WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') ORDER BY tanggal DESC, waktu_mulai")->fetchAll();
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';

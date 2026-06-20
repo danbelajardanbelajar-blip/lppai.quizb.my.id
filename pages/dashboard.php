@@ -20,12 +20,12 @@ $stmt->execute([$user['id']]);
 $pretesResult = $stmt->fetch();
 
 // Get active registrations
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations WHERE user_id = ?");
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations WHERE user_id = ? AND (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
 $stmt->execute([$user['id']]);
 $pretesRegistered = $stmt->fetchColumn();
 
 // Get tutorial registrations
-$stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? ORDER BY tr.created_at DESC");
+$stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? AND (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') ORDER BY tr.created_at DESC");
 $stmt->execute([$user['id']]);
 $tutorialRegs = $stmt->fetchAll();
 

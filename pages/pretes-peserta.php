@@ -57,7 +57,7 @@ $myReg = $stmtMyReg->fetch();
 
 // ── Ambil semua jadwal pretes ──────────────────────────────────────────────────
 $schedules = $pdo->query(
-    "SELECT * FROM pretes_schedules ORDER BY tanggal ASC, waktu_mulai ASC"
+    "SELECT * FROM pretes_schedules WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') ORDER BY tanggal ASC, waktu_mulai ASC"
 )->fetchAll();
 
 // ── Ambil daftar semua peserta (nama + nim saja, untuk informasi publik) ────────

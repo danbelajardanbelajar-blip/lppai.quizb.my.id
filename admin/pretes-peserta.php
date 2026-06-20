@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // ── Generate credentials otomatis untuk SEMUA peserta ──────────────
         if ($action === 'generate_all') {
             $prefix = trim($_POST['prefix'] ?? 'TES');
-            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations");
+            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
             $rows   = $stmt->fetchAll();
             $count  = 0;
             foreach ($rows as $row) {
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // ── Reset & regenerate SEMUA (paksa timpa) ────────────────────────
         } elseif ($action === 'regenerate_all') {
             $prefix = trim($_POST['prefix'] ?? 'TES');
-            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations");
+            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
             $rows   = $stmt->fetchAll();
             foreach ($rows as $row) {
                 $nimRow = $pdo->prepare("SELECT nim FROM users WHERE id = ?");
