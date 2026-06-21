@@ -101,21 +101,23 @@ foreach ($data as $i => $row) {
     if ($row['nilai_ujian_tulis'] !== null) { $sum += (float)$row['nilai_ujian_tulis']; $count++; }
     $nilai_akhir = $count > 0 ? round($sum / $count, 2) : null;
 
-    $editBtn = '<button class="btn btn-sm btn-warning btn-edit-nilai" 
-        data-user-id="' . $row['user_id'] . '"
-        data-reg-id="' . ($row['reg_id'] ?: 0) . '"
-        data-nama="' . htmlspecialchars($row['nama_lengkap'], ENT_QUOTES) . '"
-        data-nim="' . htmlspecialchars($row['nim'] ?: '-', ENT_QUOTES) . '"
-        data-ta="' . htmlspecialchars($row['tahun_ajaran'] ?? '', ENT_QUOTES) . '"
-        data-thaharah="' . ($row['nilai_thaharah'] ?? '') . '"
-        data-shalat="' . ($row['nilai_shalat'] ?? '') . '"
-        data-srt="' . ($row['nilai_surat_pendek'] ?? '') . '"
-        data-amaliyah="' . ($row['nilai_amaliyah'] ?? '') . '"
-        data-jenazah="' . ($row['nilai_jenazah'] ?? '') . '"
-        data-ut="' . ($row['nilai_ujian_tulis'] ?? '') . '"
-        data-akhir="' . ($nilai_akhir ?? '') . '"
-    >✏️ Edit</button>
-    <button class="btn btn-sm btn-danger btn-delete-nilai" data-reg-id="' . ($row['reg_id'] ?: 0) . '" style="margin-left: 4px;">🗑️ Hapus</button>';
+    $editBtn = '<div style="display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center; align-items: center;">
+        <button class="btn btn-sm btn-warning btn-edit-nilai" style="white-space: nowrap;"
+            data-user-id="' . $row['user_id'] . '"
+            data-reg-id="' . ($row['reg_id'] ?: 0) . '"
+            data-nama="' . htmlspecialchars($row['nama_lengkap'], ENT_QUOTES) . '"
+            data-nim="' . htmlspecialchars($row['nim'] ?: '-', ENT_QUOTES) . '"
+            data-ta="' . htmlspecialchars($row['tahun_ajaran'] ?? '', ENT_QUOTES) . '"
+            data-thaharah="' . ($row['nilai_thaharah'] ?? '') . '"
+            data-shalat="' . ($row['nilai_shalat'] ?? '') . '"
+            data-srt="' . ($row['nilai_surat_pendek'] ?? '') . '"
+            data-amaliyah="' . ($row['nilai_amaliyah'] ?? '') . '"
+            data-jenazah="' . ($row['nilai_jenazah'] ?? '') . '"
+            data-ut="' . ($row['nilai_ujian_tulis'] ?? '') . '"
+            data-akhir="' . ($nilai_akhir ?? '') . '"
+        >✏️ Edit</button>
+        <button class="btn btn-sm btn-danger btn-delete-nilai" style="white-space: nowrap;" data-reg-id="' . ($row['reg_id'] ?: 0) . '">🗑️ Hapus</button>
+    </div>';
 
     $checkbox = '<input type="checkbox" class="check-item" value="' . ($row['reg_id'] ?: 0) . '">';
 
