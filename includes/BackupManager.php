@@ -15,24 +15,29 @@ class BackupManager {
             $tables[] = $row[0];
         }
 
-        $sql = "-- LPPAI Corner Database Backup\n";
-        $sql .= "-- Waktu Pembuatan: " . date('Y-m-d H:i:s') . "\n\n";
-        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
+        $fp = fopen($outputFilePath, 'w');
+        if (!$fp) {
+            throw new Exception("Tidak dapat membuat file backup.");
+        }
+
+        fwrite($fp, "-- LPPAI Corner Database Backup\n");
+        fwrite($fp, "-- Waktu Pembuatan: " . date('Y-m-d H:i:s') . "\n\n");
+        fwrite($fp, "SET FOREIGN_KEY_CHECKS=0;\n\n");
 
         foreach ($tables as $table) {
-            $sql .= "DROP TABLE IF EXISTS `$table`;\n";
+            fwrite($fp, "DROP TABLE IF EXISTS `$table`;\n");
             $row2 = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
-            $sql .= "\n" . $row2[1] . ";\n\n";
+            fwrite($fp, "\n" . $row2[1] . ";\n\n");
 
             $rows = $pdo->query("SELECT * FROM `$table`");
             $rowCount = $rows->rowCount();
             
             if ($rowCount > 0) {
-                $sql .= "INSERT INTO `$table` VALUES \n";
+                fwrite($fp, "INSERT INTO `$table` VALUES \n");
                 $counter = 0;
                 while ($row = $rows->fetch(PDO::FETCH_NUM)) {
                     $counter++;
-                    $sql .= "(";
+                    $sql = "(";
                     for ($j = 0; $j < count($row); $j++) {
                         if (isset($row[$j])) {
                             $val = str_replace("\n", "\\n", addslashes($row[$j]));
@@ -50,14 +55,14 @@ class BackupManager {
                     } else {
                         $sql .= ";\n";
                     }
+                    fwrite($fp, $sql);
                 }
             }
-            $sql .= "\n\n";
+            fwrite($fp, "\n\n");
         }
         
-        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
-
-        file_put_contents($outputFilePath, $sql);
+        fwrite($fp, "SET FOREIGN_KEY_CHECKS=1;\n");
+        fclose($fp);
         return true;
     }
 
