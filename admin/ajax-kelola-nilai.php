@@ -148,6 +148,7 @@ foreach ($data as $i => $row) {
     $nilai_akhir = $count > 0 ? round($sum / $count, 2) : null;
     
     // Kelulusan Logic
+    $isLulus = false;
     $lulus_status = '<span class="badge badge-danger" style="background:#dc3545; color:white; padding:4px 8px; border-radius:4px;">Tidak Lulus</span>';
     if ($count == 6) {
         $th = (float)$row['nilai_thaharah'];
@@ -162,12 +163,19 @@ foreach ($data as $i => $row) {
         
         if ($th >= $min_score && $sh >= $min_score && $sp >= $min_score && $am >= $min_score && $jn >= $min_score && $ut >= $min_score) {
             $lulus_status = '<span class="badge badge-success" style="background:#28a745; color:white; padding:4px 8px; border-radius:4px;">Lulus</span>';
+            $isLulus = true;
         }
     } else {
         $lulus_status = '<span class="badge badge-secondary" style="background:#6c757d; color:white; padding:4px 8px; border-radius:4px;">Belum Lengkap</span>';
     }
 
+    $cetakBtn = '';
+    if ($isLulus && $row['reg_id']) {
+        $cetakBtn = '<a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'" target="_blank" class="btn btn-sm btn-info" style="white-space: nowrap; background-color:#0ea5e9; border-color:#0ea5e9; color:white; text-decoration:none; padding:4px 8px; border-radius:4px;">🎓 Cetak</a>';
+    }
+
     $editBtn = '<div style="display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center; align-items: center;">
+        ' . $cetakBtn . '
         <button class="btn btn-sm btn-warning btn-edit-nilai" style="white-space: nowrap;"
             data-user-id="' . $row['user_id'] . '"
             data-reg-id="' . ($row['reg_id'] ?: 0) . '"
