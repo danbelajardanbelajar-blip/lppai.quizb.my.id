@@ -136,6 +136,10 @@ try {
         (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
         VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
     ");
+    $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
+    $stmtUpdateUserDyn = $pdo->prepare("UPDATE users SET program_studi = ?, tempat_lahir = ?, tanggal_lahir = ? WHERE id = ?");
+
+    $pdo->beginTransaction();
 
     foreach (array_slice($rows, 1) as $rowNum => $row) {
         $dataRow = $rowNum + 2;
@@ -172,8 +176,7 @@ try {
             if ($nama_lengkap === '') $nama_lengkap = "Mahasiswa " . $nim;
             
             try {
-                $password = password_hash($nim, PASSWORD_DEFAULT);
-                $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
+                $password = password_hash($nim, PASSWORD_BCRYPT, ['cost' => 8]);
                 $stmtInsertUser->execute([$nim, $password, $nama_lengkap, $nim, ($jurusan!==''?$jurusan:null), ($tmptLahir!==''?$tmptLahir:null), $tglLahir]);
                 $userId = $pdo->lastInsertId();
             } catch (Exception $e) {
@@ -184,6 +187,9 @@ try {
         } else {
             // Update user fields if provided
             if ($jurusan !== '' || $tmptLahir !== '' || $tglLahir !== null) {
+                // To keep transaction fast and statements prepared, we use the full update statement if anything is changed.
+                // We'll read existing first or just overwrite all 3? Let's just use the prepared full update to avoid building dynamic SQL in the loop
+                // But it's better to only update what's changed. The existing logic builds SQL. Let's keep existing logic but just prepare it locally since it's rare to change.
                 $updates = [];
                 $params = [];
                 if ($jurusan !== '') { $updates[] = "program_studi = ?"; $params[] = $jurusan; }
@@ -214,7 +220,15 @@ try {
             $stmtInsert->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
         }
         $imported++;
+        
+        // Chunk transaction to prevent memory/lock issues on huge files
+        if ($imported % 500 === 0) {
+            $pdo->commit();
+            $pdo->beginTransaction();
+        }
     }
+
+    $pdo->commit();
 
     $msg = "Berhasil mengupdate/menyimpan nilai untuk $imported mahasiswa.";
     if ($skipped > 0) {
@@ -230,6 +244,9 @@ try {
     ]);
 
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log("Excel Import Nilai Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
     http_response_code(200); // Ensure we send 200 so ajax success runs
     echo json_encode([
