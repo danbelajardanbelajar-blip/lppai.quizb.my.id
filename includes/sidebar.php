@@ -64,6 +64,11 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/ruangan.php" class="page-nav <?= menuActive('ruangan.php') ?>">
                 <span class="icon">🏢</span> Kelola Ruangan
             </a>
+
+            <div class="menu-label">Sistem</div>
+            <a href="<?= BASE_URL ?>/admin/backup-restore.php" class="page-nav <?= menuActive('backup-restore.php') ?>">
+                <span class="icon">💾</span> Backup & Restore
+            </a>
         <?php elseif ($isDosen): ?>
             <!-- DOSEN MENU -->
             <div class="menu-label">Dashboard</div>

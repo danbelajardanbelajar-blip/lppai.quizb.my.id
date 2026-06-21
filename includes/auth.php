@@ -38,6 +38,9 @@ function requireAdmin() {
         header('Location: ' . BASE_URL . '/dashboard.php');
         exit;
     }
+    // Auto Backup hook
+    require_once __DIR__ . '/BackupManager.php';
+    BackupManager::autoBackup();
 }
 
 function requireDosen() {
