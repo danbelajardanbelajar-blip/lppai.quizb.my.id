@@ -474,17 +474,23 @@ $(document).ready(function() {
                     });
                 }
             },
-            error: function(err) {
+            error: function(xhr, status, error) {
                 $('#loadingOverlay').css('display', 'none');
                 btn.prop('disabled', false).text('Proses Import');
                 document.getElementById('importModal').style.display='none';
+                
+                let errText = 'Error: ' + status + ' - ' + error;
+                if (xhr.responseText) {
+                    errText += '<br><br>Response:<br><div style="text-align:left;max-height:200px;overflow:auto;background:#f8f9fa;padding:10px;font-size:12px;">' + xhr.responseText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+                }
+                
                 Swal.fire({
-                    title: 'Kesalahan Koneksi',
-                    text: 'Terjadi kesalahan jaringan atau server saat import.',
+                    title: 'Kesalahan Server',
+                    html: errText,
                     icon: 'error',
                     confirmButtonText: 'Tutup'
                 });
-                console.error(err);
+                console.error(xhr.responseText);
             }
         });
     });

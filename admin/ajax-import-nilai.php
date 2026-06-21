@@ -198,12 +198,12 @@ try {
             }
         }
 
-        $thaharah = isset($colMap['thaharah']) && trim((string)$row[$colMap['thaharah']]) !== '' ? (float)trim($row[$colMap['thaharah']]) : null;
-        $shalat = isset($colMap['shalat']) && trim((string)$row[$colMap['shalat']]) !== '' ? (float)trim($row[$colMap['shalat']]) : null;
-        $srt = isset($colMap['srt_pendek']) && trim((string)$row[$colMap['srt_pendek']]) !== '' ? (float)trim($row[$colMap['srt_pendek']]) : null;
-        $amaliyah = isset($colMap['amaliyah']) && trim((string)$row[$colMap['amaliyah']]) !== '' ? (float)trim($row[$colMap['amaliyah']]) : null;
-        $jenazah = isset($colMap['jenazah']) && trim((string)$row[$colMap['jenazah']]) !== '' ? (float)trim($row[$colMap['jenazah']]) : null;
-        $ut = isset($colMap['ut']) && trim((string)$row[$colMap['ut']]) !== '' ? (float)trim($row[$colMap['ut']]) : null;
+        $thaharah = isset($colMap['thaharah']) && trim((string)($row[$colMap['thaharah']] ?? '')) !== '' ? (float)trim($row[$colMap['thaharah']] ?? '') : null;
+        $shalat = isset($colMap['shalat']) && trim((string)($row[$colMap['shalat']] ?? '')) !== '' ? (float)trim($row[$colMap['shalat']] ?? '') : null;
+        $srt = isset($colMap['srt_pendek']) && trim((string)($row[$colMap['srt_pendek']] ?? '')) !== '' ? (float)trim($row[$colMap['srt_pendek']] ?? '') : null;
+        $amaliyah = isset($colMap['amaliyah']) && trim((string)($row[$colMap['amaliyah']] ?? '')) !== '' ? (float)trim($row[$colMap['amaliyah']] ?? '') : null;
+        $jenazah = isset($colMap['jenazah']) && trim((string)($row[$colMap['jenazah']] ?? '')) !== '' ? (float)trim($row[$colMap['jenazah']] ?? '') : null;
+        $ut = isset($colMap['ut']) && trim((string)($row[$colMap['ut']] ?? '')) !== '' ? (float)trim($row[$colMap['ut']] ?? '') : null;
 
         $stmtFindReg->execute([$userId]);
         $regId = $stmtFindReg->fetchColumn();
@@ -229,10 +229,11 @@ try {
         'message' => $msg
     ]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     error_log("Excel Import Nilai Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+    http_response_code(200); // Ensure we send 200 so ajax success runs
     echo json_encode([
         'success' => false,
-        'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
+        'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage() . ' di baris ' . $e->getLine()
     ]);
 }
