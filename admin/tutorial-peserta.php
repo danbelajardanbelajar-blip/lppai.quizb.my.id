@@ -37,7 +37,7 @@ if (isset($_GET['ajax_jurusan'])) {
                MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
         LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id 
-        WHERE u.program_studi = ? AND u.role = 'mahasiswa'
+        WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) >= 26
         GROUP BY u.id
         ORDER BY u.nama_lengkap
     ");
@@ -239,6 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt = $pdo->prepare("
                         SELECT id, nama_lengkap FROM users 
                         WHERE program_studi = ? 
+                          AND CAST(SUBSTRING(nim, 1, 2) AS UNSIGNED) >= 26
                           AND id NOT IN (SELECT user_id FROM tutorial_registrations)
                     ");
                     $stmt->execute([$jurusan]);
@@ -395,7 +396,7 @@ $allStudents = $pdo->query("
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
     LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id
-    WHERE u.role = 'mahasiswa'
+    WHERE u.role = 'mahasiswa' AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) >= 26
     GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
 ")->fetchAll(PDO::FETCH_ASSOC);
