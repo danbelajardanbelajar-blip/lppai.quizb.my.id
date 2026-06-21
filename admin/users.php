@@ -62,7 +62,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
                     $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, tahun_ajaran, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
                         ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $ta, $role]);
-                    $message = "User berhasil ditambahkan! Login: Username=<strong>$nim</strong>, Password=<strong>$passwordRaw</strong>";
+                    $safeNim = sanitize($nim);
+                    $safePass = sanitize($passwordRaw);
+                    $message = "User berhasil ditambahkan! Login: Username=<strong>$safeNim</strong>, Password=<strong>$safePass</strong>";
                     $msgType = 'success';
                 }
             }
@@ -210,7 +212,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <?php if ($message): ?>
-    <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
+    <div class="alert alert-<?= $msgType ?>"><?= $message ?></div>
 <?php endif; ?>
 
 <!-- ── Import Pengguna dari Excel ─────────────────────────── -->
