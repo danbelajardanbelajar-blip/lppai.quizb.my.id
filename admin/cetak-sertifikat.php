@@ -128,13 +128,16 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             position: relative;
         }
         .cert-inner-border {
-            border: 2px solid #b45309;
+            border: 2px solid #b45309; /* Emas tembaga */
             height: 100%;
             box-sizing: border-box;
-            padding: 20px 40px;
-            background: white;
+            padding: 15px 30px;
+            background: white; /* Menutupi tekstur bintik di bagian tengah */
             position: relative;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         
         .kop {
@@ -143,7 +146,7 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             justify-content: center;
             border-bottom: 3px double #1e3a8a;
             padding-bottom: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 15px;
         }
         .kop-logo {
             width: 90px;
@@ -156,8 +159,8 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             font-weight: 700;
         }
         .kop-text h1 {
-            margin: 5px 0 5px;
-            font-size: 28px;
+            margin: 4px 0;
+            font-size: 26px;
             color: #1e3a8a;
             font-weight: 700;
             text-transform: uppercase;
@@ -169,45 +172,47 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             color: #475569;
         }
 
+        /* Konten */
         .cert-title {
             font-family: 'Pinyon Script', cursive;
-            font-size: 60px;
+            font-size: 52px;
             color: #b45309;
-            margin: 5px 0 5px;
+            margin: 0 0 5px;
             letter-spacing: 1px;
         }
         .cert-number {
             font-family: 'Poppins', sans-serif;
             font-size: 14px;
             color: #334155;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             font-weight: 600;
         }
         .cert-body {
-            font-size: 18px;
-            line-height: 1.6;
+            font-size: 17px;
+            line-height: 1.5;
             margin-bottom: 10px;
             color: #334155;
+            flex-grow: 1;
         }
         .student-name {
-            font-size: 30px;
+            font-size: 28px;
             font-weight: 700;
-            margin: 15px 0 5px;
+            margin: 10px 0 5px;
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
         .student-detail {
             font-family: 'Poppins', sans-serif;
-            font-size: 15px;
+            font-size: 14px;
             color: #475569;
             margin-bottom: 15px;
         }
         .statement {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 600;
-            margin: 10px 0 25px;
-            color: #15803d;
+            margin: 10px 0 15px;
+            color: #15803d; /* Hijau sukses */
         }
         .statement span {
             font-size: 28px;
@@ -216,12 +221,13 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             letter-spacing: 2px;
         }
         
+        /* Tata Letak Bawah (Tabel & TTD) */
         .bottom-section {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 10px;
             padding: 0 10px;
+            margin-top: auto;
         }
         
         .grades-table-container {
@@ -254,16 +260,16 @@ if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
             text-align: center;
         }
         .signature-date {
-            font-size: 16px;
-            margin-bottom: 8px;
+            font-size: 15px;
+            margin-bottom: 5px;
         }
         .signature-role {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
-            margin-bottom: 70px;
+            margin-bottom: 55px; /* Space for signature */
         }
         .signature-name {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
             text-decoration: underline;
         }
