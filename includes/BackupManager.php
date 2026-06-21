@@ -25,40 +25,46 @@ class BackupManager {
         fwrite($fp, "SET FOREIGN_KEY_CHECKS=0;\n\n");
 
         foreach ($tables as $table) {
-            fwrite($fp, "DROP TABLE IF EXISTS `$table`;\n");
-            $row2 = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
-            fwrite($fp, "\n" . $row2[1] . ";\n\n");
+            try {
+                fwrite($fp, "DROP TABLE IF EXISTS `$table`;\n");
+                $row2 = $pdo->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_NUM);
+                fwrite($fp, "\n" . $row2[1] . ";\n\n");
 
-            $rows = $pdo->query("SELECT * FROM `$table`");
-            $rowCount = $rows->rowCount();
-            
-            if ($rowCount > 0) {
-                fwrite($fp, "INSERT INTO `$table` VALUES \n");
-                $counter = 0;
-                while ($row = $rows->fetch(PDO::FETCH_NUM)) {
-                    $counter++;
-                    $sql = "(";
-                    for ($j = 0; $j < count($row); $j++) {
-                        if (isset($row[$j])) {
-                            $val = str_replace("\n", "\\n", addslashes($row[$j]));
-                            $sql .= "'" . $val . "'";
+                $rows = $pdo->query("SELECT * FROM `$table`");
+                $rowCount = $rows->rowCount();
+                
+                if ($rowCount > 0) {
+                    fwrite($fp, "INSERT INTO `$table` VALUES \n");
+                    $counter = 0;
+                    while ($row = $rows->fetch(PDO::FETCH_NUM)) {
+                        $counter++;
+                        $sql = "(";
+                        for ($j = 0; $j < count($row); $j++) {
+                            if (isset($row[$j])) {
+                                $val = str_replace("\n", "\\n", addslashes($row[$j]));
+                                $sql .= "'" . $val . "'";
+                            } else {
+                                $sql .= "NULL";
+                            }
+                            if ($j < (count($row) - 1)) {
+                                $sql .= ",";
+                            }
+                        }
+                        $sql .= ")";
+                        if ($counter < $rowCount) {
+                            $sql .= ",\n";
                         } else {
-                            $sql .= "NULL";
+                            $sql .= ";\n";
                         }
-                        if ($j < (count($row) - 1)) {
-                            $sql .= ",";
-                        }
+                        fwrite($fp, $sql);
                     }
-                    $sql .= ")";
-                    if ($counter < $rowCount) {
-                        $sql .= ",\n";
-                    } else {
-                        $sql .= ";\n";
-                    }
-                    fwrite($fp, $sql);
                 }
+                fwrite($fp, "\n\n");
+            } catch (Exception $e) {
+                // Jika satu tabel gagal dibackup (misal karena hak akses atau view error), 
+                // catat errornya dan lanjut ke tabel berikutnya
+                fwrite($fp, "\n-- ERROR BACKUP TABEL `$table`: " . $e->getMessage() . "\n\n");
             }
-            fwrite($fp, "\n\n");
         }
         
         fwrite($fp, "SET FOREIGN_KEY_CHECKS=1;\n");
