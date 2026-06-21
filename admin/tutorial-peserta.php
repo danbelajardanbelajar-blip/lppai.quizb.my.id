@@ -308,6 +308,7 @@ $students = $pdo->query("
     FROM users
     WHERE role = 'mahasiswa'
     AND id IN (SELECT user_id FROM tutorial_registrations)
+    AND CAST(SUBSTRING(nim, 1, 2) AS UNSIGNED) >= 26
     ORDER BY nama_lengkap
 ")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
@@ -387,6 +388,7 @@ $registrations = $pdo->query("
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') GROUP BY user_id)
+    AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) >= 26
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
@@ -407,6 +409,7 @@ $allRegistrations = $pdo->query("
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') GROUP BY user_id)
+    AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) >= 26
     ORDER BY tr.created_at DESC
 ")->fetchAll();
 
