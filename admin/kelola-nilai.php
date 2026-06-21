@@ -111,6 +111,55 @@ require_once __DIR__ . '/../includes/header.php';
             Halaman ini khusus menampilkan <strong>mahasiswa dengan periode lama (di bawah 2026/2027)</strong>.
         </p>
 
+        <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Tahun Ajaran</label>
+                <select id="filterTahunAjaran" class="form-control form-control-sm">
+                    <option value="">Semua Tahun</option>
+                    <?php
+                    $startYear = 2017;
+                    $endYear = 2025;
+                    for ($y = $startYear; $y <= $endYear; $y++) {
+                        $label = $y . '-' . ($y + 1);
+                        echo "<option value=\"$label\">$label</option>";
+                    }
+                    ?>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Type Nilai</label>
+                <select id="filterTipeNilai" class="form-control form-control-sm">
+                    <option value="">Semua Type</option>
+                    <option value="pretest">Pretest</option>
+                    <option value="gel 1">Gel 1</option>
+                    <option value="gel 2">Gel 2</option>
+                    <option value="mandiri">Mandiri</option>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Jurusan</label>
+                <select id="filterJurusan" class="form-control form-control-sm">
+                    <option value="">Semua Jurusan</option>
+                    <?php
+                    // Ambil daftar jurusan unik dari database
+                    $stmtJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE role = 'mahasiswa' AND program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi");
+                    while ($jur = $stmtJurusan->fetch(PDO::FETCH_ASSOC)) {
+                        echo "<option value=\"" . htmlspecialchars($jur['program_studi']) . "\">" . htmlspecialchars($jur['program_studi']) . "</option>";
+                    }
+                    ?>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Status Kelulusan</label>
+                <select id="filterLulus" class="form-control form-control-sm">
+                    <option value="">Semua Status</option>
+                    <option value="lulus">Lulus</option>
+                    <option value="tidak_lulus">Tidak Lulus</option>
+                    <option value="belum_lengkap">Belum Lengkap</option>
+                </select>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <!-- Tambahkan width:100% dan class display no-datatable agar DataTables merender dengan benar tanpa konflik -->
             <table id="tableKelolaNilai" class="display no-datatable" style="width:100%">
@@ -261,7 +310,13 @@ $(document).ready(function() {
         "serverSide": true,
         "ajax": {
             "url": "<?= BASE_URL ?>/admin/ajax-kelola-nilai.php",
-            "type": "POST"
+            "type": "POST",
+            "data": function(d) {
+                d.filterTahunAjaran = $('#filterTahunAjaran').val();
+                d.filterTipeNilai = $('#filterTipeNilai').val();
+                d.filterJurusan = $('#filterJurusan').val();
+                d.filterLulus = $('#filterLulus').val();
+            }
         },
         "pageLength": 10,
         "lengthMenu": [[10, 25, 50, 100, 500], [10, 25, 50, 100, 500]],
@@ -273,6 +328,11 @@ $(document).ready(function() {
             { "orderable": false, "targets": [0, 1, 15] }, // Disable sorting pada Checkbox, No dan Aksi
             { "className": "text-center", "targets": [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] }
         ]
+    });
+
+    // Event listener untuk filter dropdown
+    $('#filterTahunAjaran, #filterTipeNilai, #filterJurusan, #filterLulus').on('change', function() {
+        table.ajax.reload();
     });
 
     // Check All handler

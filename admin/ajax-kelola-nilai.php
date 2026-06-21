@@ -18,6 +18,11 @@ $start = (int)($_POST['start'] ?? $_GET['start'] ?? 0);
 $length = (int)($_POST['length'] ?? $_GET['length'] ?? 10);
 $searchValue = trim($_POST['search']['value'] ?? $_GET['search']['value'] ?? '');
 
+$filterTahunAjaran = $_POST['filterTahunAjaran'] ?? '';
+$filterTipeNilai = $_POST['filterTipeNilai'] ?? '';
+$filterJurusan = $_POST['filterJurusan'] ?? '';
+$filterLulus = $_POST['filterLulus'] ?? '';
+
 $orderColIndex = $_POST['order'][0]['column'] ?? $_GET['order'][0]['column'] ?? 1;
 $orderDir = $_POST['order'][0]['dir'] ?? $_GET['order'][0]['dir'] ?? 'asc';
 $orderDir = (strtolower($orderDir) === 'desc') ? 'DESC' : 'ASC';
@@ -50,11 +55,42 @@ $fromClause = "
     AND CAST(SUBSTRING(tr.tahun_ajaran, 1, 4) AS UNSIGNED) < 2026
 ";
 
+$whereParams = [];
+
+if ($filterTahunAjaran !== '') {
+    $fromClause .= " AND tr.tahun_ajaran = ?";
+    $whereParams[] = $filterTahunAjaran;
+}
+
+if ($filterTipeNilai !== '') {
+    $fromClause .= " AND LOWER(tr.tipe_nilai) = ?";
+    $whereParams[] = strtolower($filterTipeNilai);
+}
+
+if ($filterJurusan !== '') {
+    $fromClause .= " AND u.program_studi = ?";
+    $whereParams[] = $filterJurusan;
+}
+
+if ($filterLulus !== '') {
+    $isCompleteSQL = "(tr.nilai_thaharah IS NOT NULL AND tr.nilai_shalat IS NOT NULL AND tr.nilai_surat_pendek IS NOT NULL AND tr.nilai_amaliyah IS NOT NULL AND tr.nilai_jenazah IS NOT NULL AND tr.nilai_ujian_tulis IS NOT NULL)";
+    $minScoreSQL = "(CASE WHEN LOWER(tr.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)";
+    $isLulusSQL = "($isCompleteSQL AND tr.nilai_thaharah >= $minScoreSQL AND tr.nilai_shalat >= $minScoreSQL AND tr.nilai_surat_pendek >= $minScoreSQL AND tr.nilai_amaliyah >= $minScoreSQL AND tr.nilai_jenazah >= $minScoreSQL AND tr.nilai_ujian_tulis >= $minScoreSQL)";
+    
+    if ($filterLulus === 'lulus') {
+        $fromClause .= " AND $isLulusSQL";
+    } elseif ($filterLulus === 'tidak_lulus') {
+        $fromClause .= " AND $isCompleteSQL AND NOT $isLulusSQL";
+    } elseif ($filterLulus === 'belum_lengkap') {
+        $fromClause .= " AND NOT $isCompleteSQL";
+    }
+}
+
 // 1. Get Total Records (without filtering)
-$stmtTotal = $pdo->query("SELECT COUNT(u.id) $fromClause");
+$stmtTotal = $pdo->prepare("SELECT COUNT(u.id) $fromClause");
+$stmtTotal->execute($whereParams);
 $recordsTotal = $stmtTotal->fetchColumn();
 
-$whereParams = [];
 if ($searchValue !== '') {
     $fromClause .= " AND (
         u.nim LIKE ? 
