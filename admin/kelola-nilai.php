@@ -111,52 +111,86 @@ require_once __DIR__ . '/../includes/header.php';
             Halaman ini khusus menampilkan <strong>mahasiswa dengan periode lama (di bawah 2026/2027)</strong>.
         </p>
 
-        <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Tahun Ajaran</label>
-                <select id="filterTahunAjaran" class="form-control form-control-sm">
-                    <option value="">Semua Tahun</option>
-                    <?php
-                    $startYear = 2017;
-                    $endYear = 2025;
-                    for ($y = $startYear; $y <= $endYear; $y++) {
-                        $label = $y . '-' . ($y + 1);
-                        echo "<option value=\"$label\">$label</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Type Nilai</label>
-                <select id="filterTipeNilai" class="form-control form-control-sm">
-                    <option value="">Semua Type</option>
-                    <option value="pretest">Pretest</option>
-                    <option value="gel 1">Gel 1</option>
-                    <option value="gel 2">Gel 2</option>
-                    <option value="mandiri">Mandiri</option>
-                </select>
-            </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Jurusan</label>
-                <select id="filterJurusan" class="form-control form-control-sm">
-                    <option value="">Semua Jurusan</option>
-                    <?php
-                    // Ambil daftar jurusan unik dari database
-                    $stmtJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE role = 'mahasiswa' AND program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi");
-                    while ($jur = $stmtJurusan->fetch(PDO::FETCH_ASSOC)) {
-                        echo "<option value=\"" . htmlspecialchars($jur['program_studi']) . "\">" . htmlspecialchars($jur['program_studi']) . "</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-            <div style="flex: 1; min-width: 150px;">
-                <label style="font-size: 12px; font-weight: bold; color: #64748b;">Status Kelulusan</label>
-                <select id="filterLulus" class="form-control form-control-sm">
-                    <option value="">Semua Status</option>
-                    <option value="lulus">Lulus</option>
-                    <option value="tidak_lulus">Tidak Lulus</option>
-                    <option value="belum_lengkap">Belum Lengkap</option>
-                </select>
+        <style>
+            .premium-filter {
+                width: 100%;
+                padding: 8px 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background-color: #f8fafc;
+                color: #334155;
+                font-size: 14px;
+                transition: all 0.2s ease-in-out;
+                appearance: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 10px center;
+                background-size: 16px;
+                cursor: pointer;
+            }
+            .premium-filter:focus {
+                outline: none;
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+                background-color: #ffffff;
+            }
+            .filter-label {
+                display: block;
+                font-size: 13px;
+                font-weight: 600;
+                color: #475569;
+                margin-bottom: 6px;
+            }
+        </style>
+
+        <div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 180px;">
+                    <label class="filter-label">📅 Tahun Ajaran</label>
+                    <select id="filterTahunAjaran" class="premium-filter">
+                        <option value="">Semua Tahun</option>
+                        <?php
+                        $startYear = 2017;
+                        $endYear = 2025;
+                        for ($y = $startYear; $y <= $endYear; $y++) {
+                            $label = $y . '-' . ($y + 1);
+                            echo "<option value=\"$label\">$label</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 180px;">
+                    <label class="filter-label">📋 Type Nilai</label>
+                    <select id="filterTipeNilai" class="premium-filter">
+                        <option value="">Semua Type</option>
+                        <option value="pretest">Pretest</option>
+                        <option value="gel 1">Gel 1</option>
+                        <option value="gel 2">Gel 2</option>
+                        <option value="mandiri">Mandiri</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 180px;">
+                    <label class="filter-label">🎓 Jurusan</label>
+                    <select id="filterJurusan" class="premium-filter">
+                        <option value="">Semua Jurusan</option>
+                        <?php
+                        // Ambil daftar jurusan unik dari database
+                        $stmtJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE role = 'mahasiswa' AND program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi");
+                        while ($jur = $stmtJurusan->fetch(PDO::FETCH_ASSOC)) {
+                            echo "<option value=\"" . htmlspecialchars($jur['program_studi']) . "\">" . htmlspecialchars($jur['program_studi']) . "</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 180px;">
+                    <label class="filter-label">🎓 Status Kelulusan</label>
+                    <select id="filterLulus" class="premium-filter">
+                        <option value="">Semua Status</option>
+                        <option value="lulus">Lulus</option>
+                        <option value="tidak_lulus">Tidak Lulus</option>
+                        <option value="belum_lengkap">Belum Lengkap</option>
+                    </select>
+                </div>
             </div>
         </div>
 
