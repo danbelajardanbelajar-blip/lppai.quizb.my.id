@@ -56,9 +56,21 @@ $recordsTotal = $stmtTotal->fetchColumn();
 
 $whereParams = [];
 if ($searchValue !== '') {
-    $fromClause .= " AND (u.nim LIKE ? OR u.nama_lengkap LIKE ? OR u.program_studi LIKE ? OR tr.tahun_ajaran LIKE ?)";
+    $fromClause .= " AND (
+        u.nim LIKE ? 
+        OR u.nama_lengkap LIKE ? 
+        OR u.program_studi LIKE ? 
+        OR tr.tahun_ajaran LIKE ?
+        OR tr.tipe_nilai LIKE ?
+        OR tr.nilai_thaharah LIKE ?
+        OR tr.nilai_shalat LIKE ?
+        OR tr.nilai_surat_pendek LIKE ?
+        OR tr.nilai_amaliyah LIKE ?
+        OR tr.nilai_jenazah LIKE ?
+        OR tr.nilai_ujian_tulis LIKE ?
+    )";
     $searchWildcard = "%$searchValue%";
-    $whereParams = [$searchWildcard, $searchWildcard, $searchWildcard, $searchWildcard];
+    $whereParams = array_fill(0, 11, $searchWildcard);
 }
 
 // 2. Get Filtered Records
