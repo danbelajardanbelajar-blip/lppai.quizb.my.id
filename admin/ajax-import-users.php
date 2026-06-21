@@ -115,6 +115,17 @@ if (!empty($missing)) {
 }
 
 $pdo = getDBConnection();
+
+// Auto-migrate: add tahun_ajaran to users if it doesn't exist
+try {
+    $pdo->query("SELECT tahun_ajaran FROM users LIMIT 1");
+} catch(PDOException $e) {
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER program_studi");
+    } catch(PDOException $ex) {
+        // ignore
+    }
+}
 $imported = 0;
 $skipped = 0;
 $errors = [];

@@ -10,6 +10,17 @@ $pdo = getDBConnection();
 $message = '';
 $msgType = '';
 
+// Auto-migrate: add tahun_ajaran to users if it doesn't exist
+try {
+    $pdo->query("SELECT tahun_ajaran FROM users LIMIT 1");
+} catch(PDOException $e) {
+    try {
+        $pdo->exec("ALTER TABLE users ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER program_studi");
+    } catch(PDOException $ex) {
+        // ignore
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $token = $_POST['csrf_token'] ?? '';
     if (!verifyCsrf($token)) {
