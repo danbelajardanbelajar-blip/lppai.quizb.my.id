@@ -131,7 +131,7 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
     $prodi = trim((string)($row[$colMap['program_studi'] ?? -1] ?? ''));
     $ta = trim((string)($row[$colMap['tahun_ajaran'] ?? -1] ?? ''));
     $roleVal = strtolower(trim((string)($row[$colMap['role'] ?? -1] ?? '')));
-    $role = in_array($roleVal, ['admin', 'mahasiswa']) ? $roleVal : 'mahasiswa';
+    $role = in_array($roleVal, ['admin', 'mahasiswa', 'dosen']) ? $roleVal : 'mahasiswa';
 
     // Skip baris kosong
     if (empty($nim) && empty($nama)) continue;

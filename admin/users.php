@@ -222,7 +222,8 @@ include __DIR__ . '/../includes/header.php';
     <div style="background:#fff;border-radius:16px;padding:32px;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
         <h3 style="margin-bottom:16px;">📤 Import Pengguna dari Excel</h3>
         <p style="margin-bottom:16px;color:#666;font-size:14px;">
-            Upload file Excel (.xlsx) sesuai template. Kolom wajib: <strong>nim, nama_lengkap, tanggal_lahir</strong>.<br>
+            Upload file Excel (.xlsx) sesuai template. Kolom wajib: <strong>NIM, Nama Lengkap, Tanggal Lahir</strong>.<br>
+            Kolom opsional: Tempat Lahir, Email, No. HP, Program Studi, Tahun Ajaran, Role.<br>
             Username otomatis = NIM. Password otomatis = tanggal lahir format <strong>ddmmyyyy</strong>.<br>
             NIM yang sudah terdaftar akan dilewati.
         </p>
@@ -321,9 +322,12 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </script>
 
 <!-- ── Tambah Pengguna ───────────────────────────────────────── -->
-<div class="card">
-    <div class="card-header">➕ Tambah Pengguna Baru</div>
-    <div class="card-body">
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;" onclick="const body = document.getElementById('formTambahPengguna'); body.style.display = body.style.display === 'none' ? 'block' : 'none'; this.querySelector('.toggle-icon').textContent = body.style.display === 'none' ? '➕ Buka Form' : '➖ Tutup Form';">
+        <span style="font-weight: 600;">➕ Tambah Pengguna Baru</span>
+        <span class="toggle-icon" style="font-size: 13px; font-weight: 600; color: #555; background: #f0f0f0; padding: 4px 10px; border-radius: 20px;">➕ Buka Form</span>
+    </div>
+    <div class="card-body" id="formTambahPengguna" style="display: none;">
         <form method="POST">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="create">

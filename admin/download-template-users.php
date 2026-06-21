@@ -60,14 +60,14 @@ $sheet = $spreadsheet->getActiveSheet();
 $sheet->setTitle('Import Pengguna');
 
 // === HEADER ROW ===
-$headers = ['NIM', 'Nama Lengkap', 'Tempat Lahir', 'Tanggal Lahir (ddmmyyyy)', 'Email', 'No. HP', 'Program Studi', 'Role (mahasiswa/admin)'];
+$headers = ['NIM', 'Nama Lengkap', 'Tempat Lahir', 'Tanggal Lahir (ddmmyyyy)', 'Email', 'No. HP', 'Program Studi', 'Tahun Ajaran', 'Role (mahasiswa/admin/dosen)'];
 foreach ($headers as $col => $title) {
     $cell = chr(65 + $col) . '1';
     $sheet->setCellValue($cell, $title);
 }
 
 // Style header
-$sheet->getStyle('A1:H1')->applyFromArray([
+$sheet->getStyle('A1:I1')->applyFromArray([
     'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1a5632']],
     'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -82,7 +82,8 @@ $sheet->setCellValue('D2', '01031990');
 $sheet->setCellValue('E2', 'contoh@mail.com');
 $sheet->setCellValue('F2', '081234567895');
 $sheet->setCellValue('G2', 'Teknik Informatika');
-$sheet->setCellValue('H2', 'mahasiswa');
+$sheet->setCellValue('H2', '2026-2027');
+$sheet->setCellValue('I2', 'mahasiswa');
 
 $sheet->setCellValue('A3', '2024010007');
 $sheet->setCellValue('B3', 'Contoh Kedua');
@@ -91,16 +92,17 @@ $sheet->setCellValue('D3', '15051995');
 $sheet->setCellValue('E3', 'contoh2@mail.com');
 $sheet->setCellValue('F3', '081234567896');
 $sheet->setCellValue('G3', 'Manajemen');
-$sheet->setCellValue('H3', 'mahasiswa');
+$sheet->setCellValue('H3', '2026-2027');
+$sheet->setCellValue('I3', 'mahasiswa');
 
 // Style data rows
-$sheet->getStyle('A2:H3')->applyFromArray([
+$sheet->getStyle('A2:I3')->applyFromArray([
     'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN]],
 ]);
-$sheet->getStyle('A2:H3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('f0fff4');
+$sheet->getStyle('A2:I3')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('f0fff4');
 
 // Auto width kolom
-foreach (range('A', 'H') as $col) {
+foreach (range('A', 'I') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
@@ -117,7 +119,8 @@ $petunjuk = [
     ['Email', 'Alamat email (opsional)'],
     ['No. HP', 'Nomor handphone (opsional)'],
     ['Program Studi', 'Program studi mahasiswa (opsional)'],
-    ['Role', 'Isi: mahasiswa atau admin (default: mahasiswa)'],
+    ['Tahun Ajaran', 'Tahun ajaran (opsional)'],
+    ['Role', 'Isi: mahasiswa, dosen, atau admin (default: mahasiswa)'],
 ];
 foreach ($petunjuk as $i => $row) {
     $info->setCellValue('A' . ($i + 4), $row[0]);
