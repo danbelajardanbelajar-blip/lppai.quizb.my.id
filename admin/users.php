@@ -156,22 +156,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-// Get users and try to fetch tahun_ajaran from tutorial_registrations if it's empty in users table
-$users = $pdo->query("
-    SELECT u.*, 
-           (CASE 
-               WHEN u.tahun_ajaran IS NOT NULL AND u.tahun_ajaran != '' THEN u.tahun_ajaran 
-               ELSE t.tahun_ajaran 
-            END) as calculated_ta
-    FROM users u
-    LEFT JOIN (
-        SELECT user_id, MAX(tahun_ajaran) as tahun_ajaran 
-        FROM tutorial_registrations 
-        WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
-        GROUP BY user_id
-    ) t ON u.id = t.user_id
-    ORDER BY u.role, u.nama_lengkap
-")->fetchAll();
+// Get users and try to fetch tahun_ajaran from tutorial_registrations
+try {
+    $users = $pdo->query("
+        SELECT u.*, 
+               t.tahun_ajaran as calculated_ta
+        FROM users u
+        LEFT JOIN (
+            SELECT user_id, MAX(tahun_ajaran) as tahun_ajaran 
+            FROM tutorial_registrations 
+            WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
+            GROUP BY user_id
+        ) t ON u.id = t.user_id
+        ORDER BY u.role, u.nama_lengkap
+    ")->fetchAll();
+} catch (Exception $e) {
+    // Fallback if query fails
+    $users = $pdo->query("SELECT * FROM users ORDER BY role, nama_lengkap")->fetchAll();
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
