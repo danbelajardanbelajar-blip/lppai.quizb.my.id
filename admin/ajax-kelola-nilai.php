@@ -50,16 +50,16 @@ $fromClause = "
     AND CAST(SUBSTRING(tr.tahun_ajaran, 1, 4) AS UNSIGNED) < 2026
 ";
 
+// 1. Get Total Records (without filtering)
+$stmtTotal = $pdo->query("SELECT COUNT(u.id) $fromClause");
+$recordsTotal = $stmtTotal->fetchColumn();
+
 $whereParams = [];
 if ($searchValue !== '') {
     $fromClause .= " AND (u.nim LIKE ? OR u.nama_lengkap LIKE ? OR u.program_studi LIKE ? OR tr.tahun_ajaran LIKE ?)";
     $searchWildcard = "%$searchValue%";
     $whereParams = [$searchWildcard, $searchWildcard, $searchWildcard, $searchWildcard];
 }
-
-// 1. Get Total Records (without filtering)
-$stmtTotal = $pdo->query("SELECT COUNT(u.id) $fromClause");
-$recordsTotal = $stmtTotal->fetchColumn();
 
 // 2. Get Filtered Records
 $stmtFiltered = $pdo->prepare("SELECT COUNT(u.id) $fromClause");
