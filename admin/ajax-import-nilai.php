@@ -216,6 +216,12 @@ try {
         $regId = $stmtFindReg->fetchColumn();
 
         $tipe = isset($colMap['tipe_nilai']) && trim((string)($row[$colMap['tipe_nilai']] ?? '')) !== '' ? strtolower(trim($row[$colMap['tipe_nilai']] ?? '')) : null;
+        if ($tipe !== null) {
+            if ($tipe === 'p' || $tipe === 'pretes') $tipe = 'pretest';
+            elseif ($tipe === 'g1' || $tipe === 'gelombang 1') $tipe = 'gel 1';
+            elseif ($tipe === 'g2' || $tipe === 'gelombang 2') $tipe = 'gel 2';
+            elseif ($tipe === 'tm' || $tipe === 'tutorial mandiri') $tipe = 'mandiri';
+        }
 
         if ($regId) {
             $stmtUpdate->execute([$ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
