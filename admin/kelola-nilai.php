@@ -26,6 +26,17 @@ try {
     }
 }
 
+// Auto-migrate: add tipe_nilai if it doesn't exist
+try {
+    $pdo->query("SELECT tipe_nilai FROM tutorial_registrations LIMIT 1");
+} catch(PDOException $e) {
+    try {
+        $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tipe_nilai VARCHAR(50) DEFAULT NULL AFTER tahun_ajaran");
+    } catch(PDOException $ex) {
+        // ignore
+    }
+}
+
 
 // Proses Simpan Nilai
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_nilai') {
@@ -39,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         $ta = $_POST['tahun_ajaran'] ?? null;
         if ($ta === '') $ta = null;
+        
+        $tipe = $_POST['tipe_nilai'] ?? null;
+        if ($tipe === '') $tipe = null;
 
         $thaharah = ($_POST['nilai_thaharah'] !== '') ? (float)$_POST['nilai_thaharah'] : null;
         $shalat = ($_POST['nilai_shalat'] !== '') ? (float)$_POST['nilai_shalat'] : null;
@@ -52,21 +66,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // UPDATE yang sudah ada
                 $stmt = $pdo->prepare("
                     UPDATE tutorial_registrations 
-                    SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
+                    SET tahun_ajaran=?, tipe_nilai=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
                         nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? 
                     WHERE id=?
                 ");
-                $stmt->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
+                $stmt->execute([$ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
                 $message = "Nilai mahasiswa berhasil diperbarui.";
                 $msgType = "success";
             } else {
                 // INSERT baru untuk mahasiswa lawas (belum pernah mendaftar kelas)
                 $stmt = $pdo->prepare("
                     INSERT INTO tutorial_registrations 
-                    (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
-                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
+                    (user_id, status, gelombang, tahun_ajaran, tipe_nilai, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
+                    VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
+                $stmt->execute([$userId, $ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
                 $message = "Nilai mahasiswa berhasil disimpan (Riwayat baru telah dibuat).";
                 $msgType = "success";
             }
@@ -108,6 +122,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>Nama Mahasiswa</th>
                         <th>Jurusan</th>
                         <th>Tahun Ajaran</th>
+                        <th>Type Nilai</th>
                         <th>Thaharah</th>
                         <th>Shalat</th>
                         <th>Srt Pendek</th>
@@ -115,6 +130,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>Jenazah</th>
                         <th>UT</th>
                         <th>Akhir</th>
+                        <th>Kelulusan</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
@@ -154,6 +170,16 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                <div style="grid-column: span 2;">
+                    <label><strong>Type Nilai</strong></label>
+                    <select name="tipe_nilai" id="editTipe" class="form-control">
+                        <option value="">-- Kosong --</option>
+                        <option value="pretest">Pretest</option>
+                        <option value="gel 1">Gel 1</option>
+                        <option value="gel 2">Gel 2</option>
+                        <option value="mandiri">Mandiri</option>
+                    </select>
+                </div>
                 <div>
                     <label>Nilai Thaharah</label>
                     <input type="number" step="0.01" name="nilai_thaharah" id="editThaharah" class="form-control">
@@ -244,8 +270,8 @@ $(document).ready(function() {
             "processing": "Sedang memuat data..."
         },
         "columnDefs": [
-            { "orderable": false, "targets": [0, 1, 13] }, // Disable sorting pada Checkbox, No dan Aksi
-            { "className": "text-center", "targets": [0, 5, 6, 7, 8, 9, 10, 11, 12, 13] }
+            { "orderable": false, "targets": [0, 1, 15] }, // Disable sorting pada Checkbox, No dan Aksi
+            { "className": "text-center", "targets": [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] }
         ]
     });
 
@@ -383,6 +409,7 @@ $(document).ready(function() {
         $('#displayNama').text(btn.data('nama'));
         $('#displayNim').text(btn.data('nim'));
         $('#editTa').val(btn.data('ta'));
+        $('#editTipe').val(btn.data('tipe'));
         
         $('#editThaharah').val(btn.data('thaharah'));
         $('#editShalat').val(btn.data('shalat'));

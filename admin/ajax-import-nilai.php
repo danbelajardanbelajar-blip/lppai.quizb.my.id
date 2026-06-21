@@ -102,6 +102,7 @@ try {
         elseif (str_contains($h, 'amaliyah')) $colMap['amaliyah'] = $idx;
         elseif (str_contains($h, 'jenazah')) $colMap['jenazah'] = $idx;
         elseif (str_contains($h, 'tulis') || str_contains($h, 'ut')) $colMap['ut'] = $idx;
+        elseif (str_contains($h, 'type') || str_contains($h, 'tipe')) $colMap['tipe_nilai'] = $idx;
     }
 
     if (!isset($colMap['nim'])) {
@@ -127,14 +128,14 @@ try {
     
     $stmtUpdate = $pdo->prepare("
         UPDATE tutorial_registrations 
-        SET tahun_ajaran=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
+        SET tahun_ajaran=?, tipe_nilai=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, 
             nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? 
         WHERE id=?
     ");
     $stmtInsert = $pdo->prepare("
         INSERT INTO tutorial_registrations 
-        (user_id, status, gelombang, tahun_ajaran, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
-        VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?)
+        (user_id, status, gelombang, tahun_ajaran, tipe_nilai, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
+        VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
     $stmtUpdateUserDyn = $pdo->prepare("UPDATE users SET program_studi = ?, tempat_lahir = ?, tanggal_lahir = ? WHERE id = ?");
@@ -214,10 +215,12 @@ try {
         $stmtFindReg->execute([$userId]);
         $regId = $stmtFindReg->fetchColumn();
 
+        $tipe = isset($colMap['tipe_nilai']) && trim((string)($row[$colMap['tipe_nilai']] ?? '')) !== '' ? strtolower(trim($row[$colMap['tipe_nilai']] ?? '')) : null;
+
         if ($regId) {
-            $stmtUpdate->execute([$ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
+            $stmtUpdate->execute([$ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
         } else {
-            $stmtInsert->execute([$userId, $ta, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
+            $stmtInsert->execute([$userId, $ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
         }
         $imported++;
         

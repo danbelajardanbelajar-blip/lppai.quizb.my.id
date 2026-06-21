@@ -53,12 +53,13 @@ $headers = [
     'D1' => 'Tempat Lahir (Opsional)',
     'E1' => 'Tanggal Lahir (Opsional)',
     'F1' => 'Tahun Ajaran (Misal: 2025-2026)',
-    'G1' => 'Thaharah',
-    'H1' => 'Shalat',
-    'I1' => 'Srt Pendek',
-    'J1' => 'Amaliyah',
-    'K1' => 'Jenazah',
-    'L1' => 'Ujian Tulis'
+    'G1' => 'Type Nilai (pretest/gel 1/gel 2/mandiri)',
+    'H1' => 'Thaharah',
+    'I1' => 'Shalat',
+    'J1' => 'Srt Pendek',
+    'K1' => 'Amaliyah',
+    'L1' => 'Jenazah',
+    'M1' => 'Ujian Tulis'
 ];
 
 foreach ($headers as $cell => $val) {
@@ -75,10 +76,10 @@ $styleArray = [
     'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]],
     'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER]
 ];
-$sheet->getStyle('A1:L1')->applyFromArray($styleArray);
+$sheet->getStyle('A1:M1')->applyFromArray($styleArray);
 
 // Auto width
-foreach(range('A','L') as $col) {
+foreach(range('A','M') as $col) {
     $sheet->getColumnDimension($col)->setAutoSize(true);
 }
 
@@ -89,15 +90,16 @@ $sheet->setCellValue('C2', 'Teknik Informatika');
 $sheet->setCellValue('D2', 'Jakarta');
 $sheet->setCellValue('E2', '2000-12-31');
 $sheet->setCellValue('F2', '2025-2026');
-$sheet->setCellValue('G2', '80');
-$sheet->setCellValue('H2', '85');
-$sheet->setCellValue('I2', '90');
-$sheet->setCellValue('J2', '88');
-$sheet->setCellValue('K2', '75');
-$sheet->setCellValue('L2', '80');
+$sheet->setCellValue('G2', 'gel 1');
+$sheet->setCellValue('H2', '80');
+$sheet->setCellValue('I2', '85');
+$sheet->setCellValue('J2', '90');
+$sheet->setCellValue('K2', '88');
+$sheet->setCellValue('L2', '75');
+$sheet->setCellValue('M2', '80');
 
-$sheet->getStyle('A2:L2')->getFont()->setItalic(true);
-$sheet->getStyle('A2:L2')->getFont()->getColor()->setARGB('FF666666');
+$sheet->getStyle('A2:M2')->getFont()->setItalic(true);
+$sheet->getStyle('A2:M2')->getFont()->getColor()->setARGB('FF666666');
 
 $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 $filename = 'Template_Import_Nilai_Master.xlsx';

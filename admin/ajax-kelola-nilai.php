@@ -69,7 +69,7 @@ $recordsFiltered = $stmtFiltered->fetchColumn();
 // 3. Get Data with Pagination
 $dataQuery = "
     SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
-           tr.id as reg_id, tr.tahun_ajaran,
+           tr.id as reg_id, tr.tahun_ajaran, tr.tipe_nilai,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis
     $fromClause
@@ -98,6 +98,26 @@ foreach ($data as $i => $row) {
     if ($row['nilai_jenazah'] !== null) { $sum += (float)$row['nilai_jenazah']; $count++; }
     if ($row['nilai_ujian_tulis'] !== null) { $sum += (float)$row['nilai_ujian_tulis']; $count++; }
     $nilai_akhir = $count > 0 ? round($sum / $count, 2) : null;
+    
+    // Kelulusan Logic
+    $lulus_status = '<span class="badge badge-danger" style="background:#dc3545; color:white; padding:4px 8px; border-radius:4px;">Tidak Lulus</span>';
+    if ($count == 6) {
+        $th = (float)$row['nilai_thaharah'];
+        $sh = (float)$row['nilai_shalat'];
+        $sp = (float)$row['nilai_surat_pendek'];
+        $am = (float)$row['nilai_amaliyah'];
+        $jn = (float)$row['nilai_jenazah'];
+        $ut = (float)$row['nilai_ujian_tulis'];
+        
+        $tipe = strtolower(trim((string)$row['tipe_nilai']));
+        $min_score = ($tipe === 'pretest') ? 80 : 70;
+        
+        if ($th >= $min_score && $sh >= $min_score && $sp >= $min_score && $am >= $min_score && $jn >= $min_score && $ut >= $min_score) {
+            $lulus_status = '<span class="badge badge-success" style="background:#28a745; color:white; padding:4px 8px; border-radius:4px;">Lulus</span>';
+        }
+    } else {
+        $lulus_status = '<span class="badge badge-secondary" style="background:#6c757d; color:white; padding:4px 8px; border-radius:4px;">Belum Lengkap</span>';
+    }
 
     $editBtn = '<div style="display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center; align-items: center;">
         <button class="btn btn-sm btn-warning btn-edit-nilai" style="white-space: nowrap;"
@@ -106,6 +126,7 @@ foreach ($data as $i => $row) {
             data-nama="' . htmlspecialchars($row['nama_lengkap'], ENT_QUOTES) . '"
             data-nim="' . htmlspecialchars($row['nim'] ?: '-', ENT_QUOTES) . '"
             data-ta="' . htmlspecialchars($row['tahun_ajaran'] ?? '', ENT_QUOTES) . '"
+            data-tipe="' . htmlspecialchars($row['tipe_nilai'] ?? '', ENT_QUOTES) . '"
             data-thaharah="' . ($row['nilai_thaharah'] ?? '') . '"
             data-shalat="' . ($row['nilai_shalat'] ?? '') . '"
             data-srt="' . ($row['nilai_surat_pendek'] ?? '') . '"
@@ -126,6 +147,7 @@ foreach ($data as $i => $row) {
         '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
         htmlspecialchars($row['program_studi'] ?: '-'),
         htmlspecialchars($row['tahun_ajaran'] ?: '-'),
+        htmlspecialchars(ucwords($row['tipe_nilai'] ?? '-')),
         $row['nilai_thaharah'] ?? '-',
         $row['nilai_shalat'] ?? '-',
         $row['nilai_surat_pendek'] ?? '-',
@@ -133,6 +155,7 @@ foreach ($data as $i => $row) {
         $row['nilai_jenazah'] ?? '-',
         $row['nilai_ujian_tulis'] ?? '-',
         '<strong>' . ($nilai_akhir ?? '-') . '</strong>',
+        $lulus_status,
         $editBtn
     ];
 }
