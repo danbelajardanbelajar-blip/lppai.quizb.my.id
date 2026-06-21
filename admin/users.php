@@ -156,7 +156,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-$users = $pdo->query("SELECT * FROM users ORDER BY role, nama_lengkap")->fetchAll();
+// Get users and try to fetch tahun_ajaran from tutorial_registrations if it's empty in users table
+$users = $pdo->query("
+    SELECT u.*, 
+           (CASE 
+               WHEN u.tahun_ajaran IS NOT NULL AND u.tahun_ajaran != '' THEN u.tahun_ajaran 
+               ELSE t.tahun_ajaran 
+            END) as calculated_ta
+    FROM users u
+    LEFT JOIN (
+        SELECT user_id, MAX(tahun_ajaran) as tahun_ajaran 
+        FROM tutorial_registrations 
+        WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
+        GROUP BY user_id
+    ) t ON u.id = t.user_id
+    ORDER BY u.role, u.nama_lengkap
+")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -395,8 +410,8 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <td><?= sanitize($u['nama_lengkap']) ?></td>
                         <td><?= sanitize($u['tempat_lahir'] ?? '-') ?></td>
                         <td><?= !empty($u['tanggal_lahir']) ? date('d/m/Y', strtotime($u['tanggal_lahir'])) : '-' ?></td>
-                        <td><?= sanitize($u['program_studi'] ?? '-') ?></td>
-                        <td><?= sanitize($u['tahun_ajaran'] ?? '-') ?></td>
+                        <td><?= sanitize(!empty($u['program_studi']) ? $u['program_studi'] : '-') ?></td>
+                        <td><?= sanitize(!empty($u['calculated_ta']) ? $u['calculated_ta'] : (!empty($u['tahun_ajaran']) ? $u['tahun_ajaran'] : '-')) ?></td>
                         <td>
                             <?php 
                             $badgeClass = 'badge-primary';
