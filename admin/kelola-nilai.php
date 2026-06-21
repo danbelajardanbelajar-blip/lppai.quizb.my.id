@@ -223,39 +223,76 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Modal Edit Nilai -->
-<div id="modalEditNilai" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5);">
-    <div class="modal-content" style="background-color:#fff; margin:5% auto; padding:24px; border-radius:10px; width:90%; max-width:600px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
-        <h3 style="margin-top:0; color:#1e293b; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">✏️ Edit Nilai Mahasiswa</h3>
-        <form id="formEditNilai" method="POST">
+<div id="modalEditNilai" class="modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5); backdrop-filter: blur(4px); transition: all 0.3s ease;">
+    <div class="modal-content" style="background-color:#ffffff; margin:5% auto; padding:0; border-radius:12px; width:90%; max-width:650px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); overflow: hidden; border: 1px solid #e2e8f0; animation: modalFadeIn 0.3s ease-out;">
+        
+        <style>
+            @keyframes modalFadeIn {
+                from { opacity: 0; transform: translateY(-20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .premium-input {
+                width: 100%;
+                padding: 10px 12px;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                background-color: #f8fafc;
+                color: #334155;
+                font-size: 14px;
+                font-weight: 500;
+                transition: all 0.2s ease-in-out;
+            }
+            .premium-input:focus {
+                outline: none;
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+                background-color: #ffffff;
+            }
+        </style>
+
+        <!-- Modal Header -->
+        <div style="background-color: #3b82f6; padding: 18px 24px; color: white; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                Edit Nilai Mahasiswa
+            </h3>
+            <button type="button" onclick="document.getElementById('modalEditNilai').style.display='none'" style="background: transparent; border: none; color: white; font-size: 24px; cursor: pointer; line-height: 1; padding: 0; opacity: 0.8; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">&times;</button>
+        </div>
+
+        <form id="formEditNilai" method="POST" style="padding: 24px;">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="save_nilai">
             <input type="hidden" name="user_id" id="editUserId">
             <input type="hidden" name="reg_id" id="editRegId">
             
-            <div style="background-color:#f1f5f9; padding:12px; border-radius:6px; margin-bottom:16px;">
-                <strong>Nama:</strong> <span id="displayNama"></span><br>
-                <strong>NIM:</strong> <span id="displayNim"></span>
+            <div style="background-color:#f8fafc; padding:16px; border-radius:8px; margin-bottom:24px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px;">
+                <div style="background-color: #eff6ff; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <div>
+                    <div style="font-size: 16px; font-weight: 700; color: #1e293b;" id="displayNama"></div>
+                    <div style="font-size: 14px; color: #64748b; font-weight: 500;" id="displayNim"></div>
+                </div>
             </div>
             
-            <div style="margin-bottom: 16px;">
-                <label><strong>Tahun Ajaran</strong></label>
-                <select name="tahun_ajaran" id="editTa" class="form-control">
-                    <option value="">-- Kosong --</option>
-                    <?php
-                    $startYear = 2017;
-                    $endYear = 2025;
-                    for ($y = $startYear; $y <= $endYear; $y++) {
-                        $label = $y . '-' . ($y + 1);
-                        echo "<option value=\"$label\">$label</option>";
-                    }
-                    ?>
-                </select>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-                <div style="grid-column: span 2;">
-                    <label><strong>Type Nilai</strong></label>
-                    <select name="tipe_nilai" id="editTipe" class="form-control">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">📅 Tahun Ajaran</label>
+                    <select name="tahun_ajaran" id="editTa" class="premium-filter" style="width: 100%;">
+                        <option value="">-- Kosong --</option>
+                        <?php
+                        $startYear = 2017;
+                        $endYear = 2025;
+                        for ($y = $startYear; $y <= $endYear; $y++) {
+                            $label = $y . '-' . ($y + 1);
+                            echo "<option value=\"$label\">$label</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 8px;">📋 Type Nilai</label>
+                    <select name="tipe_nilai" id="editTipe" class="premium-filter" style="width: 100%;">
                         <option value="">-- Kosong --</option>
                         <option value="pretest">Pretest</option>
                         <option value="gel 1">Gel 1</option>
@@ -263,39 +300,49 @@ require_once __DIR__ . '/../includes/header.php';
                         <option value="mandiri">Mandiri</option>
                     </select>
                 </div>
+            </div>
+
+            <div style="border-top: 1px dashed #cbd5e1; margin: 24px 0;"></div>
+            <h4 style="margin-top: 0; margin-bottom: 20px; color: #1e293b; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
+                Komponen Nilai
+            </h4>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;">
                 <div>
-                    <label>Nilai Thaharah</label>
-                    <input type="number" step="0.01" name="nilai_thaharah" id="editThaharah" class="form-control">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Thaharah</label>
+                    <input type="number" step="0.01" name="nilai_thaharah" id="editThaharah" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
                 <div>
-                    <label>Nilai Shalat</label>
-                    <input type="number" step="0.01" name="nilai_shalat" id="editShalat" class="form-control">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Shalat</label>
+                    <input type="number" step="0.01" name="nilai_shalat" id="editShalat" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
                 <div>
-                    <label>Nilai Surat Pendek</label>
-                    <input type="number" step="0.01" name="nilai_surat_pendek" id="editSrt" class="form-control">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Surat Pendek</label>
+                    <input type="number" step="0.01" name="nilai_surat_pendek" id="editSrt" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
                 <div>
-                    <label>Nilai Amaliyah</label>
-                    <input type="number" step="0.01" name="nilai_amaliyah" id="editAmaliyah" class="form-control">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Amaliyah</label>
+                    <input type="number" step="0.01" name="nilai_amaliyah" id="editAmaliyah" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
                 <div>
-                    <label>Nilai Jenazah</label>
-                    <input type="number" step="0.01" name="nilai_jenazah" id="editJenazah" class="form-control">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Jenazah</label>
+                    <input type="number" step="0.01" name="nilai_jenazah" id="editJenazah" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
                 <div>
-                    <label>Ujian Tulis</label>
-                    <input type="number" step="0.01" name="nilai_ujian_tulis" id="editUt" class="form-control">
-                </div>
-                <div style="grid-column: span 2;">
-                    <label><strong>Nilai Akhir (Otomatis)</strong></label>
-                    <input type="number" step="0.01" id="editAkhir" class="form-control" style="background-color:#eff6ff; font-weight:bold;" readonly>
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px;">Ujian Tulis</label>
+                    <input type="number" step="0.01" name="nilai_ujian_tulis" id="editUt" class="premium-input" style="text-align: center; padding: 12px 8px;">
                 </div>
             </div>
 
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px;">
+                <span style="font-weight: 600; color: #475569; font-size: 15px;">Nilai Akhir (Otomatis)</span>
+                <input type="number" step="0.01" id="editAkhir" class="premium-input" style="width: 120px; text-align: center; background-color:#eff6ff; font-weight:bold; color: #1d4ed8; border-color: #bfdbfe; font-size: 18px; padding: 8px;" readonly>
+            </div>
+
             <div style="display:flex; gap:12px; justify-content:flex-end;">
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalEditNilai').style.display='none'">Batal</button>
-                <button type="submit" class="btn btn-primary" style="background-color:#3b82f6;">Simpan Nilai</button>
+                <button type="button" class="btn" style="background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600; padding: 10px 20px; border-radius: 6px; transition: background 0.2s;" onclick="document.getElementById('modalEditNilai').style.display='none'" onmouseover="this.style.backgroundColor='#e2e8f0'" onmouseout="this.style.backgroundColor='#f1f5f9'">Batal</button>
+                <button type="submit" class="btn" style="background-color: #3b82f6; color: white; border: none; font-weight: 600; padding: 10px 24px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); transition: background 0.2s;" onmouseover="this.style.backgroundColor='#2563eb'" onmouseout="this.style.backgroundColor='#3b82f6'">💾 Simpan Nilai</button>
             </div>
         </form>
     </div>
