@@ -175,6 +175,26 @@ try {
     $users = $pdo->query("SELECT * FROM users ORDER BY role, nama_lengkap")->fetchAll();
 }
 
+// Extrak data unik untuk dropdown filter
+$unique_ta = [];
+$unique_prodi = [];
+$unique_role = [];
+
+foreach ($users as $u) {
+    $ta = !empty($u['calculated_ta']) ? $u['calculated_ta'] : (!empty($u['tahun_ajaran']) ? $u['tahun_ajaran'] : '');
+    if ($ta && $ta !== '-') $unique_ta[$ta] = $ta;
+
+    $prodi = !empty($u['program_studi']) ? $u['program_studi'] : '';
+    if ($prodi && $prodi !== '-') $unique_prodi[$prodi] = $prodi;
+
+    $role = !empty($u['role']) ? $u['role'] : '';
+    if ($role) $unique_role[$role] = ucfirst($role);
+}
+
+ksort($unique_ta);
+ksort($unique_prodi);
+ksort($unique_role);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -387,6 +407,43 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
         <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
     </div>
     <div class="card-body">
+        <!-- Filter Data Pengguna -->
+        <div class="filter-container" style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; background: linear-gradient(145deg, #f8f9fa, #ffffff); padding: 20px; border-radius: 12px; border: 1px solid #e9ecef; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
+            <div style="flex: 1; min-width: 220px;">
+                <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    📅 <span>Tahun Ajaran</span>
+                </label>
+                <select id="filter_ta" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Tahun Ajaran</option>
+                    <?php foreach ($unique_ta as $ta): ?>
+                        <option value="<?= htmlspecialchars($ta) ?>"><?= htmlspecialchars($ta) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 220px;">
+                <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    🎓 <span>Jurusan / Prodi</span>
+                </label>
+                <select id="filter_prodi" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Jurusan</option>
+                    <?php foreach ($unique_prodi as $prodi): ?>
+                        <option value="<?= htmlspecialchars($prodi) ?>"><?= htmlspecialchars($prodi) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 220px;">
+                <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    👤 <span>Role Pengguna</span>
+                </label>
+                <select id="filter_role" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Role</option>
+                    <?php foreach ($unique_role as $role): ?>
+                        <option value="<?= htmlspecialchars($role) ?>"><?= htmlspecialchars($role) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <table id="table-users" class="display" style="width:100%">
                 <thead>
@@ -687,6 +744,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
+    }
+
+    // Logic for DataTables Dropdown Filter
+    function initDataTablesFilters() {
+        if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
+            var table = $('#table-users').DataTable();
+            
+            $('#filter_ta').on('change', function() {
+                var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                table.column(7).search(val ? '^' + val + '$' : '', true, false).draw();
+            });
+            
+            $('#filter_prodi').on('change', function() {
+                var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
+            });
+            
+            $('#filter_role').on('change', function() {
+                var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                // Use regex exact match for role text since it's inside a badge element
+                table.column(8).search(val ? val : '', true, false).draw();
+            });
+            return true;
+        }
+        return false;
+    }
+
+    if (!initDataTablesFilters()) {
+        let dtInterval = setInterval(() => {
+            if (initDataTablesFilters()) {
+                clearInterval(dtInterval);
+            }
+        }, 500);
     }
 });
 </script>
