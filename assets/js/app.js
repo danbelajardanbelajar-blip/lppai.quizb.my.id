@@ -220,7 +220,7 @@ function initAllTables(scope) {
 
         $(table).DataTable({
             pageLength: 10,
-            lengthMenu: [10, 25, 50, 100],
+            lengthMenu: [10, 25, 50, 100, 500],
             order: [],
             columnDefs: actionCols.length ? [{ orderable: false, targets: actionCols }] : [],
             language: {
