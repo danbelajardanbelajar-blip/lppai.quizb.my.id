@@ -86,7 +86,8 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <span>📊 Data Nilai Lama (Di bawah 2026)</span>
-        <div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
             <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
             <button type="button" class="btn btn-sm btn-warning" style="font-weight: 600;" onclick="document.getElementById('importModal').style.display='block'">📥 Import Nilai Excel</button>
         </div>
@@ -101,6 +102,7 @@ require_once __DIR__ . '/../includes/header.php';
             <table id="tableKelolaNilai" class="display no-datatable" style="width:100%">
                 <thead>
                     <tr>
+                        <th style="width: 30px; text-align: center;"><input type="checkbox" id="checkAll"></th>
                         <th style="width: 40px;">No</th>
                         <th>NIM</th>
                         <th>Nama Mahasiswa</th>
@@ -244,9 +246,134 @@ $(document).ready(function() {
             "processing": "Sedang memuat data..."
         },
         "columnDefs": [
-            { "orderable": false, "targets": [0, 14] }, // Disable sorting pada No dan Aksi
-            { "className": "text-center", "targets": [4,5,6,7,8,9,10,11,12,13,14] }
+            { "orderable": false, "targets": [0, 1, 15] }, // Disable sorting pada Checkbox, No dan Aksi
+            { "className": "text-center", "targets": [0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] }
         ]
+    });
+
+    // Check All handler
+    $('#checkAll').on('change', function() {
+        $('.check-item').prop('checked', this.checked);
+        toggleHapusTerpilih();
+    });
+
+    // Individual Checkbox handler
+    $('#tableKelolaNilai tbody').on('change', '.check-item', function() {
+        var totalCheckboxes = $('.check-item').length;
+        var totalChecked = $('.check-item:checked').length;
+        $('#checkAll').prop('checked', totalCheckboxes === totalChecked && totalCheckboxes > 0);
+        toggleHapusTerpilih();
+    });
+
+    function toggleHapusTerpilih() {
+        if ($('.check-item:checked').length > 0) {
+            $('#btnHapusTerpilih').css('display', 'inline-block');
+        } else {
+            $('#btnHapusTerpilih').css('display', 'none');
+        }
+    }
+
+    // Event listener saat ganti halaman pagination, unchecked "Check All"
+    table.on('draw', function() {
+        $('#checkAll').prop('checked', false);
+        toggleHapusTerpilih();
+    });
+
+    // Delete Individual
+    $('#tableKelolaNilai tbody').on('click', '.btn-delete-nilai', function() {
+        var regId = $(this).data('reg-id');
+        if (!regId || regId === 0) {
+            Swal.fire('Info', 'Data belum memiliki riwayat nilai/registrasi.', 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Hapus Data Nilai?',
+            text: "Data yang dihapus tidak dapat dikembalikan!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?= BASE_URL ?>/admin/ajax-delete-nilai.php',
+                    type: 'POST',
+                    data: {
+                        action: 'delete',
+                        reg_id: regId,
+                        csrf_token: '<?= csrfToken() ?>'
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.success) {
+                            Swal.fire('Terhapus!', res.message, 'success');
+                            table.ajax.reload(null, false);
+                        } else {
+                            Swal.fire('Gagal!', res.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Terjadi kesalahan koneksi.', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Delete Bulk
+    $('#btnHapusTerpilih').on('click', function() {
+        var selectedIds = [];
+        $('.check-item:checked').each(function() {
+            var val = $(this).val();
+            if (val && val != 0) {
+                selectedIds.push(val);
+            }
+        });
+
+        if (selectedIds.length === 0) {
+            Swal.fire('Info', 'Pilih minimal satu data yang memiliki nilai untuk dihapus.', 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Hapus ' + selectedIds.length + ' Data?',
+            text: "Data yang dipilih akan dihapus permanen!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Hapus Semua!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?= BASE_URL ?>/admin/ajax-delete-nilai.php',
+                    type: 'POST',
+                    data: {
+                        action: 'delete_bulk',
+                        reg_ids: selectedIds,
+                        csrf_token: '<?= csrfToken() ?>'
+                    },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.success) {
+                            Swal.fire('Terhapus!', res.message, 'success');
+                            table.ajax.reload(null, false);
+                            $('#checkAll').prop('checked', false);
+                            toggleHapusTerpilih();
+                        } else {
+                            Swal.fire('Gagal!', res.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Terjadi kesalahan koneksi.', 'error');
+                    }
+                });
+            }
+        });
     });
 
     // Event listener untuk tombol Edit (karena data digenerate dinamis, gunakan event delegation)

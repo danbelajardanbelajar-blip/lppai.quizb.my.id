@@ -114,9 +114,13 @@ foreach ($data as $i => $row) {
         data-jenazah="' . ($row['nilai_jenazah'] ?? '') . '"
         data-ut="' . ($row['nilai_ujian_tulis'] ?? '') . '"
         data-akhir="' . ($nilai_akhir ?? '') . '"
-    >✏️ Edit</button>';
+    >✏️ Edit</button>
+    <button class="btn btn-sm btn-danger btn-delete-nilai" data-reg-id="' . ($row['reg_id'] ?: 0) . '" style="margin-left: 4px;">🗑️ Hapus</button>';
+
+    $checkbox = '<input type="checkbox" class="check-item" value="' . ($row['reg_id'] ?: 0) . '">';
 
     $response['data'][] = [
+        $checkbox,
         $start + $i + 1, // Nomor urut
         htmlspecialchars($row['nim'] ?: '-'),
         '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
