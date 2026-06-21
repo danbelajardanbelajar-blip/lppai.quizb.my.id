@@ -205,14 +205,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <th>Nama Mahasiswa</th>
                         <th>Jurusan</th>
                         <th>Tahun Ajaran</th>
-                        <th>Type Nilai</th>
-                        <th>Thaharah</th>
-                        <th>Shalat</th>
-                        <th>Srt Pendek</th>
-                        <th>Amaliyah</th>
-                        <th>Jenazah</th>
-                        <th>UT</th>
-                        <th>Akhir</th>
+                        <th>Tipe</th>
+                        <th title="Nilai Thaharah">Thah</th>
+                        <th title="Nilai Shalat">Shlt</th>
+                        <th title="Nilai Surat Pendek">SP</th>
+                        <th title="Nilai Amaliyah">Amal</th>
+                        <th title="Nilai Jenazah">Jnz</th>
+                        <th title="Ujian Tulis">UT</th>
+                        <th title="Nilai Akhir">NA</th>
                         <th>Kelulusan</th>
                         <th>Aksi</th>
                     </tr>
