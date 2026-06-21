@@ -92,6 +92,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
 
+        } elseif ($action === 'delete_bulk') {
+            $ids = $_POST['ids'] ?? [];
+            if (!empty($ids) && is_array($ids)) {
+                $cleanIds = [];
+                foreach ($ids as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && $id !== (int)$_SESSION['user_id']) {
+                        $cleanIds[] = $id;
+                    }
+                }
+                if (!empty($cleanIds)) {
+                    $placeholders = implode(',', array_fill(0, count($cleanIds), '?'));
+                    $pdo->prepare("DELETE FROM users WHERE id IN ($placeholders)")->execute($cleanIds);
+                    $message = count($cleanIds) . ' user berhasil dihapus.';
+                    $msgType = 'success';
+                } else {
+                    $message = 'Tidak ada user valid yang dapat dihapus (akun sendiri tidak dapat dihapus).';
+                    $msgType = 'danger';
+                }
+            } else {
+                $message = 'Tidak ada data yang dipilih.';
+                $msgType = 'danger';
+            }
+
         } elseif ($action === 'reset_password') {
             $id = (int)($_POST['id'] ?? 0);
             $userRow = $pdo->prepare("SELECT tanggal_lahir FROM users WHERE id = ?");
@@ -341,12 +365,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 
 <!-- ── Daftar Pengguna ───────────────────────────────────────── -->
 <div class="card">
-    <div class="card-header">📋 Daftar Pengguna</div>
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span>📋 Daftar Pengguna</span>
+        <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
+    </div>
     <div class="card-body">
         <div class="table-responsive">
             <table id="table-users" class="display" style="width:100%">
                 <thead>
                     <tr>
+                        <th style="width: 30px; text-align: center;"><input type="checkbox" id="checkAll"></th>
                         <th>No</th>
                         <th>NIM (Username)</th>
                         <th>Nama</th>
@@ -361,6 +389,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                 <tbody>
                     <?php foreach ($users as $i => $u): ?>
                     <tr>
+                        <td style="text-align: center;"><input type="checkbox" class="check-item" value="<?= $u['id'] ?>"></td>
                         <td><?= $i + 1 ?></td>
                         <td><strong><?= sanitize($u['nim'] ?? $u['username']) ?></strong></td>
                         <td><?= sanitize($u['nama_lengkap']) ?></td>
@@ -537,6 +566,112 @@ if (!window._editUserBound) {
         if (e.key === 'Escape') closeUserModal();
     });
 }
+
+// Script untuk Bulk Delete & Checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    const checkAll = document.getElementById('checkAll');
+    const btnHapusTerpilih = document.getElementById('btnHapusTerpilih');
+    
+    // Buat form hidden untuk submit bulk delete
+    const formDeleteBulk = document.createElement('form');
+    formDeleteBulk.method = 'POST';
+    formDeleteBulk.style.display = 'none';
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = '<?= csrfToken() ?>';
+    formDeleteBulk.appendChild(csrfInput);
+    
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'delete_bulk';
+    formDeleteBulk.appendChild(actionInput);
+    
+    const hiddenBulkIds = document.createElement('div');
+    formDeleteBulk.appendChild(hiddenBulkIds);
+    document.body.appendChild(formDeleteBulk);
+
+    function toggleHapusTerpilih() {
+        if ($('.check-item:checked').length > 0) {
+            btnHapusTerpilih.style.display = 'inline-block';
+        } else {
+            btnHapusTerpilih.style.display = 'none';
+        }
+    }
+
+    if (checkAll) {
+        $(checkAll).on('change', function() {
+            $('.check-item').prop('checked', this.checked);
+            toggleHapusTerpilih();
+        });
+    }
+
+    $('#table-users').on('change', '.check-item', function() {
+        var totalCheckboxes = $('.check-item').length;
+        var totalChecked = $('.check-item:checked').length;
+        if(checkAll) {
+            checkAll.checked = (totalCheckboxes === totalChecked && totalCheckboxes > 0);
+        }
+        toggleHapusTerpilih();
+    });
+
+    // Handle DataTables draw event to uncheck
+    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
+        $('#table-users').DataTable().on('draw', function() {
+            if(checkAll) checkAll.checked = false;
+            toggleHapusTerpilih();
+        });
+    } else {
+        // Fallback if datatables is initialized later
+        setTimeout(() => {
+            if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
+                $('#table-users').DataTable().on('draw', function() {
+                    if(checkAll) checkAll.checked = false;
+                    toggleHapusTerpilih();
+                });
+                
+                // Disable sorting on checkbox column (index 0) if not disabled
+                var table = $('#table-users').DataTable();
+                var settings = table.settings()[0];
+                if(settings && settings.aoColumns[0]) {
+                    settings.aoColumns[0].bSortable = false;
+                }
+            }
+        }, 1000);
+    }
+
+    if (btnHapusTerpilih) {
+        btnHapusTerpilih.addEventListener('click', function() {
+            const checked = document.querySelectorAll('.check-item:checked');
+            if (checked.length === 0) return;
+
+            Swal.fire({
+                title: 'Hapus ' + checked.length + ' User?',
+                text: "User yang dihapus tidak dapat dikembalikan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, Hapus Semua!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    hiddenBulkIds.innerHTML = '';
+                    checked.forEach(cb => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'ids[]';
+                        input.value = cb.value;
+                        hiddenBulkIds.appendChild(input);
+                    });
+                    formDeleteBulk.submit();
+                }
+            });
+        });
+    }
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
