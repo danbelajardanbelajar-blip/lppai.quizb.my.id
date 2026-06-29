@@ -608,11 +608,42 @@ window.openTutorialTab = function(evt, tabId) {
         <span style="font-size:18px;">👥</span> Daftar Seluruh Mahasiswa
     </div>
     <div class="card-body">
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 8px; font-size: 13px;">Filter Angkatan:</label>
+                <select id="filterAngkatanSemua" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                    <option value="">-- Semua Angkatan --</option>
+                    <?php 
+                    $angkatanList = [];
+                    foreach ($allStudents as $m) {
+                        $nim = trim($m['nim']);
+                        if(strlen($nim) >= 2) {
+                            $angkatan = "20" . substr($nim, 0, 2);
+                            $angkatanList[$angkatan] = true;
+                        }
+                    }
+                    krsort($angkatanList);
+                    foreach(array_keys($angkatanList) as $ang):
+                    ?>
+                        <option value="<?= $ang ?>"><?= $ang ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 200px;">
+                <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 8px; font-size: 13px;">Filter Status:</label>
+                <select id="filterStatusSemua" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                    <option value="">-- Semua Status --</option>
+                    <option value="Sudah Terdaftar">Sudah Terdaftar</option>
+                    <option value="Belum Mendaftar">Belum Mendaftar</option>
+                </select>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table" id="tableSemuaMahasiswa">
                 <thead>
                     <tr>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">NIM</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Angkatan</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Jurusan</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
@@ -626,6 +657,7 @@ window.openTutorialTab = function(evt, tabId) {
                         ?>
                         <tr>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['nim'] ?: '-') ?></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize((strlen(trim($m['nim'])) >= 2) ? "20" . substr(trim($m['nim']), 0, 2) : '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><strong><?= sanitize($m['nama_lengkap']) ?></strong></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['program_studi'] ?: '-') ?></td>
                             <td style="padding: 10px 16px; text-align: center;">
@@ -1330,14 +1362,40 @@ window.closeEditModal = function() {
             if (selectJurusan) {
                 selectJurusan.addEventListener('change', function() {
                     var val = this.value;
-                    // Kolom Jurusan ada di index 2 (NIM, Nama Lengkap, Jurusan, Status, Aksi)
+                    // Kolom Jurusan ada di index 3 (NIM, Angkatan, Nama Lengkap, Jurusan, Status, Aksi)
                     if (val) {
-                        tableSemua.column(2).search('^' + $.fn.dataTable.util.escapeRegex(val) + '$', true, false).draw();
+                        tableSemua.column(3).search('^' + $.fn.dataTable.util.escapeRegex(val) + '$', true, false).draw();
                     } else {
-                        tableSemua.column(2).search('').draw();
+                        tableSemua.column(3).search('').draw();
                     }
                 });
             }
+
+            // Custom Filtering for Angkatan and Status
+            $.fn.dataTable.ext.search.push(
+                function(settings, data, dataIndex) {
+                    if (settings.nTable.id !== 'tableSemuaMahasiswa') {
+                        return true;
+                    }
+                    var filterAngkatan = $('#filterAngkatanSemua').val();
+                    var filterStatus = $('#filterStatusSemua').val();
+                    
+                    var angkatan = data[1] || ""; // Index 1: Angkatan
+                    var status = data[4] || "";   // Index 4: Status
+                    
+                    if (filterAngkatan && angkatan.indexOf(filterAngkatan) === -1) {
+                        return false;
+                    }
+                    if (filterStatus && status.indexOf(filterStatus) === -1) {
+                        return false;
+                    }
+                    return true;
+                }
+            );
+
+            $('#filterAngkatanSemua, #filterStatusSemua').on('change', function() {
+                tableSemua.draw();
+            });
         }
     }, 500);
 
