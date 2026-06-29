@@ -36,7 +36,7 @@ if (isset($_GET['ajax_jurusan'])) {
                (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
                MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
-        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id 
+        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
         WHERE u.program_studi = ? AND u.role = 'mahasiswa'
         GROUP BY u.id
         ORDER BY u.nama_lengkap
@@ -197,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $dayLower = strtolower($hari_pilihan);
                     $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                     
-                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
+                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')");
                     $stmtCount->execute([$hari_pilihan]);
                     $terisi = $stmtCount->fetchColumn();
                     $sisaKuota = $totalKuota - $terisi;
@@ -227,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $dayLower = strtolower($hari_pilihan);
                 $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                 
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?)");
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')");
                 $stmtCount->execute([$hari_pilihan]);
                 $terisi = $stmtCount->fetchColumn();
                 $sisaKuota = $totalKuota - $terisi;
@@ -239,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt = $pdo->prepare("
                         SELECT id, nama_lengkap FROM users 
                         WHERE program_studi = ? 
-                          AND id NOT IN (SELECT user_id FROM tutorial_registrations)
+                          AND id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')
                     ");
                     $stmt->execute([$jurusan]);
                     $usersToRegister = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -306,7 +306,7 @@ $students = $pdo->query("
     SELECT id, nama_lengkap, nim, program_studi
     FROM users
     WHERE role = 'mahasiswa'
-    AND id IN (SELECT user_id FROM tutorial_registrations)
+    AND id IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')
     ORDER BY nama_lengkap
 ")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '2026/%' OR semester LIKE '2027/%' OR semester LIKE '2028/%' OR semester LIKE '2029/%' OR semester LIKE '2030/%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
@@ -394,7 +394,7 @@ $allStudents = $pdo->query("
            MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
-    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id
+    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
     WHERE u.role = 'mahasiswa'
     GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
