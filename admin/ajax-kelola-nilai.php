@@ -52,7 +52,7 @@ $fromClause = "
         SELECT MAX(id) FROM tutorial_registrations WHERE user_id = u.id
     )
     WHERE u.role = 'mahasiswa' 
-    AND CAST(SUBSTRING(tr.tahun_ajaran, 1, 4) AS UNSIGNED) < 2026
+    AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) <= 25
 ";
 
 $whereParams = [];
