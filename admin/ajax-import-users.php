@@ -116,16 +116,7 @@ if (!empty($missing)) {
 
 $pdo = getDBConnection();
 
-// Auto-migrate: add tahun_ajaran to users if it doesn't exist
-try {
-    $pdo->query("SELECT tahun_ajaran FROM users LIMIT 1");
-} catch(PDOException $e) {
-    try {
-        $pdo->exec("ALTER TABLE users ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER program_studi");
-    } catch(PDOException $ex) {
-        // ignore
-    }
-}
+
 $imported = 0;
 $skipped = 0;
 $errors = [];
@@ -188,8 +179,19 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
 
     // Insert (cost 8 agar lebih cepat saat import bulk)
     $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, tanggal_lahir, tahun_ajaran, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $tglLahirDB, $ta, $role]);
+    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $tglLahirDB, $role]);
+    $userId = $pdo->lastInsertId();
+
+    // Jika tahun_ajaran diisi dan dia mahasiswa, langsung daftarkan ke tutorial
+    if (!empty($ta) && $role === 'mahasiswa') {
+        // Ambil gelombang aktif jika ada, atau default ke 'gel1'
+        $active_gel = $pdo->query("SELECT gelombang FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetchColumn();
+        $gel = $active_gel ?: 'gel1';
+        
+        $stmtReg = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?)");
+        $stmtReg->execute([$userId, $gel, $ta]);
+    }
     $imported++;
 }
 
