@@ -169,39 +169,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
-// Get users and try to fetch tahun_ajaran from tutorial_registrations
-try {
-    $users = $pdo->query("
-        SELECT u.*, 
-               t.tahun_ajaran as calculated_ta
-        FROM users u
-        LEFT JOIN (
-            SELECT user_id, MAX(tahun_ajaran) as tahun_ajaran 
-            FROM tutorial_registrations 
-            WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
-            GROUP BY user_id
-        ) t ON u.id = t.user_id
-        ORDER BY u.role, u.nama_lengkap
-    ")->fetchAll();
-} catch (Exception $e) {
-    // Fallback if query fails
-    $users = $pdo->query("SELECT * FROM users ORDER BY role, nama_lengkap")->fetchAll();
-}
-
 // Extrak data unik untuk dropdown filter
 $unique_ta = [];
 $unique_prodi = [];
 $unique_role = [];
 
-foreach ($users as $u) {
-    $ta = !empty($u['calculated_ta']) ? $u['calculated_ta'] : (!empty($u['tahun_ajaran']) ? $u['tahun_ajaran'] : '');
-    if ($ta && $ta !== '-') $unique_ta[$ta] = $ta;
+// Get unique program_studi
+$stmt = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' AND program_studi != '-'");
+while ($row = $stmt->fetch()) {
+    $unique_prodi[$row['program_studi']] = $row['program_studi'];
+}
 
-    $prodi = !empty($u['program_studi']) ? $u['program_studi'] : '';
-    if ($prodi && $prodi !== '-') $unique_prodi[$prodi] = $prodi;
+// Get unique tahun_ajaran from users and tutorial_registrations
+$stmt = $pdo->query("
+    SELECT DISTINCT ta FROM (
+        SELECT tahun_ajaran as ta FROM users WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != '' AND tahun_ajaran != '-'
+        UNION
+        SELECT tahun_ajaran as ta FROM tutorial_registrations WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != '' AND tahun_ajaran != '-'
+    ) t
+");
+while ($row = $stmt->fetch()) {
+    $unique_ta[$row['ta']] = $row['ta'];
+}
 
-    $role = !empty($u['role']) ? $u['role'] : '';
-    if ($role) $unique_role[$role] = ucfirst($role);
+// Get unique roles
+$stmt = $pdo->query("SELECT DISTINCT role FROM users WHERE role IS NOT NULL AND role != ''");
+while ($row = $stmt->fetch()) {
+    $unique_role[$row['role']] = ucfirst($row['role']);
 }
 
 ksort($unique_ta);
@@ -462,7 +456,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
         </div>
 
         <div class="table-responsive">
-            <table id="table-users" class="display" style="width:100%">
+            <table id="table-users" class="display no-datatable" style="width:100%">
                 <thead>
                     <tr>
                         <th style="width: 30px; text-align: center;"><input type="checkbox" id="checkAll"></th>
@@ -478,74 +472,6 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($users as $i => $u): ?>
-                    <tr>
-                        <td style="text-align: center;"><input type="checkbox" class="check-item" value="<?= $u['id'] ?>"></td>
-                        <td><?= $i + 1 ?></td>
-                        <td><strong><?= sanitize($u['nim'] ?? $u['username']) ?></strong></td>
-                        <td><?= sanitize($u['nama_lengkap']) ?></td>
-                        <td><?= sanitize($u['tempat_lahir'] ?? '-') ?></td>
-                        <td><?= !empty($u['tanggal_lahir']) ? date('d/m/Y', strtotime($u['tanggal_lahir'])) : '-' ?></td>
-                        <td><?= sanitize(!empty($u['program_studi']) ? $u['program_studi'] : '-') ?></td>
-                        <td><?= sanitize(!empty($u['calculated_ta']) ? $u['calculated_ta'] : (!empty($u['tahun_ajaran']) ? $u['tahun_ajaran'] : '-')) ?></td>
-                        <td>
-                            <?php 
-                            $badgeClass = 'badge-primary';
-                            if ($u['role'] === 'admin') $badgeClass = 'badge-danger';
-                            if ($u['role'] === 'dosen') $badgeClass = 'badge-success'; // assuming success is green
-                            ?>
-                            <span class="badge <?= $badgeClass ?>">
-                                <?= ucfirst($u['role']) ?>
-                            </span>
-                        </td>
-                        <td style="white-space:nowrap;">
-                            <!-- Tombol Edit -->
-                            <button type="button" class="btn btn-sm btn-warning btn-edit-user"
-                                data-id="<?= $u['id'] ?>"
-                                data-nama="<?= htmlspecialchars($u['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>"
-                                data-email="<?= htmlspecialchars($u['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-no-hp="<?= htmlspecialchars($u['no_hp'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-prodi="<?= htmlspecialchars($u['program_studi'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tmpt-lahir="<?= htmlspecialchars($u['tempat_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-tgl-lahir="<?= htmlspecialchars($u['tanggal_lahir'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-ta="<?= htmlspecialchars($u['tahun_ajaran'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                data-role="<?= htmlspecialchars($u['role'], ENT_QUOTES, 'UTF-8') ?>"
-                                style="margin-right:4px;">
-                                ✏️ Edit
-                            </button>
-                            <!-- Reset Password -->
-                            <form method="POST" style="display:inline;margin-right:4px;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="reset_password">
-                                <input type="hidden" name="id" value="<?= $u['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-secondary"
-                                    data-confirm="Reset password ke tanggal lahir (ddmmyyyy)?">🔑 Reset Pass</button>
-                            </form>
-                            <!-- Login As -->
-                            <?php if ($u['id'] !== $_SESSION['user_id']): ?>
-                            <form method="POST" target="_blank" style="display:inline;margin-right:4px;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="login_as">
-                                <input type="hidden" name="id" value="<?= $u['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-info" style="background-color:#0ea5e9;color:white;"
-                                    data-confirm="Buka tab baru dan login sebagai <?= htmlspecialchars($u['nama_lengkap'], ENT_QUOTES) ?>?">🚪 Login As</button>
-                            </form>
-                            <?php endif; ?>
-                            <!-- Hapus (tidak bisa hapus diri sendiri) -->
-                            <?php if ($u['id'] !== $_SESSION['user_id']): ?>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="id" value="<?= $u['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-danger"
-                                    data-confirm="Yakin ingin menghapus user ini?"
-                                    data-table="users"
-                                    data-id="<?= $u['id'] ?>">🗑️ Hapus</button>
-                            </form>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
@@ -708,30 +634,54 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleHapusTerpilih();
     });
 
-    // Handle DataTables draw event to uncheck
-    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
-        $('#table-users').DataTable().on('draw', function() {
-            if(checkAll) checkAll.checked = false;
-            toggleHapusTerpilih();
-        });
-    } else {
-        // Fallback if datatables is initialized later
-        setTimeout(() => {
-            if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
-                $('#table-users').DataTable().on('draw', function() {
-                    if(checkAll) checkAll.checked = false;
-                    toggleHapusTerpilih();
-                });
-                
-                // Disable sorting on checkbox column (index 0) if not disabled
-                var table = $('#table-users').DataTable();
-                var settings = table.settings()[0];
-                if(settings && settings.aoColumns[0]) {
-                    settings.aoColumns[0].bSortable = false;
-                }
+    // Inisialisasi DataTables Server-Side Processing
+    var table = $('#table-users').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: 'ajax-users.php',
+            type: 'POST',
+            data: function (d) {
+                d.filterTahunAjaran = $('#filter_ta').val();
+                d.filterProdi = $('#filter_prodi').val();
+                d.filterRole = $('#filter_role').val();
+            },
+            error: function (xhr, error, code) {
+                console.log(xhr.responseText);
             }
-        }, 1000);
-    }
+        },
+        pageLength: 10,
+        lengthMenu: [10, 25, 50, 100, 500],
+        order: [[3, 'asc']],
+        columnDefs: [
+            { orderable: false, targets: [0, 9] }
+        ],
+        language: {
+            search: 'Cari:',
+            lengthMenu: 'Tampilkan _MENU_ data',
+            info: 'Menampilkan _START_ - _END_ dari _TOTAL_ data',
+            infoEmpty: 'Tidak ada data',
+            infoFiltered: '(difilter dari _MAX_ total data)',
+            zeroRecords: 'Data tidak ditemukan',
+            paginate: {
+                first: 'Pertama',
+                last: 'Terakhir',
+                next: 'Selanjutnya',
+                previous: 'Sebelumnya'
+            }
+        }
+    });
+
+    // Reload table on filter change
+    $('#filter_ta, #filter_prodi, #filter_role').on('change', function() {
+        table.ajax.reload();
+    });
+
+    // Handle DataTables draw event to uncheck
+    table.on('draw', function() {
+        if(checkAll) checkAll.checked = false;
+        toggleHapusTerpilih();
+    });
 
     if (btnHapusTerpilih) {
         btnHapusTerpilih.addEventListener('click', function() {
@@ -761,39 +711,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-    }
-
-    // Logic for DataTables Dropdown Filter
-    function initDataTablesFilters() {
-        if ($.fn.DataTable && $.fn.DataTable.isDataTable('#table-users')) {
-            var table = $('#table-users').DataTable();
-            
-            $('#filter_ta').on('change', function() {
-                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                table.column(7).search(val ? '^' + val + '$' : '', true, false).draw();
-            });
-            
-            $('#filter_prodi').on('change', function() {
-                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                table.column(6).search(val ? '^' + val + '$' : '', true, false).draw();
-            });
-            
-            $('#filter_role').on('change', function() {
-                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                // Use regex exact match for role text since it's inside a badge element
-                table.column(8).search(val ? val : '', true, false).draw();
-            });
-            return true;
-        }
-        return false;
-    }
-
-    if (!initDataTablesFilters()) {
-        let dtInterval = setInterval(() => {
-            if (initDataTablesFilters()) {
-                clearInterval(dtInterval);
-            }
-        }, 500);
     }
 });
 </script>
