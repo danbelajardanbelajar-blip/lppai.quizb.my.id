@@ -403,7 +403,11 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     }
                 }
                 // Run on load
-                document.addEventListener('DOMContentLoaded', toggleFields);
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', toggleFields);
+                } else {
+                    toggleFields();
+                }
             </script>
 
             <button type="submit" class="btn btn-primary" style="width:auto;margin-top:10px;">👤 Tambah User</button>
@@ -585,7 +589,7 @@ if (!window._editUserBound) {
 }
 
 // Script untuk Bulk Delete & Checkboxes
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
     const checkAll = document.getElementById('checkAll');
     const btnHapusTerpilih = document.getElementById('btnHapusTerpilih');
     
@@ -712,7 +716,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
+})();
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
