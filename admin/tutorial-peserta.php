@@ -36,7 +36,7 @@ if (isset($_GET['ajax_jurusan'])) {
                (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
                MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
-        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
+        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
         WHERE u.program_studi = ? AND u.role = 'mahasiswa'
         GROUP BY u.id
         ORDER BY u.nama_lengkap
@@ -394,7 +394,7 @@ $allStudents = $pdo->query("
            MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
-    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
+    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
     WHERE u.role = 'mahasiswa'
     GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
