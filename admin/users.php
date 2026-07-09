@@ -533,7 +533,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </div>
 
 <script>
-function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkatan, role) {
+window.openUserModal = function(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkatan, role) {
     document.getElementById('edit_user_id').value       = id;
     document.getElementById('edit_user_nama').value     = nama;
     document.getElementById('edit_user_email').value    = email;
@@ -544,12 +544,12 @@ function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkat
     document.getElementById('edit_user_angkatan').value = angkatan;
     document.getElementById('edit_user_role').value     = role;
     document.getElementById('editUserModal').classList.add('show');
-}
+};
 
-function closeUserModal() {
+window.closeUserModal = function() {
     var m = document.getElementById('editUserModal');
     if (m) m.classList.remove('show');
-}
+};
 
 if (!window._editUserBound) {
     window._editUserBound = true;
@@ -558,14 +558,14 @@ if (!window._editUserBound) {
         var btn = e.target.closest('.btn-edit-user');
         if (btn) {
             var d = btn.dataset;
-            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.angkatan, d.role);
+            window.openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.angkatan, d.role);
             return;
         }
-        if (e.target && e.target.id === 'editUserModal') closeUserModal();
+        if (e.target && e.target.id === 'editUserModal') window.closeUserModal();
     });
 
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') closeUserModal();
+        if (e.key === 'Escape') window.closeUserModal();
     });
 }
 
