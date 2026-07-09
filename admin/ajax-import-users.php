@@ -103,7 +103,6 @@ foreach ($headerRow as $idx => $h) {
     elseif (str_contains($h, 'email')) $colMap['email'] = $idx;
     elseif (str_contains($h, 'hp') || str_contains($h, 'phone') || str_contains($h, 'telp')) $colMap['no_hp'] = $idx;
     elseif (str_contains($h, 'prodi') || str_contains($h, 'program') || str_contains($h, 'studi')) $colMap['program_studi'] = $idx;
-    elseif (str_contains($h, 'tahun') || str_contains($h, 'ajaran') || str_contains($h, 'angkatan')) $colMap['tahun_ajaran'] = $idx;
     elseif (str_contains($h, 'role') || str_contains($h, 'peran')) $colMap['role'] = $idx;
 }
 
@@ -131,9 +130,12 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
     $email = trim((string)($row[$colMap['email'] ?? -1] ?? ''));
     $noHp = trim((string)($row[$colMap['no_hp'] ?? -1] ?? ''));
     $prodi = trim((string)($row[$colMap['program_studi'] ?? -1] ?? ''));
-    $ta = trim((string)($row[$colMap['tahun_ajaran'] ?? -1] ?? ''));
     $roleVal = strtolower(trim((string)($row[$colMap['role'] ?? -1] ?? '')));
     $role = in_array($roleVal, ['admin', 'mahasiswa', 'dosen']) ? $roleVal : 'mahasiswa';
+    
+    // Ekstrak angkatan dari 2 digit awal NIM
+    $nim_prefix = substr($nim, 0, 2);
+    $angkatan = (is_numeric($nim_prefix) && strlen($nim_prefix) == 2) ? '20' . $nim_prefix : null;
 
     // Skip baris kosong
     if (empty($nim) && empty($nama)) continue;
@@ -179,18 +181,18 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
 
     // Insert (cost 8 agar lebih cepat saat import bulk)
     $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $tglLahirDB, $role]);
+    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, angkatan, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $angkatan, $tglLahirDB, $role]);
     $userId = $pdo->lastInsertId();
 
-    // Jika tahun_ajaran diisi dan dia mahasiswa, langsung daftarkan ke tutorial
-    if (!empty($ta) && $role === 'mahasiswa') {
+    // Jika angkatan berhasil diekstrak dan dia mahasiswa, langsung daftarkan ke tutorial
+    if (!empty($angkatan) && $role === 'mahasiswa') {
         // Ambil gelombang aktif jika ada, atau default ke 'gel1'
         $active_gel = $pdo->query("SELECT gelombang FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetchColumn();
         $gel = $active_gel ?: 'gel1';
         
         $stmtReg = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?)");
-        $stmtReg->execute([$userId, $gel, $ta]);
+        $stmtReg->execute([$userId, $gel, $angkatan]);
     }
     $imported++;
 }
