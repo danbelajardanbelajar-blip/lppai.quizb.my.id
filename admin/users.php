@@ -570,7 +570,12 @@ if (!window._editUserBound) {
 }
 
 // Script untuk Bulk Delete & Checkboxes
-(function() {
+function initUsersPage() {
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.DataTable === 'undefined') {
+        setTimeout(initUsersPage, 50);
+        return;
+    }
+    var $ = jQuery;
     const checkAll = document.getElementById('checkAll');
     const btnHapusTerpilih = document.getElementById('btnHapusTerpilih');
     
@@ -697,7 +702,8 @@ if (!window._editUserBound) {
             });
         });
     }
-})();
+}
+initUsersPage();
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
