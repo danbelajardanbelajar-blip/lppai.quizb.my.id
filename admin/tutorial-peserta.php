@@ -26,6 +26,18 @@ $isMessageHtml = false;
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
 $active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
 
+// Condition to exclude Lulus
+$notLulusSQL = "u.id NOT IN (
+    SELECT tr_sub.user_id FROM tutorial_registrations tr_sub 
+    WHERE tr_sub.nilai_thaharah IS NOT NULL AND tr_sub.nilai_shalat IS NOT NULL AND tr_sub.nilai_surat_pendek IS NOT NULL AND tr_sub.nilai_amaliyah IS NOT NULL AND tr_sub.nilai_jenazah IS NOT NULL AND tr_sub.nilai_ujian_tulis IS NOT NULL
+    AND tr_sub.nilai_thaharah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+    AND tr_sub.nilai_shalat >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+    AND tr_sub.nilai_surat_pendek >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+    AND tr_sub.nilai_amaliyah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+    AND tr_sub.nilai_jenazah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+    AND tr_sub.nilai_ujian_tulis >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
+)";
+
 // AJAX API Endpoint: Ambil daftar mahasiswa berdasarkan jurusan
 if (isset($_GET['ajax_jurusan'])) {
     header('Content-Type: application/json');
@@ -37,7 +49,7 @@ if (isset($_GET['ajax_jurusan'])) {
                MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
         LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
-        WHERE u.program_studi = ? AND u.role = 'mahasiswa'
+        WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
         GROUP BY u.id
         ORDER BY u.nama_lengkap
     ");
@@ -237,9 +249,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $msgType = 'danger';
                 } else {
                     $stmt = $pdo->prepare("
-                        SELECT id, nama_lengkap FROM users 
-                        WHERE program_studi = ? 
-                          AND id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')
+                        SELECT u.id, u.nama_lengkap FROM users u
+                        WHERE u.program_studi = ? 
+                          AND u.id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')
+                          AND $notLulusSQL
                     ");
                     $stmt->execute([$jurusan]);
                     $usersToRegister = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -395,7 +408,7 @@ $allStudents = $pdo->query("
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
     LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%')
-    WHERE u.role = 'mahasiswa'
+    WHERE u.role = 'mahasiswa' AND $notLulusSQL
     GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
 ")->fetchAll(PDO::FETCH_ASSOC);
