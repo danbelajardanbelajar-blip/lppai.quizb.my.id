@@ -212,9 +212,6 @@ try {
         $jenazah = isset($colMap['jenazah']) && trim((string)($row[$colMap['jenazah']] ?? '')) !== '' ? (float)trim($row[$colMap['jenazah']] ?? '') : null;
         $ut = isset($colMap['ut']) && trim((string)($row[$colMap['ut']] ?? '')) !== '' ? (float)trim($row[$colMap['ut']] ?? '') : null;
 
-        $stmtFindReg->execute([$userId]);
-        $regId = $stmtFindReg->fetchColumn();
-
         $tipe = isset($colMap['tipe_nilai']) && trim((string)($row[$colMap['tipe_nilai']] ?? '')) !== '' ? strtolower(trim($row[$colMap['tipe_nilai']] ?? '')) : null;
         if ($tipe !== null) {
             if ($tipe === 'p' || $tipe === 'pretes') $tipe = 'pretest';
@@ -223,10 +220,25 @@ try {
             elseif ($tipe === 'tm' || $tipe === 'tutorial mandiri') $tipe = 'mandiri';
         }
 
-        if ($regId) {
-            $stmtUpdate->execute([$ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
-        } else {
-            $stmtInsert->execute([$userId, $ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
+        // Cek kelulusan
+        $min_score = ($tipe === 'pretest') ? 80 : 70;
+        $isLulus = false;
+        
+        if ($thaharah !== null && $shalat !== null && $srt !== null && $amaliyah !== null && $jenazah !== null && $ut !== null) {
+            if ($thaharah >= $min_score && $shalat >= $min_score && $srt >= $min_score && $amaliyah >= $min_score && $jenazah >= $min_score && $ut >= $min_score) {
+                $isLulus = true;
+            }
+        }
+
+        if ($isLulus) {
+            $stmtFindReg->execute([$userId]);
+            $regId = $stmtFindReg->fetchColumn();
+            
+            if ($regId) {
+                $stmtUpdate->execute([$ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut, $regId]);
+            } else {
+                $stmtInsert->execute([$userId, $ta, $tipe, $thaharah, $shalat, $srt, $amaliyah, $jenazah, $ut]);
+            }
         }
         $imported++;
         

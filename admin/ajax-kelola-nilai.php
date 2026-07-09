@@ -52,8 +52,14 @@ $fromClause = "
         SELECT MAX(id) FROM tutorial_registrations WHERE user_id = u.id
     )
     WHERE u.role = 'mahasiswa' 
-    AND CAST(SUBSTRING(u.nim, 1, 2) AS UNSIGNED) <= 25
 ";
+
+$isCompleteSQL = "(tr.nilai_thaharah IS NOT NULL AND tr.nilai_shalat IS NOT NULL AND tr.nilai_surat_pendek IS NOT NULL AND tr.nilai_amaliyah IS NOT NULL AND tr.nilai_jenazah IS NOT NULL AND tr.nilai_ujian_tulis IS NOT NULL)";
+$minScoreSQL = "(CASE WHEN LOWER(tr.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)";
+$isLulusSQL = "($isCompleteSQL AND tr.nilai_thaharah >= $minScoreSQL AND tr.nilai_shalat >= $minScoreSQL AND tr.nilai_surat_pendek >= $minScoreSQL AND tr.nilai_amaliyah >= $minScoreSQL AND tr.nilai_jenazah >= $minScoreSQL AND tr.nilai_ujian_tulis >= $minScoreSQL)";
+
+// Hanya tampilkan yang LULUS saja
+$fromClause .= " AND $isLulusSQL ";
 
 $whereParams = [];
 
@@ -73,16 +79,10 @@ if ($filterJurusan !== '') {
 }
 
 if ($filterLulus !== '') {
-    $isCompleteSQL = "(tr.nilai_thaharah IS NOT NULL AND tr.nilai_shalat IS NOT NULL AND tr.nilai_surat_pendek IS NOT NULL AND tr.nilai_amaliyah IS NOT NULL AND tr.nilai_jenazah IS NOT NULL AND tr.nilai_ujian_tulis IS NOT NULL)";
-    $minScoreSQL = "(CASE WHEN LOWER(tr.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)";
-    $isLulusSQL = "($isCompleteSQL AND tr.nilai_thaharah >= $minScoreSQL AND tr.nilai_shalat >= $minScoreSQL AND tr.nilai_surat_pendek >= $minScoreSQL AND tr.nilai_amaliyah >= $minScoreSQL AND tr.nilai_jenazah >= $minScoreSQL AND tr.nilai_ujian_tulis >= $minScoreSQL)";
-    
+    // Karena query utama sudah dilimit hanya LULUS, filter ini sebenarnya tidak akan berfungsi untuk 'tidak_lulus' atau 'belum_lengkap'.
+    // Namun kita tetap pertahankan untuk menghindari error pada frontend jika filter dikirimkan.
     if ($filterLulus === 'lulus') {
         $fromClause .= " AND $isLulusSQL";
-    } elseif ($filterLulus === 'tidak_lulus') {
-        $fromClause .= " AND $isCompleteSQL AND NOT $isLulusSQL";
-    } elseif ($filterLulus === 'belum_lengkap') {
-        $fromClause .= " AND NOT $isCompleteSQL";
     }
 }
 
