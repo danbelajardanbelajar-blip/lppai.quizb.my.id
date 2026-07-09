@@ -19,7 +19,7 @@ $length = (int)($_POST['length'] ?? $_GET['length'] ?? 10);
 $searchValue = trim($_POST['search']['value'] ?? $_GET['search']['value'] ?? '');
 
 // Filter custom (dari DataTables search pada spesifik kolom atau custom input)
-$filterTahunAjaran = $_POST['filterTahunAjaran'] ?? '';
+$filterAngkatan = $_POST['filterAngkatan'] ?? '';
 $filterProdi = $_POST['filterProdi'] ?? '';
 $filterRole = $_POST['filterRole'] ?? '';
 
@@ -37,31 +37,23 @@ $columns = [
     4 => 'u.tempat_lahir',
     5 => 'u.tanggal_lahir',
     6 => 'u.program_studi',
-    7 => 'COALESCE(t.calculated_ta, u.tahun_ajaran)', // Tahun Ajaran
+    7 => 'u.angkatan', // Angkatan
     8 => 'u.role'
 ];
 
 $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
 
 // Base Query
-// Kita butuh subquery untuk calculated_ta
 $fromClause = "
     FROM users u
-    LEFT JOIN (
-        SELECT user_id, MAX(tahun_ajaran) as calculated_ta 
-        FROM tutorial_registrations 
-        WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
-        GROUP BY user_id
-    ) t ON u.id = t.user_id
     WHERE 1=1
 ";
 
 $whereParams = [];
 
-if ($filterTahunAjaran !== '') {
-    $fromClause .= " AND (t.calculated_ta = ? OR (t.calculated_ta IS NULL AND u.tahun_ajaran = ?))";
-    $whereParams[] = $filterTahunAjaran;
-    $whereParams[] = $filterTahunAjaran;
+if ($filterAngkatan !== '') {
+    $fromClause .= " AND u.angkatan = ?";
+    $whereParams[] = $filterAngkatan;
 }
 
 if ($filterProdi !== '') {
@@ -86,12 +78,10 @@ if ($searchValue !== '') {
         OR u.username LIKE ? 
         OR u.nama_lengkap LIKE ? 
         OR u.program_studi LIKE ? 
-        OR u.tahun_ajaran LIKE ?
-        OR t.calculated_ta LIKE ?
+        OR u.angkatan LIKE ?
     )";
     $searchWildcard = '%' . $searchValue . '%';
     $whereParams = array_merge($whereParams, [
-        $searchWildcard, 
         $searchWildcard, 
         $searchWildcard, 
         $searchWildcard, 
@@ -107,7 +97,7 @@ $recordsFiltered = $stmtFiltered->fetchColumn();
 
 // 4. Get Data
 $query = "
-    SELECT u.*, COALESCE(t.calculated_ta, u.tahun_ajaran) as calculated_ta
+    SELECT u.*
     $fromClause
     ORDER BY $orderBy $orderDir
 ";
@@ -133,7 +123,7 @@ foreach ($data as $row) {
     $tempatLahir = htmlspecialchars($row['tempat_lahir'] ?? '-');
     $tglLahir = !empty($row['tanggal_lahir']) ? date('d/m/Y', strtotime($row['tanggal_lahir'])) : '-';
     $prodi = htmlspecialchars(!empty($row['program_studi']) ? $row['program_studi'] : '-');
-    $ta = htmlspecialchars(!empty($row['calculated_ta']) ? $row['calculated_ta'] : (!empty($row['tahun_ajaran']) ? $row['tahun_ajaran'] : '-'));
+    $angkatan = htmlspecialchars(!empty($row['angkatan']) ? $row['angkatan'] : '-');
     
     // Role badge
     $badgeClass = 'badge-primary';
@@ -153,7 +143,7 @@ foreach ($data as $row) {
         data-prodi="'.htmlspecialchars($row['program_studi'] ?? '', ENT_QUOTES, 'UTF-8').'"
         data-tmpt-lahir="'.htmlspecialchars($row['tempat_lahir'] ?? '', ENT_QUOTES, 'UTF-8').'"
         data-tgl-lahir="'.htmlspecialchars($row['tanggal_lahir'] ?? '', ENT_QUOTES, 'UTF-8').'"
-        data-ta="'.htmlspecialchars($row['tahun_ajaran'] ?? '', ENT_QUOTES, 'UTF-8').'"
+        data-angkatan="'.htmlspecialchars($row['angkatan'] ?? '', ENT_QUOTES, 'UTF-8').'"
         data-role="'.htmlspecialchars($row['role'], ENT_QUOTES, 'UTF-8').'"
         style="margin-right:4px;">✏️ Edit</button>';
         
@@ -197,7 +187,7 @@ foreach ($data as $row) {
         $tempatLahir,
         $tglLahir,
         $prodi,
-        $ta,
+        $angkatan,
         $roleBadge,
         $aksi
     ];

@@ -10,16 +10,6 @@ $pdo = getDBConnection();
 $message = '';
 $msgType = '';
 
-// Auto-migrate: add tahun_ajaran to users if it doesn't exist
-try {
-    $pdo->query("SELECT tahun_ajaran FROM users LIMIT 1");
-} catch(PDOException $e) {
-    try {
-        $pdo->exec("ALTER TABLE users ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER program_studi");
-    } catch(PDOException $ex) {
-        // ignore
-    }
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $token = $_POST['csrf_token'] ?? '';
@@ -37,8 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email   = trim($_POST['email'] ?? '');
             $noHp    = trim($_POST['no_hp'] ?? '');
             $prodi   = trim($_POST['program_studi'] ?? '');
-            $ta      = trim($_POST['tahun_ajaran'] ?? '');
             $role    = $_POST['role'] ?? 'mahasiswa';
+            
+            // Extract angkatan dari NIM
+            $nim_prefix = substr($nim, 0, 2);
+            $angkatan = (is_numeric($nim_prefix) && strlen($nim_prefix) == 2) ? '20' . $nim_prefix : null;
 
             if (empty($nim) || empty($nama)) {
                 $message = 'NIM/Username dan nama lengkap harus diisi.';
@@ -60,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $passwordRaw = '123456'; // Default password if no birth date
                     }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, tahun_ajaran, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $ta, $role]);
+                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, angkatan, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $angkatan, $role]);
                     $safeNim = sanitize($nim);
                     $safePass = sanitize($passwordRaw);
                     $message = "User berhasil ditambahkan! Login: Username=<strong>$safeNim</strong>, Password=<strong>$safePass</strong>";
@@ -77,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $prodi   = trim($_POST['program_studi'] ?? '');
             $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
-            $ta      = trim($_POST['tahun_ajaran'] ?? '');
+            $angkatan = trim($_POST['angkatan'] ?? '');
             $role    = in_array($_POST['role'] ?? '', ['mahasiswa', 'admin', 'dosen']) ? $_POST['role'] : 'mahasiswa';
 
             if ($id <= 0 || empty($nama)) {
@@ -88,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($id === (int)$_SESSION['user_id'] && $role !== 'admin') {
                     $role = 'admin'; // proteksi: admin tidak bisa turunkan role sendiri
                 }
-                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, tahun_ajaran = ?, role = ? WHERE id = ?")
-                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $ta ?: null, $role, $id]);
+                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, angkatan = ?, role = ? WHERE id = ?")
+                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $angkatan ?: null, $role, $id]);
                 $message = 'Data pengguna berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -170,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Extrak data unik untuk dropdown filter
-$unique_ta = [];
+$unique_angkatan = [];
 $unique_prodi = [];
 $unique_role = [];
 
@@ -180,16 +173,10 @@ while ($row = $stmt->fetch()) {
     $unique_prodi[$row['program_studi']] = $row['program_studi'];
 }
 
-// Get unique tahun_ajaran from users and tutorial_registrations
-$stmt = $pdo->query("
-    SELECT DISTINCT ta FROM (
-        SELECT tahun_ajaran as ta FROM users WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != '' AND tahun_ajaran != '-'
-        UNION
-        SELECT tahun_ajaran as ta FROM tutorial_registrations WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != '' AND tahun_ajaran != '-'
-    ) t
-");
+// Get unique angkatan from users
+$stmt = $pdo->query("SELECT DISTINCT angkatan FROM users WHERE angkatan IS NOT NULL AND angkatan != '' AND angkatan != '-'");
 while ($row = $stmt->fetch()) {
-    $unique_ta[$row['ta']] = $row['ta'];
+    $unique_angkatan[$row['angkatan']] = $row['angkatan'];
 }
 
 // Get unique roles
@@ -198,7 +185,7 @@ while ($row = $stmt->fetch()) {
     $unique_role[$row['role']] = ucfirst($row['role']);
 }
 
-ksort($unique_ta);
+ksort($unique_angkatan);
 ksort($unique_prodi);
 ksort($unique_role);
 
@@ -230,7 +217,7 @@ include __DIR__ . '/../includes/header.php';
         <h3 style="margin-bottom:16px;">📤 Import Pengguna dari Excel</h3>
         <p style="margin-bottom:16px;color:#666;font-size:14px;">
             Upload file Excel (.xlsx) sesuai template. Kolom wajib: <strong>NIM, Nama Lengkap, Tanggal Lahir</strong>.<br>
-            Kolom opsional: Tempat Lahir, Email, No. HP, Program Studi, Tahun Ajaran, Role.<br>
+            Kolom opsional: Tempat Lahir, Email, No. HP, Program Studi, Role.<br>
             Username otomatis = NIM. Password otomatis = tanggal lahir format <strong>ddmmyyyy</strong>.<br>
             NIM yang sudah terdaftar akan dilewati.
         </p>
@@ -371,10 +358,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <label>Program Studi</label>
                     <input type="text" name="program_studi" placeholder="Program studi">
                 </div>
-                <div class="form-group" id="group_ta">
-                    <label>Tahun Ajaran</label>
-                    <input type="text" name="tahun_ajaran" placeholder="Contoh: 2026-2027">
-                </div>
+
                 <div class="form-group">
                     <label>Email</label>
                     <input type="email" name="email" placeholder="Email">
@@ -389,16 +373,13 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                 function toggleFields() {
                     const role = document.getElementById('create_role').value;
                     const prodi = document.getElementById('group_prodi');
-                    const ta = document.getElementById('group_ta');
                     const labelNim = document.getElementById('label_nim');
                     
                     if (role === 'mahasiswa') {
                         prodi.style.display = 'block';
-                        ta.style.display = 'block';
                         labelNim.innerHTML = 'NIM * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     } else {
                         prodi.style.display = 'none';
-                        ta.style.display = 'none';
                         labelNim.innerHTML = 'Username / NIP * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     }
                 }
@@ -426,12 +407,12 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
         <div class="filter-container" style="display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; background: linear-gradient(145deg, #f8f9fa, #ffffff); padding: 20px; border-radius: 12px; border: 1px solid #e9ecef; box-shadow: 0 4px 6px rgba(0,0,0,0.02);">
             <div style="flex: 1; min-width: 220px;">
                 <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-                    📅 <span>Tahun Ajaran</span>
+                    📅 <span>Angkatan</span>
                 </label>
-                <select id="filter_ta" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
-                    <option value="">Semua Tahun Ajaran</option>
-                    <?php foreach ($unique_ta as $ta): ?>
-                        <option value="<?= htmlspecialchars($ta) ?>"><?= htmlspecialchars($ta) ?></option>
+                <select id="filter_angkatan" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Angkatan</option>
+                    <?php foreach ($unique_angkatan as $angkatan): ?>
+                        <option value="<?= htmlspecialchars($angkatan) ?>"><?= htmlspecialchars($angkatan) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -470,7 +451,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <th>Tempat Lahir</th>
                         <th>Tgl Lahir (Password)</th>
                         <th>Prodi</th>
-                        <th>Tahun Ajaran</th>
+                        <th>Angkatan</th>
                         <th>Role</th>
                         <th>Aksi</th>
                     </tr>
@@ -521,8 +502,8 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <input type="text" name="program_studi" id="edit_user_prodi" placeholder="Program studi">
                 </div>
                 <div class="form-group">
-                    <label>Tahun Ajaran</label>
-                    <input type="text" name="tahun_ajaran" id="edit_user_ta" placeholder="Contoh: 2026-2027">
+                    <label>Angkatan</label>
+                    <input type="text" name="angkatan" id="edit_user_angkatan" placeholder="Contoh: 2024">
                 </div>
                 <div class="form-group">
                     <label>Tempat Lahir</label>
@@ -552,7 +533,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </div>
 
 <script>
-function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, ta, role) {
+function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkatan, role) {
     document.getElementById('edit_user_id').value       = id;
     document.getElementById('edit_user_nama').value     = nama;
     document.getElementById('edit_user_email').value    = email;
@@ -560,7 +541,7 @@ function openUserModal(id, nama, email, noHp, prodi, tmptLahir, tglLahir, ta, ro
     document.getElementById('edit_user_prodi').value    = prodi;
     document.getElementById('edit_user_tmptlahir').value= tmptLahir;
     document.getElementById('edit_user_tgllahir').value = tglLahir;
-    document.getElementById('edit_user_ta').value       = ta;
+    document.getElementById('edit_user_angkatan').value = angkatan;
     document.getElementById('edit_user_role').value     = role;
     document.getElementById('editUserModal').classList.add('show');
 }
@@ -577,7 +558,7 @@ if (!window._editUserBound) {
         var btn = e.target.closest('.btn-edit-user');
         if (btn) {
             var d = btn.dataset;
-            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.ta, d.role);
+            openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.angkatan, d.role);
             return;
         }
         if (e.target && e.target.id === 'editUserModal') closeUserModal();
@@ -646,7 +627,7 @@ if (!window._editUserBound) {
             url: 'ajax-users.php',
             type: 'POST',
             data: function (d) {
-                d.filterTahunAjaran = $('#filter_ta').val();
+                d.filterAngkatan = $('#filter_angkatan').val();
                 d.filterProdi = $('#filter_prodi').val();
                 d.filterRole = $('#filter_role').val();
             },
@@ -677,7 +658,7 @@ if (!window._editUserBound) {
     });
 
     // Reload table on filter change
-    $('#filter_ta, #filter_prodi, #filter_role').on('change', function() {
+    $('#filter_angkatan, #filter_prodi, #filter_role').on('change', function() {
         table.ajax.reload();
     });
 
