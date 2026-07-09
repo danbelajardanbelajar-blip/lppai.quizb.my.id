@@ -34,23 +34,22 @@ try {
             $userIds = array_column($usersToDelete, 'id');
             $placeholders = implode(',', array_fill(0, count($userIds), '?'));
 
-            // Delete dari registrasi terlebih dahulu (mencegah constraint error)
+            // Hanya hapus nilai/pendaftaran dari tabel tutorial_registrations
             $pdo->prepare("DELETE FROM tutorial_registrations WHERE user_id IN ($placeholders)")->execute($userIds);
             
-            // Delete dari tabel users utama
-            $pdo->prepare("DELETE FROM users WHERE id IN ($placeholders)")->execute($userIds);
             $deletedCount = count($userIds);
         }
         $pdo->commit();
 
         echo "<h3 style='color:green;'>Proses Hapus Data Selesai!</h3>";
-        echo "<p>Berhasil menghapus <strong>$deletedCount</strong> akun mahasiswa yang belum lulus.</p>";
+        echo "<p>Berhasil menghapus <strong>$deletedCount</strong> data nilai/pendaftaran mahasiswa yang belum lulus (Akun mahasiswa tetap aman).</p>";
         echo "<br><p style='color:red;'>Silakan hapus file <b>delete-belum-lulus.php</b> ini dari server setelah selesai digunakan demi keamanan.</p>";
         echo "<br><a href='/admin/kelola-nilai.php'>Kembali ke Halaman Kelola Nilai</a>";
     } else {
         echo "<div style='font-family: sans-serif; padding: 20px;'>";
         echo "<h3>Preview Data yang Akan Dihapus</h3>";
-        echo "<p>Ditemukan <strong>" . count($usersToDelete) . "</strong> mahasiswa yang statusnya Belum Lulus / Tidak Lulus / Belum Lengkap pada halaman Kelola Nilai.</p>";
+        echo "<p>Ditemukan <strong>" . count($usersToDelete) . "</strong> mahasiswa yang statusnya Belum Lulus / Tidak Lulus / Belum Lengkap pada halaman Kelola Nilai.</p>
+        <p style='color: orange;'><strong>Penting:</strong> Proses ini hanya akan menghapus <strong>nilai dan riwayat pendaftarannya</strong> saja. Akun (NIM) mahasiswa akan tetap aman dan bisa digunakan login.</p>
         
         if (count($usersToDelete) > 0) {
             echo "<table border='1' cellpadding='8' style='border-collapse: collapse; margin-bottom: 20px; width: 100%; max-width: 600px;'>
