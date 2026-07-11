@@ -188,6 +188,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = count($regIds) . ' pendaftar berhasil dihapus sepenuhnya.';
                 $msgType = 'success';
             }
+
+        /* ---- HAPUS KELAS ---- */
+        } elseif ($action === 'delete_class') {
+            $classId = (int)($_POST['class_id'] ?? 0);
+            if ($classId > 0) {
+                $pdo->beginTransaction();
+                try {
+                    // Set tutorial_class_id = NULL untuk semua mahasiswa di kelas ini
+                    $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE tutorial_class_id = ?")
+                        ->execute([$classId]);
+                    // Hapus kelas dari tutorial_classes
+                    $pdo->prepare("DELETE FROM tutorial_classes WHERE id = ?")
+                        ->execute([$classId]);
+                    $pdo->commit();
+                    $message = 'Kelas berhasil dihapus beserta semua pesertanya.';
+                    $msgType = 'success';
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    $message = 'Gagal menghapus kelas: ' . $e->getMessage();
+                    $msgType = 'danger';
+                }
+            }
             
         /* ---- EDIT PENDAFTARAN ---- */
         } elseif ($action === 'edit_pendaftaran') {
@@ -996,17 +1018,20 @@ $chartData = json_encode(array_values($statsKelas));
         <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
             <span style="font-size:20px;">📋</span> Daftar Peserta Tutorial (<span class="badge-count" style="background:#e0e7ff; color:#4f46e5; padding:2px 8px; border-radius:12px; font-size:14px;">0</span>)
         </span>
-        <div style="flex:1; max-width:300px;">
-            <select id="filterKelasBottom"
-                style="width:100%;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;font-weight:500;color:#334155;box-shadow:0 1px 2px rgba(0,0,0,0.05);cursor:pointer;">
-                <option value="ALL">-- Tampilkan Semua Kelas --</option>
-                <option value="">-- Pilih Kelas --</option>
-                <?php foreach ($classes as $c): ?>
-                    <option value="<?= $c['id'] ?>">
-                        <?= sanitize($c['nama_kelas']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <div style="flex:1; max-width:300px;">
+                <select id="filterKelasBottom"
+                    style="width:100%;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;font-weight:500;color:#334155;box-shadow:0 1px 2px rgba(0,0,0,0.05);cursor:pointer;">
+                    <option value="ALL">-- Tampilkan Semua Kelas --</option>
+                    <option value="">-- Pilih Kelas --</option>
+                    <?php foreach ($classes as $c): ?>
+                        <option value="<?= $c['id'] ?>">
+                            <?= sanitize($c['nama_kelas']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger" id="btnDeleteClass" style="display:none;" data-confirm="Yakin ingin menghapus kelas ini beserta semua pesertanya?">🗑️ Hapus Kelas</button>
         </div>
     </div>
     <div class="card-body">
@@ -1206,6 +1231,8 @@ window.closeEditModal = function() {
                     if (countBadge) countBadge.textContent = '0';
                     var bulkContainer = document.getElementById('bulkActionsContainer');
                     if (bulkContainer) bulkContainer.style.display = 'none';
+                    var btnDeleteClass = document.getElementById('btnDeleteClass');
+                    if (btnDeleteClass) btnDeleteClass.style.display = 'none';
                 } else {
                     if ($.fn.DataTable.isDataTable(tableEl)) {
                         var info = tableEl.DataTable().page.info();
@@ -1224,11 +1251,15 @@ window.closeEditModal = function() {
                             if (tableDiv) tableDiv.style.display = 'block';
                             var bulkContainer = document.getElementById('bulkActionsContainer');
                             if (bulkContainer) bulkContainer.style.display = 'block';
+                            var btnDeleteClass = document.getElementById('btnDeleteClass');
+                            if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
                         }
                         if (emptyState) emptyState.style.display = 'none';
                         if (tableDiv) tableDiv.style.display = 'block';
                         var bulkContainer = document.getElementById('bulkActionsContainer');
                         if (bulkContainer) bulkContainer.style.display = 'block';
+                        var btnDeleteClass = document.getElementById('btnDeleteClass');
+                        if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
                     }
                 }
             });
@@ -1254,6 +1285,45 @@ window.closeEditModal = function() {
                         checkboxes.forEach(function(cb) {
                             cb.checked = newCheckedState;
                         });
+                    }
+                });
+            }
+
+            // Logic untuk Delete Class
+            var btnDeleteClass = document.getElementById('btnDeleteClass');
+            if (btnDeleteClass) {
+                btnDeleteClass.addEventListener('click', function() {
+                    var selectedClassId = filterKelasBottom.value;
+                    if (!selectedClassId || selectedClassId === 'ALL' || selectedClassId === '') {
+                        alert('Silakan pilih kelas terlebih dahulu.');
+                        return;
+                    }
+
+                    if (confirm(this.getAttribute('data-confirm'))) {
+                        var form = document.createElement('form');
+                        form.method = 'POST';
+                        form.style.display = 'none';
+
+                        var csrfInput = document.createElement('input');
+                        csrfInput.type = 'hidden';
+                        csrfInput.name = 'csrf_token';
+                        csrfInput.value = '<?= csrfToken() ?>';
+                        form.appendChild(csrfInput);
+
+                        var actionInput = document.createElement('input');
+                        actionInput.type = 'hidden';
+                        actionInput.name = 'action';
+                        actionInput.value = 'delete_class';
+                        form.appendChild(actionInput);
+
+                        var classIdInput = document.createElement('input');
+                        classIdInput.type = 'hidden';
+                        classIdInput.name = 'class_id';
+                        classIdInput.value = selectedClassId;
+                        form.appendChild(classIdInput);
+
+                        document.body.appendChild(form);
+                        form.submit();
                     }
                 });
             }
