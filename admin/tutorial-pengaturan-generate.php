@@ -445,6 +445,7 @@ $registrations = $pdo->query("
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
+      AND $notLulusSQL
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
@@ -465,6 +466,7 @@ $allRegistrations = $pdo->query("
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
+      AND $notLulusSQL
     ORDER BY tr.created_at DESC
 ")->fetchAll();
 
