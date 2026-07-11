@@ -9,7 +9,7 @@ requireDosen();
 $user = getCurrentUser();
 $pdo = getDBConnection();
 
-$stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '2026-%' OR semester LIKE '2027-%' OR semester LIKE '2028-%' OR semester LIKE '2029-%' OR semester LIKE '2030-%') ORDER BY semester DESC, created_at DESC");
+$stmt = $pdo->prepare("SELECT * FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '%2025%' OR semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%') ORDER BY semester DESC, created_at DESC");
 $stmt->execute([$user['nama_lengkap']]);
 $kelasData = $stmt->fetchAll();
 
