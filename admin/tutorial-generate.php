@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $semester = $gel['semester'];
-    $tahun_ajaran = $gel['tahun_ajaran'];
+    $tahun_ajaran = str_replace('/', '-', $gel['tahun_ajaran']);
     $gelombang_name = $gel['gelombang'];
 
     // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
