@@ -94,13 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $classId = (int)$pdo->lastInsertId();
 
                 $added = 0;
-                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status) VALUES (?, ?, 'terdaftar')");
+                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status, tahun_ajaran, tipe_nilai) VALUES (?, ?, 'terdaftar', ?, 'tutorial')");
 
                 foreach ($userIds as $uid) {
-                    // Cek apakah mahasiswa ini sudah ada di kelas lain? 
+                    // Cek apakah mahasiswa ini sudah ada di kelas lain?
                     // Karena membuat kelas baru, tidak mungkin sudah ada di kelas *ini*.
                     // Kita insert saja
-                    $stmtInsert->execute([$uid, $classId]);
+                    $stmtInsert->execute([$uid, $classId, $semester]);
                     $added++;
                 }
 
@@ -126,18 +126,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $regId  = (int)($_POST['reg_id'] ?? 0);
             $newClassId = (int)($_POST['tutorial_class_id'] ?? 0);
             $newRuangan = trim($_POST['ruangan'] ?? '');
-            
+
             if ($regId > 0 && $newClassId > 0) {
+                // Ambil tahun_ajaran dari kelas yang dipilih
+                $stmtClass = $pdo->prepare("SELECT semester FROM tutorial_classes WHERE id = ?");
+                $stmtClass->execute([$newClassId]);
+                $classData = $stmtClass->fetch();
+                $semester = $classData ? $classData['semester'] : null;
+
                 // Pindahkan mahasiswa
-                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ? WHERE id = ?")
-                    ->execute([$newClassId, $regId]);
-                
+                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ?, tahun_ajaran = ?, tipe_nilai = 'tutorial' WHERE id = ?")
+                    ->execute([$newClassId, $semester, $regId]);
+
                 // Update ruangan kelas jika diisi
                 if ($newRuangan !== '') {
                     $pdo->prepare("UPDATE tutorial_classes SET ruangan = ? WHERE id = ?")
                         ->execute([$newRuangan, $newClassId]);
                 }
-                
+
                 $message = 'Data penempatan berhasil diperbarui.';
                 $msgType = 'success';
             }

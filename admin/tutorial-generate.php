@@ -56,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Siapkan statement untuk membuat kelas
     $stmtInsertClass = $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?, ?, ?, '13.00 - 14.30', NULL, ?, ?, 30)");
     
-    // Siapkan statement untuk update class id mahasiswa
-    $stmtUpdateReg = $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ? WHERE id = ?");
+    // Siapkan statement untuk update class id mahasiswa beserta tahun_ajaran dan tipe_nilai
+    $stmtUpdateReg = $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ?, tahun_ajaran = ?, tipe_nilai = 'tutorial' WHERE id = ?");
 
     $pdo->beginTransaction();
 
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $classIndex++;
                     
                     foreach ($chunk as $regId) {
-                        $stmtUpdateReg->execute([$classId, $regId]);
+                        $stmtUpdateReg->execute([$classId, $tahun_ajaran, $regId]);
                     }
                     
                     $tutorIndex++;
@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Masukkan mahasiswa ke kelas ini
                     foreach ($chunk as $regId) {
-                        $stmtUpdateReg->execute([$classId, $regId]);
+                        $stmtUpdateReg->execute([$classId, $tahun_ajaran, $regId]);
                     }
                 }
             }
