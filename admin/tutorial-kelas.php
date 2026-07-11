@@ -150,7 +150,7 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                     <select name="tahun_ajaran" required>
                         <option value="">-- Pilih Tahun --</option>
                         <?php for($y=2017; $y<=2049; $y++): ?>
-                        <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                        <option value="<?= $y . '-' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
                         <?php endfor; ?>
                     </select>
                 </div>
@@ -318,7 +318,7 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                 <select name="tahun_ajaran" id="edit_tahun_ajaran" required>
                     <option value="">-- Pilih Tahun --</option>
                     <?php for($y=2017; $y<=2049; $y++): ?>
-                    <option value="<?= $y . '/' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                    <option value="<?= $y . '-' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
                     <?php endfor; ?>
                 </select>
             </div>

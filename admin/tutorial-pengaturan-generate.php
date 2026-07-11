@@ -48,7 +48,7 @@ if (isset($_GET['ajax_jurusan'])) {
                (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
                MAX(tr.hari_pilihan) as hari_pilihan
         FROM users u 
-        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%' OR tr.tahun_ajaran IS NULL)
+        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
         WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
         GROUP BY u.id
         ORDER BY u.nama_lengkap
@@ -82,7 +82,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // Nilai Default
             $gelombang = 'gel1';
             $tahun = date('Y');
-            $semester = $tahun . '/' . ($tahun+1) . '-Ganjil';
+            $semester = $tahun . '-' . ($tahun+1) . '-Ganjil';
+            $tahun_ajaran = $tahun . '-' . ($tahun+1);
+            
+            $tipe_nilai = 'mandiri';
+            if ($gelombang === 'gel1') $tipe_nilai = 'gel 1';
+            else if ($gelombang === 'gel2') $tipe_nilai = 'gel 2';
 
                 if (empty($namaKelas) || empty($userIds)) {
                     $message = 'Isi Nama Kelas dan pilih minimal satu mahasiswa.';
@@ -94,13 +99,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $classId = (int)$pdo->lastInsertId();
 
                 $added = 0;
-                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status, tahun_ajaran, tipe_nilai) VALUES (?, ?, 'terdaftar', ?, 'tutorial')");
+                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, tutorial_class_id, status, tahun_ajaran, tipe_nilai) VALUES (?, ?, 'terdaftar', ?, ?)");
 
                 foreach ($userIds as $uid) {
                     // Cek apakah mahasiswa ini sudah ada di kelas lain?
                     // Karena membuat kelas baru, tidak mungkin sudah ada di kelas *ini*.
                     // Kita insert saja
-                    $stmtInsert->execute([$uid, $classId, $semester]);
+                    $stmtInsert->execute([$uid, $classId, $tahun_ajaran, $tipe_nilai]);
                     $added++;
                 }
 
@@ -129,14 +134,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             if ($regId > 0 && $newClassId > 0) {
                 // Ambil tahun_ajaran dari kelas yang dipilih
-                $stmtClass = $pdo->prepare("SELECT semester FROM tutorial_classes WHERE id = ?");
+                $stmtClass = $pdo->prepare("SELECT semester, gelombang FROM tutorial_classes WHERE id = ?");
                 $stmtClass->execute([$newClassId]);
                 $classData = $stmtClass->fetch();
-                $semester = $classData ? $classData['semester'] : null;
+                $semStr = $classData ? $classData['semester'] : '';
+                $gel = $classData ? $classData['gelombang'] : '';
+                
+                $tahun_ajaran = '';
+                if (preg_match('/^(\d{4}[-\/]\d{4})/', $semStr, $m)) {
+                    $tahun_ajaran = str_replace('/', '-', $m[1]);
+                }
+                
+                $tipe_nilai = 'mandiri';
+                if ($gel === 'gel1') $tipe_nilai = 'gel 1';
+                else if ($gel === 'gel2') $tipe_nilai = 'gel 2';
 
                 // Pindahkan mahasiswa
-                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ?, tahun_ajaran = ?, tipe_nilai = 'tutorial' WHERE id = ?")
-                    ->execute([$newClassId, $semester, $regId]);
+                $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = ?, tahun_ajaran = ?, tipe_nilai = ? WHERE id = ?")
+                    ->execute([$newClassId, $tahun_ajaran, $tipe_nilai, $regId]);
 
                 // Update ruangan kelas jika diisi
                 if ($newRuangan !== '') {
@@ -231,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $gelombang = $active_gel['gelombang'] ?? 'gel1';
 
             if ($user_id > 0 && $hari_pilihan !== '') {
-                $stmtCek = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE user_id = ? AND (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL)");
+                $stmtCek = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE user_id = ? AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
                 $stmtCek->execute([$user_id]);
                 if ($stmtCek->fetchColumn() > 0) {
                     $message = 'Mahasiswa ini sudah terdaftar sebelumnya.';
@@ -240,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $dayLower = strtolower($hari_pilihan);
                     $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                     
-                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL)");
+                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
                     $stmtCount->execute([$hari_pilihan]);
                     $terisi = $stmtCount->fetchColumn();
                     $sisaKuota = $totalKuota - $terisi;
@@ -270,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $dayLower = strtolower($hari_pilihan);
                 $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
                 
-                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%')");
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%')");
                 $stmtCount->execute([$hari_pilihan]);
                 $terisi = $stmtCount->fetchColumn();
                 $sisaKuota = $totalKuota - $terisi;
@@ -282,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt = $pdo->prepare("
                         SELECT u.id, u.nama_lengkap FROM users u
                         WHERE u.program_studi = ? 
-                          AND u.id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL)
+                          AND u.id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)
                           AND $notLulusSQL
                     ");
                     $stmt->execute([$jurusan]);
@@ -350,7 +365,7 @@ $students = $pdo->query("
     SELECT id, nama_lengkap, nim, program_studi
     FROM users
     WHERE role = 'mahasiswa'
-    AND id IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL)
+    AND id IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)
     ORDER BY nama_lengkap
 ")->fetchAll();
 $classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '2025/%' OR semester LIKE '2026/%' OR semester LIKE '2027/%' OR semester LIKE '2028/%' OR semester LIKE '2029/%' OR semester LIKE '2030/%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
@@ -362,7 +377,7 @@ $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Ju
 if ($active_gel) {
     try {
         // Coba hitung berdasarkan hari_pilihan dari SEMUA registrasi aktif
-        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
+        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
         foreach ($stmtCount->fetchAll() as $row) {
             $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
             if (isset($registeredCounts[$hari])) {
@@ -420,7 +435,7 @@ $registered = $pdo->query("
 ")->fetchAll(PDO::FETCH_KEY_PAIR); // user_id => tutorial_class_id (mungkin multi, gunakan fetchAll biasa)
 
 $registeredPairs = [];
-foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL)")->fetchAll() as $row) {
+foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)")->fetchAll() as $row) {
     $registeredPairs[$row['user_id'] . '_' . $row['tutorial_class_id']] = true;
 }
 
@@ -429,7 +444,7 @@ $registrations = $pdo->query("
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL) GROUP BY user_id)
+    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
@@ -438,7 +453,7 @@ $allStudents = $pdo->query("
            MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
-    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025/%' OR tr.tahun_ajaran LIKE '2026/%' OR tr.tahun_ajaran LIKE '2027/%' OR tr.tahun_ajaran LIKE '2028/%' OR tr.tahun_ajaran LIKE '2029/%' OR tr.tahun_ajaran LIKE '2030/%' OR tr.tahun_ajaran IS NULL)
+    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
     WHERE u.role = 'mahasiswa' AND $notLulusSQL
     GROUP BY u.id
     ORDER BY u.program_studi, u.nama_lengkap
@@ -449,7 +464,7 @@ $allRegistrations = $pdo->query("
     SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
-    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025/%' OR tahun_ajaran LIKE '2026/%' OR tahun_ajaran LIKE '2027/%' OR tahun_ajaran LIKE '2028/%' OR tahun_ajaran LIKE '2029/%' OR tahun_ajaran LIKE '2030/%' OR tahun_ajaran IS NULL) GROUP BY user_id)
+    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
     ORDER BY tr.created_at DESC
 ")->fetchAll();
 
