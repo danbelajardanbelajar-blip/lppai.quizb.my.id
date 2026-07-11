@@ -195,6 +195,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($classId > 0) {
                 $pdo->beginTransaction();
                 try {
+                    // Hapus data absensi terkait kelas ini
+                    $pdo->prepare("DELETE FROM tutorial_attendance WHERE tutorial_class_id = ?")
+                        ->execute([$classId]);
                     // Set tutorial_class_id = NULL untuk semua mahasiswa di kelas ini
                     $pdo->prepare("UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE tutorial_class_id = ?")
                         ->execute([$classId]);
