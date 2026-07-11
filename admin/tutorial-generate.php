@@ -167,6 +167,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 } else {
     // Jika bukan POST, kembalikan ke peserta
-    header("Location: tutorial-peserta.php");
+    header("Location: tutorial-hasil-plotting.php");
     exit;
 }

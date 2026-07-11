@@ -14,7 +14,7 @@ $msgType = '';
 $unassignedClasses = $pdo->query("SELECT * FROM tutorial_classes WHERE ruangan IS NULL ORDER BY hari, nama_kelas")->fetchAll();
 
 if (empty($unassignedClasses)) {
-    header("Location: tutorial-peserta.php?tab=peserta");
+    header("Location: tutorial-hasil-plotting.php");
     exit;
 }
 
@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 
                 $pdo->commit();
                 // Selesai assign, pindah ke tabel hasil
-                header("Location: tutorial-peserta.php?tab=peserta");
+                header("Location: tutorial-hasil-plotting.php");
                 exit;
             } catch (Exception $e) {
                 $pdo->rollBack();
