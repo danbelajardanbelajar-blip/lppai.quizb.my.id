@@ -486,10 +486,24 @@ window.openTutorialTab = function(evt, tabId) {
     document.querySelectorAll('.custom-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     evt.currentTarget.classList.add('active');
-    
+
     // Trigger window resize so Chart.js recalculates canvas size properly when it becomes visible
     window.dispatchEvent(new Event('resize'));
 }
+
+// Auto-open tab based on URL parameter
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam) {
+        const tabId = 'tab-' + tabParam;
+        const tabElement = document.getElementById(tabId);
+        const tabButton = document.querySelector(`.custom-tab[onclick*="'${tabId}'"]`);
+        if (tabElement && tabButton) {
+            tabButton.click();
+        }
+    }
+});
 </script>
 
 <div id="tab-pendaftar" class="tab-content">
