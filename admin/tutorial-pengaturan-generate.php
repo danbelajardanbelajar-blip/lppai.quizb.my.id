@@ -1108,35 +1108,39 @@ window.closeAddSingleRegistrationModal = function() {
     document.getElementById('addSingleRegistrationModal').style.display = 'none';
 };
 
-document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeAddSingleRegistrationModal();
-        alert('Mahasiswa berhasil didaftarkan.');
-        window.location.reload();
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
+if (document.querySelector('#addSingleRegistrationModal form')) {
+    document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('', { method: 'POST', body: formData })
+        .then(res => res.text())
+        .then(html => {
+            closeAddSingleRegistrationModal();
+            alert('Mahasiswa berhasil didaftarkan.');
+            window.location.reload();
+        })
+        .catch(err => {
+            alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
+        });
     });
-});
+}
 
-document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-    fetch('', { method: 'POST', body: formData })
-    .then(res => res.text())
-    .then(html => {
-        closeEditPendaftarModal();
-        alert('Pilihan hari berhasil diperbarui.');
-        window.location.reload();
-    })
-    .catch(err => {
-        alert('Terjadi kesalahan saat mengedit pendaftaran.');
+if (document.querySelector('#editPendaftarModal form')) {
+    document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('', { method: 'POST', body: formData })
+        .then(res => res.text())
+        .then(html => {
+            closeEditPendaftarModal();
+            alert('Pilihan hari berhasil diperbarui.');
+            window.location.reload();
+        })
+        .catch(err => {
+            alert('Terjadi kesalahan saat mengedit pendaftaran.');
+        });
     });
-});
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
