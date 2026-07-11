@@ -744,31 +744,60 @@ window.closeEditModal = function() {
                         return;
                     }
 
-                    if (confirm(this.getAttribute('data-confirm'))) {
-                        var form = document.createElement('form');
-                        form.method = 'POST';
-                        form.style.display = 'none';
+                    if (typeof showConfirm === 'function') {
+                        showConfirm(this.getAttribute('data-my-confirm'), function() {
+                            var form = document.createElement('form');
+                            form.method = 'POST';
+                            form.style.display = 'none';
 
-                        var csrfInput = document.createElement('input');
-                        csrfInput.type = 'hidden';
-                        csrfInput.name = 'csrf_token';
-                        csrfInput.value = '<?= csrfToken() ?>';
-                        form.appendChild(csrfInput);
+                            var csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = 'csrf_token';
+                            csrfInput.value = '<?= csrfToken() ?>';
+                            form.appendChild(csrfInput);
 
-                        var actionInput = document.createElement('input');
-                        actionInput.type = 'hidden';
-                        actionInput.name = 'action';
-                        actionInput.value = 'delete_class';
-                        form.appendChild(actionInput);
+                            var actionInput = document.createElement('input');
+                            actionInput.type = 'hidden';
+                            actionInput.name = 'action';
+                            actionInput.value = 'delete_class';
+                            form.appendChild(actionInput);
 
-                        var classIdInput = document.createElement('input');
-                        classIdInput.type = 'hidden';
-                        classIdInput.name = 'class_id';
-                        classIdInput.value = selectedClassId;
-                        form.appendChild(classIdInput);
+                            var classIdInput = document.createElement('input');
+                            classIdInput.type = 'hidden';
+                            classIdInput.name = 'class_id';
+                            classIdInput.value = selectedClassId;
+                            form.appendChild(classIdInput);
 
-                        document.body.appendChild(form);
-                        form.submit();
+                            document.body.appendChild(form);
+                            form.submit();
+                        }, 'danger');
+                    } else {
+                        if (confirm(this.getAttribute('data-my-confirm'))) {
+                            var form = document.createElement('form');
+                            form.method = 'POST';
+                            form.style.display = 'none';
+
+                            var csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = 'csrf_token';
+                            csrfInput.value = '<?= csrfToken() ?>';
+                            form.appendChild(csrfInput);
+
+                            var actionInput = document.createElement('input');
+                            actionInput.type = 'hidden';
+                            actionInput.name = 'action';
+                            actionInput.value = 'delete_class';
+                            form.appendChild(actionInput);
+
+                            var classIdInput = document.createElement('input');
+                            classIdInput.type = 'hidden';
+                            classIdInput.name = 'class_id';
+                            classIdInput.value = selectedClassId;
+                            form.appendChild(classIdInput);
+
+                            document.body.appendChild(form);
+                            form.submit();
+                        }
                     }
                 });
             }
