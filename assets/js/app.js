@@ -537,6 +537,20 @@ document.addEventListener('click', function(e) {
 document.addEventListener('submit', function(e) {
     var form = e.target;
 
+    var submitBtns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+    submitBtns.forEach(function(btn) {
+        setTimeout(function() {
+            btn.disabled = true;
+            if (btn.tagName === 'BUTTON') {
+                if (!btn.hasAttribute('data-old-text')) {
+                    btn.setAttribute('data-old-text', btn.innerHTML);
+                }
+                btn.innerHTML = 'Memproses...';
+            }
+        }, 10);
+    });
+
+
     if (!form.closest('.content-area')) return;
     if (form.getAttribute('enctype') === 'multipart/form-data') return;
     if (form.querySelector('input[type="file"]')) return;
