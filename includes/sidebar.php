@@ -47,17 +47,17 @@ function menuActive($page) {
                     <span class="icon">📋</span> Data Peserta Tutorial 
                     <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
                 </a>
-                <div class="submenu" style="display: <?= (in_array($currentPage, ['tutorial-pendaftaran-kolektif.php', 'tutorial-data-pendaftar.php', 'tutorial-pengaturan-generate.php', 'tutorial-hasil-plotting.php'])) ? 'block' : 'none' ?>; background-color: #f1f5f9; padding: 4px 0;">
-                    <a href="<?= BASE_URL ?>/admin/tutorial-pendaftaran-kolektif.php" class="page-nav <?= menuActive('tutorial-pendaftaran-kolektif.php') ?>" style="padding-left: 40px; font-size: 14px;">
+                <div class="submenu" style="display: <?= (in_array($currentPage, ['tutorial-pendaftaran-kolektif.php', 'tutorial-data-pendaftar.php', 'tutorial-pengaturan-generate.php', 'tutorial-hasil-plotting.php'])) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-pendaftaran-kolektif.php" class="page-nav <?= menuActive('tutorial-pendaftaran-kolektif.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Pendaftaran Kolektif
                     </a>
-                    <a href="<?= BASE_URL ?>/admin/tutorial-data-pendaftar.php" class="page-nav <?= menuActive('tutorial-data-pendaftar.php') ?>" style="padding-left: 40px; font-size: 14px;">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-data-pendaftar.php" class="page-nav <?= menuActive('tutorial-data-pendaftar.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Data Pendaftar
                     </a>
-                    <a href="<?= BASE_URL ?>/admin/tutorial-pengaturan-generate.php" class="page-nav <?= menuActive('tutorial-pengaturan-generate.php') ?>" style="padding-left: 40px; font-size: 14px;">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-pengaturan-generate.php" class="page-nav <?= menuActive('tutorial-pengaturan-generate.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Pengaturan & Generate
                     </a>
-                    <a href="<?= BASE_URL ?>/admin/tutorial-hasil-plotting.php" class="page-nav <?= menuActive('tutorial-hasil-plotting.php') ?>" style="padding-left: 40px; font-size: 14px;">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-hasil-plotting.php" class="page-nav <?= menuActive('tutorial-hasil-plotting.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Hasil Plotting & Jadwal
                     </a>
                 </div>
