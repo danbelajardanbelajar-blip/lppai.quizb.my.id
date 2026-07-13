@@ -628,10 +628,13 @@ window.closeEditPendaftarModal = function() {
     document.getElementById('editPendaftarModal').style.display = 'none';
 };
 
-document.getElementById('edit_class_id').addEventListener('change', function() {
-    var classId = this.value;
-    document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
-});
+var editClassIdEl = document.getElementById('edit_class_id');
+if (editClassIdEl) {
+    editClassIdEl.addEventListener('change', function() {
+        var classId = this.value;
+        document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
+    });
+}
 
 window.closeEditModal = function() {
     document.getElementById('editPesertaModal').style.display = 'none';
