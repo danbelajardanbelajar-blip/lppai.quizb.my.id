@@ -368,7 +368,7 @@ $students = $pdo->query("
     AND id IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)
     ORDER BY nama_lengkap
 ")->fetchAll();
-$classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '2025/%' OR semester LIKE '2026/%' OR semester LIKE '2027/%' OR semester LIKE '2028/%' OR semester LIKE '2029/%' OR semester LIKE '2030/%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
+$classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '2025%' OR semester LIKE '2026%' OR semester LIKE '2027%' OR semester LIKE '2028%' OR semester LIKE '2029%' OR semester LIKE '2030%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
 $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
