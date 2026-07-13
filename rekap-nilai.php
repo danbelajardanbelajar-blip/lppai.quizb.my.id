@@ -407,30 +407,27 @@ include __DIR__ . '/includes/header.php';
             <input type="hidden" name="reg_id" id="edit_nilai_reg_id" value="">
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:24px;">
+                <?php
+                $fields = [
+                    ['id' => 'edit_thaharah', 'name' => 'nilai_thaharah', 'label' => 'Thaharah'],
+                    ['id' => 'edit_shalat', 'name' => 'nilai_shalat', 'label' => 'Shalat'],
+                    ['id' => 'edit_srt_pdk', 'name' => 'nilai_surat_pendek', 'label' => 'Surat Pendek'],
+                    ['id' => 'edit_amaliyah', 'name' => 'nilai_amaliyah', 'label' => 'Amaliyah'],
+                    ['id' => 'edit_jenazah', 'name' => 'nilai_jenazah', 'label' => 'Jenazah'],
+                    ['id' => 'edit_ut', 'name' => 'nilai_ujian_tulis', 'label' => 'Ujian Tulis'],
+                ];
+                foreach ($fields as $f):
+                ?>
                 <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Thaharah</label>
-                    <input type="number" step="0.01" name="nilai_thaharah" id="edit_thaharah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;"><?= $f['label'] ?></label>
+                    <input type="number" step="0.01" name="<?= $f['name'] ?>" id="<?= $f['id'] ?>" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; margin-bottom: 5px;">
+                    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                        <?php foreach([60, 70, 80, 85, 90, 100] as $val): ?>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px; font-size:12px;" onclick="document.getElementById('<?= $f['id'] ?>').value='<?= $val ?>'"><?= $val ?></button>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Shalat</label>
-                    <input type="number" step="0.01" name="nilai_shalat" id="edit_shalat" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
-                </div>
-                <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Surat Pendek</label>
-                    <input type="number" step="0.01" name="nilai_surat_pendek" id="edit_srt_pdk" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
-                </div>
-                <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Amaliyah</label>
-                    <input type="number" step="0.01" name="nilai_amaliyah" id="edit_amaliyah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
-                </div>
-                <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Jenazah</label>
-                    <input type="number" step="0.01" name="nilai_jenazah" id="edit_jenazah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
-                </div>
-                <div class="form-group">
-                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Ujian Tulis</label>
-                    <input type="number" step="0.01" name="nilai_ujian_tulis" id="edit_ut" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
-                </div>
+                <?php endforeach; ?>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:12px;">
