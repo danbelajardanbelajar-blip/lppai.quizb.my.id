@@ -15,6 +15,48 @@ $isMahasiswa = !$isAdmin && !$isDosen;
 
 $action = $_GET['action'] ?? '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_nilai') {
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        die("Invalid CSRF token.");
+    }
+    
+    $reg_id = $_POST['reg_id'] ?? '';
+    $thaharah = $_POST['nilai_thaharah'] !== '' ? (float)$_POST['nilai_thaharah'] : null;
+    $shalat = $_POST['nilai_shalat'] !== '' ? (float)$_POST['nilai_shalat'] : null;
+    $srt_pdk = $_POST['nilai_surat_pendek'] !== '' ? (float)$_POST['nilai_surat_pendek'] : null;
+    $amaliyah = $_POST['nilai_amaliyah'] !== '' ? (float)$_POST['nilai_amaliyah'] : null;
+    $jenazah = $_POST['nilai_jenazah'] !== '' ? (float)$_POST['nilai_jenazah'] : null;
+    $ut = $_POST['nilai_ujian_tulis'] !== '' ? (float)$_POST['nilai_ujian_tulis'] : null;
+    
+    if ($reg_id && ($isAdmin || $isDosen)) {
+        $can_edit = true;
+        if ($isDosen) {
+            $check_stmt = $pdo->prepare("
+                SELECT tc.dosen_pengampu 
+                FROM tutorial_registrations tr
+                JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+                WHERE tr.id = ?
+            ");
+            $check_stmt->execute([$reg_id]);
+            $res = $check_stmt->fetch();
+            if (!$res || $res['dosen_pengampu'] !== $user['nama_lengkap']) {
+                $can_edit = false;
+            }
+        }
+        
+        if ($can_edit) {
+            $upd = $pdo->prepare("
+                UPDATE tutorial_registrations 
+                SET nilai_thaharah = ?, nilai_shalat = ?, nilai_surat_pendek = ?, 
+                    nilai_amaliyah = ?, nilai_jenazah = ?, nilai_ujian_tulis = ?
+                WHERE id = ?
+            ");
+            $upd->execute([$thaharah, $shalat, $srt_pdk, $amaliyah, $jenazah, $ut, $reg_id]);
+        }
+    }
+    exit('success');
+}
+
 if ($isAdmin || $isDosen) {
     // 1. Fetch daftar kelas untuk Dropdown Filter
     if ($isAdmin) {
@@ -259,6 +301,7 @@ include __DIR__ . '/includes/header.php';
                                 <th>Jenazah</th>
                                 <th>UT</th>
                                 <th>Rata-Rata Akhir</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -288,6 +331,9 @@ include __DIR__ . '/includes/header.php';
                                         echo $count > 0 ? number_format(round($sum / $count, 2), 2) : '-';
                                         ?>
                                     </span>
+                                </td>
+                                <td align="center">
+                                    <button class="btn btn-sm btn-warning text-white" onclick="openEditNilaiModal(<?= $s['id'] ?>, '<?= sanitize(addslashes($s['nama_lengkap'])) ?>', '<?= sanitize($s['nim']) ?>', '<?= sanitize($s['nama_kelas']) ?>', '<?= $s['nilai_thaharah'] ?? '' ?>', '<?= $s['nilai_shalat'] ?? '' ?>', '<?= $s['nilai_surat_pendek'] ?? '' ?>', '<?= $s['nilai_amaliyah'] ?? '' ?>', '<?= $s['nilai_jenazah'] ?? '' ?>', '<?= $s['nilai_ujian_tulis'] ?? '' ?>')">✏️ Edit</button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -346,6 +392,93 @@ include __DIR__ . '/includes/header.php';
         <?php endforeach; ?>
         </div>
     <?php endif; ?>
+<?php endif; ?>
+
+<?php if ($isAdmin || $isDosen): ?>
+<!-- Modal Edit Nilai -->
+<div id="editNilaiModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:600px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+        <h3 style="margin-top:0; margin-bottom:10px; font-size:18px; color:#1e293b;">Edit Nilai Mahasiswa</h3>
+        <p style="margin-bottom:20px; font-size:14px; color:#64748b;">Mahasiswa: <strong id="edit_nilai_nama" style="color:#0f172a;"></strong> (<span id="edit_nilai_nim"></span>) <br> Kelas: <span id="edit_nilai_kelas"></span></p>
+        
+        <form method="POST" id="formEditNilai">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_nilai">
+            <input type="hidden" name="reg_id" id="edit_nilai_reg_id" value="">
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:24px;">
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Thaharah</label>
+                    <input type="number" step="0.01" name="nilai_thaharah" id="edit_thaharah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Shalat</label>
+                    <input type="number" step="0.01" name="nilai_shalat" id="edit_shalat" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Surat Pendek</label>
+                    <input type="number" step="0.01" name="nilai_surat_pendek" id="edit_srt_pdk" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Amaliyah</label>
+                    <input type="number" step="0.01" name="nilai_amaliyah" id="edit_amaliyah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Jenazah</label>
+                    <input type="number" step="0.01" name="nilai_jenazah" id="edit_jenazah" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div class="form-group">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Ujian Tulis</label>
+                    <input type="number" step="0.01" name="nilai_ujian_tulis" id="edit_ut" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeEditNilaiModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px;">Simpan Nilai</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+window.openEditNilaiModal = function(regId, nama, nim, kelas, thaharah, shalat, srtPdk, amaliyah, jenazah, ut) {
+    document.getElementById('edit_nilai_reg_id').value = regId;
+    document.getElementById('edit_nilai_nama').textContent = nama;
+    document.getElementById('edit_nilai_nim').textContent = nim;
+    document.getElementById('edit_nilai_kelas').textContent = kelas;
+    
+    document.getElementById('edit_thaharah').value = thaharah;
+    document.getElementById('edit_shalat').value = shalat;
+    document.getElementById('edit_srt_pdk').value = srtPdk;
+    document.getElementById('edit_amaliyah').value = amaliyah;
+    document.getElementById('edit_jenazah').value = jenazah;
+    document.getElementById('edit_ut').value = ut;
+    
+    document.getElementById('editNilaiModal').style.display = 'flex';
+};
+
+window.closeEditNilaiModal = function() {
+    document.getElementById('editNilaiModal').style.display = 'none';
+};
+
+if (document.getElementById('formEditNilai')) {
+    document.getElementById('formEditNilai').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('', { method: 'POST', body: formData })
+        .then(res => res.text())
+        .then(html => {
+            closeEditNilaiModal();
+            alert('Nilai berhasil diperbarui.');
+            window.location.reload();
+        })
+        .catch(err => {
+            alert('Terjadi kesalahan saat menyimpan nilai.');
+        });
+    });
+}
+</script>
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
