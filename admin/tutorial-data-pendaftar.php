@@ -534,8 +534,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         <div id="bulkActionsPendaftarContainer" style="margin-bottom: 16px; display: none;">
-            <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAllPendaftar" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Centang Semua</button>
-            <button type="button" class="btn btn-sm btn-danger" id="btnBulkDeletePendaftar" style="margin-left:8px;">🗑️ Hapus</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAllPendaftar" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Pilih Semua</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btnBulkDeletePendaftar" style="margin-left:8px; display: none;">🗑️ Hapus Semua</button>
         </div>
         
         <form id="formBulkDeletePendaftar" method="POST" style="display:none;">
@@ -892,7 +892,7 @@ window.closeEditModal = function() {
                     $(getPendaftarNodes()).find('.check-pendaftar').prop('checked', newValue);
                     
                     this.setAttribute('data-checked', newValue);
-                    this.innerHTML = newValue ? '🔳 Hapus Centang' : '☑️ Centang Semua';
+                    this.innerHTML = newValue ? '🔳 Hapus Centang' : '☑️ Pilih Semua';
                     
                     updateBulkPendaftarButtons();
                 });
