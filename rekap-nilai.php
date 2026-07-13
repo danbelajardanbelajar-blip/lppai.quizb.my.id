@@ -16,7 +16,7 @@ $isMahasiswa = !$isAdmin && !$isDosen;
 $action = $_GET['action'] ?? '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_nilai') {
-    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+    if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
         die("Invalid CSRF token.");
     }
     
@@ -464,14 +464,17 @@ if (document.getElementById('formEditNilai')) {
         e.preventDefault();
         const formData = new FormData(this);
         fetch('', { method: 'POST', body: formData })
-        .then(res => res.text())
+        .then(res => {
+            if (!res.ok) throw new Error('Server error');
+            return res.text();
+        })
         .then(html => {
             closeEditNilaiModal();
             alert('Nilai berhasil diperbarui.');
             window.location.reload();
         })
         .catch(err => {
-            alert('Terjadi kesalahan saat menyimpan nilai.');
+            alert('Terjadi kesalahan saat menyimpan nilai. Coba lagi.');
         });
     });
 }
