@@ -662,7 +662,8 @@ window.closeEditModal = function() {
             });
             var tableEl = $('#participantTable');
             
-            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (filterKelasBottom) {
+                $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                 if (settings.nTable.id !== 'participantTable') return true;
                 
                 var selectedClassId = filterKelasBottom.value;
@@ -729,6 +730,8 @@ window.closeEditModal = function() {
             setTimeout(function() {
                 filterKelasBottom.dispatchEvent(new Event('change'));
             }, 100);
+            }
+
 
             // Logic untuk Check All
             var btnCheckAll = document.getElementById('btnCheckAll');
