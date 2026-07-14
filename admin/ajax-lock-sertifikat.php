@@ -13,35 +13,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// Disable CSRF token check for now if it's tricky to pass via DataTables, or we can assume it's passed.
-// For simplicity, we just use session-based auth which is already checked above.
-$reg_id = (int)($_POST['reg_id'] ?? 0);
+$reg_ids = [];
+if (isset($_POST['reg_ids']) && is_array($_POST['reg_ids'])) {
+    $reg_ids = array_map('intval', $_POST['reg_ids']);
+} elseif (isset($_POST['reg_id'])) {
+    $reg_ids = [(int)$_POST['reg_id']];
+}
 
-if (!$reg_id) {
-    echo json_encode(['status' => 'error', 'message' => 'ID Registrasi tidak valid.']);
+if (empty($reg_ids)) {
+    echo json_encode(['status' => 'error', 'message' => 'Tidak ada data yang dipilih.']);
     exit;
 }
 
 try {
     $pdo = getDBConnection();
     
-    // Check if it's already locked
-    $stmtCheck = $pdo->prepare("SELECT nomor_sertifikat FROM tutorial_registrations WHERE id = ?");
-    $stmtCheck->execute([$reg_id]);
-    $row = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$row) {
-        echo json_encode(['status' => 'error', 'message' => 'Data tidak ditemukan.']);
-        exit;
-    }
-    
-    if (!empty($row['nomor_sertifikat'])) {
-        echo json_encode(['status' => 'error', 'message' => 'Sertifikat sudah memiliki nomor (locked).']);
-        exit;
-    }
-
     // Get max number
-    // It assumes format: NUMBER/U/L.3.11/A.2/...
     $stmtMax = $pdo->query("SELECT MAX(CAST(SUBSTRING_INDEX(nomor_sertifikat, '/', 1) AS UNSIGNED)) as max_num FROM tutorial_registrations");
     $maxRes = $stmtMax->fetch(PDO::FETCH_ASSOC);
     $maxNum = $maxRes['max_num'] ?? null;
@@ -52,24 +39,58 @@ try {
         $nextNum = $maxNum + 1;
     }
     
-    // Get Roman month and current year
     $bulanRomawi = [1=>"I","II","III","IV","V","VI","VII","VIII","IX","X","XI","XII"];
     $bln = date('n');
     $thnNow = date('Y');
     
-    $newNumber = sprintf("%d/U/L.3.11/A.2/%s/%s", $nextNum, $bulanRomawi[$bln], $thnNow);
+    $lockedCount = 0;
     
-    // Update database
+    // Begin transaction
+    $pdo->beginTransaction();
+    
+    $stmtCheck = $pdo->prepare("SELECT id, nomor_sertifikat FROM tutorial_registrations WHERE id = ? FOR UPDATE");
     $stmtUpdate = $pdo->prepare("UPDATE tutorial_registrations SET nomor_sertifikat = ? WHERE id = ?");
-    $stmtUpdate->execute([$newNumber, $reg_id]);
     
-    echo json_encode([
-        'status' => 'success', 
-        'message' => 'Sertifikat berhasil di-lock.',
-        'nomor_sertifikat' => $newNumber
-    ]);
+    foreach ($reg_ids as $id) {
+        if (!$id) continue;
+        
+        $stmtCheck->execute([$id]);
+        $row = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        
+        if ($row && empty($row['nomor_sertifikat'])) {
+            $newNumber = sprintf("%d/U/L.3.11/A.2/%s/%s", $nextNum, $bulanRomawi[$bln], $thnNow);
+            $stmtUpdate->execute([$newNumber, $id]);
+            $nextNum++;
+            $lockedCount++;
+        }
+    }
+    
+    $pdo->commit();
+    
+    if ($lockedCount > 0) {
+        if (count($reg_ids) === 1) {
+            echo json_encode([
+                'status' => 'success', 
+                'message' => 'Sertifikat berhasil di-lock.',
+                'nomor_sertifikat' => sprintf("%d/U/L.3.11/A.2/%s/%s", $nextNum - 1, $bulanRomawi[$bln], $thnNow)
+            ]);
+        } else {
+            echo json_encode([
+                'status' => 'success', 
+                'message' => "$lockedCount sertifikat berhasil di-lock secara massal."
+            ]);
+        }
+    } else {
+        echo json_encode([
+            'status' => 'error', 
+            'message' => 'Semua data yang dipilih sudah memiliki nomor sertifikat atau tidak ditemukan.'
+        ]);
+    }
 
 } catch (PDOException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
 }
 ?>

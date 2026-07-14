@@ -101,6 +101,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <span>📊 Data Nilai Lama (Di bawah 2026)</span>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btnLockTerpilih" style="display:none; font-weight: 600;">🔒 Lock Terpilih</button>
             <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
             <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
             <button type="button" class="btn btn-sm btn-warning" style="font-weight: 600;" onclick="document.getElementById('importModal').style.display='block'">📥 Import Nilai Excel</button>
@@ -431,10 +432,13 @@ $(document).ready(function() {
     });
 
     function toggleHapusTerpilih() {
-        if ($('.check-item:checked').length > 0) {
+        var totalChecked = $('.check-item:checked').length;
+        if (totalChecked > 0) {
             $('#btnHapusTerpilih').css('display', 'inline-block');
+            $('#btnLockTerpilih').css('display', 'inline-block');
         } else {
             $('#btnHapusTerpilih').css('display', 'none');
+            $('#btnLockTerpilih').css('display', 'none');
         }
     }
 
@@ -566,6 +570,52 @@ $(document).ready(function() {
                         if (res.status === 'success') {
                             Swal.fire('Berhasil!', res.message + '<br>No: ' + res.nomor_sertifikat, 'success');
                             table.ajax.reload(null, false);
+                        } else {
+                            Swal.fire('Gagal!', res.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Terjadi kesalahan koneksi.', 'error');
+                    }
+                });
+            }
+        });
+    });
+
+    // Event listener untuk tombol Lock Terpilih (Bulk Lock)
+    $('#btnLockTerpilih').on('click', function() {
+        var selectedIds = [];
+        $('.check-item:checked').each(function() {
+            selectedIds.push($(this).val());
+        });
+
+        if (selectedIds.length === 0) {
+            Swal.fire('Info', 'Pilih minimal satu data untuk di-lock.', 'info');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Kunci ' + selectedIds.length + ' Sertifikat?',
+            text: "Ini akan memberikan nomor surat secara permanen untuk mahasiswa yang dipilih (yang belum memiliki nomor).",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, Kunci Semua!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?= BASE_URL ?>/admin/ajax-lock-sertifikat.php',
+                    type: 'POST',
+                    data: { reg_ids: selectedIds },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            Swal.fire('Berhasil!', res.message, 'success');
+                            table.ajax.reload(null, false);
+                            $('#checkAll').prop('checked', false);
+                            toggleHapusTerpilih();
                         } else {
                             Swal.fire('Gagal!', res.message, 'error');
                         }
