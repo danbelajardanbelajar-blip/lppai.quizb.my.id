@@ -192,7 +192,7 @@ $thnNow = date('Y');
             margin: 20px auto;
             position: relative;
             box-sizing: border-box;
-            padding: 15mm;
+            padding: 15mm 15mm 10mm 15mm;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 20px 20px;
@@ -210,13 +210,13 @@ $thnNow = date('Y');
         .cert-inner-border {
             height: 100%;
             box-sizing: border-box;
-            padding: 15px 30px;
+            padding: 15px 30px 0 30px;
             background: white;
             position: relative;
             text-align: center;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            justify-content: flex-end;
         }
         
         .kop {
@@ -254,19 +254,19 @@ $thnNow = date('Y');
             font-family: 'Pinyon Script', cursive;
             font-size: 52px;
             color: #b45309;
-            margin: 3.5cm 0 5px;
+            margin: 0 0 5px;
             letter-spacing: 1px;
         }
         .cert-number {
             font-family: 'Poppins', sans-serif;
             font-size: 14px;
             color: #334155;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
             font-weight: 600;
         }
         .cert-body {
             font-size: 17px;
-            line-height: 1.5;
+            line-height: 1.3;
             margin-bottom: 10px;
             color: #334155;
             flex-grow: 1;
@@ -274,7 +274,7 @@ $thnNow = date('Y');
         .student-name {
             font-size: 28px;
             font-weight: 700;
-            margin: 10px 0 5px;
+            margin: 5px 0 2px;
             color: #0f172a;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -283,12 +283,12 @@ $thnNow = date('Y');
             font-family: 'Poppins', sans-serif;
             font-size: 14px;
             color: #475569;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         .statement {
             font-size: 19px;
             font-weight: 600;
-            margin: 10px 0 15px;
+            margin: 5px 0 10px;
             color: #15803d;
         }
         .statement span {
@@ -337,12 +337,12 @@ $thnNow = date('Y');
         }
         .signature-date {
             font-size: 15px;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
         }
         .signature-role {
             font-size: 15px;
             font-weight: 600;
-            margin-bottom: 55px;
+            margin-bottom: 40px;
         }
         .signature-name {
             font-size: 17px;
