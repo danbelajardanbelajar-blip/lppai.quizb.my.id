@@ -447,7 +447,7 @@ $thnNow = date('Y');
 
         $ttlLahir = '';
         if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
-            $ttlLahir = $data['tempat_lahir'] . ', ' . tgl_indo($data['tanggal_lahir']);
+            $ttlLahir = ucwords(strtolower($data['tempat_lahir'])) . ', ' . tgl_indo($data['tanggal_lahir']);
         } elseif ($data['tanggal_lahir']) {
             $ttlLahir = tgl_indo($data['tanggal_lahir']);
         } else {
@@ -518,7 +518,7 @@ $thnNow = date('Y');
 
                     <div class="signature-container">
                         <div class="signature-date">Lamongan, <?= $tglCetak ?></div>
-                        <div class="signature-role">Ketua LPPAI,</div>
+                        <div class="signature-role">Kepala LPPAI,</div>
                         <div class="signature-name">Dr. Zainul Hakim, M.H.I.</div>
                     </div>
                 </div>
