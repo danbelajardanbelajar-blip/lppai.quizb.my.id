@@ -112,8 +112,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 try {
                     $pdo->beginTransaction();
                     $insertStmt = $pdo->prepare("INSERT INTO tutorial_attendance (tutorial_class_id, user_id, pertemuan_ke, tanggal, status_hadir) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status_hadir = ?, tanggal = ?");
+                    $deleteStmt = $pdo->prepare("DELETE FROM tutorial_attendance WHERE tutorial_class_id = ? AND user_id = ? AND pertemuan_ke = ?");
                     foreach ($status_data as $user_id => $status) {
-                        $insertStmt->execute([$class_id, $user_id, $pertemuan_ke, $tanggal, $status, $status, $tanggal]);
+                        if ($status === 'belum') {
+                            $deleteStmt->execute([$class_id, $user_id, $pertemuan_ke]);
+                        } else {
+                            $insertStmt->execute([$class_id, $user_id, $pertemuan_ke, $tanggal, $status, $status, $tanggal]);
+                        }
                     }
                     $pdo->commit();
                     $message = 'Data absensi pertemuan ke-' . $pertemuan_ke . ' berhasil disimpan.';
@@ -417,9 +422,14 @@ include __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="action" value="save_absensi">
                     <input type="hidden" name="pertemuan_ke" value="<?= $pertemuanSelected ?>">
                     
-                    <div style="margin-bottom:20px; max-width:300px;">
-                        <label style="display:block; margin-bottom:8px; font-weight:bold;">Tanggal Pertemuan *</label>
-                        <input type="date" name="tanggal" value="<?= sanitize($tanggalSelected) ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;">
+                        <div style="width:300px;">
+                            <label style="display:block; margin-bottom:8px; font-weight:bold;">Tanggal Pertemuan *</label>
+                            <input type="date" name="tanggal" value="<?= sanitize($tanggalSelected) ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">💾 Update Data</button>
+                        </div>
                     </div>
                     
                     <div class="table-responsive">
@@ -435,7 +445,7 @@ include __DIR__ . '/../includes/header.php';
                             <tbody>
                                 <?php $no=1; foreach($students as $s): ?>
                                 <?php 
-                                    $status = $attendanceData[$s['user_id']] ?? 'hadir'; 
+                                    $status = $attendanceData[$s['user_id']] ?? 'belum'; 
                                 ?>
                                 <tr>
                                     <td align="center"><?= $no++ ?></td>
@@ -443,6 +453,9 @@ include __DIR__ . '/../includes/header.php';
                                     <td><strong><?= sanitize($s['nama_lengkap']) ?></strong></td>
                                     <td>
                                         <div style="display:flex; gap:15px; align-items:center;">
+                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#475569;">
+                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="belum" <?= $status === 'belum' ? 'checked' : '' ?>> Belum
+                                            </label>
                                             <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#166534;">
                                                 <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="hadir" <?= $status === 'hadir' ? 'checked' : '' ?>> Hadir
                                             </label>
@@ -464,7 +477,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     
                     <div style="margin-top:20px; text-align:right;">
-                        <button type="submit" class="btn btn-primary">💾 Simpan Absensi P-<?= $pertemuanSelected ?></button>
+                        <!-- Button moved to top -->
                     </div>
                 </form>
             <?php endif; ?>
