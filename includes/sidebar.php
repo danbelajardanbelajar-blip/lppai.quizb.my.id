@@ -125,6 +125,21 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">📋</span> Rincian Nilai
             </a>
+            <div class="menu-label">Absensi</div>
+            <div class="menu-item has-submenu">
+                <a href="#" class="page-nav submenu-toggle <?= (in_array($currentPage, ['absensi-tutorial.php', 'absensi-alkhidmah.php'])) ? 'active' : '' ?>">
+                    <span class="icon">📅</span> Absensi
+                    <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
+                </a>
+                <div class="submenu" style="display: <?= (in_array($currentPage, ['absensi-tutorial.php', 'absensi-alkhidmah.php'])) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
+                    <a href="<?= BASE_URL ?>/absensi-tutorial.php" class="page-nav <?= menuActive('absensi-tutorial.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Absensi Tutorial
+                    </a>
+                    <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="page-nav <?= menuActive('absensi-alkhidmah.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Absensi al Khidmah
+                    </a>
+                </div>
+            </div>
         <?php endif; ?>
 
         <div class="menu-label">Akun</div>
