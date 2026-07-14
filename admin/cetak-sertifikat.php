@@ -477,6 +477,10 @@ $thnNow = date('Y');
                     <div class="statement">
                         Telah mengikuti dan dinyatakan <br>
                         <span>LULUS</span><br>
+                        <div style="font-size: 17px; font-weight: 600; margin-top: 8px; color: #334155;">dengan predikat : <strong><?= $predikat ?></strong></div>
+                        <div style="font-size: 14px; font-weight: 400; margin-top: 8px; font-family: 'Poppins', sans-serif; color: #475569; line-height: 1.5;">
+                            dalam Program "Daurah Keislaman" LPPAI UNISDA Lamongan, <br>Semoga ilmu yang diperoleh bermanfaat dan membawa keberkahan
+                        </div>
                     </div>
                 </div>
 
@@ -511,9 +515,7 @@ $thnNow = date('Y');
                                 <td style="text-align:center; font-weight:bold; background:#e2e8f0; color:#1e3a8a; font-size:13px;"><?= getNilaiHuruf($akhir) ?></td>
                             </tr>
                         </table>
-                        <div style="font-family:'Poppins',sans-serif; font-size:13px; margin-top:5px; color:#334155;">
-                            Predikat: <strong><?= $predikat ?></strong>
-                        </div>
+                        <!-- Predikat dipindahkan ke atas -->
                     </div>
 
                     <div class="signature-container">
