@@ -541,6 +541,43 @@ $(document).ready(function() {
         });
     });
 
+    // Event listener untuk tombol Lock Sertifikat
+    $('#tableKelolaNilai tbody').on('click', '.btn-lock-sertifikat', function() {
+        var btn = $(this);
+        var regId = btn.data('reg-id');
+        
+        Swal.fire({
+            title: 'Kunci Sertifikat?',
+            text: "Ini akan memberikan nomor surat secara permanen untuk mahasiswa ini.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, Kunci!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '<?= BASE_URL ?>/admin/ajax-lock-sertifikat.php',
+                    type: 'POST',
+                    data: { reg_id: regId },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            Swal.fire('Berhasil!', res.message + '<br>No: ' + res.nomor_sertifikat, 'success');
+                            table.ajax.reload(null, false);
+                        } else {
+                            Swal.fire('Gagal!', res.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error!', 'Terjadi kesalahan koneksi.', 'error');
+                    }
+                });
+            }
+        });
+    });
+
     // Event listener untuk tombol Edit (karena data digenerate dinamis, gunakan event delegation)
     $('#tableKelolaNilai tbody').on('click', '.btn-edit-nilai', function() {
         var btn = $(this);

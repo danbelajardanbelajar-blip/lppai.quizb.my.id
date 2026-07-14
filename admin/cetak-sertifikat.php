@@ -27,7 +27,7 @@ $sqlBase = "
     SELECT u.nama_lengkap, u.nim, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran, tr.tipe_nilai,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
-           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis
+           tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
     FROM tutorial_registrations tr
     JOIN users u ON u.id = tr.user_id
 ";
@@ -422,13 +422,6 @@ $thnNow = date('Y');
         if ($nilai >= 40) return 'D';
         return 'E';
     }
-    
-    $baseNumber = 5479;
-    if ($mode === 'range') {
-        $startOffset = max(1, (int)($_GET['start'] ?? 1)) - 1;
-        $baseNumber += $startOffset;
-    }
-    
     foreach($students as $idx => $data): 
         $th = (float)$data['nilai_thaharah'];
         $sh = (float)$data['nilai_shalat'];
@@ -448,8 +441,11 @@ $thnNow = date('Y');
         elseif ($akhir >= 40) $predikat = 'Kurang';
         else $predikat = 'Sangat Kurang';
 
-        $nomorSertifikat = sprintf("%d/U/L.3.11/A.2/%s/%s", $baseNumber, $bulanRomawi[$bln], $thnNow);
-        $baseNumber++;
+        if (!empty($data['nomor_sertifikat'])) {
+            $nomorSertifikat = $data['nomor_sertifikat'];
+        } else {
+            $nomorSertifikat = "BELUM DI-LOCK";
+        }
 
         $ttlLahir = '';
         if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
