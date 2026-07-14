@@ -202,14 +202,12 @@ $thnNow = date('Y');
             page-break-after: auto;
         }
         .cert-border {
-            border: 8px solid #1e3a8a;
             padding: 8px;
             height: 100%;
             box-sizing: border-box;
             position: relative;
         }
         .cert-inner-border {
-            border: 2px solid #b45309;
             height: 100%;
             box-sizing: border-box;
             padding: 15px 30px;
@@ -225,7 +223,6 @@ $thnNow = date('Y');
             display: flex;
             align-items: center;
             justify-content: center;
-            border-bottom: 3px double #1e3a8a;
             padding-bottom: 15px;
             margin-bottom: 15px;
         }
@@ -450,9 +447,6 @@ $thnNow = date('Y');
                     <!-- Path logo dari sistem -->
                     <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI" class="kop-logo">
                     <div class="kop-text">
-                        <h2>LEMBAGA PENGKAJIAN DAN PENGAMALAN AJARAN ISLAM (LPPAI)</h2>
-                        <h1>UNIVERSITAS ISLAM DARUL 'ULUM (UNISDA)</h1>
-                        <p>Jl. Airlangga No. 03 Sukodadi, Lamongan, Jawa Timur 62253</p>
                     </div>
                 </div>
 
