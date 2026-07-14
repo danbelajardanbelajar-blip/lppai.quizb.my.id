@@ -431,7 +431,7 @@ $thnNow = date('Y');
         $jn = (float)$data['nilai_jenazah'];
         $ut = (float)$data['nilai_ujian_tulis'];
         
-        $akhir = round(($th + $sh + $sp + $am + $jn + $ut) / 6, 2);
+        $akhir = round(($th + $sh + $sp + $am + $jn) / 5, 2);
         
         $predikat = '';
         if ($akhir >= 80) $predikat = 'Memuaskan';
@@ -474,9 +474,6 @@ $thnNow = date('Y');
                     <div class="statement">
                         Telah mengikuti dan dinyatakan <br>
                         <span>LULUS</span><br>
-                        <div style="font-size: 18px; margin-top: 5px; color:#334155; font-weight:normal;">
-                            Ujian Praktik Keagamaan (Tipe: <strong><?= htmlspecialchars(ucwords($data['tipe_nilai'] ?? '-')) ?></strong>)
-                        </div>
                     </div>
                 </div>
 
@@ -492,7 +489,6 @@ $thnNow = date('Y');
                                 <th>Srt. Pendek</th>
                                 <th>Amaliyah</th>
                                 <th>Jenazah</th>
-                                <th>Ujian Tulis</th>
                                 <th>Nilai Akhir</th>
                             </tr>
                             <tr>
@@ -501,7 +497,6 @@ $thnNow = date('Y');
                                 <td style="text-align:center;"><?= number_format($sp, 2) ?></td>
                                 <td style="text-align:center;"><?= number_format($am, 2) ?></td>
                                 <td style="text-align:center;"><?= number_format($jn, 2) ?></td>
-                                <td style="text-align:center;"><?= number_format($ut, 2) ?></td>
                                 <td style="text-align:center; font-weight:bold; background:#e2e8f0; font-size:13px;"><?= number_format($akhir, 2) ?></td>
                             </tr>
                             <tr>
@@ -510,7 +505,6 @@ $thnNow = date('Y');
                                 <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($sp) ?></td>
                                 <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($am) ?></td>
                                 <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($jn) ?></td>
-                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($ut) ?></td>
                                 <td style="text-align:center; font-weight:bold; background:#e2e8f0; color:#1e3a8a; font-size:13px;"><?= getNilaiHuruf($akhir) ?></td>
                             </tr>
                         </table>
