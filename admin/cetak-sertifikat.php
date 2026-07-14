@@ -192,7 +192,7 @@ $thnNow = date('Y');
             margin: 20px auto;
             position: relative;
             box-sizing: border-box;
-            padding: 15mm 15mm 10mm 15mm;
+            padding: 15mm 15mm 20mm 15mm;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
             background-size: 20px 20px;
