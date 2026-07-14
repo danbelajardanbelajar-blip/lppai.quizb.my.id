@@ -423,6 +423,12 @@ $thnNow = date('Y');
         return 'E';
     }
     
+    $baseNumber = 5479;
+    if ($mode === 'range') {
+        $startOffset = max(1, (int)($_GET['start'] ?? 1)) - 1;
+        $baseNumber += $startOffset;
+    }
+    
     foreach($students as $idx => $data): 
         $th = (float)$data['nilai_thaharah'];
         $sh = (float)$data['nilai_shalat'];
@@ -442,7 +448,8 @@ $thnNow = date('Y');
         elseif ($akhir >= 40) $predikat = 'Kurang';
         else $predikat = 'Sangat Kurang';
 
-        $nomorSertifikat = sprintf("No: %03d/LPPAI/UNISDA/%s/%s", $data['reg_id'], $bulanRomawi[$bln], $thnNow);
+        $nomorSertifikat = sprintf("%d/U/L.3.11/A.2/%s/%s", $baseNumber, $bulanRomawi[$bln], $thnNow);
+        $baseNumber++;
 
         $ttlLahir = '';
         if ($data['tempat_lahir'] && $data['tanggal_lahir']) {
