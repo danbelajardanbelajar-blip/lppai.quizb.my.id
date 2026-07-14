@@ -122,14 +122,8 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">
                 <span class="icon">📝</span> Pendaftaran Tutorial
             </a>
-            <a href="<?= BASE_URL ?>/tutorial-pembagian.php" class="page-nav <?= menuActive('tutorial-pembagian.php') ?>">
-                <span class="icon">🏫</span> Pembagian Kelas
-            </a>
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">📋</span> Rincian Nilai
-            </a>
-            <a href="<?= BASE_URL ?>/tutorial-kelulusan.php" class="page-nav <?= menuActive('tutorial-kelulusan.php') ?>">
-                <span class="icon">🎓</span> Kelulusan Tutorial
             </a>
         <?php endif; ?>
 
