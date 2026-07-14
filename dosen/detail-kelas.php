@@ -400,58 +400,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script>
-    var qrcodeObj = null;
-    
-    function generateQR(regenerate) {
-        var btn = document.getElementById('btnGenerateQR');
-        if (!regenerate) btn.disabled = true;
-        
-        $.ajax({
-            url: '<?= BASE_URL ?>/dosen/ajax-qr-generate.php',
-            type: 'POST',
-            data: {
-                class_id: <?= $class_id ?>,
-                pertemuan_ke: <?= $pertemuanSelected ?>,
-                regenerate: regenerate ? 1 : 0
-            },
-            dataType: 'json',
-            success: function(res) {
-                if (!regenerate) btn.style.display = 'none';
-                
-                if (res.status === 'success') {
-                    document.getElementById('qrContainer').style.display = 'block';
-                    document.getElementById('qrExpiry').textContent = res.expires_at;
-                    
-                    if (qrcodeObj) {
-                        qrcodeObj.clear();
-                        qrcodeObj.makeCode(res.token);
-                    } else {
-                        qrcodeObj = new QRCode(document.getElementById("qrcode"), {
-                            text: res.token,
-                            width: 250,
-                            height: 250,
-                            colorDark : "#000000",
-                            colorLight : "#ffffff",
-                            correctLevel : QRCode.CorrectLevel.H
-                        });
-                    }
-                    Swal.fire('Berhasil', res.message, 'success');
-                } else {
-                    Swal.fire('Gagal', res.message, 'error');
-                    if (!regenerate) btn.style.display = 'inline-block';
-                    btn.disabled = false;
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Gagal menghubungi server.', 'error');
-                if (!regenerate) btn.style.display = 'inline-block';
-                btn.disabled = false;
-            }
-        });
-    }
-    </script>
+
 
     <div class="card">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
@@ -524,3 +473,56 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+    var qrcodeObj = null;
+    
+    function generateQR(regenerate) {
+        var btn = document.getElementById('btnGenerateQR');
+        if (!regenerate) btn.disabled = true;
+        
+        $.ajax({
+            url: '<?= BASE_URL ?>/dosen/ajax-qr-generate.php',
+            type: 'POST',
+            data: {
+                class_id: <?= $class_id ?>,
+                pertemuan_ke: <?= $pertemuanSelected ?>,
+                regenerate: regenerate ? 1 : 0
+            },
+            dataType: 'json',
+            success: function(res) {
+                if (!regenerate) btn.style.display = 'none';
+                
+                if (res.status === 'success') {
+                    document.getElementById('qrContainer').style.display = 'block';
+                    document.getElementById('qrExpiry').textContent = res.expires_at;
+                    
+                    if (qrcodeObj) {
+                        qrcodeObj.clear();
+                        qrcodeObj.makeCode(res.token);
+                    } else {
+                        qrcodeObj = new QRCode(document.getElementById("qrcode"), {
+                            text: res.token,
+                            width: 250,
+                            height: 250,
+                            colorDark : "#000000",
+                            colorLight : "#ffffff",
+                            correctLevel : QRCode.CorrectLevel.H
+                        });
+                    }
+                    Swal.fire('Berhasil', res.message, 'success');
+                } else {
+                    Swal.fire('Gagal', res.message, 'error');
+                    if (!regenerate) btn.style.display = 'inline-block';
+                    btn.disabled = false;
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'Gagal menghubungi server.', 'error');
+                if (!regenerate) btn.style.display = 'inline-block';
+                btn.disabled = false;
+            }
+        });
+    }
+    </script>

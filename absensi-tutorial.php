@@ -36,7 +36,9 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<?php include __DIR__ . '/includes/footer.php'; ?>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     var html5QrcodeScanner = new Html5QrcodeScanner(
         "reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }, false);
@@ -95,5 +97,3 @@ include __DIR__ . '/includes/header.php';
 
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);
 </script>
-
-<?php include __DIR__ . '/includes/footer.php'; ?>
