@@ -254,7 +254,7 @@ $thnNow = date('Y');
             font-family: 'Pinyon Script', cursive;
             font-size: 52px;
             color: #b45309;
-            margin: 3cm 0 5px;
+            margin: 3.5cm 0 5px;
             letter-spacing: 1px;
         }
         .cert-number {
