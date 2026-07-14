@@ -355,9 +355,6 @@ $thnNow = date('Y');
             .cert-page {
                 margin: 0;
                 box-shadow: none;
-                width: 100%;
-                height: 100%;
-                padding: 10mm;
             }
             .print-panel {
                 display: none !important;
