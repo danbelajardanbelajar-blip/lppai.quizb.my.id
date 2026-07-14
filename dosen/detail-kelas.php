@@ -381,6 +381,78 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
+    <!-- TAB ABSENSI: QR CODE CARD -->
+    <div class="card" style="margin-bottom:20px; border: 2px solid #3b82f6;">
+        <div class="card-header" style="background:#eff6ff; color:#1e40af; border-bottom: 1px solid #bfdbfe; font-weight: bold;">
+            📱 QR Code Absensi (Scan via HP Mahasiswa)
+        </div>
+        <div class="card-body" style="text-align: center;">
+            <p>Klik tombol di bawah untuk menampilkan QR Code. Mahasiswa dapat melakukan scan melalui menu <b>Absensi Tutorial</b> di dashboard mereka.</p>
+            <button type="button" class="btn btn-primary" id="btnGenerateQR" onclick="generateQR(false)">Generate QR Code (P-<?= $pertemuanSelected ?>)</button>
+            <div id="qrContainer" style="display: none; margin-top: 20px;">
+                <div id="qrcode" style="display: inline-block; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                <div style="margin-top: 15px;">
+                    <p style="font-weight: bold; color: #10b981; font-size: 18px;" id="qrStatus">Aktif</p>
+                    <p>Berakhir pada: <span id="qrExpiry"></span></p>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="generateQR(true)">Perbarui / Perpanjang QR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+    var qrcodeObj = null;
+    
+    function generateQR(regenerate) {
+        var btn = document.getElementById('btnGenerateQR');
+        if (!regenerate) btn.disabled = true;
+        
+        $.ajax({
+            url: '<?= BASE_URL ?>/dosen/ajax-qr-generate.php',
+            type: 'POST',
+            data: {
+                class_id: <?= $class_id ?>,
+                pertemuan_ke: <?= $pertemuanSelected ?>,
+                regenerate: regenerate ? 1 : 0
+            },
+            dataType: 'json',
+            success: function(res) {
+                if (!regenerate) btn.style.display = 'none';
+                
+                if (res.status === 'success') {
+                    document.getElementById('qrContainer').style.display = 'block';
+                    document.getElementById('qrExpiry').textContent = res.expires_at;
+                    
+                    if (qrcodeObj) {
+                        qrcodeObj.clear();
+                        qrcodeObj.makeCode(res.token);
+                    } else {
+                        qrcodeObj = new QRCode(document.getElementById("qrcode"), {
+                            text: res.token,
+                            width: 250,
+                            height: 250,
+                            colorDark : "#000000",
+                            colorLight : "#ffffff",
+                            correctLevel : QRCode.CorrectLevel.H
+                        });
+                    }
+                    Swal.fire('Berhasil', res.message, 'success');
+                } else {
+                    Swal.fire('Gagal', res.message, 'error');
+                    if (!regenerate) btn.style.display = 'inline-block';
+                    btn.disabled = false;
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'Gagal menghubungi server.', 'error');
+                if (!regenerate) btn.style.display = 'inline-block';
+                btn.disabled = false;
+            }
+        });
+    }
+    </script>
+
     <div class="card">
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
             <span>📅 Absensi - Pertemuan Ke-<?= $pertemuanSelected ?></span>
