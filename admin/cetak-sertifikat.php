@@ -412,7 +412,18 @@ $thnNow = date('Y');
         <button class="btn btn-success" onclick="window.print()">Cetak Ke Printer / PDF</button>
     </div>
 
-    <?php foreach($students as $idx => $data): 
+    <?php 
+    function getNilaiHuruf($nilai) {
+        if ($nilai >= 80) return 'A';
+        if ($nilai >= 75) return 'B+';
+        if ($nilai >= 70) return 'B';
+        if ($nilai >= 65) return 'C+';
+        if ($nilai >= 60) return 'C';
+        if ($nilai >= 40) return 'D';
+        return 'E';
+    }
+    
+    foreach($students as $idx => $data): 
         $th = (float)$data['nilai_thaharah'];
         $sh = (float)$data['nilai_shalat'];
         $sp = (float)$data['nilai_surat_pendek'];
@@ -423,10 +434,13 @@ $thnNow = date('Y');
         $akhir = round(($th + $sh + $sp + $am + $jn + $ut) / 6, 2);
         
         $predikat = '';
-        if ($akhir >= 90) $predikat = 'Istimewa / Mumtaz';
-        elseif ($akhir >= 80) $predikat = 'Sangat Baik / Jayyid Jiddan';
-        elseif ($akhir >= 70) $predikat = 'Baik / Jayyid';
-        else $predikat = 'Cukup / Maqbul';
+        if ($akhir >= 80) $predikat = 'Memuaskan';
+        elseif ($akhir >= 75) $predikat = 'Sangat Baik';
+        elseif ($akhir >= 70) $predikat = 'Baik';
+        elseif ($akhir >= 65) $predikat = 'Cukup Baik';
+        elseif ($akhir >= 60) $predikat = 'Cukup';
+        elseif ($akhir >= 40) $predikat = 'Kurang';
+        else $predikat = 'Sangat Kurang';
 
         $nomorSertifikat = sprintf("No: %03d/LPPAI/UNISDA/%s/%s", $data['reg_id'], $bulanRomawi[$bln], $thnNow);
 
@@ -443,12 +457,7 @@ $thnNow = date('Y');
         <div class="cert-border">
             <div class="cert-inner-border">
                 
-                <div class="kop">
-                    <!-- Path logo dari sistem -->
-                    <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI" class="kop-logo">
-                    <div class="kop-text">
-                    </div>
-                </div>
+
 
                 <div class="cert-title">Sertifikat Kelulusan</div>
                 <div class="cert-number"><?= htmlspecialchars($nomorSertifikat) ?></div>
@@ -494,6 +503,15 @@ $thnNow = date('Y');
                                 <td style="text-align:center;"><?= number_format($jn, 2) ?></td>
                                 <td style="text-align:center;"><?= number_format($ut, 2) ?></td>
                                 <td style="text-align:center; font-weight:bold; background:#e2e8f0; font-size:13px;"><?= number_format($akhir, 2) ?></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($th) ?></td>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($sh) ?></td>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($sp) ?></td>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($am) ?></td>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($jn) ?></td>
+                                <td style="text-align:center; font-weight:bold; color:#1e3a8a;"><?= getNilaiHuruf($ut) ?></td>
+                                <td style="text-align:center; font-weight:bold; background:#e2e8f0; color:#1e3a8a; font-size:13px;"><?= getNilaiHuruf($akhir) ?></td>
                             </tr>
                         </table>
                         <div style="font-family:'Poppins',sans-serif; font-size:13px; margin-top:5px; color:#334155;">
