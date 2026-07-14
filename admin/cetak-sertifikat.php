@@ -269,7 +269,6 @@ $thnNow = date('Y');
             line-height: 1.3;
             margin-bottom: 10px;
             color: #334155;
-            flex-grow: 1;
         }
         .student-name {
             font-size: 28px;
@@ -303,7 +302,6 @@ $thnNow = date('Y');
             justify-content: space-between;
             align-items: flex-end;
             padding: 0 10px;
-            margin-top: auto;
         }
         
         .grades-table-container {
