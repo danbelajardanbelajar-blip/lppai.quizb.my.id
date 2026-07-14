@@ -43,7 +43,7 @@ try {
     $class_id = $session['tutorial_class_id'];
     $pertemuan_ke = $session['pertemuan_ke'];
     
-    $stmt = $pdo->prepare("SELECT id, status FROM tutorial_registrations WHERE tutorial_class_id = ? AND user_id = ? AND (status = 'aktif' OR status = 'lulus')");
+    $stmt = $pdo->prepare("SELECT id, status FROM tutorial_registrations WHERE tutorial_class_id = ? AND user_id = ?");
     $stmt->execute([$class_id, $user_id]);
     $registration = $stmt->fetch();
     
