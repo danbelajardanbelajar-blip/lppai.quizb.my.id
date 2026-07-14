@@ -24,9 +24,11 @@ if (!$class_id || !$pertemuan_ke) {
 try {
     $pdo = getDBConnection();
     
+    $user = getCurrentUser();
+    
     // Validasi dosen berhak atas kelas ini
-    $stmt = $pdo->prepare("SELECT id FROM tutorial_classes WHERE id = ? AND dosen_id = ?");
-    $stmt->execute([$class_id, $_SESSION['user_id']]);
+    $stmt = $pdo->prepare("SELECT id FROM tutorial_classes WHERE id = ? AND dosen_pengampu = ?");
+    $stmt->execute([$class_id, $user['nama_lengkap']]);
     if (!$stmt->fetch()) {
         echo json_encode(['status' => 'error', 'message' => 'Anda tidak memiliki akses ke kelas ini.']);
         exit;
