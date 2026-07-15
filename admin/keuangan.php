@@ -272,6 +272,33 @@ $saldo = $totalIncome - $totalExpense;
 
 include __DIR__ . '/../includes/header.php';
 ?>
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #print-rab, #print-rab * {
+            visibility: visible;
+        }
+        #print-rab {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+    .print-only {
+        display: none;
+    }
+    @media print {
+        .print-only {
+            display: block;
+        }
+    }
+</style>
 
 <div class="card">
     <div class="card-header">💰 Kelola Keuangan</div>
@@ -294,7 +321,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran" class="btn btn-secondary" style="width:auto;">Kembali ke Daftar</a>
-                        <button type="button" class="btn btn-warning" style="width:auto;" onclick="window.print();">Cetak Rencana</button>
+                        <button type="button" class="btn btn-warning no-print" style="width:auto;" onclick="printRab();">Cetak Rencana</button>
                     </div>
                 </div>
 
@@ -368,7 +395,12 @@ include __DIR__ . '/../includes/header.php';
 
                 <div class="table-responsive">
                     <h4>Daftar Transaksi Rencana</h4>
-                    <table>
+                    <div id="print-rab">
+                        <div class="print-only" style="margin-bottom:16px; text-align:center;">
+                            <h1 style="font-size:18px; margin:0;">Rencana Anggaran Belanja LPPAI UNISDA Tahun 2026/2027</h1>
+                            <p style="margin:4px 0 0; font-size:14px;"><?= sanitize($selectedBudget['nama']) ?> • Periode <?= sanitize($selectedBudget['periode']) ?></p>
+                        </div>
+                        <table>
                         <thead>
                             <tr>
                                 <th>Nama / Detail</th>
@@ -394,6 +426,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endforeach; endif; ?>
                         </tbody>
                     </table>
+                    </div>
 
                     <div style="margin-top:16px; max-width:480px;">
                         <table style="width:100%; border-collapse:collapse;">
@@ -414,6 +447,17 @@ include __DIR__ . '/../includes/header.php';
                         </table>
                     </div>
                 </div>
+
+                <script>
+                    function printRab() {
+                        const printContainer = document.getElementById('print-rab');
+                        if (!printContainer) {
+                            window.print();
+                            return;
+                        }
+                        window.print();
+                    }
+                </script>
             <?php else: ?>
                 <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
                     <input type="hidden" name="view" value="rencana-anggaran">
