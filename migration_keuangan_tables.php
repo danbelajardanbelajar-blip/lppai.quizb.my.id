@@ -32,6 +32,26 @@ $sqls = [
         kategori VARCHAR(50) NULL,
         keterangan TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+    "CREATE TABLE IF NOT EXISTS keuangan_rencana_pemasukan (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        anggaran_id INT NOT NULL,
+        nama VARCHAR(150) NOT NULL,
+        jumlah DECIMAL(15,2) NOT NULL DEFAULT 0,
+        keterangan TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (anggaran_id) REFERENCES keuangan_anggaran(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+    "CREATE TABLE IF NOT EXISTS keuangan_rencana_pengeluaran (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        anggaran_id INT NOT NULL,
+        nama VARCHAR(150) NOT NULL,
+        jumlah DECIMAL(15,2) NOT NULL DEFAULT 0,
+        keterangan TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (anggaran_id) REFERENCES keuangan_anggaran(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
 ];
 
