@@ -37,6 +37,16 @@ function ensureKeuanganTables(PDO $pdo): void {
             keterangan TEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS keuangan_transaksi (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            tanggal DATE NOT NULL,
+            jenis VARCHAR(20) NOT NULL,
+            nama VARCHAR(150) NOT NULL,
+            jumlah DECIMAL(15,2) NOT NULL DEFAULT 0,
+            kategori VARCHAR(50) NULL,
+            keterangan TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS keuangan_rencana_pemasukan (
             id INT AUTO_INCREMENT PRIMARY KEY,
             anggaran_id INT NOT NULL,
@@ -161,20 +171,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($view === 'pemasukan') {
-        $stmt = $pdo->prepare("INSERT INTO keuangan_pemasukan (tanggal, sumber, jumlah, kategori, keterangan) VALUES (?, ?, ?, ?, ?)");
+    if ($view === 'pemasukan' || $view === 'pengeluaran') {
+        $jenis = trim($_POST['jenis'] ?? ($view === 'pengeluaran' ? 'pengeluaran' : 'pemasukan'));
+        $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['tanggal'] ?? date('Y-m-d'),
-            trim($_POST['sumber'] ?? ''),
-            (float) ($_POST['jumlah'] ?? 0),
-            trim($_POST['kategori'] ?? ''),
-            trim($_POST['keterangan'] ?? '')
-        ]);
-    } elseif ($view === 'pengeluaran') {
-        $stmt = $pdo->prepare("INSERT INTO keuangan_pengeluaran (tanggal, tujuan, jumlah, kategori, keterangan) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $_POST['tanggal'] ?? date('Y-m-d'),
-            trim($_POST['tujuan'] ?? ''),
+            $jenis,
+            trim($_POST['nama'] ?? ''),
             (float) ($_POST['jumlah'] ?? 0),
             trim($_POST['kategori'] ?? ''),
             trim($_POST['keterangan'] ?? '')
@@ -186,8 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $budgets = $pdo->query("SELECT * FROM keuangan_anggaran ORDER BY id DESC")->fetchAll();
-$incomes = $pdo->query("SELECT * FROM keuangan_pemasukan ORDER BY tanggal DESC, id DESC")->fetchAll();
-$expenses = $pdo->query("SELECT * FROM keuangan_pengeluaran ORDER BY tanggal DESC, id DESC")->fetchAll();
+$transactions = $pdo->query("SELECT * FROM keuangan_transaksi ORDER BY tanggal DESC, id DESC")->fetchAll();
 
 $selectedBudget = null;
 $selectedBudgetId = isset($_GET['budget_id']) ? (int) $_GET['budget_id'] : 0;
@@ -214,12 +216,13 @@ foreach ($budgets as $budget) {
     $totalBudget += (float) $budget['total_anggaran'];
 }
 $totalIncome = 0;
-foreach ($incomes as $income) {
-    $totalIncome += (float) $income['jumlah'];
-}
 $totalExpense = 0;
-foreach ($expenses as $expense) {
-    $totalExpense += (float) $expense['jumlah'];
+foreach ($transactions as $transaction) {
+    if ($transaction['jenis'] === 'pemasukan') {
+        $totalIncome += (float) $transaction['jumlah'];
+    } else {
+        $totalExpense += (float) $transaction['jumlah'];
+    }
 }
 $saldo = $totalIncome - $totalExpense;
 
@@ -449,17 +452,25 @@ include __DIR__ . '/../includes/header.php';
                     </table>
                 </div>
             <?php endif; ?>
-        <?php elseif ($view === 'pemasukan'): ?>
+        <?php elseif ($view === 'pemasukan' || $view === 'pengeluaran'): ?>
+            <?php $defaultType = $view === 'pengeluaran' ? 'pengeluaran' : 'pemasukan'; ?>
             <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
-                <input type="hidden" name="view" value="pemasukan">
+                <input type="hidden" name="view" value="<?= sanitize($view) ?>">
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
                     <div>
                         <label>Tanggal</label>
                         <input type="date" name="tanggal" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
-                        <label>Sumber</label>
-                        <input type="text" name="sumber" required placeholder="Donatur / Sponsor" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <label>Jenis Transaksi</label>
+                        <select name="jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            <option value="pemasukan" <?= $defaultType === 'pemasukan' ? 'selected' : '' ?>>Pemasukan</option>
+                            <option value="pengeluaran" <?= $defaultType === 'pengeluaran' ? 'selected' : '' ?>>Pengeluaran</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Nama / Detail</label>
+                        <input type="text" name="nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
                         <label>Jumlah</label>
@@ -467,14 +478,14 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div>
                         <label>Kategori</label>
-                        <input type="text" name="kategori" placeholder="Bantuan / SPP / Lainnya" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" name="kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                 </div>
                 <div>
                     <label>Keterangan</label>
                     <textarea name="keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success" style="width:auto;">Simpan Pemasukan</button>
+                <button type="submit" class="btn btn-success" style="width:auto;">Simpan Transaksi</button>
             </form>
 
             <div class="table-responsive">
@@ -482,76 +493,24 @@ include __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr>
                             <th>Tanggal</th>
-                            <th>Sumber</th>
+                            <th>Jenis</th>
+                            <th>Nama / Detail</th>
                             <th>Kategori</th>
                             <th>Jumlah</th>
                             <th>Keterangan</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($incomes)): ?>
-                            <tr><td colspan="5">Belum ada data pemasukan.</td></tr>
-                        <?php else: foreach ($incomes as $income): ?>
+                        <?php if (empty($transactions)): ?>
+                            <tr><td colspan="6">Belum ada data transaksi.</td></tr>
+                        <?php else: foreach ($transactions as $transaction): ?>
                             <tr>
-                                <td><?= sanitize($income['tanggal']) ?></td>
-                                <td><?= sanitize($income['sumber']) ?></td>
-                                <td><?= sanitize($income['kategori']) ?></td>
-                                <td><?= formatCurrency($income['jumlah']) ?></td>
-                                <td><?= sanitize($income['keterangan']) ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php elseif ($view === 'pengeluaran'): ?>
-            <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
-                <input type="hidden" name="view" value="pengeluaran">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                    <div>
-                        <label>Tanggal</label>
-                        <input type="date" name="tanggal" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Tujuan</label>
-                        <input type="text" name="tujuan" required placeholder="Belanja / Operasional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Jumlah</label>
-                        <input type="number" name="jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Kategori</label>
-                        <input type="text" name="kategori" placeholder="ATK / Transport / Lainnya" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                </div>
-                <div>
-                    <label>Keterangan</label>
-                    <textarea name="keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
-                </div>
-                <button type="submit" class="btn btn-warning" style="width:auto;">Simpan Pengeluaran</button>
-            </form>
-
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Tujuan</th>
-                            <th>Kategori</th>
-                            <th>Jumlah</th>
-                            <th>Keterangan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($expenses)): ?>
-                            <tr><td colspan="5">Belum ada data pengeluaran.</td></tr>
-                        <?php else: foreach ($expenses as $expense): ?>
-                            <tr>
-                                <td><?= sanitize($expense['tanggal']) ?></td>
-                                <td><?= sanitize($expense['tujuan']) ?></td>
-                                <td><?= sanitize($expense['kategori']) ?></td>
-                                <td><?= formatCurrency($expense['jumlah']) ?></td>
-                                <td><?= sanitize($expense['keterangan']) ?></td>
+                                <td><?= sanitize($transaction['tanggal']) ?></td>
+                                <td><?= sanitize(ucfirst($transaction['jenis'])) ?></td>
+                                <td><?= sanitize($transaction['nama']) ?></td>
+                                <td><?= sanitize($transaction['kategori']) ?></td>
+                                <td><?= formatCurrency($transaction['jumlah']) ?></td>
+                                <td><?= sanitize($transaction['keterangan']) ?></td>
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
