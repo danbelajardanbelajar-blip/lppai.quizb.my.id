@@ -82,6 +82,11 @@ function menuActive($page) {
                 <span class="icon">🏢</span> Kelola Ruangan
             </a>
 
+            <div class="menu-label">Absensi</div>
+            <a href="<?= BASE_URL ?>/admin/absensi-alkhidmah.php" class="page-nav <?= menuActive('absensi-alkhidmah.php') ?>">
+                <span class="icon">📅</span> Absensi Al Khidmah
+            </a>
+
             <div class="menu-label">Sistem</div>
             <a href="<?= BASE_URL ?>/admin/backup-restore.php" class="page-nav <?= menuActive('backup-restore.php') ?>">
                 <span class="icon">💾</span> Backup & Restore
