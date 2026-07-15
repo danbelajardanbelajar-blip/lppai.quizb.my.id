@@ -51,6 +51,8 @@ function ensureKeuanganTables(PDO $pdo): void {
             id INT AUTO_INCREMENT PRIMARY KEY,
             anggaran_id INT NOT NULL,
             nama VARCHAR(150) NOT NULL,
+            jumlah_item INT NOT NULL DEFAULT 1,
+            nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0,
             jumlah DECIMAL(15,2) NOT NULL DEFAULT 0,
             keterangan TEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,6 +62,8 @@ function ensureKeuanganTables(PDO $pdo): void {
             id INT AUTO_INCREMENT PRIMARY KEY,
             anggaran_id INT NOT NULL,
             nama VARCHAR(150) NOT NULL,
+            jumlah_item INT NOT NULL DEFAULT 1,
+            nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0,
             jumlah DECIMAL(15,2) NOT NULL DEFAULT 0,
             keterangan TEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -69,6 +73,23 @@ function ensureKeuanganTables(PDO $pdo): void {
 
     foreach ($sqls as $sql) {
         $pdo->exec($sql);
+    }
+
+    $alterStatements = [
+        "ALTER TABLE keuangan_rencana_pemasukan ADD COLUMN IF NOT EXISTS jumlah_item INT NOT NULL DEFAULT 1",
+        "ALTER TABLE keuangan_rencana_pemasukan ADD COLUMN IF NOT EXISTS nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE keuangan_rencana_pemasukan ADD COLUMN IF NOT EXISTS jumlah DECIMAL(15,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah_item INT NOT NULL DEFAULT 1",
+        "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah DECIMAL(15,2) NOT NULL DEFAULT 0",
+    ];
+
+    foreach ($alterStatements as $sql) {
+        try {
+            $pdo->exec($sql);
+        } catch (PDOException $e) {
+            // ignore if database version doesn't support ADD COLUMN IF NOT EXISTS
+        }
     }
 }
 
@@ -144,20 +165,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $budgetId = (int) ($_POST['budget_id'] ?? 0);
         if ($budgetId > 0) {
             $jenis = $_POST['jenis'] === 'pengeluaran' ? 'pengeluaran' : 'pemasukan';
+            $jumlahItem = max(1, (int) ($_POST['jumlah_item'] ?? 1));
+            $nilaiPerItem = max(0, (float) ($_POST['nilai_per_item'] ?? 0));
+            $total = $jumlahItem * $nilaiPerItem;
+
             if ($jenis === 'pemasukan') {
-                $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pemasukan (anggaran_id, nama, jumlah, keterangan) VALUES (?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pemasukan (anggaran_id, nama, jumlah_item, nilai_per_item, jumlah, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $budgetId,
                     trim($_POST['nama'] ?? ''),
-                    (float) ($_POST['jumlah'] ?? 0),
+                    $jumlahItem,
+                    $nilaiPerItem,
+                    $total,
                     trim($_POST['keterangan'] ?? '')
                 ]);
             } else {
-                $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pengeluaran (anggaran_id, nama, jumlah, keterangan) VALUES (?, ?, ?, ?)");
+                $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pengeluaran (anggaran_id, nama, jumlah_item, nilai_per_item, jumlah, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
                 $stmt->execute([
                     $budgetId,
                     trim($_POST['nama'] ?? ''),
-                    (float) ($_POST['jumlah'] ?? 0),
+                    $jumlahItem,
+                    $nilaiPerItem,
+                    $total,
                     trim($_POST['keterangan'] ?? '')
                 ]);
             }
@@ -196,14 +225,14 @@ if ($selectedBudgetId > 0) {
 
 $plannedTransactions = [];
 if ($selectedBudget) {
-    $stmt = $pdo->prepare("SELECT id, nama, jumlah, keterangan, created_at FROM keuangan_rencana_pemasukan WHERE anggaran_id = ? ORDER BY id DESC");
+    $stmt = $pdo->prepare("SELECT id, nama, jumlah_item, nilai_per_item, jumlah, keterangan, created_at FROM keuangan_rencana_pemasukan WHERE anggaran_id = ? ORDER BY id DESC");
     $stmt->execute([$selectedBudget['id']]);
     while ($row = $stmt->fetch()) {
         $row['jenis'] = 'pemasukan';
         $plannedTransactions[] = $row;
     }
 
-    $stmt = $pdo->prepare("SELECT id, nama, jumlah, keterangan, created_at FROM keuangan_rencana_pengeluaran WHERE anggaran_id = ? ORDER BY id DESC");
+    $stmt = $pdo->prepare("SELECT id, nama, jumlah_item, nilai_per_item, jumlah, keterangan, created_at FROM keuangan_rencana_pengeluaran WHERE anggaran_id = ? ORDER BY id DESC");
     $stmt->execute([$selectedBudget['id']]);
     while ($row = $stmt->fetch()) {
         $row['jenis'] = 'pengeluaran';
@@ -310,12 +339,12 @@ include __DIR__ . '/../includes/header.php';
                                 <input type="text" name="nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                             <div>
-                                <label>Jumlah</label>
-                                <input type="number" name="jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                <label>Jumlah Item</label>
+                                <input type="number" name="jumlah_item" min="1" step="1" value="1" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                             <div>
-                                <label>Kategori</label>
-                                <input type="text" name="kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                <label>Nilai per Item</label>
+                                <input type="number" name="nilai_per_item" min="0" step="1000" value="0" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                         </div>
                         <div>
@@ -331,11 +360,11 @@ include __DIR__ . '/../includes/header.php';
                     <table>
                         <thead>
                             <tr>
-                                <th>Tipe</th>
                                 <th>Nama / Detail</th>
-                                <th>Jumlah</th>
-                                <th>Kategori</th>
-                                <th>Keterangan</th>
+                                <th>Jumlah Item</th>
+                                <th>Nilai per Item</th>
+                                <th>Pemasukan</th>
+                                <th>Pengeluaran</th>
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -344,11 +373,11 @@ include __DIR__ . '/../includes/header.php';
                                 <tr><td colspan="6">Belum ada transaksi rencana.</td></tr>
                             <?php else: foreach ($plannedTransactions as $item): ?>
                                 <tr>
-                                    <td><?= sanitize(ucfirst($item['jenis'])) ?></td>
                                     <td><?= sanitize($item['nama']) ?></td>
-                                    <td><?= formatCurrency($item['jumlah']) ?></td>
-                                    <td><?= sanitize($item['keterangan'] ? '—' : '—') ?></td>
-                                    <td><?= sanitize($item['keterangan']) ?></td>
+                                    <td><?= (int) $item['jumlah_item'] ?></td>
+                                    <td><?= formatCurrency($item['nilai_per_item']) ?></td>
+                                    <td><?= $item['jenis'] === 'pemasukan' ? formatCurrency($item['jumlah']) : '-' ?></td>
+                                    <td><?= $item['jenis'] === 'pengeluaran' ? formatCurrency($item['jumlah']) : '-' ?></td>
                                     <td><a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a></td>
                                 </tr>
                             <?php endforeach; endif; ?>
