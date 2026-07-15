@@ -44,10 +44,13 @@ include __DIR__ . '/../includes/header.php';
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <span>🕌 QR Code Absensi Al Khidmah Hari Ini (<?= htmlspecialchars(date('d F Y', strtotime($today))) ?>)</span>
-        <button class="btn btn-primary no-print" onclick="window.print()">🖨️ Print QR Code</button>
+        <button class="btn btn-primary no-print" id="btnPrint" onclick="window.print()" style="display:none;">🖨️ Print QR Code</button>
     </div>
     <div class="card-body">
-        <div id="print-area" class="qr-container">
+        <div class="text-center no-print" style="margin-bottom: 20px;">
+            <button class="btn btn-primary" id="btnGenerate" onclick="generateQRCode()">Generate QR Code</button>
+        </div>
+        <div id="print-area" class="qr-container" style="display:none;">
             <h2 style="margin-bottom: 20px;">Absensi Al Khidmah</h2>
             <div id="qrcode"></div>
             <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">Silakan scan QR Code ini menggunakan menu Absensi Al Khidmah di akun Mahasiswa Anda.</p>
@@ -126,18 +129,28 @@ include __DIR__ . '/../includes/header.php';
                 "url": "//cdn.datatables.net/plug-ins/1.13.8/i18n/id.json"
             }
         });
-
-        // Generate QR Code
-        var qrPayload = <?= json_encode($qrPayload) ?>;
-        new QRCode(document.getElementById("qrcode"), {
-            text: qrPayload,
-            width: 256,
-            height: 256,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
-        });
     });
+
+    function generateQRCode() {
+        var qrPayload = <?= json_encode($qrPayload) ?>;
+        var qrcodeElement = document.getElementById("qrcode");
+        
+        // Cek jika belum ada gambar di dalamnya
+        if (qrcodeElement.innerHTML === "") {
+            new QRCode(qrcodeElement, {
+                text: qrPayload,
+                width: 256,
+                height: 256,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+        
+        document.getElementById('btnGenerate').style.display = 'none';
+        document.getElementById('print-area').style.display = 'flex';
+        document.getElementById('btnPrint').style.display = 'inline-block';
+    }
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

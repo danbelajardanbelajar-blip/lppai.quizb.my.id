@@ -144,20 +144,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function startScanner() {
         scannerWrapper.style.display = "block";
-        html5QrcodeScanner = new Html5Qrcode("reader");
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-        
-        // Use environment facing camera
-        html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
-        .catch(err => {
-            showError("Gagal mengakses kamera belakang: " + err);
-        });
+        html5QrcodeScanner = new Html5QrcodeScanner(
+            "reader", { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
     }
 
     function onScanSuccess(decodedText, decodedResult) {
-        // Hentikan scanner setelah berhasil
         if (html5QrcodeScanner) {
-            html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear().then(() => {
                 scannerWrapper.style.display = "none";
                 scannedQrData = decodedText;
                 showSuccess("QR Code berhasil discan! Silakan ambil foto selfie.");
@@ -166,6 +160,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 console.error("Gagal menghentikan scanner", err);
             });
         }
+    }
+
+    function onScanFailure(error) {
+        // Abaikan pesan error minor selama proses scan berlangsung
     }
 
     function startSelfieCamera() {
