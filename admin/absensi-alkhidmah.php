@@ -124,11 +124,7 @@ include __DIR__ . '/../includes/header.php';
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script>
     $(document).ready(function() {
-        $('#absensiTable').DataTable({
-            "language": {
-                "url": "//cdn.datatables.net/plug-ins/1.13.8/i18n/id.json"
-            }
-        });
+        // DataTable sudah diinisialisasi secara global oleh app.js
     });
 
     function generateQRCode() {
