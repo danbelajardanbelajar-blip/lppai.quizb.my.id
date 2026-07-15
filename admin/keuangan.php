@@ -171,7 +171,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $planId = !empty($_POST['plan_id']) ? (int) $_POST['plan_id'] : null;
 
             if ($planId) {
-                $originalJenis = $_POST['original_plan_type'] === 'pengeluaran' ? 'pengeluaran' : 'pemasukan';
+                $originalJenis = isset($_POST['original_plan_type']) && $_POST['original_plan_type'] === 'pengeluaran' ? 'pengeluaran' : 'pemasukan';
+                if (!isset($_POST['original_plan_type']) || empty($_POST['original_plan_type'])) {
+                    $stmt = $pdo->prepare("SELECT id FROM keuangan_rencana_pemasukan WHERE id = ? AND anggaran_id = ?");
+                    $stmt->execute([$planId, $budgetId]);
+                    if ($stmt->fetch()) {
+                        $originalJenis = 'pemasukan';
+                    } else {
+                        $originalJenis = 'pengeluaran';
+                    }
+                }
                 if ($originalJenis === $jenis) {
                     if ($jenis === 'pemasukan') {
                         $stmt = $pdo->prepare("UPDATE keuangan_rencana_pemasukan SET nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, keterangan = ? WHERE id = ? AND anggaran_id = ?");
@@ -275,6 +284,22 @@ if ($selectedBudget && isset($_GET['edit_plan_id']) && isset($_GET['edit_plan_ty
     }
     $stmt->execute([$editPlanId, $selectedBudget['id']]);
     $editPlan = $stmt->fetch();
+    if (!$editPlan) {
+        $stmt = $pdo->prepare("SELECT * FROM keuangan_rencana_pemasukan WHERE id = ? AND anggaran_id = ?");
+        $stmt->execute([$editPlanId, $selectedBudget['id']]);
+        $editPlan = $stmt->fetch();
+        if ($editPlan) {
+            $editPlanType = 'pemasukan';
+        }
+    }
+    if (!$editPlan) {
+        $stmt = $pdo->prepare("SELECT * FROM keuangan_rencana_pengeluaran WHERE id = ? AND anggaran_id = ?");
+        $stmt->execute([$editPlanId, $selectedBudget['id']]);
+        $editPlan = $stmt->fetch();
+        if ($editPlan) {
+            $editPlanType = 'pengeluaran';
+        }
+    }
     if ($editPlan) {
         $editPlan['jenis'] = $editPlanType;
         $editPlan['original_jenis'] = $editPlanType;
