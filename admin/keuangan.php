@@ -171,20 +171,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $planId = !empty($_POST['plan_id']) ? (int) $_POST['plan_id'] : null;
 
             if ($planId) {
-                if ($jenis === 'pemasukan') {
-                    $stmt = $pdo->prepare("UPDATE keuangan_rencana_pemasukan SET nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, keterangan = ? WHERE id = ? AND anggaran_id = ?");
+                $originalJenis = $_POST['original_plan_type'] === 'pengeluaran' ? 'pengeluaran' : 'pemasukan';
+                if ($originalJenis === $jenis) {
+                    if ($jenis === 'pemasukan') {
+                        $stmt = $pdo->prepare("UPDATE keuangan_rencana_pemasukan SET nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, keterangan = ? WHERE id = ? AND anggaran_id = ?");
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE keuangan_rencana_pengeluaran SET nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, keterangan = ? WHERE id = ? AND anggaran_id = ?");
+                    }
+                    $stmt->execute([
+                        trim($_POST['nama'] ?? ''),
+                        $jumlahItem,
+                        $nilaiPerItem,
+                        $total,
+                        trim($_POST['keterangan'] ?? ''),
+                        $planId,
+                        $budgetId
+                    ]);
                 } else {
-                    $stmt = $pdo->prepare("UPDATE keuangan_rencana_pengeluaran SET nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, keterangan = ? WHERE id = ? AND anggaran_id = ?");
+                    if ($originalJenis === 'pemasukan') {
+                        $pdo->prepare("DELETE FROM keuangan_rencana_pemasukan WHERE id = ? AND anggaran_id = ?")->execute([$planId, $budgetId]);
+                    } else {
+                        $pdo->prepare("DELETE FROM keuangan_rencana_pengeluaran WHERE id = ? AND anggaran_id = ?")->execute([$planId, $budgetId]);
+                    }
+
+                    if ($jenis === 'pemasukan') {
+                        $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pemasukan (anggaran_id, nama, jumlah_item, nilai_per_item, jumlah, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
+                    } else {
+                        $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pengeluaran (anggaran_id, nama, jumlah_item, nilai_per_item, jumlah, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
+                    }
+                    $stmt->execute([
+                        $budgetId,
+                        trim($_POST['nama'] ?? ''),
+                        $jumlahItem,
+                        $nilaiPerItem,
+                        $total,
+                        trim($_POST['keterangan'] ?? '')
+                    ]);
                 }
-                $stmt->execute([
-                    trim($_POST['nama'] ?? ''),
-                    $jumlahItem,
-                    $nilaiPerItem,
-                    $total,
-                    trim($_POST['keterangan'] ?? ''),
-                    $planId,
-                    $budgetId
-                ]);
             } else {
                 if ($jenis === 'pemasukan') {
                     $stmt = $pdo->prepare("INSERT INTO keuangan_rencana_pemasukan (anggaran_id, nama, jumlah_item, nilai_per_item, jumlah, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
@@ -254,6 +277,7 @@ if ($selectedBudget && isset($_GET['edit_plan_id']) && isset($_GET['edit_plan_ty
     $editPlan = $stmt->fetch();
     if ($editPlan) {
         $editPlan['jenis'] = $editPlanType;
+        $editPlan['original_jenis'] = $editPlanType;
     }
 }
 
@@ -402,6 +426,7 @@ include __DIR__ . '/../includes/header.php';
                         <input type="hidden" name="budget_id" value="<?= (int) $selectedBudget['id'] ?>">
                         <?php if ($editPlan): ?>
                             <input type="hidden" name="plan_id" value="<?= (int) $editPlan['id'] ?>">
+                            <input type="hidden" name="original_plan_type" value="<?= sanitize($editPlan['original_jenis']) ?>">
                         <?php endif; ?>
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
                             <div>
