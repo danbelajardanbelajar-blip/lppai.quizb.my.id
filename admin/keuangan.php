@@ -441,8 +441,8 @@ include __DIR__ . '/../includes/header.php';
                     <button type="submit" class="btn btn-primary" style="width:auto;">Simpan Perubahan</button>
                 </form>
 
-                <div style="padding:12px 0 20px 0; margin-bottom:8px;">
-                    <button type="button" class="btn btn-success no-print" id="btn-open-add" style="width:auto;">Tambah Transaksi Rencana</button>
+                    <div style="padding:12px 0 20px 0; margin-bottom:8px;">
+                    <button type="button" class="btn btn-success no-print" id="btn-open-add" style="width:auto;" onclick="window.openPlanModalFromElement(null)">Tambah Transaksi Rencana</button>
                 </div>
 
                 <!-- Modal: Tambah/Edit Transaksi Rencana -->
@@ -525,6 +525,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
                                             data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
                                             data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
+                                            onclick="window.openPlanModalFromElement(this)"
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
                                     </td>
@@ -685,12 +686,43 @@ include __DIR__ . '/../includes/header.php';
                             });
                         });
 
+                        // expose global fallbacks so inline onclicks work if listeners failed
+                        try{
+                            window.openPlanModalFromElement = function(el){
+                                if (!el) return openModal(null);
+                                const ds = el.dataset || {};
+                                openModal({
+                                    id: ds.id,
+                                    jenis: ds.jenis,
+                                    nama: ds.nama,
+                                    jumlah_item: ds.jumlah_item,
+                                    nilai_per_item: ds.nilai_per_item,
+                                    keterangan: ds.keterangan
+                                });
+                            };
+                        }catch(e){ console.error('openPlanModalFromElement init failed', e); }
+
+                        try{
+                            window.openBudgetModalFromElement = function(el){
+                                if (!el) return openBudgetModal(null);
+                                const ds = el.dataset || {};
+                                openBudgetModal({
+                                    id: ds.id,
+                                    nama: ds.nama,
+                                    periode: ds.periode,
+                                    total: ds.total,
+                                    status: ds.status,
+                                    deskripsi: ds.deskripsi
+                                });
+                            };
+                        }catch(e){ console.error('openBudgetModalFromElement init failed', e); }
+
                         if (modalBudget) modalBudget.addEventListener('click', function(e){ if (e.target === modalBudget) closeBudgetModal(); });
                     })();
                 </script>
             <?php else: ?>
                 <div style="padding:12px 0 20px 0; margin-bottom:8px;">
-                    <button type="button" class="btn btn-success no-print" id="btn-open-budget">Tambah Rencana</button>
+                    <button type="button" class="btn btn-success no-print" id="btn-open-budget" onclick="window.openBudgetModalFromElement(null)">Tambah Rencana</button>
                 </div>
 
                 <!-- Modal: Tambah/Edit Rencana Anggaran -->
@@ -767,6 +799,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-total="<?= (float) $budget['total_anggaran'] ?>"
                                             data-status="<?= sanitize($budget['status']) ?>"
                                             data-deskripsi="<?= htmlspecialchars($budget['deskripsi'], ENT_QUOTES) ?>"
+                                            onclick="window.openBudgetModalFromElement(this)"
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>&action=delete" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus rencana ini?')">Delete</a>
                                     </td>
