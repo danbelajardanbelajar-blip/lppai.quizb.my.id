@@ -441,48 +441,52 @@ include __DIR__ . '/../includes/header.php';
                     <button type="submit" class="btn btn-primary" style="width:auto;">Simpan Perubahan</button>
                 </form>
 
-                <div class="card" style="padding:16px; margin-bottom:20px;">
-                    <div class="card-header" style="margin-bottom:10px;">
-                        <?= $editPlan ? 'Edit Transaksi Rencana' : 'Tambah Transaksi Rencana' ?>
+                <div style="padding:12px 0 20px 0; margin-bottom:8px;">
+                    <button type="button" class="btn btn-success no-print" id="btn-open-add" style="width:auto;">Tambah Transaksi Rencana</button>
+                </div>
+
+                <!-- Modal: Tambah/Edit Transaksi Rencana -->
+                <div id="modal-plan" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+                    <div style="background:#fff; width:720px; max-width:95%; padding:16px; border-radius:8px; position:relative;">
+                        <button type="button" id="modal-close" style="position:absolute; right:12px; top:12px;">&times;</button>
+                        <h3 id="modal-title">Tambah Transaksi Rencana</h3>
+                        <form method="post" id="modal-form" style="display:grid; gap:12px; margin-top:8px;">
+                            <input type="hidden" name="view" value="rencana-anggaran">
+                            <input type="hidden" name="action" value="save-plan-transaction">
+                            <input type="hidden" name="budget_id" value="<?= (int) $selectedBudget['id'] ?>">
+                            <input type="hidden" name="plan_id" id="modal-plan-id" value="">
+                            <input type="hidden" name="original_plan_type" id="modal-original-type" value="">
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                                <div>
+                                    <label>Jenis</label>
+                                    <select name="jenis" id="modal-jenis" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                        <option value="pemasukan">Pemasukan</option>
+                                        <option value="pengeluaran">Pengeluaran</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label>Nama / Detail</label>
+                                    <input type="text" name="nama" id="modal-nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div>
+                                    <label>Jumlah Item</label>
+                                    <input type="number" name="jumlah_item" id="modal-jumlah-item" min="1" step="1" value="1" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div>
+                                    <label>Nilai per Item</label>
+                                    <input type="number" name="nilai_per_item" id="modal-nilai-per-item" min="0" step="1000" value="0" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                            </div>
+                            <div>
+                                <label>Keterangan</label>
+                                <textarea name="keterangan" id="modal-keterangan" rows="2" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button type="submit" class="btn btn-success" id="modal-submit">Simpan Transaksi</button>
+                                <button type="button" class="btn btn-secondary" id="modal-cancel">Batal</button>
+                            </div>
+                        </form>
                     </div>
-                    <form method="post" style="display:grid; gap:12px;">
-                        <input type="hidden" name="view" value="rencana-anggaran">
-                        <input type="hidden" name="action" value="save-plan-transaction">
-                        <input type="hidden" name="budget_id" value="<?= (int) $selectedBudget['id'] ?>">
-                        <?php if ($editPlan): ?>
-                            <input type="hidden" name="plan_id" value="<?= (int) $editPlan['id'] ?>">
-                            <input type="hidden" name="original_plan_type" value="<?= sanitize($editPlan['original_jenis']) ?>">
-                        <?php endif; ?>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                            <div>
-                                <label>Jenis</label>
-                                <select name="jenis" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                                    <option value="pemasukan" <?= ($editPlan && $editPlan['jenis'] === 'pemasukan') ? 'selected' : '' ?>>Pemasukan</option>
-                                    <option value="pengeluaran" <?= ($editPlan && $editPlan['jenis'] === 'pengeluaran') ? 'selected' : '' ?>>Pengeluaran</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label>Nama / Detail</label>
-                                <input type="text" name="nama" required placeholder="Contoh: Donatur, Belanja ATK" value="<?= sanitize($editPlan['nama'] ?? '') ?>" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                            <div>
-                                <label>Jumlah Item</label>
-                                <input type="number" name="jumlah_item" min="1" step="1" value="<?= isset($editPlan['jumlah_item']) ? (int) $editPlan['jumlah_item'] : 1 ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                            <div>
-                                <label>Nilai per Item</label>
-                                <input type="number" name="nilai_per_item" min="0" step="1000" value="<?= isset($editPlan['nilai_per_item']) ? (float) $editPlan['nilai_per_item'] : 0 ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            </div>
-                        </div>
-                        <div>
-                            <label>Keterangan</label>
-                            <textarea name="keterangan" rows="2" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"><?= sanitize($editPlan['keterangan'] ?? '') ?></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-success" style="width:auto;"><?= $editPlan ? 'Perbarui Transaksi' : 'Simpan Transaksi' ?></button>
-                        <?php if ($editPlan): ?>
-                            <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>" class="btn btn-secondary" style="width:auto;">Batal</a>
-                        <?php endif; ?>
-                    </form>
                 </div>
 
                 <div class="table-responsive">
@@ -514,7 +518,14 @@ include __DIR__ . '/../includes/header.php';
                                     <td><?= $item['jenis'] === 'pemasukan' ? formatCurrency($item['jumlah']) : '-' ?></td>
                                     <td><?= $item['jenis'] === 'pengeluaran' ? formatCurrency($item['jumlah']) : '-' ?></td>
                                     <td style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                                        <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&edit_plan_id=<?= (int) $item['id'] ?>&edit_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-primary" style="width:auto;">Edit</a>
+                                        <button type="button" class="btn btn-primary btn-edit" style="width:auto;"
+                                            data-id="<?= (int) $item['id'] ?>"
+                                            data-jenis="<?= sanitize($item['jenis']) ?>"
+                                            data-nama="<?= htmlspecialchars($item['nama'], ENT_QUOTES) ?>"
+                                            data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
+                                            data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
+                                            data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
+                                        >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
                                     </td>
                                 </tr>
@@ -552,6 +563,75 @@ include __DIR__ . '/../includes/header.php';
                         }
                         window.print();
                     }
+                    // Modal handling for add/edit
+                    (function(){
+                        const modal = document.getElementById('modal-plan');
+                        const btnOpenAdd = document.getElementById('btn-open-add');
+                        const btnClose = document.getElementById('modal-close');
+                        const btnCancel = document.getElementById('modal-cancel');
+                        const modalTitle = document.getElementById('modal-title');
+                        const form = document.getElementById('modal-form');
+                        const inputId = document.getElementById('modal-plan-id');
+                        const inputOriginal = document.getElementById('modal-original-type');
+                        const inputJenis = document.getElementById('modal-jenis');
+                        const inputNama = document.getElementById('modal-nama');
+                        const inputJumlahItem = document.getElementById('modal-jumlah-item');
+                        const inputNilaiPerItem = document.getElementById('modal-nilai-per-item');
+                        const inputKeterangan = document.getElementById('modal-keterangan');
+
+                        function openModal(values) {
+                            if (values) {
+                                modalTitle.textContent = 'Edit Transaksi Rencana';
+                                inputId.value = values.id || '';
+                                inputOriginal.value = values.jenis || '';
+                                inputJenis.value = values.jenis || 'pemasukan';
+                                inputNama.value = values.nama || '';
+                                inputJumlahItem.value = values.jumlah_item || 1;
+                                inputNilaiPerItem.value = values.nilai_per_item || 0;
+                                inputKeterangan.value = values.keterangan || '';
+                                document.getElementById('modal-submit').textContent = 'Perbarui Transaksi';
+                            } else {
+                                modalTitle.textContent = 'Tambah Transaksi Rencana';
+                                inputId.value = '';
+                                inputOriginal.value = '';
+                                inputJenis.value = 'pemasukan';
+                                inputNama.value = '';
+                                inputJumlahItem.value = 1;
+                                inputNilaiPerItem.value = 0;
+                                inputKeterangan.value = '';
+                                document.getElementById('modal-submit').textContent = 'Simpan Transaksi';
+                            }
+                            modal.style.display = 'flex';
+                        }
+
+                        function closeModal() {
+                            modal.style.display = 'none';
+                        }
+
+                        if (btnOpenAdd) btnOpenAdd.addEventListener('click', function(){ openModal(null); });
+                        if (btnClose) btnClose.addEventListener('click', closeModal);
+                        if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+                        // Attach edit buttons
+                        document.querySelectorAll('.btn-edit').forEach(function(b){
+                            b.addEventListener('click', function(){
+                                const dataset = b.dataset;
+                                openModal({
+                                    id: dataset.id,
+                                    jenis: dataset.jenis,
+                                    nama: dataset.nama,
+                                    jumlah_item: dataset.jumlah_item,
+                                    nilai_per_item: dataset.nilai_per_item,
+                                    keterangan: dataset.keterangan
+                                });
+                            });
+                        });
+
+                        // Close modal on background click
+                        modal.addEventListener('click', function(e){
+                            if (e.target === modal) closeModal();
+                        });
+                    })();
                 </script>
             <?php else: ?>
                 <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
