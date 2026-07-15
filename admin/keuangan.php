@@ -408,6 +408,64 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
+                <script>
+                    (function(){
+                        const modalBudget = document.getElementById('modal-budget');
+                        const btnOpenBudget = document.getElementById('btn-open-budget');
+                        const btnBudgetClose = document.getElementById('modal-budget-close');
+                        const btnBudgetCancel = document.getElementById('modal-budget-cancel');
+                        const budgetTitle = document.getElementById('modal-budget-title');
+                        const budgetIdInput = document.getElementById('modal-budget-id');
+                        const budgetNama = document.getElementById('modal-budget-nama');
+                        const budgetPeriode = document.getElementById('modal-budget-periode');
+                        const budgetTotal = document.getElementById('modal-budget-total');
+                        const budgetStatus = document.getElementById('modal-budget-status');
+                        const budgetDeskripsi = document.getElementById('modal-budget-deskripsi');
+
+                        function openBudgetModal(values){
+                            if (!modalBudget) return;
+                            if (values) {
+                                budgetTitle.textContent = 'Edit Rencana Anggaran';
+                                budgetIdInput.value = values.id || '';
+                                budgetNama.value = values.nama || '';
+                                budgetPeriode.value = values.periode || '';
+                                budgetTotal.value = values.total || 0;
+                                budgetStatus.value = values.status || 'aktif';
+                                budgetDeskripsi.value = values.deskripsi || '';
+                                document.getElementById('modal-budget-submit').textContent = 'Perbarui Rencana';
+                            } else {
+                                budgetTitle.textContent = 'Tambah Rencana Anggaran';
+                                budgetIdInput.value = '';
+                                budgetNama.value = '';
+                                budgetPeriode.value = '';
+                                budgetTotal.value = '';
+                                budgetStatus.value = 'aktif';
+                                budgetDeskripsi.value = '';
+                                document.getElementById('modal-budget-submit').textContent = 'Simpan Rencana';
+                            }
+                            modalBudget.style.display = 'flex';
+                        }
+
+                        window.openBudgetModalFromElement = function(el){
+                            if (!el) return openBudgetModal(null);
+                            const ds = el.dataset || {};
+                            openBudgetModal({
+                                id: ds.id,
+                                nama: ds.nama,
+                                periode: ds.periode,
+                                total: ds.total,
+                                status: ds.status,
+                                deskripsi: ds.deskripsi
+                            });
+                        };
+
+                        if (btnOpenBudget) btnOpenBudget.addEventListener('click', function(){ openBudgetModal(null); });
+                        if (btnBudgetClose) btnBudgetClose.addEventListener('click', function(){ if (modalBudget) modalBudget.style.display = 'none'; });
+                        if (btnBudgetCancel) btnBudgetCancel.addEventListener('click', function(){ if (modalBudget) modalBudget.style.display = 'none'; });
+                        if (modalBudget) modalBudget.addEventListener('click', function(e){ if (e.target === modalBudget) modalBudget.style.display = 'none'; });
+                    })();
+                </script>
+
                 <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
                     <input type="hidden" name="view" value="rencana-anggaran">
                     <input type="hidden" name="action" value="save-budget">
