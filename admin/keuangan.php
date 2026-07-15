@@ -563,14 +563,14 @@ include __DIR__ . '/../includes/header.php';
                         }
                         window.print();
                     }
-                    // Modal handling for add/edit
+                    // Modal handling for add/edit (transactions and budgets)
                     (function(){
+                        // Transaction modal elements
                         const modal = document.getElementById('modal-plan');
                         const btnOpenAdd = document.getElementById('btn-open-add');
                         const btnClose = document.getElementById('modal-close');
                         const btnCancel = document.getElementById('modal-cancel');
                         const modalTitle = document.getElementById('modal-title');
-                        const form = document.getElementById('modal-form');
                         const inputId = document.getElementById('modal-plan-id');
                         const inputOriginal = document.getElementById('modal-original-type');
                         const inputJenis = document.getElementById('modal-jenis');
@@ -580,6 +580,7 @@ include __DIR__ . '/../includes/header.php';
                         const inputKeterangan = document.getElementById('modal-keterangan');
 
                         function openModal(values) {
+                            if (!modal) return;
                             if (values) {
                                 modalTitle.textContent = 'Edit Transaksi Rencana';
                                 inputId.value = values.id || '';
@@ -604,15 +605,12 @@ include __DIR__ . '/../includes/header.php';
                             modal.style.display = 'flex';
                         }
 
-                        function closeModal() {
-                            modal.style.display = 'none';
-                        }
+                        function closeModal() { if (modal) modal.style.display = 'none'; }
 
                         if (btnOpenAdd) btnOpenAdd.addEventListener('click', function(){ openModal(null); });
                         if (btnClose) btnClose.addEventListener('click', closeModal);
                         if (btnCancel) btnCancel.addEventListener('click', closeModal);
 
-                        // Attach edit buttons
                         document.querySelectorAll('.btn-edit').forEach(function(b){
                             b.addEventListener('click', function(){
                                 const dataset = b.dataset;
@@ -627,44 +625,116 @@ include __DIR__ . '/../includes/header.php';
                             });
                         });
 
-                        // Close modal on background click
-                        modal.addEventListener('click', function(e){
-                            if (e.target === modal) closeModal();
+                        if (modal) modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+
+                        // Budget modal elements
+                        const btnOpenBudget = document.getElementById('btn-open-budget');
+                        const modalBudget = document.getElementById('modal-budget');
+                        const btnBudgetClose = document.getElementById('modal-budget-close');
+                        const btnBudgetCancel = document.getElementById('modal-budget-cancel');
+                        const budgetTitle = document.getElementById('modal-budget-title');
+                        const budgetForm = document.getElementById('modal-budget-form');
+                        const budgetIdInput = document.getElementById('modal-budget-id');
+                        const budgetNama = document.getElementById('modal-budget-nama');
+                        const budgetPeriode = document.getElementById('modal-budget-periode');
+                        const budgetTotal = document.getElementById('modal-budget-total');
+                        const budgetStatus = document.getElementById('modal-budget-status');
+                        const budgetDeskripsi = document.getElementById('modal-budget-deskripsi');
+
+                        function openBudgetModal(values){
+                            if (!modalBudget) return;
+                            if (values) {
+                                budgetTitle.textContent = 'Edit Rencana Anggaran';
+                                budgetIdInput.value = values.id || '';
+                                budgetNama.value = values.nama || '';
+                                budgetPeriode.value = values.periode || '';
+                                budgetTotal.value = values.total || 0;
+                                budgetStatus.value = values.status || 'aktif';
+                                budgetDeskripsi.value = values.deskripsi || '';
+                                document.getElementById('modal-budget-submit').textContent = 'Perbarui Rencana';
+                            } else {
+                                budgetTitle.textContent = 'Tambah Rencana Anggaran';
+                                budgetIdInput.value = '';
+                                budgetNama.value = '';
+                                budgetPeriode.value = '';
+                                budgetTotal.value = '';
+                                budgetStatus.value = 'aktif';
+                                budgetDeskripsi.value = '';
+                                document.getElementById('modal-budget-submit').textContent = 'Simpan Rencana';
+                            }
+                            modalBudget.style.display = 'flex';
+                        }
+
+                        function closeBudgetModal(){ if (modalBudget) modalBudget.style.display = 'none'; }
+
+                        if (btnOpenBudget) btnOpenBudget.addEventListener('click', function(){ openBudgetModal(null); });
+                        if (btnBudgetClose) btnBudgetClose.addEventListener('click', closeBudgetModal);
+                        if (btnBudgetCancel) btnBudgetCancel.addEventListener('click', closeBudgetModal);
+
+                        document.querySelectorAll('.btn-edit-budget').forEach(function(b){
+                            b.addEventListener('click', function(){
+                                const d = b.dataset;
+                                openBudgetModal({
+                                    id: d.id,
+                                    nama: d.nama,
+                                    periode: d.periode,
+                                    total: d.total,
+                                    status: d.status,
+                                    deskripsi: d.deskripsi
+                                });
+                            });
                         });
+
+                        if (modalBudget) modalBudget.addEventListener('click', function(e){ if (e.target === modalBudget) closeBudgetModal(); });
                     })();
                 </script>
             <?php else: ?>
-                <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
-                    <input type="hidden" name="view" value="rencana-anggaran">
-                    <input type="hidden" name="action" value="save-budget">
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                        <div>
-                            <label>Nama Rencana</label>
-                            <input type="text" name="nama" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label>Periode</label>
-                            <input type="text" name="periode" required placeholder="2026/2027" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label>Total Anggaran</label>
-                            <input type="number" name="total_anggaran" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        </div>
-                        <div>
-                            <label>Status</label>
-                            <select name="status" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                                <option value="aktif">Aktif</option>
-                                <option value="draft">Draft</option>
-                                <option value="selesai">Selesai</option>
-                            </select>
-                        </div>
+                <div style="padding:12px 0 20px 0; margin-bottom:8px;">
+                    <button type="button" class="btn btn-success no-print" id="btn-open-budget">Tambah Rencana</button>
+                </div>
+
+                <!-- Modal: Tambah/Edit Rencana Anggaran -->
+                <div id="modal-budget" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+                    <div style="background:#fff; width:720px; max-width:95%; padding:16px; border-radius:8px; position:relative;">
+                        <button type="button" id="modal-budget-close" style="position:absolute; right:12px; top:12px;">&times;</button>
+                        <h3 id="modal-budget-title">Tambah Rencana Anggaran</h3>
+                        <form method="post" id="modal-budget-form" style="display:grid; gap:12px; margin-top:8px;">
+                            <input type="hidden" name="view" value="rencana-anggaran">
+                            <input type="hidden" name="action" value="save-budget">
+                            <input type="hidden" name="budget_id" id="modal-budget-id" value="">
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                                <div>
+                                    <label>Nama Rencana</label>
+                                    <input type="text" name="nama" id="modal-budget-nama" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div>
+                                    <label>Periode</label>
+                                    <input type="text" name="periode" id="modal-budget-periode" required placeholder="2026/2027" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div>
+                                    <label>Total Anggaran</label>
+                                    <input type="number" name="total_anggaran" id="modal-budget-total" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                </div>
+                                <div>
+                                    <label>Status</label>
+                                    <select name="status" id="modal-budget-status" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                        <option value="aktif">Aktif</option>
+                                        <option value="draft">Draft</option>
+                                        <option value="selesai">Selesai</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label>Deskripsi</label>
+                                <textarea name="deskripsi" id="modal-budget-deskripsi" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button type="submit" class="btn btn-primary" id="modal-budget-submit">Simpan Rencana</button>
+                                <button type="button" class="btn btn-secondary" id="modal-budget-cancel">Batal</button>
+                            </div>
+                        </form>
                     </div>
-                    <div>
-                        <label>Deskripsi</label>
-                        <textarea name="deskripsi" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:auto;">Simpan Rencana</button>
-                </form>
+                </div>
 
                 <div class="table-responsive">
                     <table>
@@ -690,7 +760,14 @@ include __DIR__ . '/../includes/header.php';
                                     <td><?= sanitize($budget['deskripsi']) ?></td>
                                     <td style="display:flex; gap:6px; flex-wrap:wrap;">
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>" class="btn btn-secondary" style="width:auto;">Detail</a>
-                                        <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>" class="btn btn-primary" style="width:auto;">Edit</a>
+                                        <button type="button" class="btn btn-primary btn-edit-budget" style="width:auto;"
+                                            data-id="<?= (int) $budget['id'] ?>"
+                                            data-nama="<?= htmlspecialchars($budget['nama'], ENT_QUOTES) ?>"
+                                            data-periode="<?= htmlspecialchars($budget['periode'], ENT_QUOTES) ?>"
+                                            data-total="<?= (float) $budget['total_anggaran'] ?>"
+                                            data-status="<?= sanitize($budget['status']) ?>"
+                                            data-deskripsi="<?= htmlspecialchars($budget['deskripsi'], ENT_QUOTES) ?>"
+                                        >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>&action=delete" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus rencana ini?')">Delete</a>
                                     </td>
                                 </tr>
