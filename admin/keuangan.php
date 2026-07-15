@@ -242,6 +242,17 @@ if ($selectedBudget) {
     usort($plannedTransactions, function ($a, $b) {
         return strcmp($b['created_at'], $a['created_at']);
     });
+
+    $totalPlannedIncome = 0;
+    $totalPlannedExpense = 0;
+    foreach ($plannedTransactions as $planned) {
+        if ($planned['jenis'] === 'pemasukan') {
+            $totalPlannedIncome += (float) $planned['jumlah'];
+        } else {
+            $totalPlannedExpense += (float) $planned['jumlah'];
+        }
+    }
+    $totalPlannedRemaining = $totalPlannedIncome - $totalPlannedExpense;
 }
 
 $totalBudget = 0;
@@ -383,6 +394,25 @@ include __DIR__ . '/../includes/header.php';
                             <?php endforeach; endif; ?>
                         </tbody>
                     </table>
+
+                    <div style="margin-top:16px; max-width:480px;">
+                        <table style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pemasukan</th>
+                                    <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pengeluaran</th>
+                                    <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Sisa</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalPlannedIncome ?? 0) ?></td>
+                                    <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalPlannedExpense ?? 0) ?></td>
+                                    <td style="padding:8px; border:1px solid #ddd; font-weight:600;"><?= formatCurrency($totalPlannedRemaining ?? 0) ?></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             <?php else: ?>
                 <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
