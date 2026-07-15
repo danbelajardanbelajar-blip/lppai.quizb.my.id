@@ -74,6 +74,28 @@ function menuActive($page) {
                 <span class="icon">📢</span> Kelola Pengumuman
             </a>
 
+            <div class="menu-label">Keuangan</div>
+            <div class="menu-item has-submenu">
+                <a href="#" class="page-nav submenu-toggle <?= (in_array($currentPage, ['keuangan.php'])) ? 'active' : '' ?>">
+                    <span class="icon">💰</span> Keuangan
+                    <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
+                </a>
+                <div class="submenu" style="display: <?= (in_array($currentPage, ['keuangan.php'])) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
+                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'rencana-anggaran') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Rencana Anggaran
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pemasukan" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'pemasukan') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Pemasukan
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pengeluaran" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'pengeluaran') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Pengeluaran
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=laporan" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'laporan') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Laporan
+                    </a>
+                </div>
+            </div>
+
             <div class="menu-label">Users</div>
             <a href="<?= BASE_URL ?>/admin/users.php" class="page-nav <?= menuActive('users.php') ?>">
                 <span class="icon">👥</span> Kelola Pengguna
