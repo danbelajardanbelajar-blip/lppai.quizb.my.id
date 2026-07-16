@@ -84,11 +84,8 @@ function menuActive($page) {
                     <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'rencana-anggaran') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Rencana Anggaran
                     </a>
-                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pemasukan" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'pemasukan') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
-                        Pemasukan
-                    </a>
-                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pengeluaran" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'pengeluaran') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
-                        Pengeluaran
+                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=transaksi" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'transaksi') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                        Transaksi (In/Out)
                     </a>
                     <a href="<?= BASE_URL ?>/admin/keuangan.php?view=laporan" class="page-nav <?= (isset($_GET['view']) && $_GET['view'] === 'laporan') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Laporan
