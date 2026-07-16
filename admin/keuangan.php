@@ -851,51 +851,59 @@ include __DIR__ . '/../includes/header.php';
                     })();
                 </script>
         <?php elseif ($view === 'transaksi'): ?>
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <h4 id="form-transaksi-title" style="margin:0;">Tambah Transaksi</h4>
-                <button type="button" class="btn btn-secondary" id="btn-cancel-transaksi" style="display:none; width:auto;" onclick="resetTransaksiForm()">Batal Edit</button>
+            <div style="padding:12px 0 20px 0; margin-bottom:8px;">
+                <button type="button" class="btn btn-success no-print" onclick="window.openTransaksiModal(null)">Tambah Transaksi</button>
             </div>
-            <form method="post" enctype="multipart/form-data" id="form-transaksi" style="display:grid; gap:12px; margin-bottom:20px;">
-                <input type="hidden" name="view" value="transaksi">
-                <input type="hidden" name="transaksi_id" id="input-transaksi-id" value="">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                    <div>
-                        <label>Tanggal</label>
-                        <input type="date" name="tanggal" id="input-transaksi-tanggal" value="<?= date('Y-m-d') ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Jenis Transaksi</label>
-                        <select name="jenis" id="input-transaksi-jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            <option value="pemasukan">Pemasukan</option>
-                            <option value="pengeluaran">Pengeluaran</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Nama / Detail</label>
-                        <input type="text" name="nama" id="input-transaksi-nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Jumlah</label>
-                        <input type="number" name="jumlah" id="input-transaksi-jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Kategori</label>
-                        <input type="text" name="kategori" id="input-transaksi-kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    </div>
-                    <div>
-                        <label>Bukti / Nota <span id="bukti-wajib">(Wajib)</span></label>
-                        <input type="file" name="bukti" id="input-transaksi-bukti" required accept="image/*,.pdf" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                        <small id="bukti-help" style="display:none; color:#666;">Biarkan kosong jika tidak ingin mengubah bukti.</small>
-                    </div>
+
+            <!-- Modal: Tambah/Edit Transaksi -->
+            <div id="modal-transaksi" style="display:none; position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9999;">
+                <div style="background:#fff; width:720px; max-width:95%; padding:16px; border-radius:8px; position:relative;">
+                    <button type="button" onclick="closeTransaksiModal()" style="position:absolute; right:12px; top:12px;">&times;</button>
+                    <h3 id="modal-transaksi-title">Tambah Transaksi</h3>
+                    <form method="post" enctype="multipart/form-data" id="form-transaksi" style="display:grid; gap:12px; margin-top:8px;">
+                        <input type="hidden" name="view" value="transaksi">
+                        <input type="hidden" name="transaksi_id" id="input-transaksi-id" value="">
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                            <div>
+                                <label>Tanggal</label>
+                                <input type="date" name="tanggal" id="input-transaksi-tanggal" value="<?= date('Y-m-d') ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label>Jenis Transaksi</label>
+                                <select name="jenis" id="input-transaksi-jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                    <option value="pemasukan">Pemasukan</option>
+                                    <option value="pengeluaran">Pengeluaran</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>Nama / Detail</label>
+                                <input type="text" name="nama" id="input-transaksi-nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label>Jumlah</label>
+                                <input type="number" name="jumlah" id="input-transaksi-jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label>Kategori</label>
+                                <input type="text" name="kategori" id="input-transaksi-kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label>Bukti / Nota <span id="bukti-wajib">(Wajib)</span></label>
+                                <input type="file" name="bukti" id="input-transaksi-bukti" required accept="image/*,.pdf" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                <small id="bukti-help" style="display:none; color:#666;">Biarkan kosong jika tidak ingin mengubah bukti.</small>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Keterangan</label>
+                            <textarea name="keterangan" id="input-transaksi-keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button type="submit" class="btn btn-success" id="btn-submit-transaksi" style="width:auto;">Simpan Transaksi</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeTransaksiModal()">Batal</button>
+                        </div>
+                    </form>
                 </div>
-                <div>
-                    <label>Keterangan</label>
-                    <textarea name="keterangan" id="input-transaksi-keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button type="submit" class="btn btn-success" id="btn-submit-transaksi" style="width:auto;">Simpan Transaksi</button>
-                </div>
-            </form>
+            </div>
 
             <div class="table-responsive">
                 <table>
@@ -946,39 +954,60 @@ include __DIR__ . '/../includes/header.php';
                 </table>
             </div>
             <script>
-                function resetTransaksiForm() {
-                    document.getElementById('form-transaksi-title').textContent = 'Tambah Transaksi';
-                    document.getElementById('btn-cancel-transaksi').style.display = 'none';
-                    document.getElementById('input-transaksi-id').value = '';
-                    document.getElementById('input-transaksi-tanggal').value = '<?= date('Y-m-d') ?>';
-                    document.getElementById('input-transaksi-jenis').value = 'pemasukan';
-                    document.getElementById('input-transaksi-nama').value = '';
-                    document.getElementById('input-transaksi-jumlah').value = '';
-                    document.getElementById('input-transaksi-kategori').value = '';
-                    document.getElementById('input-transaksi-bukti').required = true;
-                    document.getElementById('bukti-wajib').style.display = 'inline';
-                    document.getElementById('bukti-help').style.display = 'none';
-                    document.getElementById('input-transaksi-keterangan').value = '';
-                    document.getElementById('btn-submit-transaksi').textContent = 'Simpan Transaksi';
+                function closeTransaksiModal() {
+                    document.getElementById('modal-transaksi').style.display = 'none';
                 }
+
+                window.openTransaksiModal = function(values) {
+                    const modal = document.getElementById('modal-transaksi');
+                    if (values) {
+                        document.getElementById('modal-transaksi-title').textContent = 'Edit Transaksi';
+                        document.getElementById('input-transaksi-id').value = values.id;
+                        document.getElementById('input-transaksi-tanggal').value = values.tanggal;
+                        document.getElementById('input-transaksi-jenis').value = values.jenis;
+                        document.getElementById('input-transaksi-nama').value = values.nama;
+                        document.getElementById('input-transaksi-jumlah').value = values.jumlah;
+                        document.getElementById('input-transaksi-kategori').value = values.kategori;
+                        document.getElementById('input-transaksi-bukti').required = false;
+                        document.getElementById('bukti-wajib').style.display = 'none';
+                        document.getElementById('bukti-help').style.display = 'block';
+                        document.getElementById('input-transaksi-keterangan').value = values.keterangan;
+                        document.getElementById('btn-submit-transaksi').textContent = 'Perbarui Transaksi';
+                    } else {
+                        document.getElementById('modal-transaksi-title').textContent = 'Tambah Transaksi';
+                        document.getElementById('input-transaksi-id').value = '';
+                        document.getElementById('input-transaksi-tanggal').value = '<?= date('Y-m-d') ?>';
+                        document.getElementById('input-transaksi-jenis').value = 'pemasukan';
+                        document.getElementById('input-transaksi-nama').value = '';
+                        document.getElementById('input-transaksi-jumlah').value = '';
+                        document.getElementById('input-transaksi-kategori').value = '';
+                        document.getElementById('input-transaksi-bukti').required = true;
+                        document.getElementById('bukti-wajib').style.display = 'inline';
+                        document.getElementById('bukti-help').style.display = 'none';
+                        document.getElementById('input-transaksi-keterangan').value = '';
+                        document.getElementById('btn-submit-transaksi').textContent = 'Simpan Transaksi';
+                    }
+                    modal.style.display = 'flex';
+                };
 
                 window.editTransaksi = function(el) {
                     const ds = el.dataset;
-                    document.getElementById('form-transaksi-title').textContent = 'Edit Transaksi';
-                    document.getElementById('btn-cancel-transaksi').style.display = 'inline-block';
-                    document.getElementById('input-transaksi-id').value = ds.id;
-                    document.getElementById('input-transaksi-tanggal').value = ds.tanggal;
-                    document.getElementById('input-transaksi-jenis').value = ds.jenis;
-                    document.getElementById('input-transaksi-nama').value = ds.nama;
-                    document.getElementById('input-transaksi-jumlah').value = ds.jumlah;
-                    document.getElementById('input-transaksi-kategori').value = ds.kategori;
-                    document.getElementById('input-transaksi-bukti').required = false;
-                    document.getElementById('bukti-wajib').style.display = 'none';
-                    document.getElementById('bukti-help').style.display = 'block';
-                    document.getElementById('input-transaksi-keterangan').value = ds.keterangan;
-                    document.getElementById('btn-submit-transaksi').textContent = 'Perbarui Transaksi';
-                    window.scrollTo({ top: document.getElementById('form-transaksi-title').offsetTop - 50, behavior: 'smooth' });
+                    window.openTransaksiModal({
+                        id: ds.id,
+                        tanggal: ds.tanggal,
+                        jenis: ds.jenis,
+                        nama: ds.nama,
+                        jumlah: ds.jumlah,
+                        kategori: ds.kategori,
+                        keterangan: ds.keterangan
+                    });
                 };
+
+                document.getElementById('modal-transaksi').addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closeTransaksiModal();
+                    }
+                });
             </script>
         <?php else: ?>
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">
