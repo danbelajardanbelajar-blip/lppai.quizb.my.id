@@ -82,6 +82,7 @@ function ensureKeuanganTables(PDO $pdo): void {
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah_item INT NOT NULL DEFAULT 1",
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0",
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah DECIMAL(15,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE keuangan_transaksi ADD COLUMN IF NOT EXISTS bukti VARCHAR(255) NULL",
     ];
 
     foreach ($alterStatements as $sql) {
@@ -102,8 +103,7 @@ ensureKeuanganTables($pdo);
 $view = isset($_GET['view']) ? $_GET['view'] : 'rencana-anggaran';
 $viewLabels = [
     'rencana-anggaran' => 'Rencana Anggaran',
-    'pemasukan' => 'Pemasukan',
-    'pengeluaran' => 'Pengeluaran',
+    'transaksi' => 'Transaksi (In/Out)',
     'laporan' => 'Laporan',
 ];
 $viewTitle = $viewLabels[$view] ?? 'Keuangan';
@@ -245,16 +245,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if ($view === 'pemasukan' || $view === 'pengeluaran') {
-        $jenis = trim($_POST['jenis'] ?? ($view === 'pengeluaran' ? 'pengeluaran' : 'pemasukan'));
-        $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan) VALUES (?, ?, ?, ?, ?, ?)");
+    if ($view === 'transaksi') {
+        $jenis = trim($_POST['jenis'] ?? 'pemasukan');
+        
+        $buktiPath = '';
+        if (isset($_FILES['bukti']) && $_FILES['bukti']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = __DIR__ . '/../uploads/keuangan/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9.\-_]/', '', basename($_FILES['bukti']['name']));
+            $targetPath = $uploadDir . $fileName;
+            if (move_uploaded_file($_FILES['bukti']['tmp_name'], $targetPath)) {
+                $buktiPath = 'uploads/keuangan/' . $fileName;
+            }
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan, bukti) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['tanggal'] ?? date('Y-m-d'),
             $jenis,
             trim($_POST['nama'] ?? ''),
             (float) ($_POST['jumlah'] ?? 0),
             trim($_POST['kategori'] ?? ''),
-            trim($_POST['keterangan'] ?? '')
+            trim($_POST['keterangan'] ?? ''),
+            $buktiPath
         ]);
     }
 
@@ -388,8 +403,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
             <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran" class="btn btn-secondary" style="width:auto;">Rencana Anggaran</a>
-            <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pemasukan" class="btn btn-secondary" style="width:auto;">Pemasukan</a>
-            <a href="<?= BASE_URL ?>/admin/keuangan.php?view=pengeluaran" class="btn btn-secondary" style="width:auto;">Pengeluaran</a>
+            <a href="<?= BASE_URL ?>/admin/keuangan.php?view=transaksi" class="btn btn-secondary" style="width:auto;">Transaksi (In/Out)</a>
             <a href="<?= BASE_URL ?>/admin/keuangan.php?view=laporan" class="btn btn-secondary" style="width:auto;">Laporan</a>
         </div>
 
@@ -780,20 +794,19 @@ include __DIR__ . '/../includes/header.php';
                         };
                     })();
                 </script>
-        <?php elseif ($view === 'pemasukan' || $view === 'pengeluaran'): ?>
-            <?php $defaultType = $view === 'pengeluaran' ? 'pengeluaran' : 'pemasukan'; ?>
-            <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
-                <input type="hidden" name="view" value="<?= sanitize($view) ?>">
+        <?php elseif ($view === 'transaksi'): ?>
+            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px; margin-bottom:20px;">
+                <input type="hidden" name="view" value="transaksi">
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
                     <div>
                         <label>Tanggal</label>
-                        <input type="date" name="tanggal" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
                         <label>Jenis Transaksi</label>
                         <select name="jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                            <option value="pemasukan" <?= $defaultType === 'pemasukan' ? 'selected' : '' ?>>Pemasukan</option>
-                            <option value="pengeluaran" <?= $defaultType === 'pengeluaran' ? 'selected' : '' ?>>Pengeluaran</option>
+                            <option value="pemasukan">Pemasukan</option>
+                            <option value="pengeluaran">Pengeluaran</option>
                         </select>
                     </div>
                     <div>
@@ -807,6 +820,10 @@ include __DIR__ . '/../includes/header.php';
                     <div>
                         <label>Kategori</label>
                         <input type="text" name="kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <div>
+                        <label>Bukti / Nota (Wajib)</label>
+                        <input type="file" name="bukti" required accept="image/*,.pdf" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                 </div>
                 <div>
@@ -826,6 +843,7 @@ include __DIR__ . '/../includes/header.php';
                             <th>Kategori</th>
                             <th>Jumlah</th>
                             <th>Keterangan</th>
+                            <th>Bukti</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -837,6 +855,13 @@ include __DIR__ . '/../includes/header.php';
                                 <td><?= sanitize($transaction['kategori']) ?></td>
                                 <td><?= formatCurrency($transaction['jumlah']) ?></td>
                                 <td><?= sanitize($transaction['keterangan']) ?></td>
+                                <td>
+                                    <?php if (!empty($transaction['bukti'])): ?>
+                                        <a href="<?= BASE_URL . '/' . sanitize($transaction['bukti']) ?>" target="_blank" class="btn btn-secondary" style="padding:4px 8px; font-size:12px;">Lihat Bukti</a>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
