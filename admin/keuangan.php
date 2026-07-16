@@ -510,9 +510,7 @@ include __DIR__ . '/../includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (empty($plannedTransactions)): ?>
-                                <tr><td colspan="6">Belum ada transaksi rencana.</td></tr>
-                            <?php else: foreach ($plannedTransactions as $item): ?>
+                            <?php foreach ($plannedTransactions as $item): ?>
                                 <tr>
                                     <td><?= sanitize($item['nama']) ?></td>
                                     <td><?= (int) $item['jumlah_item'] ?></td>
@@ -532,7 +530,7 @@ include __DIR__ . '/../includes/header.php';
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
                                     </td>
                                 </tr>
-                            <?php endforeach; endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                     </div>
@@ -619,9 +617,7 @@ include __DIR__ . '/../includes/header.php';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (empty($budgets)): ?>
-                                <tr><td colspan="6">Belum ada data rencana anggaran.</td></tr>
-                            <?php else: foreach ($budgets as $budget): ?>
+                            <?php foreach ($budgets as $budget): ?>
                                 <tr>
                                     <td><a href="<?= BASE_URL ?>/admin/keuangan_rencana.php?budget_id=<?= (int) $budget['id'] ?>" style="color:#2563eb; font-weight:600;"><?= sanitize($budget['nama']) ?></a></td>
                                     <td><?= sanitize($budget['periode']) ?></td>
@@ -642,7 +638,7 @@ include __DIR__ . '/../includes/header.php';
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>&action=delete" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus rencana ini?')">Delete</a>
                                     </td>
                                 </tr>
-                            <?php endforeach; endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
@@ -696,9 +692,7 @@ include __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($transactions)): ?>
-                            <tr><td colspan="6">Belum ada data transaksi.</td></tr>
-                        <?php else: foreach ($transactions as $transaction): ?>
+                        <?php foreach ($transactions as $transaction): ?>
                             <tr>
                                 <td><?= sanitize($transaction['tanggal']) ?></td>
                                 <td><?= sanitize(ucfirst($transaction['jenis'])) ?></td>
@@ -707,7 +701,7 @@ include __DIR__ . '/../includes/header.php';
                                 <td><?= formatCurrency($transaction['jumlah']) ?></td>
                                 <td><?= sanitize($transaction['keterangan']) ?></td>
                             </tr>
-                        <?php endforeach; endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
