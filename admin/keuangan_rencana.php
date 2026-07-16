@@ -51,7 +51,47 @@ $totalPlannedRemaining = $totalPlannedIncome - $totalPlannedExpense;
 include __DIR__ . '/../includes/header.php';
 ?>
 <style>
-    @media print { body * { visibility: hidden; } .print-only, .print-only * { visibility: visible; } #print-rab { display:block; } }
+    .print-only { display: none; }
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #print-rab, #print-rab * {
+            visibility: visible;
+        }
+        #print-rab {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print, .no-print * {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        #print-rab table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        #print-rab th, #print-rab td {
+            border: 1px solid #000 !important;
+            padding: 8px;
+        }
+        #print-rab th {
+            background-color: #f3f4f6 !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        #print-rab .print-only {
+            display: block !important;
+            margin-bottom: 20px;
+        }
+        #print-rab .print-only-flex {
+            display: flex !important;
+        }
+    }
 </style>
 
 <div class="container">
@@ -116,19 +156,20 @@ include __DIR__ . '/../includes/header.php';
     <div class="table-responsive">
         <h4>Daftar Transaksi Rencana</h4>
         <div id="print-rab">
-            <div class="print-only" style="margin-bottom:16px; text-align:center;">
-                <h1 style="font-size:18px; margin:0;">Rencana Anggaran Belanja LPPAI UNISDA Tahun 2026/2027</h1>
-                <p style="margin:4px 0 0; font-size:14px;"><?= sanitize($selectedBudget['nama']) ?> • Periode <?= sanitize($selectedBudget['periode']) ?></p>
+            <div class="print-only" style="margin-bottom:20px; text-align:center;">
+                <h2 style="font-size:22px; margin:0; text-transform:uppercase;">Rencana Anggaran Belanja</h2>
+                <h3 style="font-size:18px; margin:4px 0 0;">LPPAI UNISDA</h3>
+                <p style="margin:8px 0 0; font-size:14px;"><?= sanitize($selectedBudget['nama']) ?> • Periode <?= sanitize($selectedBudget['periode']) ?></p>
             </div>
-            <table>
+            <table style="width:100%; border-collapse:collapse;">
                 <thead>
                     <tr>
-                        <th>Nama / Detail</th>
-                        <th>Jumlah Item</th>
-                        <th>Nilai per Item</th>
-                        <th>Pemasukan</th>
-                        <th>Pengeluaran</th>
-                        <th>Aksi</th>
+                        <th style="border:1px solid #ddd; padding:8px;">Nama / Detail</th>
+                        <th style="border:1px solid #ddd; padding:8px; text-align:center;">Jumlah Item</th>
+                        <th style="border:1px solid #ddd; padding:8px; text-align:right;">Nilai per Item</th>
+                        <th style="border:1px solid #ddd; padding:8px; text-align:right;">Pemasukan</th>
+                        <th style="border:1px solid #ddd; padding:8px; text-align:right;">Pengeluaran</th>
+                        <th class="no-print" style="border:1px solid #ddd; padding:8px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,45 +177,54 @@ include __DIR__ . '/../includes/header.php';
                         <tr><td colspan="6">Belum ada transaksi rencana.</td></tr>
                     <?php else: foreach ($plannedTransactions as $item): ?>
                         <tr>
-                            <td><?= sanitize($item['nama']) ?></td>
-                            <td><?= (int) $item['jumlah_item'] ?></td>
-                            <td><?= formatCurrency($item['nilai_per_item']) ?></td>
-                            <td><?= $item['jenis'] === 'pemasukan' ? formatCurrency($item['jumlah']) : '-' ?></td>
-                            <td><?= $item['jenis'] === 'pengeluaran' ? formatCurrency($item['jumlah']) : '-' ?></td>
-                            <td style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                                <button type="button" class="btn btn-primary btn-edit" style="width:auto;"
-                                    data-id="<?= (int) $item['id'] ?>"
-                                    data-jenis="<?= sanitize($item['jenis']) ?>"
-                                    data-nama="<?= htmlspecialchars($item['nama'], ENT_QUOTES) ?>"
-                                    data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
-                                    data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
-                                    data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
-                                >Edit</button>
-                                <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
+                            <td style="border:1px solid #ddd; padding:8px;"><?= sanitize($item['nama']) ?></td>
+                            <td style="border:1px solid #ddd; padding:8px; text-align:center;"><?= (int) $item['jumlah_item'] ?></td>
+                            <td style="border:1px solid #ddd; padding:8px; text-align:right;"><?= formatCurrency($item['nilai_per_item']) ?></td>
+                            <td style="border:1px solid #ddd; padding:8px; text-align:right;"><?= $item['jenis'] === 'pemasukan' ? formatCurrency($item['jumlah']) : '-' ?></td>
+                            <td style="border:1px solid #ddd; padding:8px; text-align:right;"><?= $item['jenis'] === 'pengeluaran' ? formatCurrency($item['jumlah']) : '-' ?></td>
+                            <td class="no-print" style="border:1px solid #ddd; padding:8px;">
+                                <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                                    <button type="button" class="btn btn-primary btn-edit" style="width:auto;"
+                                        data-id="<?= (int) $item['id'] ?>"
+                                        data-jenis="<?= sanitize($item['jenis']) ?>"
+                                        data-nama="<?= htmlspecialchars($item['nama'], ENT_QUOTES) ?>"
+                                        data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
+                                        data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
+                                        data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
+                                    >Edit</button>
+                                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>
                 </tbody>
             </table>
-        </div>
 
-        <div style="margin-top:16px; max-width:480px;">
-            <table style="width:100%; border-collapse:collapse;">
-                <thead>
-                    <tr>
-                        <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pemasukan</th>
-                        <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pengeluaran</th>
-                        <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Sisa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalPlannedIncome ?? 0) ?></td>
-                        <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalPlannedExpense ?? 0) ?></td>
-                        <td style="padding:8px; border:1px solid #ddd; font-weight:600;"><?= formatCurrency($totalPlannedRemaining ?? 0) ?></td>
-                    </tr>
-                </tbody>
-            </table>
+            <div style="margin-top:24px; max-width:480px; page-break-inside: avoid;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pemasukan</th>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pengeluaran</th>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Sisa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:right;"><?= formatCurrency($totalPlannedIncome ?? 0) ?></td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:right;"><?= formatCurrency($totalPlannedExpense ?? 0) ?></td>
+                            <td style="padding:8px; border:1px solid #ddd; text-align:right; font-weight:600;"><?= formatCurrency($totalPlannedRemaining ?? 0) ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="print-only print-only-flex" style="margin-top:60px; justify-content:flex-end;">
+                <div style="text-align:center; width:250px;">
+                    <p style="margin:0 0 70px 0;">Mengetahui,<br>Ketua LPPAI UNISDA</p>
+                    <p style="margin:0; font-weight:bold;">_________________________</p>
+                </div>
+            </div>
         </div>
     </div>
 
