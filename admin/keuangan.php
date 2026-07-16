@@ -130,6 +130,24 @@ if (isset($_GET['delete_plan_id']) && isset($_GET['delete_plan_type']) && isset(
     exit;
 }
 
+if (isset($_GET['action']) && $_GET['action'] === 'delete-transaksi' && isset($_GET['id'])) {
+    $id = (int) $_GET['id'];
+    
+    $stmt = $pdo->prepare("SELECT bukti FROM keuangan_transaksi WHERE id = ?");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if ($row && !empty($row['bukti'])) {
+        $filePath = __DIR__ . '/../' . $row['bukti'];
+        if (file_exists($filePath) && is_file($filePath)) {
+            unlink($filePath);
+        }
+    }
+
+    $pdo->prepare("DELETE FROM keuangan_transaksi WHERE id = ?")->execute([$id]);
+    header('Location: ' . BASE_URL . '/admin/keuangan.php?view=transaksi');
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $view = isset($_POST['view']) ? $_POST['view'] : $view;
 
@@ -261,16 +279,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan, bukti) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $_POST['tanggal'] ?? date('Y-m-d'),
-            $jenis,
-            trim($_POST['nama'] ?? ''),
-            (float) ($_POST['jumlah'] ?? 0),
-            trim($_POST['kategori'] ?? ''),
-            trim($_POST['keterangan'] ?? ''),
-            $buktiPath
-        ]);
+        $transaksiId = !empty($_POST['transaksi_id']) ? (int) $_POST['transaksi_id'] : null;
+
+        if ($transaksiId) {
+            if ($buktiPath !== '') {
+                $stmt = $pdo->prepare("SELECT bukti FROM keuangan_transaksi WHERE id = ?");
+                $stmt->execute([$transaksiId]);
+                $row = $stmt->fetch();
+                if ($row && !empty($row['bukti'])) {
+                    $oldPath = __DIR__ . '/../' . $row['bukti'];
+                    if (file_exists($oldPath) && is_file($oldPath)) {
+                        unlink($oldPath);
+                    }
+                }
+                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah = ?, kategori = ?, keterangan = ?, bukti = ? WHERE id = ?");
+                $stmt->execute([
+                    $_POST['tanggal'] ?? date('Y-m-d'),
+                    $jenis,
+                    trim($_POST['nama'] ?? ''),
+                    (float) ($_POST['jumlah'] ?? 0),
+                    trim($_POST['kategori'] ?? ''),
+                    trim($_POST['keterangan'] ?? ''),
+                    $buktiPath,
+                    $transaksiId
+                ]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah = ?, kategori = ?, keterangan = ? WHERE id = ?");
+                $stmt->execute([
+                    $_POST['tanggal'] ?? date('Y-m-d'),
+                    $jenis,
+                    trim($_POST['nama'] ?? ''),
+                    (float) ($_POST['jumlah'] ?? 0),
+                    trim($_POST['kategori'] ?? ''),
+                    trim($_POST['keterangan'] ?? ''),
+                    $transaksiId
+                ]);
+            }
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan, bukti) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $_POST['tanggal'] ?? date('Y-m-d'),
+                $jenis,
+                trim($_POST['nama'] ?? ''),
+                (float) ($_POST['jumlah'] ?? 0),
+                trim($_POST['kategori'] ?? ''),
+                trim($_POST['keterangan'] ?? ''),
+                $buktiPath
+            ]);
+        }
     }
 
     header('Location: ' . BASE_URL . '/admin/keuangan.php?view=' . urlencode($view));
@@ -795,42 +851,50 @@ include __DIR__ . '/../includes/header.php';
                     })();
                 </script>
         <?php elseif ($view === 'transaksi'): ?>
-            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h4 id="form-transaksi-title" style="margin:0;">Tambah Transaksi</h4>
+                <button type="button" class="btn btn-secondary" id="btn-cancel-transaksi" style="display:none; width:auto;" onclick="resetTransaksiForm()">Batal Edit</button>
+            </div>
+            <form method="post" enctype="multipart/form-data" id="form-transaksi" style="display:grid; gap:12px; margin-bottom:20px;">
                 <input type="hidden" name="view" value="transaksi">
+                <input type="hidden" name="transaksi_id" id="input-transaksi-id" value="">
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
                     <div>
                         <label>Tanggal</label>
-                        <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="date" name="tanggal" id="input-transaksi-tanggal" value="<?= date('Y-m-d') ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
                         <label>Jenis Transaksi</label>
-                        <select name="jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <select name="jenis" id="input-transaksi-jenis" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             <option value="pemasukan">Pemasukan</option>
                             <option value="pengeluaran">Pengeluaran</option>
                         </select>
                     </div>
                     <div>
                         <label>Nama / Detail</label>
-                        <input type="text" name="nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" name="nama" id="input-transaksi-nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
                         <label>Jumlah</label>
-                        <input type="number" name="jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="number" name="jumlah" id="input-transaksi-jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
                         <label>Kategori</label>
-                        <input type="text" name="kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input type="text" name="kategori" id="input-transaksi-kategori" placeholder="Opsional" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                     </div>
                     <div>
-                        <label>Bukti / Nota (Wajib)</label>
-                        <input type="file" name="bukti" required accept="image/*,.pdf" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <label>Bukti / Nota <span id="bukti-wajib">(Wajib)</span></label>
+                        <input type="file" name="bukti" id="input-transaksi-bukti" required accept="image/*,.pdf" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <small id="bukti-help" style="display:none; color:#666;">Biarkan kosong jika tidak ingin mengubah bukti.</small>
                     </div>
                 </div>
                 <div>
                     <label>Keterangan</label>
-                    <textarea name="keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                    <textarea name="keterangan" id="input-transaksi-keterangan" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"></textarea>
                 </div>
-                <button type="submit" class="btn btn-success" style="width:auto;">Simpan Transaksi</button>
+                <div style="display:flex; gap:8px;">
+                    <button type="submit" class="btn btn-success" id="btn-submit-transaksi" style="width:auto;">Simpan Transaksi</button>
+                </div>
             </form>
 
             <div class="table-responsive">
@@ -844,6 +908,7 @@ include __DIR__ . '/../includes/header.php';
                             <th>Jumlah</th>
                             <th>Keterangan</th>
                             <th>Bukti</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -862,11 +927,59 @@ include __DIR__ . '/../includes/header.php';
                                         -
                                     <?php endif; ?>
                                 </td>
+                                <td style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-primary btn-edit-transaksi" style="width:auto; padding:4px 8px; font-size:12px;"
+                                        data-id="<?= (int) $transaction['id'] ?>"
+                                        data-tanggal="<?= sanitize($transaction['tanggal']) ?>"
+                                        data-jenis="<?= sanitize($transaction['jenis']) ?>"
+                                        data-nama="<?= htmlspecialchars($transaction['nama'], ENT_QUOTES) ?>"
+                                        data-kategori="<?= htmlspecialchars($transaction['kategori'], ENT_QUOTES) ?>"
+                                        data-jumlah="<?= (float) $transaction['jumlah'] ?>"
+                                        data-keterangan="<?= htmlspecialchars($transaction['keterangan'], ENT_QUOTES) ?>"
+                                        onclick="window.editTransaksi(this)"
+                                    >Edit</button>
+                                    <a href="<?= BASE_URL ?>/admin/keuangan.php?view=transaksi&action=delete-transaksi&id=<?= (int) $transaction['id'] ?>" class="btn btn-danger" style="width:auto; padding:4px 8px; font-size:12px;" onclick="return confirm('Hapus transaksi ini?')">Delete</a>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
+            <script>
+                function resetTransaksiForm() {
+                    document.getElementById('form-transaksi-title').textContent = 'Tambah Transaksi';
+                    document.getElementById('btn-cancel-transaksi').style.display = 'none';
+                    document.getElementById('input-transaksi-id').value = '';
+                    document.getElementById('input-transaksi-tanggal').value = '<?= date('Y-m-d') ?>';
+                    document.getElementById('input-transaksi-jenis').value = 'pemasukan';
+                    document.getElementById('input-transaksi-nama').value = '';
+                    document.getElementById('input-transaksi-jumlah').value = '';
+                    document.getElementById('input-transaksi-kategori').value = '';
+                    document.getElementById('input-transaksi-bukti').required = true;
+                    document.getElementById('bukti-wajib').style.display = 'inline';
+                    document.getElementById('bukti-help').style.display = 'none';
+                    document.getElementById('input-transaksi-keterangan').value = '';
+                    document.getElementById('btn-submit-transaksi').textContent = 'Simpan Transaksi';
+                }
+
+                window.editTransaksi = function(el) {
+                    const ds = el.dataset;
+                    document.getElementById('form-transaksi-title').textContent = 'Edit Transaksi';
+                    document.getElementById('btn-cancel-transaksi').style.display = 'inline-block';
+                    document.getElementById('input-transaksi-id').value = ds.id;
+                    document.getElementById('input-transaksi-tanggal').value = ds.tanggal;
+                    document.getElementById('input-transaksi-jenis').value = ds.jenis;
+                    document.getElementById('input-transaksi-nama').value = ds.nama;
+                    document.getElementById('input-transaksi-jumlah').value = ds.jumlah;
+                    document.getElementById('input-transaksi-kategori').value = ds.kategori;
+                    document.getElementById('input-transaksi-bukti').required = false;
+                    document.getElementById('bukti-wajib').style.display = 'none';
+                    document.getElementById('bukti-help').style.display = 'block';
+                    document.getElementById('input-transaksi-keterangan').value = ds.keterangan;
+                    document.getElementById('btn-submit-transaksi').textContent = 'Perbarui Transaksi';
+                    window.scrollTo({ top: document.getElementById('form-transaksi-title').offsetTop - 50, behavior: 'smooth' });
+                };
+            </script>
         <?php else: ?>
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:20px;">
                 <div class="stat-card">
