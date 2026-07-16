@@ -48,6 +48,92 @@ foreach ($plannedTransactions as $p) {
 }
 $totalPlannedRemaining = $totalPlannedIncome - $totalPlannedExpense;
 
+if (isset($_GET['action']) && $_GET['action'] === 'export-docx') {
+    require_once __DIR__ . '/../../vendor/autoload.php';
+    
+    $phpWord = new \PhpOffice\PhpWord\PhpWord();
+    $section = $phpWord->addSection();
+    
+    // Add title
+    $phpWord->addTitleStyle(1, ['size' => 16, 'bold' => true], ['alignment' => 'center']);
+    $section->addTitle('RENCANA ANGGARAN BELANJA', 1);
+    
+    $phpWord->addTitleStyle(2, ['size' => 14, 'bold' => true], ['alignment' => 'center']);
+    $section->addTitle('LPPAI UNISDA', 2);
+    
+    $section->addText($selectedBudget['nama'] . ' • Periode ' . $selectedBudget['periode'], ['size' => 12], ['alignment' => 'center']);
+    $section->addTextBreak(1);
+    
+    // Add table
+    $styleTable = ['borderSize' => 6, 'borderColor' => '000000', 'cellMargin' => 80];
+    $styleFirstRow = ['bgColor' => 'F3F4F6'];
+    $phpWord->addTableStyle('RabTable', $styleTable, $styleFirstRow);
+    $table = $section->addTable('RabTable');
+    
+    // Header
+    $table->addRow();
+    $table->addCell(3000)->addText('Nama / Detail', ['bold' => true]);
+    $table->addCell(1500)->addText('Jumlah Item', ['bold' => true], ['alignment' => 'center']);
+    $table->addCell(2000)->addText('Nilai per Item', ['bold' => true], ['alignment' => 'right']);
+    $table->addCell(2000)->addText('Pemasukan', ['bold' => true], ['alignment' => 'right']);
+    $table->addCell(2000)->addText('Pengeluaran', ['bold' => true], ['alignment' => 'right']);
+    
+    // Data
+    if (empty($plannedTransactions)) {
+        $table->addRow();
+        $table->addCell(10500, ['gridSpan' => 5])->addText('Belum ada transaksi rencana.');
+    } else {
+        foreach ($plannedTransactions as $item) {
+            $table->addRow();
+            $table->addCell(3000)->addText(sanitize($item['nama']));
+            $table->addCell(1500)->addText((string)$item['jumlah_item'], null, ['alignment' => 'center']);
+            $table->addCell(2000)->addText(formatCurrency($item['nilai_per_item']), null, ['alignment' => 'right']);
+            $table->addCell(2000)->addText($item['jenis'] === 'pemasukan' ? formatCurrency($item['jumlah']) : '-', null, ['alignment' => 'right']);
+            $table->addCell(2000)->addText($item['jenis'] === 'pengeluaran' ? formatCurrency($item['jumlah']) : '-', null, ['alignment' => 'right']);
+        }
+    }
+    
+    $section->addTextBreak(1);
+    
+    // Totals Table
+    $phpWord->addTableStyle('TotalsTable', $styleTable, $styleFirstRow);
+    $totalsTable = $section->addTable('TotalsTable');
+    
+    $totalsTable->addRow();
+    $totalsTable->addCell(3500)->addText('Total Pemasukan', ['bold' => true]);
+    $totalsTable->addCell(3500)->addText('Total Pengeluaran', ['bold' => true]);
+    $totalsTable->addCell(3500)->addText('Sisa', ['bold' => true]);
+    
+    $totalsTable->addRow();
+    $totalsTable->addCell(3500)->addText(formatCurrency($totalPlannedIncome ?? 0), null, ['alignment' => 'right']);
+    $totalsTable->addCell(3500)->addText(formatCurrency($totalPlannedExpense ?? 0), null, ['alignment' => 'right']);
+    $totalsTable->addCell(3500)->addText(formatCurrency($totalPlannedRemaining ?? 0), ['bold' => true], ['alignment' => 'right']);
+    
+    $section->addTextBreak(3);
+    
+    // Signatures
+    $tableSignature = $section->addTable();
+    $tableSignature->addRow();
+    $tableSignature->addCell(6000)->addText(''); // Empty space
+    $cellSig = $tableSignature->addCell(4500);
+    $cellSig->addText('Mengetahui,', null, ['alignment' => 'center']);
+    $cellSig->addText('Ketua LPPAI UNISDA', null, ['alignment' => 'center']);
+    $cellSig->addTextBreak(3);
+    $cellSig->addText('_________________________', ['bold' => true], ['alignment' => 'center']);
+    
+    $filename = 'Rencana_Anggaran_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $selectedBudget['nama']) . '.docx';
+    header("Content-Description: File Transfer");
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Transfer-Encoding: binary');
+    header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+    header('Expires: 0');
+    ob_clean(); // Ensure no extra output is sent before the file
+    $objWriter = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+    $objWriter->save("php://output");
+    exit;
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <style>
@@ -101,6 +187,7 @@ include __DIR__ . '/../includes/header.php';
     <div style="margin-bottom:12px; display:flex; gap:8px;">
         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran" class="btn btn-secondary">Kembali ke Daftar</a>
         <button type="button" class="btn btn-warning" onclick="printRab();">Cetak Rencana</button>
+        <a href="<?= BASE_URL ?>/admin/keuangan_rencana.php?budget_id=<?= (int) $selectedBudget['id'] ?>&action=export-docx" class="btn btn-primary" style="background:#007bff; color:#fff; border:none;">Export DOCX</a>
     </div>
 
 
