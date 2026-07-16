@@ -525,7 +525,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
                                             data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
                                             data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
-                                            
+                                            onclick="window.openPlanModalFromElement(this)"
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
                                     </td>
@@ -633,7 +633,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-total="<?= (float) $budget['total_anggaran'] ?>"
                                             data-status="<?= sanitize($budget['status']) ?>"
                                             data-deskripsi="<?= htmlspecialchars($budget['deskripsi'], ENT_QUOTES) ?>"
-                                            
+                                            onclick="window.openBudgetModalFromElement(this)"
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>&action=delete" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus rencana ini?')">Delete</a>
                                     </td>
@@ -643,6 +643,143 @@ include __DIR__ . '/../includes/header.php';
                     </table>
                 </div>
             <?php endif; ?>
+                <script>
+                    function printRab() {
+                        const printContainer = document.getElementById('print-rab');
+                        if (!printContainer) {
+                            window.print();
+                            return;
+                        }
+                        window.print();
+                    }
+                    // Modal handling for add/edit (transactions and budgets)
+                    (function(){
+                        // Transaction modal elements
+                        const modal = document.getElementById('modal-plan');
+                        const btnOpenAdd = document.getElementById('btn-open-add');
+                        const btnClose = document.getElementById('modal-close');
+                        const btnCancel = document.getElementById('modal-cancel');
+                        const modalTitle = document.getElementById('modal-title');
+                        const inputId = document.getElementById('modal-plan-id');
+                        const inputOriginal = document.getElementById('modal-original-type');
+                        const inputJenis = document.getElementById('modal-jenis');
+                        const inputNama = document.getElementById('modal-nama');
+                        const inputJumlahItem = document.getElementById('modal-jumlah-item');
+                        const inputNilaiPerItem = document.getElementById('modal-nilai-per-item');
+                        const inputKeterangan = document.getElementById('modal-keterangan');
+
+                        function openModal(values) {
+                            if (!modal) return;
+                            if (values) {
+                                modalTitle.textContent = 'Edit Transaksi Rencana';
+                                inputId.value = values.id || '';
+                                inputOriginal.value = values.jenis || '';
+                                inputJenis.value = values.jenis || 'pemasukan';
+                                inputNama.value = values.nama || '';
+                                inputJumlahItem.value = values.jumlah_item || 1;
+                                inputNilaiPerItem.value = values.nilai_per_item || 0;
+                                inputKeterangan.value = values.keterangan || '';
+                                const subBtn = document.getElementById('modal-submit');
+                                if (subBtn) subBtn.textContent = 'Perbarui Transaksi';
+                            } else {
+                                modalTitle.textContent = 'Tambah Transaksi Rencana';
+                                inputId.value = '';
+                                inputOriginal.value = '';
+                                inputJenis.value = 'pemasukan';
+                                inputNama.value = '';
+                                inputJumlahItem.value = 1;
+                                inputNilaiPerItem.value = 0;
+                                inputKeterangan.value = '';
+                                const subBtn = document.getElementById('modal-submit');
+                                if (subBtn) subBtn.textContent = 'Simpan Transaksi';
+                            }
+                            modal.style.display = 'flex';
+                        }
+
+                        function closeModal() { if (modal) modal.style.display = 'none'; }
+
+                        if (btnOpenAdd) btnOpenAdd.addEventListener('click', function(){ openModal(null); });
+                        if (btnClose) btnClose.addEventListener('click', closeModal);
+                        if (btnCancel) btnCancel.addEventListener('click', closeModal);
+
+                        if (modal) modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+
+                        // Budget modal elements
+                        const btnOpenBudget = document.getElementById('btn-open-budget');
+                        const modalBudget = document.getElementById('modal-budget');
+                        const btnBudgetClose = document.getElementById('modal-budget-close');
+                        const btnBudgetCancel = document.getElementById('modal-budget-cancel');
+                        const budgetTitle = document.getElementById('modal-budget-title');
+                        const budgetForm = document.getElementById('modal-budget-form');
+                        const budgetIdInput = document.getElementById('modal-budget-id');
+                        const budgetNama = document.getElementById('modal-budget-nama');
+                        const budgetPeriode = document.getElementById('modal-budget-periode');
+                        const budgetTotal = document.getElementById('modal-budget-total');
+                        const budgetStatus = document.getElementById('modal-budget-status');
+                        const budgetDeskripsi = document.getElementById('modal-budget-deskripsi');
+
+                        function openBudgetModal(values){
+                            if (!modalBudget) return;
+                            if (values) {
+                                if (budgetTitle) budgetTitle.textContent = 'Edit Rencana Anggaran';
+                                if (budgetIdInput) budgetIdInput.value = values.id || '';
+                                if (budgetNama) budgetNama.value = values.nama || '';
+                                if (budgetPeriode) budgetPeriode.value = values.periode || '';
+                                if (budgetTotal) budgetTotal.value = values.total || 0;
+                                if (budgetStatus) budgetStatus.value = values.status || 'aktif';
+                                if (budgetDeskripsi) budgetDeskripsi.value = values.deskripsi || '';
+                                const subBBtn = document.getElementById('modal-budget-submit');
+                                if (subBBtn) subBBtn.textContent = 'Perbarui Rencana';
+                            } else {
+                                if (budgetTitle) budgetTitle.textContent = 'Tambah Rencana Anggaran';
+                                if (budgetIdInput) budgetIdInput.value = '';
+                                if (budgetNama) budgetNama.value = '';
+                                if (budgetPeriode) budgetPeriode.value = '';
+                                if (budgetTotal) budgetTotal.value = '';
+                                if (budgetStatus) budgetStatus.value = 'aktif';
+                                if (budgetDeskripsi) budgetDeskripsi.value = '';
+                                const subBBtn = document.getElementById('modal-budget-submit');
+                                if (subBBtn) subBBtn.textContent = 'Simpan Rencana';
+                            }
+                            modalBudget.style.display = 'flex';
+                        }
+
+                        function closeBudgetModal(){ if (modalBudget) modalBudget.style.display = 'none'; }
+
+                        if (btnOpenBudget) btnOpenBudget.addEventListener('click', function(){ openBudgetModal(null); });
+                        if (btnBudgetClose) btnBudgetClose.addEventListener('click', closeBudgetModal);
+                        if (btnBudgetCancel) btnBudgetCancel.addEventListener('click', closeBudgetModal);
+
+                        if (modalBudget) modalBudget.addEventListener('click', function(e){ if (e.target === modalBudget) closeBudgetModal(); });
+
+                        // expose global fallbacks so inline onclicks work if listeners failed
+                        window.openPlanModalFromElement = function(el){
+                            if (!el) return openModal(null);
+                            const ds = el.dataset || {};
+                            openModal({
+                                id: ds.id,
+                                jenis: ds.jenis,
+                                nama: ds.nama,
+                                jumlah_item: ds.jumlah_item,
+                                nilai_per_item: ds.nilai_per_item,
+                                keterangan: ds.keterangan
+                            });
+                        };
+
+                        window.openBudgetModalFromElement = function(el){
+                            if (!el) return openBudgetModal(null);
+                            const ds = el.dataset || {};
+                            openBudgetModal({
+                                id: ds.id,
+                                nama: ds.nama,
+                                periode: ds.periode,
+                                total: ds.total,
+                                status: ds.status,
+                                deskripsi: ds.deskripsi
+                            });
+                        };
+                    })();
+                </script>
         <?php elseif ($view === 'pemasukan' || $view === 'pengeluaran'): ?>
             <?php $defaultType = $view === 'pengeluaran' ? 'pengeluaran' : 'pemasukan'; ?>
             <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
