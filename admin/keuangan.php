@@ -843,13 +843,13 @@ include __DIR__ . '/../includes/header.php';
                                 <tr><td colspan="6">Belum ada data rencana anggaran.</td></tr>
                             <?php else: foreach ($budgets as $budget): ?>
                                 <tr>
-                                    <td><a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>" style="color:#2563eb; font-weight:600;"><?= sanitize($budget['nama']) ?></a></td>
+                                    <td><a href="<?= BASE_URL ?>/admin/keuangan_rencana.php?budget_id=<?= (int) $budget['id'] ?>" style="color:#2563eb; font-weight:600;"><?= sanitize($budget['nama']) ?></a></td>
                                     <td><?= sanitize($budget['periode']) ?></td>
                                     <td><?= formatCurrency($budget['total_anggaran']) ?></td>
                                     <td><?= sanitize(ucfirst($budget['status'])) ?></td>
                                     <td><?= sanitize($budget['deskripsi']) ?></td>
                                     <td style="display:flex; gap:6px; flex-wrap:wrap;">
-                                        <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>" class="btn btn-secondary" style="width:auto;">Detail</a>
+                                        <a href="<?= BASE_URL ?>/admin/keuangan_rencana.php?budget_id=<?= (int) $budget['id'] ?>" class="btn btn-secondary" style="width:auto;">Detail</a>
                                         <button type="button" class="btn btn-primary btn-edit-budget" style="width:auto;"
                                             data-id="<?= (int) $budget['id'] ?>"
                                             data-nama="<?= htmlspecialchars($budget['nama'], ENT_QUOTES) ?>"
