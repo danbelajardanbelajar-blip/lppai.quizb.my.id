@@ -976,6 +976,25 @@ include __DIR__ . '/../includes/header.php';
                     </tbody>
                 </table>
             </div>
+
+            <div style="margin-top:16px; max-width:480px;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pemasukan</th>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Pengeluaran</th>
+                            <th style="text-align:left; padding:8px; background:#f3f4f6; border:1px solid #ddd;">Total Saldo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalIncome ?? 0) ?></td>
+                            <td style="padding:8px; border:1px solid #ddd;"><?= formatCurrency($totalExpense ?? 0) ?></td>
+                            <td style="padding:8px; border:1px solid #ddd; font-weight:600;"><?= formatCurrency($saldo ?? 0) ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <script>
                 function closeTransaksiModal() {
                     document.getElementById('modal-transaksi').style.display = 'none';
