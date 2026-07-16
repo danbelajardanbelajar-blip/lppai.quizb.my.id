@@ -54,9 +54,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'export-docx') {
     error_reporting(E_ALL);
 
     try {
-        $autoloaderPath = __DIR__ . '/../../vendor/phpoffice/phpword/src/PhpWord/Autoloader.php';
+        $autoloaderPath = dirname(dirname(__DIR__)) . '/vendor/phpoffice/phpword/src/PhpWord/Autoloader.php';
         if (!file_exists($autoloaderPath)) {
-            die("File Autoloader tidak ditemukan di: " . realpath(__DIR__ . '/../../') . '/vendor/phpoffice/phpword/src/PhpWord/Autoloader.php');
+            $autoloaderPath = '/home/quic1934/public_html/vendor/phpoffice/phpword/src/PhpWord/Autoloader.php';
+            if (!file_exists($autoloaderPath)) {
+                die("File Autoloader tidak ditemukan di: " . dirname(dirname(__DIR__)) . '/vendor/phpoffice/phpword/src/PhpWord/Autoloader.php');
+            }
         }
         
         require_once $autoloaderPath;
