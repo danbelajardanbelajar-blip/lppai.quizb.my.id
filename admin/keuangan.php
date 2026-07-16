@@ -82,6 +82,8 @@ function ensureKeuanganTables(PDO $pdo): void {
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah_item INT NOT NULL DEFAULT 1",
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0",
         "ALTER TABLE keuangan_rencana_pengeluaran ADD COLUMN IF NOT EXISTS jumlah DECIMAL(15,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE keuangan_transaksi ADD COLUMN IF NOT EXISTS jumlah_item INT NOT NULL DEFAULT 1",
+        "ALTER TABLE keuangan_transaksi ADD COLUMN IF NOT EXISTS nilai_per_item DECIMAL(15,2) NOT NULL DEFAULT 0",
         "ALTER TABLE keuangan_transaksi ADD COLUMN IF NOT EXISTS bukti VARCHAR(255) NULL",
     ];
 
@@ -281,6 +283,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $transaksiId = !empty($_POST['transaksi_id']) ? (int) $_POST['transaksi_id'] : null;
 
+        $jumlahItem = max(1, (int) ($_POST['jumlah_item'] ?? 1));
+        $nilaiPerItem = max(0, (float) ($_POST['nilai_per_item'] ?? 0));
+        $jumlah = $jumlahItem * $nilaiPerItem;
+
         if ($transaksiId) {
             if ($buktiPath !== '') {
                 $stmt = $pdo->prepare("SELECT bukti FROM keuangan_transaksi WHERE id = ?");
@@ -292,36 +298,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         unlink($oldPath);
                     }
                 }
-                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah = ?, kategori = ?, keterangan = ?, bukti = ? WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, kategori = ?, keterangan = ?, bukti = ? WHERE id = ?");
                 $stmt->execute([
                     $_POST['tanggal'] ?? date('Y-m-d'),
                     $jenis,
                     trim($_POST['nama'] ?? ''),
-                    (float) ($_POST['jumlah'] ?? 0),
+                    $jumlahItem,
+                    $nilaiPerItem,
+                    $jumlah,
                     trim($_POST['kategori'] ?? ''),
                     trim($_POST['keterangan'] ?? ''),
                     $buktiPath,
                     $transaksiId
                 ]);
             } else {
-                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah = ?, kategori = ?, keterangan = ? WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE keuangan_transaksi SET tanggal = ?, jenis = ?, nama = ?, jumlah_item = ?, nilai_per_item = ?, jumlah = ?, kategori = ?, keterangan = ? WHERE id = ?");
                 $stmt->execute([
                     $_POST['tanggal'] ?? date('Y-m-d'),
                     $jenis,
                     trim($_POST['nama'] ?? ''),
-                    (float) ($_POST['jumlah'] ?? 0),
+                    $jumlahItem,
+                    $nilaiPerItem,
+                    $jumlah,
                     trim($_POST['kategori'] ?? ''),
                     trim($_POST['keterangan'] ?? ''),
                     $transaksiId
                 ]);
             }
         } else {
-            $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah, kategori, keterangan, bukti) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $pdo->prepare("INSERT INTO keuangan_transaksi (tanggal, jenis, nama, jumlah_item, nilai_per_item, jumlah, kategori, keterangan, bukti) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([
                 $_POST['tanggal'] ?? date('Y-m-d'),
                 $jenis,
                 trim($_POST['nama'] ?? ''),
-                (float) ($_POST['jumlah'] ?? 0),
+                $jumlahItem,
+                $nilaiPerItem,
+                $jumlah,
                 trim($_POST['kategori'] ?? ''),
                 trim($_POST['keterangan'] ?? ''),
                 $buktiPath
@@ -880,8 +892,12 @@ include __DIR__ . '/../includes/header.php';
                                 <input type="text" name="nama" id="input-transaksi-nama" required placeholder="Contoh: Donatur, Belanja ATK" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                             <div>
-                                <label>Jumlah</label>
-                                <input type="number" name="jumlah" id="input-transaksi-jumlah" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                <label>Jumlah Item</label>
+                                <input type="number" name="jumlah_item" id="input-transaksi-jumlah-item" min="1" step="1" value="1" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            </div>
+                            <div>
+                                <label>Nilai per Item</label>
+                                <input type="number" name="nilai_per_item" id="input-transaksi-nilai-per-item" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                             <div>
                                 <label>Kategori</label>
@@ -910,11 +926,12 @@ include __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr>
                             <th>Tanggal</th>
-                            <th>Jenis</th>
                             <th>Nama / Detail</th>
-                            <th>Kategori</th>
-                            <th>Jumlah</th>
-                            <th>Keterangan</th>
+                            <th>Jumlah Item</th>
+                            <th>Per Item</th>
+                            <th>Nilai / Nominal</th>
+                            <th>Pemasukan</th>
+                            <th>Pengeluaran</th>
                             <th>Bukti</th>
                             <th>Aksi</th>
                         </tr>
@@ -923,11 +940,16 @@ include __DIR__ . '/../includes/header.php';
                         <?php foreach ($transactions as $transaction): ?>
                             <tr>
                                 <td><?= sanitize($transaction['tanggal']) ?></td>
-                                <td><?= sanitize(ucfirst($transaction['jenis'])) ?></td>
-                                <td><?= sanitize($transaction['nama']) ?></td>
-                                <td><?= sanitize($transaction['kategori']) ?></td>
+                                <td><?= sanitize($transaction['nama']) ?>
+                                    <?php if(!empty($transaction['keterangan'])): ?>
+                                        <div style="font-size:12px; color:#666;"><?= sanitize($transaction['keterangan']) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= isset($transaction['jumlah_item']) ? (int) $transaction['jumlah_item'] : 1 ?></td>
+                                <td><?= isset($transaction['nilai_per_item']) ? formatCurrency($transaction['nilai_per_item']) : formatCurrency($transaction['jumlah']) ?></td>
                                 <td><?= formatCurrency($transaction['jumlah']) ?></td>
-                                <td><?= sanitize($transaction['keterangan']) ?></td>
+                                <td style="color:green;"><?= $transaction['jenis'] === 'pemasukan' ? formatCurrency($transaction['jumlah']) : '-' ?></td>
+                                <td style="color:red;"><?= $transaction['jenis'] === 'pengeluaran' ? formatCurrency($transaction['jumlah']) : '-' ?></td>
                                 <td>
                                     <?php if (!empty($transaction['bukti'])): ?>
                                         <a href="<?= BASE_URL . '/' . sanitize($transaction['bukti']) ?>" target="_blank" class="btn btn-secondary" style="padding:4px 8px; font-size:12px;">Lihat Bukti</a>
@@ -942,7 +964,8 @@ include __DIR__ . '/../includes/header.php';
                                         data-jenis="<?= sanitize($transaction['jenis']) ?>"
                                         data-nama="<?= htmlspecialchars($transaction['nama'], ENT_QUOTES) ?>"
                                         data-kategori="<?= htmlspecialchars($transaction['kategori'], ENT_QUOTES) ?>"
-                                        data-jumlah="<?= (float) $transaction['jumlah'] ?>"
+                                        data-jumlah_item="<?= isset($transaction['jumlah_item']) ? (int) $transaction['jumlah_item'] : 1 ?>"
+                                        data-nilai_per_item="<?= isset($transaction['nilai_per_item']) ? (float) $transaction['nilai_per_item'] : (float) $transaction['jumlah'] ?>"
                                         data-keterangan="<?= htmlspecialchars($transaction['keterangan'], ENT_QUOTES) ?>"
                                         onclick="window.editTransaksi(this)"
                                     >Edit</button>
@@ -966,7 +989,8 @@ include __DIR__ . '/../includes/header.php';
                         document.getElementById('input-transaksi-tanggal').value = values.tanggal;
                         document.getElementById('input-transaksi-jenis').value = values.jenis;
                         document.getElementById('input-transaksi-nama').value = values.nama;
-                        document.getElementById('input-transaksi-jumlah').value = values.jumlah;
+                        document.getElementById('input-transaksi-jumlah-item').value = values.jumlah_item;
+                        document.getElementById('input-transaksi-nilai-per-item').value = values.nilai_per_item;
                         document.getElementById('input-transaksi-kategori').value = values.kategori;
                         document.getElementById('input-transaksi-bukti').required = false;
                         document.getElementById('bukti-wajib').style.display = 'none';
@@ -979,7 +1003,8 @@ include __DIR__ . '/../includes/header.php';
                         document.getElementById('input-transaksi-tanggal').value = '<?= date('Y-m-d') ?>';
                         document.getElementById('input-transaksi-jenis').value = 'pemasukan';
                         document.getElementById('input-transaksi-nama').value = '';
-                        document.getElementById('input-transaksi-jumlah').value = '';
+                        document.getElementById('input-transaksi-jumlah-item').value = 1;
+                        document.getElementById('input-transaksi-nilai-per-item').value = '';
                         document.getElementById('input-transaksi-kategori').value = '';
                         document.getElementById('input-transaksi-bukti').required = true;
                         document.getElementById('bukti-wajib').style.display = 'inline';
@@ -997,7 +1022,8 @@ include __DIR__ . '/../includes/header.php';
                         tanggal: ds.tanggal,
                         jenis: ds.jenis,
                         nama: ds.nama,
-                        jumlah: ds.jumlah,
+                        jumlah_item: ds.jumlah_item,
+                        nilai_per_item: ds.nilai_per_item,
                         kategori: ds.kategori,
                         keterangan: ds.keterangan
                     });
