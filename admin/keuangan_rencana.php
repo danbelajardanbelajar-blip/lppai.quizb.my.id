@@ -63,38 +63,7 @@ include __DIR__ . '/../includes/header.php';
         <button type="button" class="btn btn-warning" onclick="printRab();">Cetak Rencana</button>
     </div>
 
-    <form method="post" style="display:grid; gap:12px; margin-bottom:20px;">
-        <input type="hidden" name="view" value="rencana-anggaran">
-        <input type="hidden" name="action" value="save-budget">
-        <input type="hidden" name="budget_id" value="<?= (int) $selectedBudget['id'] ?>">
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-            <div>
-                <label>Nama Rencana</label>
-                <input type="text" name="nama" value="<?= sanitize($selectedBudget['nama']) ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-            </div>
-            <div>
-                <label>Periode</label>
-                <input type="text" name="periode" value="<?= sanitize($selectedBudget['periode']) ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-            </div>
-            <div>
-                <label>Total Anggaran</label>
-                <input type="number" name="total_anggaran" min="0" step="1000" value="<?= (float) $selectedBudget['total_anggaran'] ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-            </div>
-            <div>
-                <label>Status</label>
-                <select name="status" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    <option value="aktif" <?= ($selectedBudget['status'] === 'aktif') ? 'selected' : '' ?>>Aktif</option>
-                    <option value="draft" <?= ($selectedBudget['status'] === 'draft') ? 'selected' : '' ?>>Draft</option>
-                    <option value="selesai" <?= ($selectedBudget['status'] === 'selesai') ? 'selected' : '' ?>>Selesai</option>
-                </select>
-            </div>
-        </div>
-        <div>
-            <label>Deskripsi</label>
-            <textarea name="deskripsi" rows="3" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;"><?= sanitize($selectedBudget['deskripsi']) ?></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-    </form>
+
 
     <div style="padding:12px 0 20px 0; margin-bottom:8px;">
         <button type="button" class="btn btn-success" id="btn-open-add">Tambah Transaksi Rencana</button>
