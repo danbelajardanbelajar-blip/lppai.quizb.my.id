@@ -133,7 +133,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export-docx') {
         $cellSig->addText('Mengetahui,', null, ['alignment' => 'center']);
         $cellSig->addText('Ketua LPPAI UNISDA', null, ['alignment' => 'center']);
         $cellSig->addTextBreak(3);
-        $cellSig->addText('_________________________', ['bold' => true], ['alignment' => 'center']);
+        $cellSig->addText('Dr. Zainul Hakim, M.H.I.', ['bold' => true, 'underline' => 'single'], ['alignment' => 'center']);
         
         $filename = 'Rencana_Anggaran_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $selectedBudget['nama']) . '.docx';
         
@@ -329,7 +329,7 @@ include __DIR__ . '/../includes/header.php';
             <div class="print-only print-only-flex" style="margin-top:60px; justify-content:flex-end;">
                 <div style="text-align:center; width:250px;">
                     <p style="margin:0 0 70px 0;">Mengetahui,<br>Ketua LPPAI UNISDA</p>
-                    <p style="margin:0; font-weight:bold;">_________________________</p>
+                    <p style="margin:0; font-weight:bold; text-decoration:underline;">Dr. Zainul Hakim, M.H.I.</p>
                 </div>
             </div>
         </div>
