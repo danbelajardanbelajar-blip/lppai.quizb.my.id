@@ -49,7 +49,8 @@ foreach ($plannedTransactions as $p) {
 $totalPlannedRemaining = $totalPlannedIncome - $totalPlannedExpense;
 
 if (isset($_GET['action']) && $_GET['action'] === 'export-docx') {
-    require_once __DIR__ . '/../../vendor/autoload.php';
+    require_once __DIR__ . '/../../vendor/phpoffice/phpword/src/PhpWord/Autoloader.php';
+    \PhpOffice\PhpWord\Autoloader::register();
     
     $phpWord = new \PhpOffice\PhpWord\PhpWord();
     $section = $phpWord->addSection();
