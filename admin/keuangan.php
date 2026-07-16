@@ -500,7 +500,7 @@ include __DIR__ . '/../includes/header.php';
                 </form>
 
                     <div style="padding:12px 0 20px 0; margin-bottom:8px;">
-                    <button type="button" class="btn btn-success no-print" id="btn-open-add" style="width:auto;" onclick="window.openPlanModalFromElement(null)">Tambah Transaksi Rencana</button>
+                    <button type="button" class="btn btn-success no-print" id="btn-open-add" style="width:auto;">Tambah Transaksi Rencana</button>
                 </div>
 
                 <!-- Modal: Tambah/Edit Transaksi Rencana -->
@@ -583,7 +583,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-jumlah_item="<?= (int) $item['jumlah_item'] ?>"
                                             data-nilai_per_item="<?= (float) $item['nilai_per_item'] ?>"
                                             data-keterangan="<?= htmlspecialchars($item['keterangan'], ENT_QUOTES) ?>"
-                                            onclick="window.openPlanModalFromElement(this)"
+                                            
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $selectedBudget['id'] ?>&delete_plan_id=<?= (int) $item['id'] ?>&delete_plan_type=<?= sanitize($item['jenis']) ?>" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus transaksi rencana ini?')">Delete</a>
                                     </td>
@@ -780,7 +780,7 @@ include __DIR__ . '/../includes/header.php';
                 </script>
             <?php else: ?>
                 <div style="padding:12px 0 20px 0; margin-bottom:8px;">
-                    <button type="button" class="btn btn-success no-print" id="btn-open-budget" onclick="window.openBudgetModalFromElement(null)">Tambah Rencana</button>
+                    <button type="button" class="btn btn-success no-print" id="btn-open-budget">Tambah Rencana</button>
                 </div>
 
                 <!-- Modal: Tambah/Edit Rencana Anggaran -->
@@ -857,7 +857,7 @@ include __DIR__ . '/../includes/header.php';
                                             data-total="<?= (float) $budget['total_anggaran'] ?>"
                                             data-status="<?= sanitize($budget['status']) ?>"
                                             data-deskripsi="<?= htmlspecialchars($budget['deskripsi'], ENT_QUOTES) ?>"
-                                            onclick="window.openBudgetModalFromElement(this)"
+                                            
                                         >Edit</button>
                                         <a href="<?= BASE_URL ?>/admin/keuangan.php?view=rencana-anggaran&budget_id=<?= (int) $budget['id'] ?>&action=delete" class="btn btn-danger" style="width:auto;" onclick="return confirm('Hapus rencana ini?')">Delete</a>
                                     </td>
