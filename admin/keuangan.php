@@ -507,7 +507,7 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <div>
                             <label>Total Anggaran</label>
-                            <input type="number" name="total_anggaran" min="0" step="1000" value="<?= (float) $selectedBudget['total_anggaran'] ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                            <input type="number" name="total_anggaran" min="0" step="1" value="<?= (float) $selectedBudget['total_anggaran'] ?>" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                         </div>
                         <div>
                             <label>Status</label>
@@ -558,7 +558,7 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                                 <div>
                                     <label>Nilai per Item</label>
-                                    <input type="number" name="nilai_per_item" id="modal-nilai-per-item" min="0" step="1000" value="0" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                    <input type="number" name="nilai_per_item" id="modal-nilai-per-item" min="0" step="1" value="0" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                                 </div>
                             </div>
                             <div>
@@ -663,7 +663,7 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                                 <div>
                                     <label>Total Anggaran</label>
-                                    <input type="number" name="total_anggaran" id="modal-budget-total" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                    <input type="number" name="total_anggaran" id="modal-budget-total" min="0" step="1" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                                 </div>
                                 <div>
                                     <label>Status</label>
@@ -897,7 +897,7 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                             <div>
                                 <label>Nilai per Item</label>
-                                <input type="number" name="nilai_per_item" id="input-transaksi-nilai-per-item" min="0" step="1000" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                                <input type="number" name="nilai_per_item" id="input-transaksi-nilai-per-item" min="0" step="1" required style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
                             </div>
                             <div>
                                 <label>Kategori</label>
