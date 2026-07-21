@@ -29,7 +29,7 @@ try {
     $pdo = getDBConnection();
     
     // Get max number
-    $stmtMax = $pdo->query("SELECT MAX(CAST(SUBSTRING_INDEX(nomor_sertifikat, '/', 1) AS UNSIGNED)) as max_num FROM tutorial_registrations");
+    $stmtMax = $pdo->query("SELECT MAX(CAST(SUBSTRING_INDEX(nomor_sertifikat, '/', 1) AS UNSIGNED)) as max_num FROM tutorial_registrations WHERE nomor_sertifikat REGEXP '^[0-9]+/'");
     $maxRes = $stmtMax->fetch(PDO::FETCH_ASSOC);
     $maxNum = $maxRes['max_num'] ?? null;
     

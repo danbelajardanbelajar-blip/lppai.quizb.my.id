@@ -173,7 +173,7 @@ foreach ($data as $i => $row) {
     $cetakBtn = '';
     if ($isLulus && $row['reg_id']) {
         if (empty($row['nomor_sertifikat'])) {
-            $lockBtn = '<button class="btn btn-sm btn-secondary btn-lock-sertifikat" style="white-space: nowrap; padding:4px 8px; border-radius:4px;" data-reg-id="' . $row['reg_id'] . '">🔒 Lock</button>';
+            $lockBtn = '<button type="button" class="btn btn-sm btn-secondary btn-lock-sertifikat" style="white-space: nowrap; padding:4px 8px; border-radius:4px;" data-reg-id="' . $row['reg_id'] . '">🔒 Lock</button>';
         } else {
             $cetakBtn = '<a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'" target="_blank" class="btn btn-sm btn-info" style="white-space: nowrap; background-color:#0ea5e9; border-color:#0ea5e9; color:white; text-decoration:none; padding:4px 8px; border-radius:4px;" title="No: '.htmlspecialchars($row['nomor_sertifikat']).'">🎓 Cetak</a>';
             $lockBtn = '<span style="font-size: 11px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; color: #475569;" title="Locked: '.htmlspecialchars($row['nomor_sertifikat']).'">🔒 Locked</span>';

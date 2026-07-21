@@ -546,7 +546,8 @@ $(document).ready(function() {
     });
 
     // Event listener untuk tombol Lock Sertifikat
-    $('#tableKelolaNilai tbody').on('click', '.btn-lock-sertifikat', function() {
+    $('#tableKelolaNilai tbody').on('click', '.btn-lock-sertifikat', function(e) {
+        e.preventDefault();
         var btn = $(this);
         var regId = btn.data('reg-id');
         
