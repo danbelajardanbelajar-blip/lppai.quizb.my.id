@@ -305,8 +305,27 @@ $thnNow = date('Y');
         }
         
         .grades-table-container {
-            width: 65%;
+            width: 55%;
             text-align: left;
+        }
+        
+        .photo-container {
+            width: 15%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        .photo-box {
+            width: 3cm;
+            height: 4cm;
+            border: 1px dashed #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Poppins', sans-serif;
+            font-size: 11px;
+            color: #94a3b8;
+            background-color: #f8fafc;
         }
         .grades-table {
             width: 100%;
@@ -511,6 +530,12 @@ $thnNow = date('Y');
                             </tr>
                         </table>
                         <!-- Predikat dipindahkan ke atas -->
+                    </div>
+
+                    <div class="photo-container">
+                        <div class="photo-box">
+                            Foto 3x4
+                        </div>
                     </div>
 
                     <div class="signature-container">
