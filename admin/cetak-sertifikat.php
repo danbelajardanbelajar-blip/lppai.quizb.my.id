@@ -404,7 +404,6 @@ $thnNow = date('Y');
             <div style="margin-bottom: 15px; padding: 10px; background: #eff6ff; border-radius: 6px; font-size:12px; color:#1e40af;">
                 Mode: <strong>Print Individual (1)</strong>
             </div>
-            <button class="btn btn-secondary" onclick="window.location='?mode=all<?= $reg_id ? '&id='.$reg_id : '' ?>'">Cetak Semua (Lulus)</button>
         <?php else: ?>
             <div style="margin-bottom: 15px; padding: 10px; background: #f0fdf4; border-radius: 6px; font-size:12px; color:#166534;">
                 Mode: <strong><?= $mode === 'all' ? 'Print Semua (Lulus)' : ($mode === 'selected' ? 'Print Terpilih (Lulus)' : 'Print Range (Lulus)') ?></strong><br>
@@ -431,12 +430,6 @@ $thnNow = date('Y');
                 <label>Sampai Urutan Ke:</label>
                 <input type="number" name="end" class="form-control" value="<?= $_GET['end'] ?? (count($students) > 0 ? count($students) : 10) ?>" min="1" required>
             </div>
-            <?php if ($mode !== 'selected'): ?>
-            <div style="display:flex; gap:8px;">
-                <button type="submit" class="btn btn-primary" style="flex:1; margin-bottom:0;">Filter Range</button>
-                <button type="button" class="btn btn-secondary" style="flex:1; margin-bottom:0;" onclick="window.location='?mode=all<?= $reg_id ? '&id='.$reg_id : '' ?>'">Reset (All)</button>
-            </div>
-            <?php endif; ?>
         </form>
 
         <button class="btn btn-success" onclick="window.print()">Cetak Ke Printer / PDF</button>
