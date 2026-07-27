@@ -121,7 +121,7 @@ $dataQuery = "
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
     $fromClause
-    ORDER BY $orderBy $orderDir
+    ORDER BY (tr.nomor_sertifikat IS NOT NULL AND tr.nomor_sertifikat != '') DESC, $orderBy $orderDir
     LIMIT $length OFFSET $start
 ";
 
