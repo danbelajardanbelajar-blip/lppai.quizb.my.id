@@ -67,16 +67,30 @@ if ($mode === 'single') {
     
     $students[] = $student;
 } else {
-    // Mode all atau range
-    $sqlFilter = $sqlBase . " WHERE " . $whereLulus . " ORDER BY u.nama_lengkap ASC";
-    if ($mode === 'range') {
-        $start = max(1, (int)($_GET['start'] ?? 1));
-        $end = max($start, (int)($_GET['end'] ?? 10));
-        $limit = $end - $start + 1;
-        $offset = $start - 1;
-        $sqlFilter .= " LIMIT $limit OFFSET $offset";
+    // Mode all, range, atau selected
+    $sqlFilter = $sqlBase . " WHERE " . $whereLulus;
+    
+    if ($mode === 'selected') {
+        $ids = $_GET['ids'] ?? '';
+        $idArray = array_filter(array_map('intval', explode(',', $ids)));
+        if (empty($idArray)) die("<h2 style='text-align:center; font-family:sans-serif; margin-top:50px;'>Tidak ada data yang dipilih.</h2>");
+        
+        $placeholders = implode(',', array_fill(0, count($idArray), '?'));
+        $sqlFilter .= " AND tr.id IN ($placeholders) ORDER BY u.nama_lengkap ASC";
+        $stmt = $pdo->prepare($sqlFilter);
+        $stmt->execute(array_values($idArray));
+    } else {
+        $sqlFilter .= " ORDER BY u.nama_lengkap ASC";
+        if ($mode === 'range') {
+            $start = max(1, (int)($_GET['start'] ?? 1));
+            $end = max($start, (int)($_GET['end'] ?? 10));
+            $limit = $end - $start + 1;
+            $offset = $start - 1;
+            $sqlFilter .= " LIMIT $limit OFFSET $offset";
+        }
+        $stmt = $pdo->query($sqlFilter);
     }
-    $stmt = $pdo->query($sqlFilter);
+    
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     if (empty($students)) {
@@ -393,7 +407,7 @@ $thnNow = date('Y');
             <button class="btn btn-secondary" onclick="window.location='?mode=all<?= $reg_id ? '&id='.$reg_id : '' ?>'">Cetak Semua (Lulus)</button>
         <?php else: ?>
             <div style="margin-bottom: 15px; padding: 10px; background: #f0fdf4; border-radius: 6px; font-size:12px; color:#166534;">
-                Mode: <strong><?= $mode === 'all' ? 'Print Semua (Lulus)' : 'Print Range (Lulus)' ?></strong><br>
+                Mode: <strong><?= $mode === 'all' ? 'Print Semua (Lulus)' : ($mode === 'selected' ? 'Print Terpilih (Lulus)' : 'Print Range (Lulus)') ?></strong><br>
                 Jumlah: <strong><?= count($students) ?> Sertifikat</strong>
             </div>
             <?php if($reg_id): ?>

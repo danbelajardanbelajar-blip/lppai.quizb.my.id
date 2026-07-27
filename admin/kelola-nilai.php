@@ -101,6 +101,7 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <span>📊 Data Nilai Lama (Di bawah 2026)</span>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-info" id="btnCetakTerpilih" style="display:none; font-weight: 600; background-color: #0ea5e9; border-color: #0ea5e9; color: white;">🎓 Cetak Terpilih</button>
             <button type="button" class="btn btn-sm btn-secondary" id="btnLockTerpilih" style="display:none; font-weight: 600;">🔒 Lock Terpilih</button>
             <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
             <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
@@ -434,9 +435,11 @@ $(document).ready(function() {
     function toggleHapusTerpilih() {
         var totalChecked = $('.check-item:checked').length;
         if (totalChecked > 0) {
+            $('#btnCetakTerpilih').css('display', 'inline-block');
             $('#btnHapusTerpilih').css('display', 'inline-block');
             $('#btnLockTerpilih').css('display', 'inline-block');
         } else {
+            $('#btnCetakTerpilih').css('display', 'none');
             $('#btnHapusTerpilih').css('display', 'none');
             $('#btnLockTerpilih').css('display', 'none');
         }
@@ -627,6 +630,26 @@ $(document).ready(function() {
                 });
             }
         });
+    });
+
+    // Event listener untuk tombol Cetak Terpilih
+    $('#btnCetakTerpilih').on('click', function() {
+        var selectedIds = [];
+        $('.check-item:checked').each(function() {
+            var val = $(this).val();
+            if (val && val != 0) {
+                selectedIds.push(val);
+            }
+        });
+
+        if (selectedIds.length === 0) {
+            Swal.fire('Info', 'Pilih minimal satu data untuk dicetak.', 'info');
+            return;
+        }
+        
+        // Buka tab baru ke halaman cetak dengan parameter selected
+        var url = '<?= BASE_URL ?>/admin/cetak-sertifikat.php?mode=selected&ids=' + selectedIds.join(',');
+        window.open(url, '_blank');
     });
 
     // Event listener untuk tombol Edit (karena data digenerate dinamis, gunakan event delegation)
