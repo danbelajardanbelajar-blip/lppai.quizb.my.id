@@ -429,7 +429,7 @@ $thnNow = date('Y');
             </div>
             <div class="form-group">
                 <label>Sampai Urutan Ke:</label>
-                <input type="number" name="end" class="form-control" value="<?= $_GET['end'] ?? 10 ?>" min="1" required>
+                <input type="number" name="end" class="form-control" value="<?= $_GET['end'] ?? (count($students) > 0 ? count($students) : 10) ?>" min="1" required>
             </div>
             <div style="display:flex; gap:8px;">
                 <button type="submit" class="btn btn-primary" style="flex:1; margin-bottom:0;">Filter Range</button>
