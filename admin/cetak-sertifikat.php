@@ -12,6 +12,7 @@ $pdo = getDBConnection();
 
 $mode = $_GET['mode'] ?? 'single';
 $reg_id = (int)($_GET['id'] ?? 0);
+$isSigned = isset($_GET['signed']) && $_GET['signed'] == 1;
 
 $whereLulus = "
     (tr.nilai_thaharah IS NOT NULL AND tr.nilai_shalat IS NOT NULL AND tr.nilai_surat_pendek IS NOT NULL AND tr.nilai_amaliyah IS NOT NULL AND tr.nilai_jenazah IS NOT NULL AND tr.nilai_ujian_tulis IS NOT NULL)
@@ -421,6 +422,9 @@ $thnNow = date('Y');
             <?php if($reg_id): ?>
                 <input type="hidden" name="id" value="<?= $reg_id ?>">
             <?php endif; ?>
+            <?php if($isSigned): ?>
+                <input type="hidden" name="signed" value="1">
+            <?php endif; ?>
             
             <div class="form-group">
                 <label>Print Dari Urutan Ke:</label>
@@ -549,7 +553,14 @@ $thnNow = date('Y');
 
                     <div class="signature-container">
                         <div class="signature-date">Lamongan, <?= $tglCetak ?></div>
-                        <div class="signature-role">Kepala LPPAI,</div>
+                        <div class="signature-role" style="margin-bottom: 5px;">Kepala LPPAI,</div>
+                        <?php if ($isSigned): ?>
+                            <div>
+                                <img src="<?= BASE_URL ?>/assets/img/ttd_zainul_hakim.png" alt="Tanda Tangan" style="height: 70px; object-fit: contain; mix-blend-mode: multiply; margin-bottom: 5px;">
+                            </div>
+                        <?php else: ?>
+                            <div style="height: 70px;"></div>
+                        <?php endif; ?>
                         <div class="signature-name">Dr. Zainul Hakim, M.H.I.</div>
                     </div>
                 </div>
