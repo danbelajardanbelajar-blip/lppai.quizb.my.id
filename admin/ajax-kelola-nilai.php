@@ -175,10 +175,8 @@ foreach ($data as $i => $row) {
         if (empty($row['nomor_sertifikat'])) {
             $lockBtn = '<button type="button" class="btn btn-sm btn-secondary btn-lock-sertifikat" style="white-space: nowrap; padding:4px 8px; border-radius:4px;" data-reg-id="' . $row['reg_id'] . '">🔒 Lock</button>';
         } else {
-            $cetakBtn = '<div class="btn-group" role="group" style="box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-radius:4px;">' . 
-                        '<a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'" target="_blank" class="btn btn-sm btn-info" style="white-space: nowrap; background-color:#0ea5e9; border-color:#0ea5e9; color:white; text-decoration:none; padding:4px 8px; border-top-right-radius: 0; border-bottom-right-radius: 0;" title="No: '.htmlspecialchars($row['nomor_sertifikat']).'">🎓 Cetak</a>' .
-                        '<a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'&signed=1" target="_blank" class="btn btn-sm btn-success" style="white-space: nowrap; background-color:#10b981; border-color:#10b981; color:white; text-decoration:none; padding:4px 8px; border-top-left-radius: 0; border-bottom-left-radius: 0;" title="No: '.htmlspecialchars($row['nomor_sertifikat']).' (Signed)">✍️ Signed</a>' .
-                        '</div>';
+            $cetakBtn = '<a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'" target="_blank" class="btn btn-sm btn-info" style="white-space: nowrap; background-color:#0ea5e9; border-color:#0ea5e9; color:white; text-decoration:none; padding:4px 8px; border-radius: 4px;" title="No: '.htmlspecialchars($row['nomor_sertifikat']).'">🎓 Cetak</a>' .
+                        ' <a href="'.BASE_URL.'/admin/cetak-sertifikat.php?id='.$row['reg_id'].'&signed=1" target="_blank" class="btn btn-sm btn-success" style="white-space: nowrap; background-color:#10b981; border-color:#10b981; color:white; text-decoration:none; padding:4px 8px; border-radius: 4px;" title="No: '.htmlspecialchars($row['nomor_sertifikat']).' (Signed)">✍️ Signed</a>';
             $lockBtn = '<span style="font-size: 11px; background: #e2e8f0; padding: 2px 5px; border-radius: 4px; color: #475569;" title="Locked: '.htmlspecialchars($row['nomor_sertifikat']).'">🔒 Locked</span>';
         }
     }
