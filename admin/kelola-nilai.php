@@ -101,8 +101,10 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <span>📊 Data Nilai Lama (Di bawah 2026)</span>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-sm btn-info" id="btnCetakTerpilih" style="display:none; font-weight: 600; background-color: #0ea5e9; border-color: #0ea5e9; color: white;">🎓 Cetak Terpilih</button>
-            <button type="button" class="btn btn-sm btn-primary" id="btnCetakSignedTerpilih" style="display:none; font-weight: 600; background-color: #2563eb; border-color: #2563eb; color: white;">✍️ Cetak Signed Terpilih</button>
+            <div class="btn-group" id="btnGroupCetakTerpilih" style="display:none; box-shadow: 0 1px 2px rgba(0,0,0,0.05); border-radius:4px;">
+                <button type="button" class="btn btn-sm btn-info" id="btnCetakTerpilih" style="font-weight: 600; background-color: #0ea5e9; border-color: #0ea5e9; color: white; border-top-right-radius: 0; border-bottom-right-radius: 0;">🎓 Cetak Terpilih</button>
+                <button type="button" class="btn btn-sm btn-success" id="btnCetakSignedTerpilih" style="font-weight: 600; background-color: #10b981; border-color: #10b981; color: white; border-top-left-radius: 0; border-bottom-left-radius: 0;">✍️ Signed Terpilih</button>
+            </div>
             <button type="button" class="btn btn-sm btn-secondary" id="btnLockTerpilih" style="display:none; font-weight: 600;">🔒 Lock Terpilih</button>
             <button type="button" class="btn btn-sm btn-danger" id="btnHapusTerpilih" style="display:none; font-weight: 600;">🗑️ Hapus Terpilih</button>
             <a href="<?= BASE_URL ?>/admin/download-template-nilai.php" class="btn btn-sm" style="background-color: white; color: #3b82f6; font-weight: 600; border: none; padding: 5px 12px; border-radius: 4px; text-decoration: none;" data-no-spa="true">📄 Download Template</a>
@@ -436,13 +438,11 @@ $(document).ready(function() {
     function toggleHapusTerpilih() {
         var totalChecked = $('.check-item:checked').length;
         if (totalChecked > 0) {
-            $('#btnCetakTerpilih').css('display', 'inline-block');
-            $('#btnCetakSignedTerpilih').css('display', 'inline-block');
+            $('#btnGroupCetakTerpilih').css('display', 'inline-flex');
             $('#btnHapusTerpilih').css('display', 'inline-block');
             $('#btnLockTerpilih').css('display', 'inline-block');
         } else {
-            $('#btnCetakTerpilih').css('display', 'none');
-            $('#btnCetakSignedTerpilih').css('display', 'none');
+            $('#btnGroupCetakTerpilih').css('display', 'none');
             $('#btnHapusTerpilih').css('display', 'none');
             $('#btnLockTerpilih').css('display', 'none');
         }

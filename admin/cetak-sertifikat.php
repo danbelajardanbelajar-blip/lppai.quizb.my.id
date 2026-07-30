@@ -555,13 +555,14 @@ $thnNow = date('Y');
                         <div class="signature-date">Lamongan, <?= $tglCetak ?></div>
                         <div class="signature-role" style="margin-bottom: 5px;">Kepala LPPAI,</div>
                         <?php if ($isSigned): ?>
-                            <div>
-                                <img src="<?= BASE_URL ?>/assets/img/ttd_zainul_hakim.png" alt="Tanda Tangan" style="height: 70px; object-fit: contain; mix-blend-mode: multiply; margin-bottom: 5px;">
+                            <div style="position: relative;">
+                                <img src="<?= BASE_URL ?>/assets/img/ttd_zainul_hakim.png" alt="Tanda Tangan" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); height: 140px; object-fit: contain; mix-blend-mode: multiply; z-index: 10; pointer-events: none;">
+                                <div style="height: 70px;"></div>
                             </div>
                         <?php else: ?>
                             <div style="height: 70px;"></div>
                         <?php endif; ?>
-                        <div class="signature-name">Dr. Zainul Hakim, M.H.I.</div>
+                        <div class="signature-name" style="position: relative; z-index: 1;">Dr. Zainul Hakim, M.H.I.</div>
                     </div>
                 </div>
 
