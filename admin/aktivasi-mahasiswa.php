@@ -105,7 +105,7 @@ include __DIR__ . '/../includes/header.php';
                 </tr>
             </table>
 
-            <form method="POST" class="text-center mt-4">
+            <form method="POST" class="text-center mt-4" data-no-spa>
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="action" value="activate_account">
                 

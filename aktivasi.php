@@ -134,7 +134,7 @@ include __DIR__ . '/includes/header.php';
             </div>
         </form>
 
-        <form method="POST">
+        <form method="POST" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="request_activation">
             
