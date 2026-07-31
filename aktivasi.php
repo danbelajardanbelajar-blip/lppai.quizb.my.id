@@ -24,10 +24,17 @@ $user = getCurrentUser();
 $userId = $user['id'];
 
 // Ambil data terbaru dari database
-$stmt = $pdo->prepare("SELECT no_hp, activation_token FROM users WHERE id = ?");
-$stmt->execute([$userId]);
-$userData = $stmt->fetch();
-$noHp = $userData['no_hp'] ?? '';
+$noHp = '';
+try {
+    $stmt = $pdo->prepare("SELECT no_hp FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $userData = $stmt->fetch();
+    $noHp = $userData['no_hp'] ?? '';
+} catch (PDOException $e) {
+    // Abaikan error jika tabel belum dimigrasi
+    $message = "Sistem sedang dalam perbaikan (menunggu admin melakukan migrasi). Harap tunggu.";
+    $msgType = "warning";
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if (!verifyCsrf($_POST['csrf_token'])) {
@@ -55,7 +62,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } else {
                 // Generate token
                 $token = bin2hex(random_bytes(32));
-                $pdo->prepare("UPDATE users SET activation_token = ? WHERE id = ?")->execute([$token, $userId]);
+                try {
+                    $pdo->prepare("UPDATE users SET activation_token = ? WHERE id = ?")->execute([$token, $userId]);
+                } catch (PDOException $e) {
+                    $message = 'Error: Migrasi database belum dijalankan oleh Admin. Fitur aktivasi belum siap.';
+                    $msgType = 'danger';
+                    // Stop eksekusi agar tidak redirect WA jika database gagal
+                    include __DIR__ . '/includes/header.php';
+                    echo "<div class='container mt-5'><div class='alert alert-danger'>$message</div></div>";
+                    include __DIR__ . '/includes/footer.php';
+                    exit;
+                }
                 
                 // Siapkan pesan WhatsApp
                 $adminWa = '6281515726827';
