@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $waUrl = "https://wa.me/" . $adminWa . "?text=" . rawurlencode($waText);
 
                 // Redirect ke WhatsApp
-                echo "<script>window.location.href = '$waUrl';</script>";
+                header("Location: $waUrl");
                 exit;
             }
         }

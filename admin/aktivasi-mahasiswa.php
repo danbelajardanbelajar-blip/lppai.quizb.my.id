@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $waUrl = "https://wa.me/" . $waNumber . "?text=" . rawurlencode($waText);
 
         // Redirect Admin ke WA untuk kirim pesan ke mahasiswa
-        echo "<script>window.location.href = '$waUrl';</script>";
+        header("Location: $waUrl");
         exit;
     }
 }
