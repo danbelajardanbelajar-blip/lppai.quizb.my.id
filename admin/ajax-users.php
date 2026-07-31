@@ -131,6 +131,17 @@ foreach ($data as $row) {
     if ($row['role'] === 'dosen') $badgeClass = 'badge-success';
     $roleBadge = '<span class="badge ' . $badgeClass . '">' . ucfirst(htmlspecialchars($row['role'])) . '</span>';
     
+    // Status Badge
+    $statusBadge = '';
+    if (isset($row['is_active'])) {
+        if ($row['is_active'] == 1) {
+            $statusBadge = ' <span class="badge badge-success" title="Aktif">✔️</span>';
+        } else {
+            $statusBadge = ' <span class="badge badge-warning" title="Belum Aktif">⏳</span>';
+        }
+    }
+    $roleBadge .= $statusBadge;
+    
     // Aksi
     $aksi = '<div style="white-space:nowrap;">';
     

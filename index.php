@@ -11,7 +11,11 @@ if (isLoggedIn()) {
     } elseif (isDosen()) {
         header('Location: ' . BASE_URL . '/dosen/dashboard.php');
     } else {
-        header('Location: ' . BASE_URL . '/dashboard.php');
+        if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+            header('Location: ' . BASE_URL . '/aktivasi.php');
+        } else {
+            header('Location: ' . BASE_URL . '/dashboard.php');
+        }
     }
     exit;
 }
@@ -33,7 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (isDosen()) {
             header('Location: ' . BASE_URL . '/dosen/dashboard.php');
         } else {
-            header('Location: ' . BASE_URL . '/dashboard.php');
+            if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+                header('Location: ' . BASE_URL . '/aktivasi.php');
+            } else {
+                header('Location: ' . BASE_URL . '/dashboard.php');
+            }
         }
         exit;
     } else {

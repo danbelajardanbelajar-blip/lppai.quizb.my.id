@@ -30,6 +30,16 @@ function requireLogin() {
         header('Location: ' . BASE_URL . '/index.php');
         exit;
     }
+    
+    // Jika mahasiswa dan belum aktif, paksa ke halaman aktivasi
+    // Cegah redirect loop jika sudah berada di halaman aktivasi.php
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'mahasiswa' && isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+        $current_script = basename($_SERVER['PHP_SELF']);
+        if ($current_script !== 'aktivasi.php') {
+            header('Location: ' . BASE_URL . '/aktivasi.php');
+            exit;
+        }
+    }
 }
 
 function requireAdmin() {
@@ -65,6 +75,16 @@ function loginUser($username, $password) {
         $_SESSION['role'] = $user['role'];
         $_SESSION['program_studi'] = $user['program_studi'];
         $_SESSION['fakultas'] = $user['fakultas'];
+        
+        // Cek kolom is_active jika ada di array user (setelah migrasi), jika belum ada anggap 1 agar aman sementara.
+        // Tapi kita akan paksa 0 untuk mahasiswa berdasarkan plan jika belum ada (walaupun setelah migrasi default 0).
+        // Lebih baik:
+        $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 0;
+        // Dosen/Admin otomatis aktif jika kolom is_active belum terupdate
+        if ($_SESSION['role'] !== 'mahasiswa') {
+            $_SESSION['is_active'] = 1;
+        }
+
         return true;
     }
     return false;
@@ -87,6 +107,7 @@ function getCurrentUser() {
         'role' => $_SESSION['role'],
         'program_studi' => $_SESSION['program_studi'] ?? '',
         'fakultas' => $_SESSION['fakultas'] ?? '',
+        'is_active' => $_SESSION['is_active'] ?? 0,
     ];
 }
 
@@ -121,6 +142,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
             $_SESSION['role'] = $user['role'];
             $_SESSION['program_studi'] = $user['program_studi'];
             $_SESSION['fakultas'] = $user['fakultas'];
+            $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 1;
             unset($_SESSION['admin_login_as']);
             header('Location: ' . BASE_URL . '/admin/users.php');
             exit;
