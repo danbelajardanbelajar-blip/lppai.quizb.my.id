@@ -34,6 +34,7 @@ $linkOptions = [
     '/pages/pretes-daftar.php' => 'Pendaftaran Pretes',
     '/pages/tutorial-pendaftaran.php' => 'Pendaftaran Tutorial',
     '/pages/tutorial-pembagian.php' => 'Cek Pembagian Kelas',
+    '/pages/tutorial-pengumuman.php' => 'Cek Kelulusan Tutorial',
 ];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
