@@ -18,7 +18,7 @@ $pdo  = getDBConnection();
 $stmt = $pdo->prepare("
     SELECT tr.*, tc.nama_kelas, tc.gelombang
     FROM tutorial_registrations tr
-    LEFT JOIN tutorial_classes tc ON tr.class_id = tc.id
+    LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tr.user_id = ?
     ORDER BY tr.created_at DESC
     LIMIT 1
