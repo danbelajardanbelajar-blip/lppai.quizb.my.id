@@ -29,9 +29,37 @@ $stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam
 $stmt->execute([$user['id']]);
 $tutorialRegs = $stmt->fetchAll();
 
-// Get recent announcements
-$stmt = $pdo->query("SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 5");
-$recentAnnouncements = $stmt->fetchAll();
+$stmt = $pdo->query("SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 10");
+$allAnnouncements = $stmt->fetchAll();
+
+// Cek status kelulusan dan gelombang terdaftar
+$isLulusTutorial = false;
+$registeredGels = [];
+foreach ($tutorialRegs as $reg) {
+    if (!empty($reg['nomor_sertifikat'])) {
+        $isLulusTutorial = true;
+    }
+    $registeredGels[] = $reg['gelombang']; // 'gel1', 'gel2', 'mandiri'
+}
+
+$recentAnnouncements = [];
+foreach ($allAnnouncements as $ann) {
+    $tipe = $ann['tipe'];
+    
+    // 1. Jika sudah lulus, jangan tampilkan pengumuman pendaftaran tutorial
+    if ($isLulusTutorial && strpos($tipe, 'pendaftaran_') === 0) {
+        continue;
+    }
+    
+    // 2. Jika sudah terdaftar di gelombang tertentu, jangan tampilkan pengumuman pendaftarannya
+    if (in_array('gel1', $registeredGels) && $tipe === 'pendaftaran_gel1') continue;
+    if (in_array('gel2', $registeredGels) && $tipe === 'pendaftaran_gel2') continue;
+    if (in_array('mandiri', $registeredGels) && $tipe === 'pendaftaran_mandiri') continue;
+    
+    $recentAnnouncements[] = $ann;
+    
+    if (count($recentAnnouncements) >= 5) break; // Batasi maksimal 5 pengumuman yang relevan
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
