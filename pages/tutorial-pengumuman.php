@@ -33,7 +33,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="card" style="max-width: 700px; margin: 0 auto; overflow: hidden; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-    <?php if ($latestReg && $latestReg['status'] === 'lulus'): ?>
+    <?php if ($latestReg && (!empty($latestReg['nomor_sertifikat']) || $latestReg['status'] === 'lulus')): ?>
         <!-- Tampilan Jika Lulus (Pengganti Modal) -->
         <div style="background-color: #10b981; color: white; padding: 30px 20px; text-align: center;">
             <h2 style="margin: 0; font-size: 28px;">🎉 PENGUMUMAN KELULUSAN 🎉</h2>
