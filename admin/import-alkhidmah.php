@@ -24,44 +24,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file_import'])) {
         if (strtolower($ext) === 'csv') {
             $handle = fopen($file['tmp_name'], 'r');
             if ($handle) {
-                $pdo->beginTransaction();
-                
-                $stmtUser = $pdo->prepare("SELECT id FROM users WHERE nim = ?");
-                $stmtInsert = $pdo->prepare("
-                    INSERT INTO absensi_alkhidmah (nim, tanggal, waktu_hadir) 
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE waktu_hadir = VALUES(waktu_hadir)
-                ");
-                
-                while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) {
-                    // Fallback jika delimiter koma
-                    if (count($data) == 1 && strpos($data[0], ',') !== false) {
-                        $data = explode(',', $data[0]);
-                    }
+                try {
+                    $pdo->beginTransaction();
                     
-                    $nim = trim($data[0]);
-                    if (empty($nim) || strtolower($nim) == 'nim') continue; // Skip header/kosong
+                    $stmtUser = $pdo->prepare("SELECT id FROM users WHERE nim = ?");
+                    $stmtInsert = $pdo->prepare("
+                        INSERT INTO absensi_alkhidmah (nim, tanggal, waktu_hadir) 
+                        VALUES (?, ?, ?)
+                        ON DUPLICATE KEY UPDATE waktu_hadir = VALUES(waktu_hadir)
+                    ");
                     
-                    // Cek di table users
-                    $stmtUser->execute([$nim]);
-                    if (!$stmtUser->fetch()) {
-                        $unregisteredNims[] = $nim;
-                    }
-                    
-                    // Eksekusi insert (waktu hadir default jam 07:00:00 jika manual)
-                    try {
+                    while (($data = fgetcsv($handle, 1000, ";")) !== FALSE) {
+                        // Fallback jika delimiter koma
+                        if (count($data) == 1 && strpos($data[0], ',') !== false) {
+                            $data = explode(',', $data[0]);
+                        }
+                        
+                        $nim = trim($data[0]);
+                        if (empty($nim) || strtolower($nim) == 'nim') continue; // Skip header/kosong
+                        
+                        // Cek di table users
+                        $stmtUser->execute([$nim]);
+                        if (!$stmtUser->fetch()) {
+                            $unregisteredNims[] = $nim;
+                        }
+                        
+                        // Eksekusi insert (waktu hadir default jam 07:00:00 jika manual)
                         $stmtInsert->execute([$nim, $tanggalKegiatan, '07:00:00']);
                         $successCount++;
-                    } catch (PDOException $e) {
-                        // Abaikan error baris individu
                     }
+                    
+                    $pdo->commit();
+                    $message = "Berhasil mengimpor $successCount baris data absensi.";
+                    $msgType = "success";
+                } catch (Exception $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    $message = "Error Database: " . $e->getMessage() . " (Pastikan Anda sudah menjalankan migration_alkhidmah.php)";
+                    $msgType = "danger";
                 }
-                
-                $pdo->commit();
                 fclose($handle);
-                
-                $message = "Berhasil mengimpor $successCount baris data absensi.";
-                $msgType = "success";
                 
             } else {
                 $message = "Gagal membaca file CSV.";
