@@ -47,6 +47,11 @@ include __DIR__ . '/includes/header.php';
             📍 Memeriksa lokasi Anda...
         </div>
 
+        <div id="action-buttons" style="display:flex; gap:10px; justify-content:center; margin-bottom: 20px; flex-wrap:wrap;">
+            <button id="btn-refresh-location" class="btn btn-warning" style="display:none; border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer;">📍 Refresh Lokasi</button>
+            <button id="btn-refresh-browser" class="btn btn-secondary" style="border:none; padding:8px 16px; border-radius:6px; font-weight:bold; cursor:pointer; background:#6b7280; color:white;">🔄 Refresh Browser</button>
+        </div>
+
         <!-- QR Scanner Container -->
         <div id="scanner-wrapper" class="scanner-container">
             <h4 class="text-center mb-3">1. Scan QR Code</h4>
@@ -78,6 +83,15 @@ document.addEventListener("DOMContentLoaded", function() {
     const videoSelfie = document.getElementById('video-selfie');
     const canvasSelfie = document.getElementById('canvas-selfie');
     const btnCapture = document.getElementById('btn-capture');
+    const btnRefreshLocation = document.getElementById('btn-refresh-location');
+    const btnRefreshBrowser = document.getElementById('btn-refresh-browser');
+
+    if (btnRefreshBrowser) {
+        btnRefreshBrowser.addEventListener('click', function() { window.location.reload(); });
+    }
+    if (btnRefreshLocation) {
+        btnRefreshLocation.addEventListener('click', initGeolocation);
+    }
 
     let html5QrcodeScanner = null;
     let scannedQrData = null;
@@ -105,6 +119,10 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
+        if (btnRefreshLocation) btnRefreshLocation.style.display = 'none';
+        statusMsg.className = "status-box status-loading";
+        statusMsg.innerHTML = "📍 Memeriksa lokasi Anda...";
+
         navigator.geolocation.getCurrentPosition(function(position) {
             let lat = position.coords.latitude;
             let lng = position.coords.longitude;
@@ -115,6 +133,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 startScanner();
             } else {
                 showError("Anda berada di luar area absensi. Jarak Anda: " + Math.round(distance) + " meter (Maks " + MAX_DISTANCE_METERS + "m).");
+                if (btnRefreshLocation) btnRefreshLocation.style.display = 'inline-block';
             }
         }, function(error) {
             let msg = "";
@@ -125,6 +144,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 default: msg = "Terjadi kesalahan tidak dikenal saat mengambil lokasi."; break;
             }
             showError("Gagal mendapatkan lokasi: " + msg);
+            if (btnRefreshLocation) btnRefreshLocation.style.display = 'inline-block';
         }, {
             enableHighAccuracy: true,
             timeout: 10000,
