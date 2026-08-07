@@ -35,16 +35,14 @@ if ($qr_data['date'] !== $today) {
     exit;
 }
 
-// 2. Validasi Waktu (Hadir: 13:00-14:00, Pulang: 16:00-17:00)
-// UNTUK SEMENTARA DINONAKTIFKAN SESUAI PERMINTAAN USER (Bisa diaktifkan nanti)
-/*
+// 2. Validasi Waktu (Hadir: 13:00-14:30, Pulang: 16:00-17:00)
 $waktuHadirStart = '13:00:00';
-$waktuHadirEnd   = '14:00:00';
+$waktuHadirEnd   = '14:30:00';
 $waktuPulangStart = '16:00:00';
 $waktuPulangEnd   = '17:00:00';
 
-// Nanti butuh logic untuk ngecek hari Jumat minggu pertama juga
-*/
+$is_waktu_hadir = ($now >= $waktuHadirStart && $now <= $waktuHadirEnd);
+$is_waktu_pulang = ($now >= $waktuPulangStart && $now <= $waktuPulangEnd);
 
 // 3. Cek Status Absensi (Hadir atau Pulang)
 $pdo = getDBConnection();
@@ -59,6 +57,16 @@ if ($absen) {
         exit;
     }
     $tipe_absen = 'pulang';
+}
+
+if ($tipe_absen === 'hadir' && !$is_waktu_hadir) {
+    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kehadiran (13:00-14:30).']);
+    exit;
+}
+
+if ($tipe_absen === 'pulang' && !$is_waktu_pulang) {
+    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kepulangan (16:00-17:00).']);
+    exit;
 }
 
 // 4. Proses Foto Selfie
