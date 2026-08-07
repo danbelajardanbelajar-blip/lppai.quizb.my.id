@@ -87,6 +87,24 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Al Khidmah Alert -->
+<?php if ($isFirstFriday): ?>
+<div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background-color: #f0fdf4;">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;">
+        <div style="display:flex;align-items:center;gap:15px;">
+            <div class="stat-icon" style="background:#d1fae5;color:#10b981;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;">
+                🕌
+            </div>
+            <div>
+                <h3 style="margin:0;font-size:18px;color:#065f46;">Absensi Al Khidmah</h3>
+                <p style="margin:4px 0 0;color:#047857;font-size:14px;">Hari ini adalah Jum'at awal bulan. Jangan lupa untuk mengisi kehadiran Al Khidmah Anda.</p>
+            </div>
+        </div>
+        <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-success" style="white-space:nowrap;padding:10px 20px;font-weight:bold;">📍 Isi Absensi Sekarang</a>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Stats -->
 <div class="stat-grid">
     <div class="stat-card">
@@ -111,24 +129,6 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
-
-<!-- Al Khidmah Alert -->
-<?php if ($isFirstFriday): ?>
-<div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background-color: #f0fdf4;">
-    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;">
-        <div style="display:flex;align-items:center;gap:15px;">
-            <div class="stat-icon" style="background:#d1fae5;color:#10b981;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;">
-                🕌
-            </div>
-            <div>
-                <h3 style="margin:0;font-size:18px;color:#065f46;">Absensi Al Khidmah</h3>
-                <p style="margin:4px 0 0;color:#047857;font-size:14px;">Hari ini adalah Jum'at awal bulan. Jangan lupa untuk mengisi kehadiran Al Khidmah Anda.</p>
-            </div>
-        </div>
-        <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-success" style="white-space:nowrap;padding:10px 20px;font-weight:bold;">📍 Isi Absensi Sekarang</a>
-    </div>
-</div>
-<?php endif; ?>
 
 <!-- Tutorial Registrations -->
 <?php if (!empty($tutorialRegs)): ?>
