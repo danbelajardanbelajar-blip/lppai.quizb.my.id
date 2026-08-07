@@ -8,6 +8,30 @@ requireAdmin();
 
 $pdo = getDBConnection();
 
+// Proses Delete
+if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
+    $id = (int)$_GET['id'];
+    
+    // Ambil path foto untuk dihapus dari server
+    $stmt = $pdo->prepare("SELECT foto_hadir, foto_pulang FROM absensi_alkhidmah WHERE id = ?");
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    
+    if ($row) {
+        if (!empty($row['foto_hadir']) && file_exists(__DIR__ . '/../' . $row['foto_hadir'])) {
+            unlink(__DIR__ . '/../' . $row['foto_hadir']);
+        }
+        if (!empty($row['foto_pulang']) && file_exists(__DIR__ . '/../' . $row['foto_pulang'])) {
+            unlink(__DIR__ . '/../' . $row['foto_pulang']);
+        }
+    }
+    
+    // Hapus record dari database
+    $pdo->prepare("DELETE FROM absensi_alkhidmah WHERE id = ?")->execute([$id]);
+    header('Location: ' . BASE_URL . '/admin/absensi-alkhidmah.php');
+    exit;
+}
+
 // Ambil data absensi
 $stmt = $pdo->query("
     SELECT a.*, u.nama_lengkap, u.program_studi, u.fakultas 
@@ -74,6 +98,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Foto Hadir</th>
                         <th>Waktu Pulang</th>
                         <th>Foto Pulang</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -111,6 +136,9 @@ include __DIR__ . '/../includes/header.php';
                                 <?php else: ?>
                                     -
                                 <?php endif; ?>
+                            </td>
+                            <td>
+                                <a href="<?= BASE_URL ?>/admin/absensi-alkhidmah.php?action=delete&id=<?= (int)$row['id'] ?>" class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:12px;border-radius:4px;text-decoration:none;" onclick="return confirm('Apakah Anda yakin ingin menghapus data absen ini? (Foto juga akan terhapus dari server)');">Hapus</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
