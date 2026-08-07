@@ -56,6 +56,11 @@ foreach ($allAnnouncements as $ann) {
     if (in_array('gel2', $registeredGels) && $tipe === 'pendaftaran_gel2') continue;
     if (in_array('mandiri', $registeredGels) && $tipe === 'pendaftaran_mandiri') continue;
     
+    // 3. Jika NIM diawali dengan '23', jangan tampilkan pendaftaran mandiri
+    if (strpos($user['nim'], '23') === 0 && $tipe === 'pendaftaran_mandiri') {
+        continue;
+    }
+    
     $recentAnnouncements[] = $ann;
     
     if (count($recentAnnouncements) >= 5) break; // Batasi maksimal 5 pengumuman yang relevan
