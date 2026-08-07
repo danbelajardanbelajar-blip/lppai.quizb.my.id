@@ -27,7 +27,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file_import'])) {
                 try {
                     $pdo->beginTransaction();
                     
-                    $stmtUser = $pdo->prepare("SELECT id FROM users WHERE nim = ?");
+                    // Gunakan BINARY untuk menghindari error "Illegal mix of collations" antara latin1 dan utf8mb4
+                    $stmtUser = $pdo->prepare("SELECT id FROM users WHERE BINARY nim = ?");
                     $stmtInsert = $pdo->prepare("
                         INSERT INTO absensi_alkhidmah (nim, tanggal, waktu_hadir) 
                         VALUES (?, ?, ?)
