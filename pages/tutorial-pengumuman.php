@@ -102,7 +102,7 @@ include __DIR__ . '/../includes/header.php';
                 <h4 style="margin: 0 0 10px 0; color: #1e3a8a; font-size: 18px;">📌 Informasi Penting Tindak Lanjut:</h4>
                 <?php if (!$hasAlkhidmah): ?>
                     <p style="margin: 0; color: #1e40af; font-size: 15px; line-height: 1.5;">
-                        Bagi mahasiswa yang telah dinyatakan lulus, Anda <strong>WAJIB mengikuti kegiatan Al Khidmah</strong> yang dilaksanakan pada Hari Jum'at awal bulan, yaitu pada tanggal:
+                        Bagi mahasiswa yang telah dinyatakan lulus, Anda <strong>tidak bisa mengambil sertifikat LPPAI sebelum mengikuti kegiatan Al Khidmah</strong>. Anda <strong>WAJIB mengikuti kegiatan Al Khidmah</strong> yang dilaksanakan pada Hari Jum'at awal bulan, yaitu pada tanggal:
                         <br><br>
                         <strong>📅 7 Agustus 2026</strong> dan <strong>📅 4 September 2026</strong>.
                     </p>
