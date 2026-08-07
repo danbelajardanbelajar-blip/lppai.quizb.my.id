@@ -73,8 +73,8 @@ include __DIR__ . '/includes/header.php';
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const TARGET_LAT = -7.095662;
-    const TARGET_LNG = 112.330615;
+    const TARGET_LAT = -7.095422;
+    const TARGET_LNG = 112.330381;
     const MAX_DISTANCE_METERS = 20;
 
     const statusMsg = document.getElementById('status-message');
