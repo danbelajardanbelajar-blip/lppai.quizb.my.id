@@ -35,9 +35,9 @@ if ($qr_data['date'] !== $today) {
     exit;
 }
 
-// 2. Validasi Waktu (Hadir: 13:00-14:30, Pulang: 16:00-17:00)
+// 2. Validasi Waktu (Hadir: 13:00-15:00, Pulang: 16:00-17:00)
 $waktuHadirStart = '13:00:00';
-$waktuHadirEnd   = '14:30:00';
+$waktuHadirEnd   = '15:00:00';
 $waktuPulangStart = '16:00:00';
 $waktuPulangEnd   = '17:00:00';
 
@@ -60,7 +60,7 @@ if ($absen) {
 }
 
 if ($tipe_absen === 'hadir' && !$is_waktu_hadir) {
-    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kehadiran (13:00-14:30).']);
+    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kehadiran (13:00-15:00).']);
     exit;
 }
 
