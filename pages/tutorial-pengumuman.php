@@ -26,6 +26,20 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $latestReg = $stmt->fetch();
 
+// Cek kehadiran Al Khidmah
+$hasAlkhidmah = false;
+if (!empty($user['nim'])) {
+    try {
+        $stmtAk = $pdo->prepare("SELECT id FROM absensi_alkhidmah WHERE nim = ? LIMIT 1");
+        $stmtAk->execute([$user['nim']]);
+        if ($stmtAk->fetch()) {
+            $hasAlkhidmah = true;
+        }
+    } catch (Exception $e) {
+        // Abaikan jika tabel belum di-migrate
+    }
+}
+
 // Cek ketersediaan pendaftaran aktif saat ini
 $active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
 
@@ -83,6 +97,21 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                 </tbody>
             </table>
+            
+            <div style="text-align: left; margin-top: 30px; background-color: #eff6ff; border: 1px solid #bfdbfe; padding: 20px; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #1e3a8a; font-size: 18px;">📌 Informasi Penting Tindak Lanjut:</h4>
+                <?php if (!$hasAlkhidmah): ?>
+                    <p style="margin: 0; color: #1e40af; font-size: 15px; line-height: 1.5;">
+                        Bagi mahasiswa yang telah dinyatakan lulus, Anda <strong>WAJIB mengikuti kegiatan Al Khidmah</strong> yang dilaksanakan pada Hari Jum'at awal bulan, yaitu pada tanggal:
+                        <br><br>
+                        <strong>📅 7 Agustus 2026</strong> dan <strong>📅 4 September 2026</strong>.
+                    </p>
+                <?php else: ?>
+                    <p style="margin: 0; color: #1e40af; font-size: 15px; line-height: 1.5;">
+                        Karena Anda telah mengikuti kegiatan Al Khidmah, selanjutnya Anda <strong>WAJIB membayar biaya LPPAI di Bank Jatim</strong> dan <strong>WAJIB membawa pas foto ukuran 3x4 ke kantor LPPAI</strong> untuk keperluan administrasi dan pencetakan sertifikat.
+                    </p>
+                <?php endif; ?>
+            </div>
             
             <div style="text-align: center; margin-top: 30px;">
                 <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-primary" style="padding: 10px 24px; font-size: 16px;">🏠 Kembali ke Dashboard</a>
