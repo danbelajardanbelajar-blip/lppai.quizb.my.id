@@ -158,6 +158,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     exit;
                 }
             }
+            
+        } elseif ($action === 'toggle_active') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                // Get current status
+                $stmt = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+                $stmt->execute([$id]);
+                $user = $stmt->fetch();
+                if ($user) {
+                    $newStatus = $user['is_active'] == 1 ? 0 : 1;
+                    $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?")->execute([$newStatus, $id]);
+                    $message = $newStatus == 1 ? 'Akun pengguna berhasil diaktifkan.' : 'Akun pengguna berhasil dinonaktifkan.';
+                    $msgType = 'success';
+                }
+            }
         }
     }
 }

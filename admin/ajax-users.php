@@ -131,13 +131,23 @@ foreach ($data as $row) {
     if ($row['role'] === 'dosen') $badgeClass = 'badge-success';
     $roleBadge = '<span class="badge ' . $badgeClass . '">' . ucfirst(htmlspecialchars($row['role'])) . '</span>';
     
-    // Status Badge
+    // Status Badge Button
     $statusBadge = '';
     if (isset($row['is_active'])) {
         if ($row['is_active'] == 1) {
-            $statusBadge = ' <span class="badge badge-success" title="Aktif">✔️</span>';
+            $statusBadge = '<form method="POST" style="display:inline;margin-left:4px;" action="users.php">
+                <input type="hidden" name="csrf_token" value="'.$csrfToken.'">
+                <input type="hidden" name="action" value="toggle_active">
+                <input type="hidden" name="id" value="'.$id.'">
+                <button type="submit" class="badge badge-success" style="border:none;cursor:pointer;padding:4px 6px;" title="Klik untuk menonaktifkan" data-confirm="Nonaktifkan akun ini?">✔️ Aktif</button>
+            </form>';
         } else {
-            $statusBadge = ' <span class="badge badge-warning" title="Belum Aktif">⏳</span>';
+            $statusBadge = '<form method="POST" style="display:inline;margin-left:4px;" action="users.php">
+                <input type="hidden" name="csrf_token" value="'.$csrfToken.'">
+                <input type="hidden" name="action" value="toggle_active">
+                <input type="hidden" name="id" value="'.$id.'">
+                <button type="submit" class="badge badge-warning" style="border:none;cursor:pointer;padding:4px 6px;" title="Klik untuk mengaktifkan" data-confirm="Aktifkan akun ini sekarang?">⏳ Blm Aktif</button>
+            </form>';
         }
     }
     $roleBadge .= $statusBadge;
