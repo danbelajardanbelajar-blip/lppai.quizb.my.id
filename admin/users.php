@@ -453,6 +453,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div style="flex: 1; min-width: 220px;">
+                <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    ✅ <span>Status Aktif</span>
+                </label>
+                <select id="filter_active" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Status</option>
+                    <option value="1">Aktif</option>
+                    <option value="0">Belum Aktif</option>
+                </select>
+            </div>
         </div>
 
         <div class="table-responsive">
@@ -650,6 +660,7 @@ function initUsersPage() {
                 d.filterAngkatan = $('#filter_angkatan').val();
                 d.filterProdi = $('#filter_prodi').val();
                 d.filterRole = $('#filter_role').val();
+                d.filterActive = $('#filter_active').val();
             },
             error: function (xhr, error, code) {
                 console.log(xhr.responseText);
@@ -678,7 +689,7 @@ function initUsersPage() {
     });
 
     // Reload table on filter change
-    $('#filter_angkatan, #filter_prodi, #filter_role').on('change', function() {
+    $('#filter_angkatan, #filter_prodi, #filter_role, #filter_active').on('change', function() {
         table.ajax.reload();
     });
 

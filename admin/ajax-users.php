@@ -22,6 +22,7 @@ $searchValue = trim($_POST['search']['value'] ?? $_GET['search']['value'] ?? '')
 $filterAngkatan = $_POST['filterAngkatan'] ?? '';
 $filterProdi = $_POST['filterProdi'] ?? '';
 $filterRole = $_POST['filterRole'] ?? '';
+$filterActive = $_POST['filterActive'] ?? '';
 
 // Urutan kolom
 $orderColIndex = $_POST['order'][0]['column'] ?? $_GET['order'][0]['column'] ?? 2;
@@ -64,6 +65,11 @@ if ($filterProdi !== '') {
 if ($filterRole !== '') {
     $fromClause .= " AND u.role = ?";
     $whereParams[] = strtolower($filterRole);
+}
+
+if ($filterActive !== '') {
+    $fromClause .= " AND u.is_active = ?";
+    $whereParams[] = (int)$filterActive;
 }
 
 // 1. Get Total Records (without search filter)
