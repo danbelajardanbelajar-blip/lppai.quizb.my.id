@@ -6,6 +6,45 @@ define('PAGE_TITLE', 'Keuangan');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
+$view_check = isset($_POST['view']) ? $_POST['view'] : (isset($_GET['view']) ? $_GET['view'] : 'rencana-anggaran');
+
+if (in_array($view_check, ['rencana-anggaran', 'transaksi', 'laporan'])) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['keuangan_access_code'])) {
+        if ($_POST['keuangan_access_code'] === '071062') {
+            $_SESSION['keuangan_unlocked'] = true;
+            header('Location: ' . BASE_URL . '/admin/keuangan.php?view=' . urlencode($view_check));
+            exit;
+        } else {
+            $access_error = "Kode akses salah.";
+        }
+    }
+
+    if (empty($_SESSION['keuangan_unlocked'])) {
+        include __DIR__ . '/../includes/header.php';
+        ?>
+        <div class="card">
+            <div class="card-header">🔒 Otentikasi Keuangan</div>
+            <div class="card-body">
+                <?php if (isset($access_error)): ?>
+                    <div style="background:#fee2e2; color:#b91c1c; border:1px solid #f87171; padding:10px; border-radius:6px; margin-bottom:15px; text-align:center;">
+                        <?= $access_error ?>
+                    </div>
+                <?php endif; ?>
+                <form method="post" style="max-width: 400px; margin: 40px auto; text-align: center;">
+                    <input type="hidden" name="view" value="<?= htmlspecialchars($view_check, ENT_QUOTES) ?>">
+                    <h3 style="margin-bottom:10px;">Akses Dibatasi</h3>
+                    <p style="margin-bottom:20px; color:#6b7280;">Silakan masukkan kode akses untuk membuka data keuangan.</p>
+                    <input type="password" name="keuangan_access_code" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 20px; font-size:16px; text-align:center;" placeholder="******" required>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size:16px;">Buka Akses</button>
+                </form>
+            </div>
+        </div>
+        <?php
+        include __DIR__ . '/../includes/footer.php';
+        exit;
+    }
+}
+
 $pdo = getDBConnection();
 
 function ensureKeuanganTables(PDO $pdo): void {
