@@ -422,7 +422,7 @@ include __DIR__ . '/includes/header.php';
                     <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;"><?= $f['label'] ?></label>
                     <input type="number" step="0.01" name="<?= $f['name'] ?>" id="<?= $f['id'] ?>" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px; margin-bottom: 5px;">
                     <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                        <?php foreach([60, 70, 80, 85, 90, 100] as $val): ?>
+                        <?php foreach([60, 65, 70, 75, 80, 85, 90, 95, 100] as $val): ?>
                         <button type="button" class="btn btn-sm btn-outline-secondary" style="padding:2px 8px; font-size:12px;" onclick="document.getElementById('<?= $f['id'] ?>').value='<?= $val ?>'"><?= $val ?></button>
                         <?php endforeach; ?>
                     </div>
