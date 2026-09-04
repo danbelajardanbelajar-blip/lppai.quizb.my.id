@@ -223,6 +223,9 @@ include __DIR__ . '/../includes/header.php';
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
+        document.body.appendChild(document.getElementById('manualAbsenModal'));
+
         var searchInput = document.getElementById('searchAbsensi');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
