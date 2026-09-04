@@ -224,18 +224,17 @@ include __DIR__ . '/../includes/header.php';
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    $(document).ready(function() {
+    document.addEventListener("DOMContentLoaded", function() {
+        // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
+        document.body.appendChild(document.getElementById('manualAbsenModal'));
+
+        // Inisialisasi Select2 SETELAH modal dipindahkan
         $('#selectNim').select2({
             dropdownParent: $('#manualAbsenModal'),
             placeholder: "-- Pilih Mahasiswa --",
             allowClear: true,
             width: '100%'
         });
-    });
-
-    document.addEventListener("DOMContentLoaded", function() {
-        // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
-        document.body.appendChild(document.getElementById('manualAbsenModal'));
 
         var searchInput = document.getElementById('searchAbsensi');
         if (searchInput) {
