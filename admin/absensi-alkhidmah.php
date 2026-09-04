@@ -32,6 +32,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])
     exit;
 }
 
+// Proses Tambah Manual
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_manual') {
+    $nim = $_POST['nim'] ?? '';
+    $tanggal = $_POST['tanggal'] ?? date('Y-m-d');
+    $waktu_hadir = !empty($_POST['waktu_hadir']) ? $_POST['waktu_hadir'] : null;
+    $waktu_pulang = !empty($_POST['waktu_pulang']) ? $_POST['waktu_pulang'] : null;
+
+    if ($nim && $tanggal) {
+        $check = $pdo->prepare("SELECT id FROM absensi_alkhidmah WHERE nim = ? AND tanggal = ?");
+        $check->execute([$nim, $tanggal]);
+        $existing = $check->fetch();
+
+        if ($existing) {
+            $pdo->prepare("UPDATE absensi_alkhidmah SET waktu_hadir = COALESCE(?, waktu_hadir), waktu_pulang = COALESCE(?, waktu_pulang) WHERE id = ?")
+                ->execute([$waktu_hadir, $waktu_pulang, $existing['id']]);
+        } else {
+            $pdo->prepare("INSERT INTO absensi_alkhidmah (nim, tanggal, waktu_hadir, waktu_pulang) VALUES (?, ?, ?, ?)")
+                ->execute([$nim, $tanggal, $waktu_hadir, $waktu_pulang]);
+        }
+    }
+    header('Location: ' . BASE_URL . '/admin/absensi-alkhidmah.php?success=1');
+    exit;
+}
+
 // Ambil data absensi
 $stmt = $pdo->query("
     SELECT a.*, u.nama_lengkap, u.program_studi, u.fakultas 
@@ -47,6 +71,10 @@ $qrPayload = json_encode([
     'type' => 'alkhidmah',
     'date' => $today
 ]);
+
+// Ambil daftar mahasiswa untuk dropdown manual absen
+$stmt = $pdo->query("SELECT nim, nama_lengkap, program_studi FROM users WHERE role = 'mahasiswa' ORDER BY nama_lengkap ASC");
+$mahasiswaList = $stmt->fetchAll();
 
 define('EXTRA_HEAD', '
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -85,7 +113,10 @@ include __DIR__ . '/../includes/header.php';
 <div class="card no-print">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <span>📋 Data Absensi (Tampilan Thumbnail)</span>
-        <input type="text" id="searchAbsensi" class="form-control form-control-sm" style="width: 250px; border-radius:20px; padding: 4px 12px;" placeholder="Cari Nama / NIM...">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button type="button" class="btn btn-sm btn-success" onclick="openManualAbsenModal()" style="border-radius:20px;">➕ Tambah Manual</button>
+            <input type="text" id="searchAbsensi" class="form-control form-control-sm" style="width: 250px; border-radius:20px; padding: 4px 12px;" placeholder="Cari Nama / NIM...">
+        </div>
     </div>
     <div class="card-body">
         <div class="row" id="absensiGrid" style="display:flex; flex-wrap:wrap; margin-right:-10px; margin-left:-10px;">
@@ -145,6 +176,50 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Modal Tambah Manual -->
+<div id="manualAbsenModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto;">
+        <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Tambah Absensi Manual</h3>
+        
+        <form method="POST">
+            <input type="hidden" name="action" value="add_manual">
+            
+            <div class="form-group mb-3">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569; font-weight:bold;">Mahasiswa</label>
+                <select name="nim" class="form-control" required style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                    <option value="">-- Pilih Mahasiswa --</option>
+                    <?php foreach($mahasiswaList as $m): ?>
+                        <option value="<?= htmlspecialchars($m['nim']) ?>"><?= htmlspecialchars($m['nim']) ?> - <?= htmlspecialchars($m['nama_lengkap']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            
+            <div class="form-group mb-3">
+                <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569; font-weight:bold;">Tanggal</label>
+                <input type="date" name="tanggal" value="<?= date('Y-m-d') ?>" required class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+            </div>
+            
+            <div style="display:flex; gap:15px; margin-bottom:24px;">
+                <div class="form-group" style="flex:1;">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569; font-weight:bold;">Waktu Hadir</label>
+                    <input type="time" name="waktu_hadir" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                    <small style="color:#94a3b8; font-size:11px;">Kosongkan jika belum hadir</small>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569; font-weight:bold;">Waktu Pulang</label>
+                    <input type="time" name="waktu_pulang" class="form-control" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                    <small style="color:#94a3b8; font-size:11px;">Kosongkan jika belum pulang</small>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeManualAbsenModal()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 16px; border-radius:8px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 16px; border-radius:8px;">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -165,6 +240,14 @@ include __DIR__ . '/../includes/header.php';
             });
         }
     });
+
+    function openManualAbsenModal() {
+        document.getElementById('manualAbsenModal').style.display = 'flex';
+    }
+
+    function closeManualAbsenModal() {
+        document.getElementById('manualAbsenModal').style.display = 'none';
+    }
 
     function generateQRCode() {
         var qrPayload = <?= json_encode($qrPayload) ?>;
