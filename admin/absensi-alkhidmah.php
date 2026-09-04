@@ -83,76 +83,87 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="card no-print">
-    <div class="card-header">📋 Data Absensi</div>
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <span>📋 Data Absensi (Tampilan Thumbnail)</span>
+        <input type="text" id="searchAbsensi" class="form-control form-control-sm" style="width: 250px; border-radius:20px; padding: 4px 12px;" placeholder="Cari Nama / NIM...">
+    </div>
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped" id="absensiTable">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Tanggal</th>
-                        <th>NIM</th>
-                        <th>Nama Mahasiswa</th>
-                        <th>Prodi</th>
-                        <th>Waktu Hadir</th>
-                        <th>Foto Hadir</th>
-                        <th>Waktu Pulang</th>
-                        <th>Foto Pulang</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php $no = 1; foreach ($absensiData as $row): ?>
-                        <tr>
-                            <td><?= $no++ ?></td>
-                            <td><?= htmlspecialchars($row['tanggal']) ?></td>
-                            <td><?= htmlspecialchars($row['nim']) ?></td>
-                            <td><?= htmlspecialchars($row['nama_lengkap']) ?></td>
-                            <td><?= htmlspecialchars($row['program_studi']) ?></td>
-                            <td>
-                                <?php if ($row['waktu_hadir']): ?>
-                                    <span class="badge" style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px;"><?= htmlspecialchars($row['waktu_hadir']) ?></span>
-                                <?php else: ?>
-                                    <span style="color: #ef4444;">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($row['foto_hadir']): ?>
-                                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_hadir']) ?>" target="_blank" class="btn btn-sm" style="background:#3b82f6;color:white;padding:2px 8px;font-size:12px;border-radius:4px;text-decoration:none;">Lihat Foto</a>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($row['waktu_pulang']): ?>
-                                    <span class="badge" style="background: #f59e0b; color: white; padding: 4px 8px; border-radius: 4px;"><?= htmlspecialchars($row['waktu_pulang']) ?></span>
-                                <?php else: ?>
-                                    <span style="color: #ef4444;">-</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($row['foto_pulang']): ?>
-                                    <a href="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_pulang']) ?>" target="_blank" class="btn btn-sm" style="background:#3b82f6;color:white;padding:2px 8px;font-size:12px;border-radius:4px;text-decoration:none;">Lihat Foto</a>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <a href="<?= BASE_URL ?>/admin/absensi-alkhidmah.php?action=delete&id=<?= (int)$row['id'] ?>" class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:12px;border-radius:4px;text-decoration:none;" onclick="return confirm('Apakah Anda yakin ingin menghapus data absen ini? (Foto juga akan terhapus dari server)');">Hapus</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+        <div class="row" id="absensiGrid" style="display:flex; flex-wrap:wrap; margin-right:-10px; margin-left:-10px;">
+            <?php if(empty($absensiData)): ?>
+                <div style="width:100%; text-align:center; padding: 20px; color:#6b7280;">Belum ada data absensi.</div>
+            <?php else: ?>
+                <?php foreach ($absensiData as $row): ?>
+                    <div class="absensi-item" style="width:100%; max-width:33.333%; padding:10px; box-sizing:border-box; min-width:300px;">
+                        <div class="card h-100 shadow-sm" style="border: 1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+                            <div class="card-body" style="padding:16px;">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+                                    <div>
+                                        <h5 class="card-title mb-1 absensi-nama" style="font-size:16px; font-weight:bold; margin:0;"><?= htmlspecialchars($row['nama_lengkap']) ?></h5>
+                                        <h6 class="card-subtitle text-muted absensi-nim" style="font-size:13px; margin-top:4px;"><?= htmlspecialchars($row['nim']) ?> - <?= htmlspecialchars($row['program_studi']) ?></h6>
+                                    </div>
+                                    <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:11px; padding:4px 8px; border-radius:6px;"><?= htmlspecialchars($row['tanggal']) ?></span>
+                                </div>
+                                
+                                <div style="display:flex; justify-content:space-between; margin-top:16px;">
+                                    <div style="text-align:center; flex:1;">
+                                        <div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:8px;">Hadir</div>
+                                        <?php if ($row['foto_hadir']): ?>
+                                            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_hadir']) ?>" target="_blank">
+                                                <img src="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_hadir']) ?>" alt="Hadir" style="width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                            </a>
+                                        <?php else: ?>
+                                            <div style="width:90px; height:90px; margin:0 auto; background:#f8fafc; border-radius:8px; border: 1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:12px;">Kosong</div>
+                                        <?php endif; ?>
+                                        <div style="margin-top:8px;">
+                                            <span style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px; font-size:11px; font-weight:bold;"><?= $row['waktu_hadir'] ? htmlspecialchars($row['waktu_hadir']) : '-' ?></span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="text-align:center; flex:1;">
+                                        <div style="font-size:12px; font-weight:600; color:#475569; margin-bottom:8px;">Pulang</div>
+                                        <?php if ($row['foto_pulang']): ?>
+                                            <a href="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_pulang']) ?>" target="_blank">
+                                                <img src="<?= BASE_URL ?>/<?= htmlspecialchars($row['foto_pulang']) ?>" alt="Pulang" style="width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                            </a>
+                                        <?php else: ?>
+                                            <div style="width:90px; height:90px; margin:0 auto; background:#f8fafc; border-radius:8px; border: 1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:12px;">Kosong</div>
+                                        <?php endif; ?>
+                                        <div style="margin-top:8px;">
+                                            <span style="background: #f59e0b; color: white; padding: 4px 10px; border-radius: 12px; font-size:11px; font-weight:bold;"><?= $row['waktu_pulang'] ? htmlspecialchars($row['waktu_pulang']) : '-' ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer" style="background:#fff; border-top:1px solid #f1f5f9; padding:12px; text-align:center;">
+                                <a href="<?= BASE_URL ?>/admin/absensi-alkhidmah.php?action=delete&id=<?= (int)$row['id'] ?>" class="btn btn-sm btn-danger" style="font-size:12px; font-weight:500; border-radius:6px; padding:6px 12px; width:100%; display:inline-block;" onclick="return confirm('Apakah Anda yakin ingin menghapus data absen ini? (Foto juga akan terhapus dari server)');">Hapus Data</a>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script>
-    $(document).ready(function() {
-        // DataTable sudah diinisialisasi secara global oleh app.js
+    document.addEventListener("DOMContentLoaded", function() {
+        var searchInput = document.getElementById('searchAbsensi');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                var query = this.value.toLowerCase();
+                var items = document.querySelectorAll('.absensi-item');
+                items.forEach(function(item) {
+                    var nama = item.querySelector('.absensi-nama').textContent.toLowerCase();
+                    var nim = item.querySelector('.absensi-nim').textContent.toLowerCase();
+                    if (nama.includes(query) || nim.includes(query)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
     });
 
     function generateQRCode() {
