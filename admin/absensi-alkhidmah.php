@@ -56,13 +56,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// Ambil data absensi
-$stmt = $pdo->query("
+// Proses Search & Pagination
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+$whereClause = "";
+$params = [];
+
+if ($search !== '') {
+    $whereClause = "WHERE a.nim LIKE :search OR u.nama_lengkap LIKE :search";
+    $params[':search'] = "%$search%";
+}
+
+$limit = 15; // Jumlah data per halaman
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
+
+// Ambil total data untuk paginasi
+$countSql = "SELECT COUNT(*) FROM absensi_alkhidmah a JOIN users u ON a.nim = u.nim $whereClause";
+$totalStmt = $pdo->prepare($countSql);
+foreach ($params as $key => $val) {
+    $totalStmt->bindValue($key, $val);
+}
+$totalStmt->execute();
+$totalRecords = $totalStmt->fetchColumn();
+$totalPages = ceil($totalRecords / $limit);
+
+// Ambil data absensi dengan limit
+$sql = "
     SELECT a.*, u.nama_lengkap, u.program_studi, u.fakultas 
     FROM absensi_alkhidmah a 
     JOIN users u ON a.nim = u.nim 
+    $whereClause
     ORDER BY a.tanggal DESC, a.created_at DESC
-");
+    LIMIT :limit OFFSET :offset
+";
+$stmt = $pdo->prepare($sql);
+foreach ($params as $key => $val) {
+    $stmt->bindValue($key, $val);
+}
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+$stmt->execute();
 $absensiData = $stmt->fetchAll();
 
 // Payload untuk QR Code hari ini
@@ -116,7 +150,13 @@ include __DIR__ . '/../includes/header.php';
         <span>📋 Data Absensi (Tampilan Thumbnail)</span>
         <div style="display:flex; gap:10px; align-items:center;">
             <button type="button" class="btn btn-sm btn-success" onclick="openManualAbsenModal()" style="border-radius:20px;">➕ Tambah Manual</button>
-            <input type="text" id="searchAbsensi" class="form-control form-control-sm" style="width: 250px; border-radius:20px; padding: 4px 12px;" placeholder="Cari Nama / NIM...">
+            <form method="GET" action="" style="margin: 0; display: flex; gap: 5px;">
+                <input type="text" name="search" value="<?= htmlspecialchars($search) ?>" class="form-control form-control-sm" style="width: 250px; border-radius:20px; padding: 4px 12px;" placeholder="Cari Nama / NIM...">
+                <button type="submit" class="btn btn-sm btn-secondary" style="border-radius:20px;">Cari</button>
+                <?php if($search !== ''): ?>
+                    <a href="absensi-alkhidmah.php" class="btn btn-sm btn-outline-secondary" style="border-radius:20px;">Reset</a>
+                <?php endif; ?>
+            </form>
         </div>
     </div>
     <div class="card-body">
@@ -174,6 +214,46 @@ include __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
+        
+        <!-- Pagination -->
+        <?php if ($totalPages > 1): ?>
+        <nav aria-label="Page navigation" style="margin-top: 20px;">
+            <ul class="pagination justify-content-center">
+                <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                    <a class="page-link" href="?page=<?= $page - 1 ?><?= $search ? '&search='.urlencode($search) : '' ?>" tabindex="-1">Previous</a>
+                </li>
+                
+                <?php
+                // Logika agar pagination tidak terlalu panjang (menampilkan max 5 halaman)
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                
+                if ($startPage > 1) {
+                    echo '<li class="page-item"><a class="page-link" href="?page=1'.($search ? '&search='.urlencode($search) : '').'">1</a></li>';
+                    if ($startPage > 2) {
+                        echo '<li class="page-item disabled"><a class="page-link" href="#">...</a></li>';
+                    }
+                }
+                
+                for ($i = $startPage; $i <= $endPage; $i++) {
+                    $active = ($i == $page) ? 'active' : '';
+                    echo '<li class="page-item '.$active.'"><a class="page-link" href="?page='.$i.($search ? '&search='.urlencode($search) : '').'">'.$i.'</a></li>';
+                }
+                
+                if ($endPage < $totalPages) {
+                    if ($endPage < $totalPages - 1) {
+                        echo '<li class="page-item disabled"><a class="page-link" href="#">...</a></li>';
+                    }
+                    echo '<li class="page-item"><a class="page-link" href="?page='.$totalPages.($search ? '&search='.urlencode($search) : '').'">'.$totalPages.'</a></li>';
+                }
+                ?>
+                
+                <li class="page-item <?= ($page >= $totalPages) ? 'disabled' : '' ?>">
+                    <a class="page-link" href="?page=<?= $page + 1 ?><?= $search ? '&search='.urlencode($search) : '' ?>">Next</a>
+                </li>
+            </ul>
+        </nav>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -225,22 +305,7 @@ include __DIR__ . '/../includes/header.php';
     document.addEventListener("DOMContentLoaded", function() {
         // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
         document.body.appendChild(document.getElementById('manualAbsenModal'));
-        var searchInput = document.getElementById('searchAbsensi');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
-                var query = this.value.toLowerCase();
-                var items = document.querySelectorAll('.absensi-item');
-                items.forEach(function(item) {
-                    var nama = item.querySelector('.absensi-nama').textContent.toLowerCase();
-                    var nim = item.querySelector('.absensi-nim').textContent.toLowerCase();
-                    if (nama.includes(query) || nim.includes(query)) {
-                        item.style.display = '';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-            });
-        }
+        // Client-side search has been replaced by server-side search with pagination
     });
 
     function openManualAbsenModal() {
