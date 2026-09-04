@@ -122,6 +122,13 @@ define('EXTRA_HEAD', '
     }
     .qr-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; background: #fff; border-radius: 8px; border: 1px solid #e5e7eb; }
     #qrcode img { margin: 0 auto; }
+    
+    /* Pagination Styles */
+    .pagination { display: flex; padding-left: 0; list-style: none; justify-content: center; margin-bottom: 0; gap: 4px; }
+    .page-link { position: relative; display: block; color: #475569; text-decoration: none; background-color: #fff; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; font-size: 14px; transition: all 0.2s ease-in-out; }
+    .page-link:hover { z-index: 2; color: #1e293b; background-color: #f1f5f9; border-color: #94a3b8; }
+    .page-item.active .page-link { z-index: 3; color: #fff; background-color: #10b981; border-color: #10b981; }
+    .page-item.disabled .page-link { color: #94a3b8; pointer-events: none; background-color: #f8fafc; border-color: #e2e8f0; }
 </style>
 ');
 
