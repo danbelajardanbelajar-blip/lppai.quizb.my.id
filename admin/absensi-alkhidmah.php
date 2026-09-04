@@ -77,6 +77,7 @@ $stmt = $pdo->query("SELECT nim, nama_lengkap, program_studi FROM users WHERE ro
 $mahasiswaList = $stmt->fetchAll();
 
 define('EXTRA_HEAD', '
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
     @media print {
@@ -186,7 +187,7 @@ include __DIR__ . '/../includes/header.php';
             
             <div class="form-group mb-3">
                 <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569; font-weight:bold;">Mahasiswa</label>
-                <select name="nim" class="form-control" required style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                <select name="nim" id="selectNim" class="form-control" required style="width:100%;">
                     <option value="">-- Pilih Mahasiswa --</option>
                     <?php foreach($mahasiswaList as $m): ?>
                         <option value="<?= htmlspecialchars($m['nim']) ?>"><?= htmlspecialchars($m['nim']) ?> - <?= htmlspecialchars($m['nama_lengkap']) ?></option>
@@ -221,7 +222,17 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+    $(document).ready(function() {
+        $('#selectNim').select2({
+            dropdownParent: $('#manualAbsenModal'),
+            placeholder: "-- Pilih Mahasiswa --",
+            allowClear: true,
+            width: '100%'
+        });
+    });
+
     document.addEventListener("DOMContentLoaded", function() {
         // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
         document.body.appendChild(document.getElementById('manualAbsenModal'));
