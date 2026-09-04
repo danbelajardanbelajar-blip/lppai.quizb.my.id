@@ -221,21 +221,10 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         // Pindahkan modal ke body agar tidak terpengaruh z-index atau transform dari parent
         document.body.appendChild(document.getElementById('manualAbsenModal'));
-
-        // Inisialisasi Select2 SETELAH modal dipindahkan
-        $('#selectNim').select2({
-            dropdownParent: $('#manualAbsenModal'),
-            placeholder: "-- Pilih Mahasiswa --",
-            allowClear: true,
-            width: '100%'
-        });
-
         var searchInput = document.getElementById('searchAbsensi');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -256,6 +245,15 @@ include __DIR__ . '/../includes/header.php';
 
     function openManualAbsenModal() {
         document.getElementById('manualAbsenModal').style.display = 'flex';
+        // Pastikan select2 diinisialisasi atau diperbarui tampilannya saat modal dibuka
+        if (!$('#selectNim').hasClass('select2-hidden-accessible')) {
+            $('#selectNim').select2({
+                dropdownParent: $('#manualAbsenModal'),
+                placeholder: "-- Pilih Mahasiswa --",
+                allowClear: true,
+                width: '100%'
+            });
+        }
     }
 
     function closeManualAbsenModal() {
@@ -285,3 +283,6 @@ include __DIR__ . '/../includes/header.php';
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+
+<!-- Load Select2 setelah jQuery dari footer -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
