@@ -99,6 +99,21 @@ if ($mode === 'single') {
     }
 }
 
+// Validasi Absensi Al Khidmah
+$nimArray = array_unique(array_column($students, 'nim'));
+if (!empty($nimArray)) {
+    $placeholders = implode(',', array_fill(0, count($nimArray), '?'));
+    $stmt = $pdo->prepare("SELECT DISTINCT nim FROM absensi_alkhidmah WHERE nim IN ($placeholders)");
+    $stmt->execute(array_values($nimArray));
+    $hadirAlkhidmah = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    foreach ($students as $student) {
+        if (!in_array($student['nim'], $hadirAlkhidmah)) {
+            die("<div style='display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif; background:#f8fafc;'><div style='background:white; padding:40px; border-radius:12px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); text-align:center; max-width:600px;'><h2 style='color:#ef4444; margin-top:0;'>❌ Pencetakan Dibatalkan</h2><p style='font-size:18px; color:#334155; line-height:1.6;'>Mahasiswa atas nama : <strong>" . htmlspecialchars($student['nama_lengkap']) . "</strong> dengan NIM : <strong>" . htmlspecialchars($student['nim']) . "</strong> belum mengikuti al KHidmah</p><button onclick='window.close()' style='margin-top:20px; padding:10px 20px; background:#ef4444; color:white; border:none; border-radius:6px; cursor:pointer; font-size:16px;'>Tutup Halaman</button></div></div>");
+        }
+    }
+}
+
 // Formatting Tanggal (Indonesia)
 function tgl_indo($tanggal){
     if(!$tanggal) return '-';
