@@ -106,6 +106,11 @@ function menuActive($page) {
                 <span class="icon">📅</span> Absensi Al Khidmah
             </a>
 
+            <div class="menu-label">Administrasi</div>
+            <a href="<?= BASE_URL ?>/admin/jaminan.php" class="page-nav <?= menuActive('jaminan.php') ?>">
+                <span class="icon">💳</span> Jaminan Mahasiswa
+            </a>
+
             <div class="menu-label">Sistem</div>
             <a href="<?= BASE_URL ?>/admin/backup-restore.php" class="page-nav <?= menuActive('backup-restore.php') ?>">
                 <span class="icon">💾</span> Backup & Restore
