@@ -64,9 +64,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     exit;
 }
 
-// Fetch Mahasiswa list for dropdown
-$stmtMhs = $pdo->query("SELECT nim, nama_lengkap FROM users WHERE role = 'mahasiswa' ORDER BY nama_lengkap ASC");
-$mahasiswaList = $stmtMhs->fetchAll();
+// Handle AJAX request for Select2 Mahasiswa
+if (isset($_GET['action']) && $_GET['action'] === 'search_mahasiswa') {
+    $search = trim($_GET['q'] ?? '');
+    $page = (int)($_GET['page'] ?? 1);
+    $limit = 20;
+    $offset = ($page - 1) * $limit;
+
+    $where = "role = 'mahasiswa'";
+    $params = [];
+    if ($search !== '') {
+        $where .= " AND (nim LIKE ? OR nama_lengkap LIKE ?)";
+        $params[] = "%$search%";
+        $params[] = "%$search%";
+    }
+
+    $stmt = $pdo->prepare("SELECT nim, nama_lengkap FROM users WHERE $where ORDER BY nama_lengkap ASC LIMIT $limit OFFSET $offset");
+    $stmt->execute($params);
+    $results = $stmt->fetchAll();
+
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $where");
+    $stmtCount->execute($params);
+    $totalCount = $stmtCount->fetchColumn();
+
+    $items = [];
+    foreach ($results as $row) {
+        $items[] = [
+            'id' => $row['nim'],
+            'text' => $row['nim'] . ' - ' . $row['nama_lengkap']
+        ];
+    }
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'results' => $items,
+        'pagination' => [
+            'more' => ($offset + $limit) < $totalCount
+        ]
+    ]);
+    exit;
+}
 
 // Fetch Jaminan data
 $stmtData = $pdo->query("
@@ -115,10 +152,6 @@ include __DIR__ . '/../includes/header.php';
                     <div class="mb-3" style="margin-bottom:15px;">
                         <label class="form-label" style="font-weight:600; font-size:14px; color:#334155; display:block; margin-bottom:8px;">Mahasiswa</label>
                         <select name="nim" id="selectNim" class="form-control" required style="width: 100%;">
-                            <option value="">-- Pilih Mahasiswa --</option>
-                            <?php foreach($mahasiswaList as $m): ?>
-                                <option value="<?= htmlspecialchars($m['nim']) ?>"><?= htmlspecialchars($m['nim']) ?> - <?= htmlspecialchars($m['nama_lengkap']) ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </div>
 
@@ -227,9 +260,32 @@ include __DIR__ . '/../includes/header.php';
 <script>
     $(document).ready(function() {
         $('#selectNim').select2({
-            placeholder: "-- Pilih Mahasiswa --",
+            placeholder: "-- Ketik Nama / NIM --",
             allowClear: true,
-            width: '100%'
+            width: '100%',
+            ajax: {
+                url: 'jaminan.php',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        action: 'search_mahasiswa',
+                        q: params.term, // search term
+                        page: params.page
+                    };
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    return {
+                        results: data.results,
+                        pagination: {
+                            more: data.pagination.more
+                        }
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 1
         });
 
         // Jika menggunakan datatables, inisialisasi di sini
