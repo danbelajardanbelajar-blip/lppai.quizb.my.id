@@ -173,11 +173,7 @@ include __DIR__ . '/../includes/header.php';
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if(empty($jaminanData)): ?>
-                            <tr>
-                                <td colspan="6" class="text-center" style="padding:20px; color:#64748b;">Belum ada data jaminan.</td>
-                            </tr>
-                        <?php else: ?>
+                        <?php if(!empty($jaminanData)): ?>
                             <?php foreach($jaminanData as $row): ?>
                             <tr>
                                 <td style="padding:12px 10px; vertical-align:middle;">
