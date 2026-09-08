@@ -288,24 +288,5 @@ include __DIR__ . '/../includes/header.php';
             minimumInputLength: 1
         });
 
-        // Jika menggunakan datatables, inisialisasi di sini
-        if ($.fn.DataTable) {
-            $('#tableJaminan').DataTable({
-                "pageLength": 10,
-                "language": {
-                    "search": "Cari:",
-                    "lengthMenu": "Tampilkan _MENU_ data",
-                    "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-                    "infoEmpty": "Tidak ada data yang tersedia",
-                    "zeroRecords": "Tidak ditemukan data yang sesuai",
-                    "paginate": {
-                        "first": "Awal",
-                        "last": "Akhir",
-                        "next": "Selanjutnya",
-                        "previous": "Sebelumnya"
-                    }
-                }
-            });
-        }
     });
 </script>
