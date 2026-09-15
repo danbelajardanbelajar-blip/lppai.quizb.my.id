@@ -94,8 +94,9 @@ $whereClause = "";
 $params = [];
 
 if ($search !== '') {
-    $whereClause = "WHERE a.nim LIKE :search OR u.nama_lengkap LIKE :search";
-    $params[':search'] = "%$search%";
+    $whereClause = "WHERE a.nim LIKE :search1 OR u.nama_lengkap LIKE :search2";
+    $params[':search1'] = "%$search%";
+    $params[':search2'] = "%$search%";
 }
 
 $limit = 15; // Jumlah data per halaman
