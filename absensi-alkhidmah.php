@@ -17,6 +17,16 @@ if (isAdmin()) {
 $user = getCurrentUser();
 $pdo = getDBConnection();
 
+// Load Config
+$configFile = __DIR__ . '/config_alkhidmah.json';
+$config = [];
+if (file_exists($configFile)) {
+    $config = json_decode(file_get_contents($configFile), true);
+}
+$targetLat = $config['latitude'] ?? '-7.036009';
+$targetLng = $config['longitude'] ?? '112.351515';
+$maxDist = $config['radius'] ?? '100';
+
 // Tambahkan library HTML5-QRCode
 define('EXTRA_HEAD', '
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -73,9 +83,9 @@ include __DIR__ . '/includes/header.php';
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const TARGET_LAT = -7.036009;
-    const TARGET_LNG = 112.351515;
-    const MAX_DISTANCE_METERS = 100;
+    const TARGET_LAT = <?= $targetLat ?>;
+    const TARGET_LNG = <?= $targetLng ?>;
+    const MAX_DISTANCE_METERS = <?= $maxDist ?>;
 
     const statusMsg = document.getElementById('status-message');
     const scannerWrapper = document.getElementById('scanner-wrapper');

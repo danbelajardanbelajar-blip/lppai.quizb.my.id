@@ -1,0 +1,18 @@
+{
+    "waktu_hadir_start": "07:00:00",
+    "waktu_hadir_end": "10:00:00",
+    "waktu_pulang_start": "10:01:00",
+    "waktu_pulang_end": "12:00:00",
+    "hari_aktif": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+    ],
+    "latitude": "-7.036009",
+    "longitude": "112.351515",
+    "radius": "100"
+}

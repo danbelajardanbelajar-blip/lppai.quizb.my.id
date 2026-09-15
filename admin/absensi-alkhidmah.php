@@ -8,6 +8,38 @@ requireAdmin();
 
 $pdo = getDBConnection();
 
+// Load Config
+$configFile = __DIR__ . '/../config_alkhidmah.json';
+if (!file_exists($configFile)) {
+    $defaultConfig = [
+        'waktu_hadir_start' => '07:00:00',
+        'waktu_hadir_end' => '10:00:00',
+        'waktu_pulang_start' => '10:01:00',
+        'waktu_pulang_end' => '12:00:00',
+        'hari_aktif' => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        'latitude' => '-7.036009',
+        'longitude' => '112.351515',
+        'radius' => '100'
+    ];
+    file_put_contents($configFile, json_encode($defaultConfig, JSON_PRETTY_PRINT));
+}
+$config = json_decode(file_get_contents($configFile), true);
+
+// Save Config
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_settings') {
+    $config['waktu_hadir_start'] = $_POST['waktu_hadir_start'] ?? '07:00:00';
+    $config['waktu_hadir_end'] = $_POST['waktu_hadir_end'] ?? '10:00:00';
+    $config['waktu_pulang_start'] = $_POST['waktu_pulang_start'] ?? '10:01:00';
+    $config['waktu_pulang_end'] = $_POST['waktu_pulang_end'] ?? '12:00:00';
+    $config['hari_aktif'] = $_POST['hari_aktif'] ?? [];
+    $config['latitude'] = $_POST['latitude'] ?? '-7.036009';
+    $config['longitude'] = $_POST['longitude'] ?? '112.351515';
+    $config['radius'] = $_POST['radius'] ?? '100';
+    file_put_contents($configFile, json_encode($config, JSON_PRETTY_PRINT));
+    header('Location: ' . BASE_URL . '/admin/absensi-alkhidmah.php?settings_saved=1');
+    exit;
+}
+
 // Proses Delete
 if (isset($_GET['action']) && $_GET['action'] === 'delete' && isset($_GET['id'])) {
     $id = (int)$_GET['id'];
@@ -134,6 +166,73 @@ define('EXTRA_HEAD', '
 
 include __DIR__ . '/../includes/header.php';
 ?>
+
+<!-- Settings Panel -->
+<div class="card mb-4 no-print">
+    <div class="card-header">⚙️ Pengaturan Absensi Al Khidmah</div>
+    <div class="card-body">
+        <?php if (isset($_GET['settings_saved'])): ?>
+            <div style="padding: 10px; background-color: #d1fae5; color: #047857; border: 1px solid #34d399; border-radius: 6px; margin-bottom: 15px;">
+                ✅ Pengaturan berhasil disimpan!
+            </div>
+        <?php endif; ?>
+        <form method="POST" action="">
+            <input type="hidden" name="action" value="save_settings">
+            
+            <div style="display:flex; flex-wrap:wrap; gap:20px; margin-bottom:15px;">
+                <div style="flex:1; min-width:200px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Jam Datang Mulai</label>
+                    <input type="time" step="1" name="waktu_hadir_start" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['waktu_hadir_start']) ?>" required>
+                </div>
+                <div style="flex:1; min-width:200px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Jam Datang Selesai</label>
+                    <input type="time" step="1" name="waktu_hadir_end" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['waktu_hadir_end']) ?>" required>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:20px; margin-bottom:15px;">
+                <div style="flex:1; min-width:200px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Jam Pulang Mulai</label>
+                    <input type="time" step="1" name="waktu_pulang_start" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['waktu_pulang_start']) ?>" required>
+                </div>
+                <div style="flex:1; min-width:200px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Jam Pulang Selesai</label>
+                    <input type="time" step="1" name="waktu_pulang_end" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['waktu_pulang_end']) ?>" required>
+                </div>
+            </div>
+
+            <div style="margin-bottom:15px;">
+                <label style="font-weight:bold; margin-bottom:5px; display:block;">Hari Aktif</label>
+                <div style="display:flex; gap:15px; flex-wrap:wrap; margin-top:5px;">
+                    <?php 
+                    $days = ['Monday'=>'Senin', 'Tuesday'=>'Selasa', 'Wednesday'=>'Rabu', 'Thursday'=>'Kamis', 'Friday'=>'Jumat', 'Saturday'=>'Sabtu', 'Sunday'=>'Minggu'];
+                    foreach($days as $en => $id): 
+                        $checked = in_array($en, $config['hari_aktif']) ? 'checked' : '';
+                    ?>
+                    <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" name="hari_aktif[]" value="<?= $en ?>" <?= $checked ?>> <?= $id ?></label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:20px; margin-bottom:15px;">
+                <div style="flex:1; min-width:150px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Latitude</label>
+                    <input type="text" name="latitude" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['latitude']) ?>" required>
+                </div>
+                <div style="flex:1; min-width:150px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Longitude</label>
+                    <input type="text" name="longitude" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['longitude']) ?>" required>
+                </div>
+                <div style="flex:1; min-width:150px;">
+                    <label style="font-weight:bold; margin-bottom:5px; display:block;">Radius (Meter)</label>
+                    <input type="number" name="radius" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" value="<?= htmlspecialchars($config['radius']) ?>" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-success" style="padding:10px 20px; border:none; border-radius:6px; cursor:pointer;">💾 Simpan Pengaturan</button>
+        </form>
+    </div>
+</div>
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">

@@ -35,11 +35,25 @@ if ($qr_data['date'] !== $today) {
     exit;
 }
 
-// 2. Validasi Waktu (Hadir: 07:00-10:00, Pulang: 10:01-12:00)
-$waktuHadirStart = '07:00:00';
-$waktuHadirEnd   = '10:00:00';
-$waktuPulangStart = '10:01:00';
-$waktuPulangEnd   = '12:00:00';
+// Load Config
+$configFile = __DIR__ . '/config_alkhidmah.json';
+$config = [];
+if (file_exists($configFile)) {
+    $config = json_decode(file_get_contents($configFile), true);
+}
+
+// 2. Validasi Hari Aktif
+$currentDay = date('l'); // Monday, Tuesday, etc.
+if (!empty($config['hari_aktif']) && !in_array($currentDay, $config['hari_aktif'])) {
+    echo json_encode(['status' => 'error', 'message' => 'Hari ini bukan hari aktif untuk absensi Al Khidmah.']);
+    exit;
+}
+
+// 3. Validasi Waktu
+$waktuHadirStart = $config['waktu_hadir_start'] ?? '07:00:00';
+$waktuHadirEnd   = $config['waktu_hadir_end'] ?? '10:00:00';
+$waktuPulangStart = $config['waktu_pulang_start'] ?? '10:01:00';
+$waktuPulangEnd   = $config['waktu_pulang_end'] ?? '12:00:00';
 
 $is_waktu_hadir = ($now >= $waktuHadirStart && $now <= $waktuHadirEnd);
 $is_waktu_pulang = ($now >= $waktuPulangStart && $now <= $waktuPulangEnd);
@@ -60,12 +74,12 @@ if ($absen) {
 }
 
 if ($tipe_absen === 'hadir' && !$is_waktu_hadir) {
-    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kehadiran (07:00-10:00).']);
+    echo json_encode(['status' => 'error', 'message' => "Saat ini bukan waktu absensi kehadiran ({$waktuHadirStart}-{$waktuHadirEnd})."]);
     exit;
 }
 
 if ($tipe_absen === 'pulang' && !$is_waktu_pulang) {
-    echo json_encode(['status' => 'error', 'message' => 'Saat ini bukan waktu absensi kepulangan (10:01-12:00).']);
+    echo json_encode(['status' => 'error', 'message' => "Saat ini bukan waktu absensi kepulangan ({$waktuPulangStart}-{$waktuPulangEnd})."]);
     exit;
 }
 
