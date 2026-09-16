@@ -174,6 +174,14 @@ function menuActive($page) {
             </div>
         <?php endif; ?>
 
+        <div class="menu-label">Informasi</div>
+        <a href="<?= BASE_URL ?>/about.php" class="page-nav <?= menuActive('about.php') ?>">
+            <span class="icon">ℹ️</span> Tentang Kami
+        </a>
+        <a href="<?= BASE_URL ?>/privacy-policy.php" class="page-nav <?= menuActive('privacy-policy.php') ?>">
+            <span class="icon">🔒</span> Kebijakan Privasi
+        </a>
+
         <div class="menu-label">Akun</div>
         <a href="<?= BASE_URL ?>/logout.php">
             <span class="icon">🚪</span> Keluar

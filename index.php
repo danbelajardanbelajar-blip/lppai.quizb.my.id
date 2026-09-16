@@ -88,8 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn btn-primary">Masuk</button>
         </form>
 
-        <p style="margin-top: 24px; font-size: 12px; color: #999;">
-            &copy; <?= date('Y') ?> LPPAI Corner
+        <div style="margin-top: 24px; font-size: 13px; text-align: center;">
+            <a href="<?= BASE_URL ?>/about.php" style="color: #666; text-decoration: none; margin-right: 10px;">Tentang Kami</a> |
+            <a href="<?= BASE_URL ?>/privacy-policy.php" style="color: #666; text-decoration: none; margin-left: 10px;">Kebijakan Privasi</a>
+        </div>
+        <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
+            &copy; <?= date('Y') ?> <?= APP_NAME ?? 'LPPAI Corner' ?>
         </p>
     </div>
 </div>
