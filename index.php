@@ -89,8 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div style="margin-top: 24px; font-size: 13px; text-align: center;">
-            <a href="<?= BASE_URL ?>/about.php" style="color: #666; text-decoration: none; margin-right: 10px;">Tentang Kami</a> |
-            <a href="<?= BASE_URL ?>/privacy-policy.php" style="color: #666; text-decoration: none; margin-left: 10px;">Kebijakan Privasi</a>
+            <a href="<?= BASE_URL ?>/about.php" style="color: #666; text-decoration: none;">Tentang Kami</a> |
+            <a href="<?= BASE_URL ?>/privacy-policy.php" style="color: #666; text-decoration: none;">Kebijakan Privasi</a> |
+            <a href="<?= BASE_URL ?>/hapus-akun.php" style="color: #666; text-decoration: none;">Hapus Akun</a>
         </div>
         <p style="margin-top: 10px; font-size: 12px; color: #999; text-align: center;">
             &copy; <?= date('Y') ?> <?= APP_NAME ?? 'LPPAI Corner' ?>

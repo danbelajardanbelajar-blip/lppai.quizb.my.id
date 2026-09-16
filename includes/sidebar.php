@@ -181,6 +181,9 @@ function menuActive($page) {
         <a href="<?= BASE_URL ?>/privacy-policy.php" class="page-nav <?= menuActive('privacy-policy.php') ?>">
             <span class="icon">🔒</span> Kebijakan Privasi
         </a>
+        <a href="<?= BASE_URL ?>/hapus-akun.php" class="page-nav <?= menuActive('hapus-akun.php') ?>">
+            <span class="icon">🗑️</span> Hapus Akun
+        </a>
 
         <div class="menu-label">Akun</div>
         <a href="<?= BASE_URL ?>/logout.php">
