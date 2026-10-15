@@ -81,6 +81,7 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>/admin/pretes-hasil.php" class="btn btn-warning" style="width:auto;">📝 Input Hasil Pretes</a>
         <a href="<?= BASE_URL ?>/admin/tutorial-kelas.php" class="btn btn-secondary" style="width:auto;">🏫 Kelola Kelas</a>
         <a href="<?= BASE_URL ?>/admin/users.php" class="btn btn-secondary" style="width:auto;">👤 Kelola User</a>
+        <a href="<?= BASE_URL ?>/admin/inventaris-surat.php" class="btn btn-info" style="width:auto;">📑 Inventaris Surat</a>
     </div>
 </div>
 

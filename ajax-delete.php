@@ -35,6 +35,7 @@ try {
         'tutorial_classes'       => 'id',
         'tutorial_registrations' => 'id',
         'master_gelombang'       => 'id',
+        'surat_inventaris'       => 'id',
     ];
 
     $table = trim($_POST['table'] ?? '');
@@ -65,6 +66,16 @@ try {
     if (!$check->fetch()) {
         echo json_encode(['success' => false, 'message' => 'Data tidak ditemukan.']);
         exit;
+    }
+
+    // If surat_inventaris, clean up uploaded file
+    if ($table === 'surat_inventaris') {
+        $stmtFile = $pdo->prepare("SELECT file_surat FROM surat_inventaris WHERE id = ?");
+        $stmtFile->execute([$id]);
+        $filePath = $stmtFile->fetchColumn();
+        if ($filePath && file_exists(__DIR__ . '/' . $filePath)) {
+            @unlink(__DIR__ . '/' . $filePath);
+        }
     }
 
     $pdo->prepare("DELETE FROM {$table} WHERE {$col} = ?")->execute([$id]);
