@@ -7,6 +7,46 @@
 require_once __DIR__ . '/includes/auth.php';
 
 $pdo = getDBConnection();
+
+// Auto-migration aman untuk tabel dan kolom pengambilan sertifikat (jika belum ada di server live)
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS pengambilan_sertifikat (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            tutorial_registration_id INT NULL,
+            nim VARCHAR(50) NOT NULL,
+            nama_mahasiswa VARCHAR(150) NOT NULL,
+            program_studi VARCHAR(100) NULL,
+            nomor_sertifikat VARCHAR(100) NOT NULL,
+            tahun_ajaran VARCHAR(50) NULL,
+            status_pengambilan ENUM('Sudah Diambil', 'Belum Diambil') NOT NULL DEFAULT 'Sudah Diambil',
+            tanggal_pengambilan DATETIME NOT NULL,
+            metode_pengambilan ENUM('Scan QR', 'Manual Admin', 'Barcode/Scanner') NOT NULL DEFAULT 'Scan QR',
+            nama_penerima VARCHAR(150) NULL,
+            hubungan_penerima VARCHAR(50) NULL DEFAULT 'Sendiri',
+            foto_bukti VARCHAR(255) NULL,
+            tanda_tangan_digital MEDIUMTEXT NULL,
+            catatan TEXT NULL,
+            petugas_id INT NULL,
+            petugas_nama VARCHAR(150) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_nim (nim),
+            INDEX idx_nomor_sertifikat (nomor_sertifikat),
+            INDEX idx_tanggal_pengambilan (tanggal_pengambilan),
+            INDEX idx_status (status_pengambilan)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    ");
+} catch (Exception $e) {}
+
+try {
+    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN is_sertifikat_diambil TINYINT(1) DEFAULT 0 AFTER nomor_sertifikat");
+} catch (Exception $e) {}
+
+try {
+    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tgl_sertifikat_diambil DATETIME NULL AFTER is_sertifikat_diambil");
+} catch (Exception $e) {}
+
 $currentUser = getCurrentUser();
 $isLoggedIn  = isLoggedIn();
 $isAdminUser = isAdmin();
@@ -26,6 +66,8 @@ if (filter_var($rawCode, FILTER_VALIDATE_URL)) {
 
 $cert = null;
 $pickupLog = null;
+$isSertifikatDiambil = 0;
+$tglSertifikatDiambil = null;
 $flashMsg = null;
 $flashType = 'success';
 
@@ -42,14 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $flashType = 'danger';
     } else {
         // Ambil data sertifikat yang dimaksud
-        $stmtC = $pdo->prepare("
-            SELECT tr.*, u.nim, u.nama_lengkap, u.program_studi, u.fakultas
-            FROM tutorial_registrations tr
-            JOIN users u ON tr.user_id = u.id
-            WHERE tr.id = ?
-        ");
-        $stmtC->execute([$regId]);
-        $targetCert = $stmtC->fetch();
+        $targetCert = null;
+        try {
+            $stmtC = $pdo->prepare("
+                SELECT tr.*, u.nim, u.nama_lengkap, u.program_studi
+                FROM tutorial_registrations tr
+                JOIN users u ON tr.user_id = u.id
+                WHERE tr.id = ?
+            ");
+            $stmtC->execute([$regId]);
+            $targetCert = $stmtC->fetch();
+        } catch (Exception $e) {}
 
         if (!$targetCert) {
             $flashMsg = 'Data sertifikat tidak ditemukan.';
@@ -61,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             if (!$isTargetOwner && !$isAdminUser) {
                 $flashMsg = 'Akses ditolak! Anda hanya dapat mengonfirmasi sertifikat milik Anda sendiri (NIM: ' . htmlspecialchars($targetCert['nim']) . ').';
                 $flashType = 'danger';
-            } elseif ($targetCert['is_sertifikat_diambil'] == 1) {
+            } elseif (!empty($targetCert['is_sertifikat_diambil']) && $targetCert['is_sertifikat_diambil'] == 1) {
                 $flashMsg = 'Sertifikat ini sudah tercatat telah diambil sebelumnya.';
                 $flashType = 'warning';
             } else {
@@ -79,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     // Simpan ke log pengambilan_sertifikat
                     $sqlIns = "
                         INSERT INTO pengambilan_sertifikat (
-                            registration_id, nim, nama_mahasiswa, program_studi, nomor_sertifikat,
+                            tutorial_registration_id, nim, nama_mahasiswa, program_studi, nomor_sertifikat,
                             tahun_ajaran, status_pengambilan, tanggal_pengambilan, metode_pengambilan,
                             nama_penerima, hubungan_penerima, catatan, petugas_id, petugas_nama
                         ) VALUES (?, ?, ?, ?, ?, ?, 'Sudah Diambil', NOW(), ?, ?, ?, ?, ?, ?)
@@ -100,13 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                         $petugasNama
                     ]);
 
-                    // Update flag di tutorial_registrations
-                    $stmtUp = $pdo->prepare("
-                        UPDATE tutorial_registrations 
-                        SET is_sertifikat_diambil = 1, tgl_sertifikat_diambil = NOW()
-                        WHERE id = ?
-                    ");
-                    $stmtUp->execute([$targetCert['id']]);
+                    // Update flag di tutorial_registrations jika kolom ada
+                    try {
+                        $stmtUp = $pdo->prepare("
+                            UPDATE tutorial_registrations 
+                            SET is_sertifikat_diambil = 1, tgl_sertifikat_diambil = NOW()
+                            WHERE id = ?
+                        ");
+                        $stmtUp->execute([$targetCert['id']]);
+                    } catch (Exception $e) {}
 
                     $pdo->commit();
 
@@ -124,61 +171,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Cari data sertifikat jika ada parameter
 if (!empty($certCode)) {
-    // Cari berdasarkan nomor_sertifikat, NIM, atau id registrasi
-    $sqlLookup = "
-        SELECT tr.id as reg_id, tr.nomor_sertifikat, tr.tahun_ajaran,
-               tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
-               tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis,
-               tr.is_sertifikat_diambil, tr.tgl_sertifikat_diambil,
-               tr.created_at as tgl_daftar,
-               u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.fakultas,
-               u.tempat_lahir, u.tanggal_lahir, u.no_hp
-        FROM tutorial_registrations tr
-        JOIN users u ON tr.user_id = u.id
-        WHERE (tr.nomor_sertifikat = ? OR u.nim = ? OR tr.id = ?)
-          AND tr.nomor_sertifikat IS NOT NULL AND tr.nomor_sertifikat != ''
-        ORDER BY tr.id DESC
-        LIMIT 1
-    ";
-    $stmtLookup = $pdo->prepare($sqlLookup);
-    $stmtLookup->execute([$certCode, $certCode, is_numeric($certCode) ? (int)$certCode : 0]);
-    $cert = $stmtLookup->fetch();
+    try {
+        $sqlLookup = "
+            SELECT u.nama_lengkap, u.nim, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
+                   tr.id as reg_id, tr.user_id, tr.tahun_ajaran, tr.tipe_nilai,
+                   tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
+                   tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
+            FROM tutorial_registrations tr
+            JOIN users u ON u.id = tr.user_id
+            WHERE (tr.nomor_sertifikat = ? OR u.nim = ? OR tr.id = ?)
+              AND tr.nomor_sertifikat IS NOT NULL AND tr.nomor_sertifikat != ''
+            ORDER BY tr.id DESC
+            LIMIT 1
+        ";
+        $stmtLookup = $pdo->prepare($sqlLookup);
+        $stmtLookup->execute([$certCode, $certCode, is_numeric($certCode) ? (int)$certCode : 0]);
+        $cert = $stmtLookup->fetch();
+    } catch (Exception $e) {
+        $cert = null;
+    }
 
     if ($cert) {
+        // Cek status fisik dari kolom tutorial_registrations jika ada
+        try {
+            $stmtCol = $pdo->prepare("SELECT is_sertifikat_diambil, tgl_sertifikat_diambil FROM tutorial_registrations WHERE id = ?");
+            $stmtCol->execute([$cert['reg_id']]);
+            $colRes = $stmtCol->fetch();
+            if ($colRes) {
+                $isSertifikatDiambil = (int)($colRes['is_sertifikat_diambil'] ?? 0);
+                $tglSertifikatDiambil = $colRes['tgl_sertifikat_diambil'] ?? null;
+            }
+        } catch (Exception $e) {}
+
         // Ambil riwayat pengambilan fisik jika ada
-        $stmtPick = $pdo->prepare("
-            SELECT * FROM pengambilan_sertifikat 
-            WHERE nomor_sertifikat = ? OR registration_id = ?
-            ORDER BY id DESC LIMIT 1
-        ");
-        $stmtPick->execute([$cert['nomor_sertifikat'], $cert['reg_id']]);
-        $pickupLog = $stmtPick->fetch();
+        try {
+            $stmtPick = $pdo->prepare("
+                SELECT * FROM pengambilan_sertifikat 
+                WHERE nomor_sertifikat = ? OR tutorial_registration_id = ?
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtPick->execute([$cert['nomor_sertifikat'], $cert['reg_id']]);
+            $pickupLog = $stmtPick->fetch();
+            if ($pickupLog) {
+                $isSertifikatDiambil = 1;
+                if (empty($tglSertifikatDiambil)) {
+                    $tglSertifikatDiambil = $pickupLog['tanggal_pengambilan'];
+                }
+            }
+        } catch (Exception $e) {}
     }
 }
 
 // Helper Predikat Nilai
-function hitungPredikatHuruf($val) {
-    if ($val >= 80) return ['A', 'Memuaskan'];
-    if ($val >= 75) return ['B+', 'Sangat Baik'];
-    if ($val >= 70) return ['B', 'Baik'];
-    if ($val >= 65) return ['C+', 'Cukup Baik'];
-    if ($val >= 60) return ['C', 'Cukup'];
-    if ($val >= 40) return ['D', 'Kurang'];
-    return ['E', 'Sangat Kurang'];
+if (!function_exists('hitungPredikatHuruf')) {
+    function hitungPredikatHuruf($val) {
+        if ($val >= 80) return ['A', 'Memuaskan'];
+        if ($val >= 75) return ['B+', 'Sangat Baik'];
+        if ($val >= 70) return ['B', 'Baik'];
+        if ($val >= 65) return ['C+', 'Cukup Baik'];
+        if ($val >= 60) return ['C', 'Cukup'];
+        if ($val >= 40) return ['D', 'Kurang'];
+        return ['E', 'Sangat Kurang'];
+    }
 }
 
-function formatTanggalIndo($dateStr) {
-    if (empty($dateStr)) return '-';
-    $bulanIndo = [
-        1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    $timestamp = strtotime($dateStr);
-    if (!$timestamp) return $dateStr;
-    $d = date('j', $timestamp);
-    $m = $bulanIndo[(int)date('n', $timestamp)];
-    $y = date('Y', $timestamp);
-    return "$d $m $y";
+if (!function_exists('formatTanggalIndo')) {
+    function formatTanggalIndo($dateStr) {
+        if (empty($dateStr)) return '-';
+        $bulanIndo = [
+            1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        $timestamp = strtotime($dateStr);
+        if (!$timestamp) return $dateStr;
+        $d = date('j', $timestamp);
+        $m = $bulanIndo[(int)date('n', $timestamp)] ?? date('F', $timestamp);
+        $y = date('Y', $timestamp);
+        return "$d $m $y";
+    }
 }
 
 // Cek status kepemilikan bagi user yang sedang login
@@ -782,20 +852,19 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
 
             <?php
                 // Hitung Nilai & Predikat
-                $th = (float)$cert['nilai_thaharah'];
-                $sh = (float)$cert['nilai_shalat'];
-                $sp = (float)$cert['nilai_surat_pendek'];
-                $am = (float)$cert['nilai_amaliyah'];
-                $jn = (float)$cert['nilai_jenazah'];
-                $ut = (float)$cert['nilai_ujian_tulis'];
+                $th = (float)($cert['nilai_thaharah'] ?? 0);
+                $sh = (float)($cert['nilai_shalat'] ?? 0);
+                $sp = (float)($cert['nilai_surat_pendek'] ?? 0);
+                $am = (float)($cert['nilai_amaliyah'] ?? 0);
+                $jn = (float)($cert['nilai_jenazah'] ?? 0);
                 
                 $rataAkhir = round(($th + $sh + $sp + $am + $jn) / 5, 2);
                 list($hurufAkhir, $predikatTeks) = hitungPredikatHuruf($rataAkhir);
 
                 $ttlLahir = '-';
-                if ($cert['tempat_lahir'] && $cert['tanggal_lahir']) {
+                if (!empty($cert['tempat_lahir']) && !empty($cert['tanggal_lahir'])) {
                     $ttlLahir = ucwords(strtolower($cert['tempat_lahir'])) . ', ' . formatTanggalIndo($cert['tanggal_lahir']);
-                } elseif ($cert['tanggal_lahir']) {
+                } elseif (!empty($cert['tanggal_lahir'])) {
                     $ttlLahir = formatTanggalIndo($cert['tanggal_lahir']);
                 }
             ?>
@@ -817,7 +886,7 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                         <span class="cert-id-tag">#REG-<?= $cert['reg_id'] ?></span>
                     </div>
                     <div>
-                        <?php if ($cert['is_sertifikat_diambil'] == 1): ?>
+                        <?php if ($isSertifikatDiambil == 1): ?>
                             <span class="cert-status-tag tag-taken">✅ SUDAH DIAMBIL</span>
                         <?php else: ?>
                             <span class="cert-status-tag tag-pending">📦 BELUM DIAMBIL (SIAP AMBIL)</span>
@@ -839,9 +908,6 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                         <div class="cert-meta-grid">
                             <div class="cert-meta-item">NIM: <strong><?= htmlspecialchars($cert['nim']) ?></strong></div>
                             <div class="cert-meta-item">Program Studi: <strong><?= htmlspecialchars($cert['program_studi'] ?: '-') ?></strong></div>
-                            <?php if (!empty($cert['fakultas'])): ?>
-                                <div class="cert-meta-item">Fakultas: <strong><?= htmlspecialchars($cert['fakultas']) ?></strong></div>
-                            <?php endif; ?>
                             <div class="cert-meta-item">TTL: <strong><?= htmlspecialchars($ttlLahir) ?></strong></div>
                         </div>
 
@@ -902,7 +968,7 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
             </div>
 
             <!-- BAGIAN STATUS & PENGAMBILAN SERTIFIKAT -->
-            <?php if ($cert['is_sertifikat_diambil'] == 1): ?>
+            <?php if ($isSertifikatDiambil == 1): ?>
                 <!-- JIKA SUDAH DIAMBIL -->
                 <div class="action-card" style="border-left: 5px solid #10b981;">
                     <h3>✅ Informasi Pengambilan Sertifikat Fisik</h3>
@@ -915,7 +981,7 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                         </tr>
                         <tr>
                             <td>Waktu Pengambilan</td>
-                            <td><?= !empty($cert['tgl_sertifikat_diambil']) ? date('d F Y, H:i', strtotime($cert['tgl_sertifikat_diambil'])) . ' WIB' : '-' ?></td>
+                            <td><?= !empty($tglSertifikatDiambil) ? date('d F Y, H:i', strtotime($tglSertifikatDiambil)) . ' WIB' : '-' ?></td>
                         </tr>
                         <?php if ($pickupLog): ?>
                             <tr>
