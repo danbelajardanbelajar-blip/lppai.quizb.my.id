@@ -357,6 +357,40 @@ $thnNow = date('Y');
             color: #94a3b8;
             background-color: #f8fafc;
         }
+        .cert-qr-corner {
+            position: absolute;
+            top: 25px;
+            right: 35px;
+            text-align: center;
+            background: #ffffff;
+            padding: 5px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            z-index: 50;
+            transition: all 0.2s ease;
+        }
+        .cert-qr-corner.top-left {
+            right: auto;
+            left: 35px;
+        }
+        .cert-qr-corner.top-right {
+            left: auto;
+            right: 35px;
+        }
+        .cert-qr-corner img, .cert-qr-corner canvas {
+            display: block;
+            margin: 0 auto;
+        }
+        .cert-qr-corner .qr-label {
+            font-family: 'Poppins', sans-serif;
+            font-size: 7.5px;
+            color: #475569;
+            font-weight: 600;
+            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
         .grades-table {
             width: 100%;
             border-collapse: collapse;
@@ -400,9 +434,14 @@ $thnNow = date('Y');
         @media print {
             body {
                 background-color: white;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             .cert-page {
                 margin: 0;
+                box-shadow: none;
+            }
+            .cert-qr-corner {
                 box-shadow: none;
             }
             .print-panel {
@@ -451,11 +490,19 @@ $thnNow = date('Y');
             </div>
             
             <div class="form-group" style="margin-top:10px;">
-                <label>Tampilan Kotak Tengah:</label>
-                <select id="selectCenterBox" class="form-control" onchange="toggleCenterBox(this.value)">
-                    <option value="qr" selected>🔳 QR Code Validasi & Pengambilan</option>
-                    <option value="photo">🖼️ Kotak Foto 3x4</option>
-                    <option value="both">🔳🖼️ Keduanya (QR & Foto)</option>
+                <label>Posisi QR Code:</label>
+                <select id="selectQrPosition" class="form-control" onchange="changeQrPosition(this.value)">
+                    <option value="top-right" selected>Pojok Kanan Atas (Default)</option>
+                    <option value="top-left">Pojok Kiri Atas</option>
+                    <option value="hide">Sembunyikan QR Code</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-top:10px;">
+                <label>Kotak Panduan Foto 3x4:</label>
+                <select id="selectPhotoBox" class="form-control" onchange="togglePhotoBox(this.value)">
+                    <option value="show" selected>Tampilkan Kotak Foto 3x4</option>
+                    <option value="hide">Sembunyikan Kotak Foto 3x4</option>
                 </select>
             </div>
         </form>
@@ -513,6 +560,12 @@ $thnNow = date('Y');
                 
 
 
+                <!-- QR Code di Pojok Atas (Kanan Atas / Kiri Atas) -->
+                <div class="cert-qr-corner top-right" id="qrCorner_<?= $data['reg_id'] ?>">
+                    <div id="qrcode_cert_<?= $data['reg_id'] ?>"></div>
+                    <div class="qr-label">Validasi / Ambil</div>
+                </div>
+
                 <div class="cert-title">Sertifikat Kelulusan</div>
                 <div class="cert-number"><?= htmlspecialchars($nomorSertifikat) ?></div>
 
@@ -569,16 +622,8 @@ $thnNow = date('Y');
                         <!-- Predikat dipindahkan ke atas -->
                     </div>
 
-                    <div class="photo-container" style="flex-direction: column; align-items: center; justify-content: flex-end;">
-                        <!-- Kotak QR Code -->
-                        <div class="qr-code-box" style="text-align: center;">
-                            <div id="qrcode_cert_<?= $data['reg_id'] ?>" style="display: inline-block; background: #fff; padding: 3px; border: 1px solid #94a3b8; border-radius: 4px;"></div>
-                            <div style="font-family: 'Poppins', sans-serif; font-size: 8px; color: #475569; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px;">
-                                Validasi & Ambil
-                            </div>
-                        </div>
-                        <!-- Kotak Foto 3x4 (Bisa disembunyikan/ditampilkan) -->
-                        <div class="photo-box" style="display: none;">
+                    <div class="photo-container">
+                        <div class="photo-box">
                             Foto 3x4
                         </div>
                     </div>
@@ -616,27 +661,41 @@ $thnNow = date('Y');
                 if (el) {
                     new QRCode(el, {
                         text: <?= json_encode($qrUrl) ?>,
-                        width: 76,
-                        height: 76,
+                        width: 68,
+                        height: 68,
                         correctLevel: QRCode.CorrectLevel.M
                     });
                 }
             } catch(e) {}
         <?php endforeach; ?>
 
-        function toggleCenterBox(mode) {
-            document.querySelectorAll('.photo-container').forEach(function(c) {
-                var qrBox = c.querySelector('.qr-code-box');
-                var photoBox = c.querySelector('.photo-box');
-                if (mode === 'qr') {
-                    if (qrBox) qrBox.style.display = 'block';
-                    if (photoBox) photoBox.style.display = 'none';
-                } else if (mode === 'photo') {
-                    if (qrBox) qrBox.style.display = 'none';
-                    if (photoBox) photoBox.style.display = 'flex';
-                } else if (mode === 'both') {
-                    if (qrBox) qrBox.style.display = 'block';
-                    if (photoBox) photoBox.style.display = 'flex';
+        function changeQrPosition(pos) {
+            document.querySelectorAll('.cert-qr-corner').forEach(function(el) {
+                if (pos === 'hide') {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                    if (pos === 'top-left') {
+                        el.classList.remove('top-right');
+                        el.classList.add('top-left');
+                    } else {
+                        el.classList.remove('top-left');
+                        el.classList.add('top-right');
+                    }
+                }
+            });
+        }
+
+        function togglePhotoBox(mode) {
+            document.querySelectorAll('.photo-box').forEach(function(el) {
+                if (mode === 'hide') {
+                    el.style.border = 'none';
+                    el.style.backgroundColor = 'transparent';
+                    el.innerText = '';
+                } else {
+                    el.style.border = '1px dashed #94a3b8';
+                    el.style.backgroundColor = '#f8fafc';
+                    el.innerText = 'Foto 3x4';
                 }
             });
         }
