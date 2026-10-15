@@ -369,7 +369,7 @@ $thnNow = date('Y');
         }
         .cert-qr-corner {
             position: absolute;
-            top: 50%;
+            top: calc(50% + 1cm);
             transform: translateY(-50%);
             right: 20px;
             text-align: center;
@@ -498,17 +498,6 @@ $thnNow = date('Y');
                     <option value="top-left">Kiri (Sejajar "Sertifikat Kelulusan")</option>
                     <option value="hide">Sembunyikan QR Code</option>
                 </select>
-            </div>
-            
-            <div class="form-group" style="margin-top:10px;">
-                <label>Geser Presisi Vertikal QR (Atas / Bawah):</label>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <input type="range" id="qrOffsetY" min="-40" max="40" value="0" step="1" class="form-control" style="padding:0; flex:1;" oninput="adjustQrOffsetY(this.value)">
-                    <span id="qrOffsetYVal" style="font-size:12px; font-weight:700; width:45px; text-align:right;">0 px</span>
-                </div>
-                <small style="color:#64748b; font-size:11px; display:block; margin-top:3px;">
-                    Geser bila perlu penyesuaian milimeter terhadap kertas cetak fisik.
-                </small>
             </div>
             
             <div class="form-group" style="margin-top:10px;">
@@ -682,16 +671,6 @@ $thnNow = date('Y');
             } catch(e) {}
         <?php endforeach; ?>
 
-        var currentQrOffsetY = 0;
-
-        function adjustQrOffsetY(val) {
-            currentQrOffsetY = parseInt(val) || 0;
-            document.getElementById('qrOffsetYVal').textContent = (currentQrOffsetY > 0 ? '+' : '') + currentQrOffsetY + ' px';
-            document.querySelectorAll('.cert-qr-corner').forEach(function(el) {
-                el.style.transform = 'translateY(calc(-50% + ' + currentQrOffsetY + 'px))';
-            });
-        }
-
         function changeQrPosition(pos) {
             document.querySelectorAll('.cert-qr-corner').forEach(function(el) {
                 if (pos === 'hide') {
@@ -705,7 +684,6 @@ $thnNow = date('Y');
                         el.classList.remove('top-left');
                         el.classList.add('top-right');
                     }
-                    el.style.transform = 'translateY(calc(-50% + ' + currentQrOffsetY + 'px))';
                 }
             });
         }
