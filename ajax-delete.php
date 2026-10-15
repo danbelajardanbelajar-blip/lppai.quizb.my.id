@@ -36,6 +36,7 @@ try {
         'tutorial_registrations' => 'id',
         'master_gelombang'       => 'id',
         'surat_inventaris'       => 'id',
+        'pengambilan_sertifikat' => 'id',
     ];
 
     $table = trim($_POST['table'] ?? '');

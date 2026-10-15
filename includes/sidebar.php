@@ -107,6 +107,9 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Administrasi</div>
+            <a href="<?= BASE_URL ?>/admin/pengambilan-sertifikat.php" class="page-nav <?= menuActive('pengambilan-sertifikat.php') ?>">
+                <span class="icon">🎓</span> Pengambilan Sertifikat
+            </a>
             <a href="<?= BASE_URL ?>/admin/inventaris-surat.php" class="page-nav <?= menuActive('inventaris-surat.php') ?>">
                 <span class="icon">📑</span> Inventaris Surat
             </a>

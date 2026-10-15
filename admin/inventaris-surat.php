@@ -396,7 +396,8 @@ $kategoriList = [
 $sifatList = ['Biasa', 'Penting', 'Segera', 'Rahasia'];
 $statusList = ['Arsip', 'Disposisi', 'Proses', 'Selesai'];
 
-define('EXTRA_HEAD', '
+include __DIR__ . '/../includes/header.php';
+?>
 <style>
     .surat-stat-grid {
         display: grid;
@@ -534,9 +535,6 @@ define('EXTRA_HEAD', '
     .detail-table th { width: 32%; background: #f8fafc; font-weight: 600; color: #475569; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
     .detail-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
 </style>
-');
-
-include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- Header Halaman & Aksi Cepat -->

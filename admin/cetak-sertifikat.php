@@ -449,6 +449,15 @@ $thnNow = date('Y');
                 <label>Sampai Urutan Ke:</label>
                 <input type="number" name="end" class="form-control" value="<?= $_GET['end'] ?? (count($students) > 0 ? count($students) : 10) ?>" min="1" required>
             </div>
+            
+            <div class="form-group" style="margin-top:10px;">
+                <label>Tampilan Kotak Tengah:</label>
+                <select id="selectCenterBox" class="form-control" onchange="toggleCenterBox(this.value)">
+                    <option value="qr" selected>🔳 QR Code Validasi & Pengambilan</option>
+                    <option value="photo">🖼️ Kotak Foto 3x4</option>
+                    <option value="both">🔳🖼️ Keduanya (QR & Foto)</option>
+                </select>
+            </div>
         </form>
 
         <button class="btn btn-success" onclick="window.print()">Cetak Ke Printer / PDF</button>
@@ -560,8 +569,16 @@ $thnNow = date('Y');
                         <!-- Predikat dipindahkan ke atas -->
                     </div>
 
-                    <div class="photo-container">
-                        <div class="photo-box">
+                    <div class="photo-container" style="flex-direction: column; align-items: center; justify-content: flex-end;">
+                        <!-- Kotak QR Code -->
+                        <div class="qr-code-box" style="text-align: center;">
+                            <div id="qrcode_cert_<?= $data['reg_id'] ?>" style="display: inline-block; background: #fff; padding: 3px; border: 1px solid #94a3b8; border-radius: 4px;"></div>
+                            <div style="font-family: 'Poppins', sans-serif; font-size: 8px; color: #475569; font-weight: 600; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px;">
+                                Validasi & Ambil
+                            </div>
+                        </div>
+                        <!-- Kotak Foto 3x4 (Bisa disembunyikan/ditampilkan) -->
+                        <div class="photo-box" style="display: none;">
                             Foto 3x4
                         </div>
                     </div>
@@ -586,5 +603,43 @@ $thnNow = date('Y');
     </div>
     <?php endforeach; ?>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        // Inisialisasi QR Code untuk setiap lembar sertifikat
+        <?php foreach ($students as $st): ?>
+            <?php 
+                $noSert = !empty($st['nomor_sertifikat']) ? $st['nomor_sertifikat'] : 'UNLOCKED-' . $st['reg_id'];
+                $qrUrl = BASE_URL . '/admin/pengambilan-sertifikat.php?code=' . urlencode($noSert);
+            ?>
+            try {
+                var el = document.getElementById("qrcode_cert_<?= $st['reg_id'] ?>");
+                if (el) {
+                    new QRCode(el, {
+                        text: <?= json_encode($qrUrl) ?>,
+                        width: 76,
+                        height: 76,
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                }
+            } catch(e) {}
+        <?php endforeach; ?>
+
+        function toggleCenterBox(mode) {
+            document.querySelectorAll('.photo-container').forEach(function(c) {
+                var qrBox = c.querySelector('.qr-code-box');
+                var photoBox = c.querySelector('.photo-box');
+                if (mode === 'qr') {
+                    if (qrBox) qrBox.style.display = 'block';
+                    if (photoBox) photoBox.style.display = 'none';
+                } else if (mode === 'photo') {
+                    if (qrBox) qrBox.style.display = 'none';
+                    if (photoBox) photoBox.style.display = 'flex';
+                } else if (mode === 'both') {
+                    if (qrBox) qrBox.style.display = 'block';
+                    if (photoBox) photoBox.style.display = 'flex';
+                }
+            });
+        }
+    </script>
 </body>
 </html>
