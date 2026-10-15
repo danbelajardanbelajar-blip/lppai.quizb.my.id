@@ -714,15 +714,7 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($suratList)): ?>
-                        <tr>
-                            <td colspan="9" style="text-align:center; padding:36px; color:#94a3b8;">
-                                <div style="font-size:36px; margin-bottom:8px;">📭</div>
-                                <strong>Tidak ada data surat yang ditemukan.</strong><br>
-                                <span style="font-size:12.5px;">Silakan klik tombol "➕ Catat Surat Baru" untuk menambahkan surat ke dalam inventaris.</span>
-                            </td>
-                        </tr>
-                    <?php else: ?>
+                    <?php if (!empty($suratList)): ?>
                         <?php $no = 1; foreach ($suratList as $s): ?>
                         <tr>
                             <td style="text-align:center; color:#64748b;"><?= $no++ ?></td>
@@ -1143,7 +1135,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div style="overflow-x:auto;">
-            <table class="table detail-table" style="width:100%; font-size:13.5px; border-collapse:collapse;">
+            <table class="table detail-table no-datatable" style="width:100%; font-size:13.5px; border-collapse:collapse;">
                 <tbody>
                     <tr>
                         <th>Nomor Surat</th>

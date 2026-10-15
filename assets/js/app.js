@@ -197,6 +197,10 @@ function initAllTables(scope) {
     if (!isDataTablesReady()) return;
 
     var $ = window.jQuery;
+    if ($.fn && $.fn.dataTable && $.fn.dataTable.ext) {
+        $.fn.dataTable.ext.errMode = 'none';
+    }
+
     var root = scope || document;
     var tables = root.querySelectorAll('table');
 
