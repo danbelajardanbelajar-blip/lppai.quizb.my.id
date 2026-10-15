@@ -571,76 +571,74 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Banner Info: Scanner Kamera dipindahkan ke Mahasiswa -->
+<div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 14px;">
+    <span style="font-size: 26px;">ℹ️</span>
+    <div style="font-size: 13.5px; color: #1e40af; line-height: 1.5;">
+        <strong>Fitur Scanner Kamera Aktif di Sisi Mahasiswa:</strong><br>
+        Pemindaian kamera utama dilakukan langsung oleh <strong>Mahasiswa</strong> melalui menu <em>"Scan Pengambilan Sertifikat"</em> pada akun mahasiswa mereka saat menerima sertifikat fisik. Halaman Admin ini difokuskan untuk <strong>Monitoring Data, Rekapitulasi, Ekspor Laporan, Cetak Tanda Terima, dan Pelayanan Manual Loket</strong>.
+    </div>
+</div>
+
 <!-- ── Navigasi Tab ─────────────────────────────────────────── -->
 <div class="nav-tabs-sertifikat">
-    <div class="nav-tab-item active" id="tab_btn_scanner" onclick="switchTab('scanner')">
-        <span>📷</span> Scan QR / Input Cepat
-    </div>
-    <div class="nav-tab-item" id="tab_btn_data" onclick="switchTab('data')">
+    <div class="nav-tab-item active" id="tab_btn_data" onclick="switchTab('data')">
         <span>📋</span> Data Seluruh Sertifikat (<?= $statTotalSertifikat ?>)
     </div>
     <div class="nav-tab-item" id="tab_btn_logs" onclick="switchTab('logs')">
         <span>📜</span> Riwayat Penyerahan Terakhir
     </div>
+    <div class="nav-tab-item" id="tab_btn_scanner" onclick="switchTab('scanner')">
+        <span>⌨️</span> Pencatatan Manual / Bantuan Loket TU
+    </div>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════
-     TAB 1: SCANNER QR & INPUT CEPAT
+     TAB 3: PENCATATAN MANUAL / BANTUAN LOKET TU (TANPA KAMERA)
      ══════════════════════════════════════════════════════════════ -->
-<div id="tab_content_scanner">
+<div id="tab_content_scanner" style="display:none;">
     <div class="scanner-view-grid">
-        <!-- Kolom Kiri: Kamera Scanner & Input Scanner Gun -->
+        <!-- Kolom Kiri: Input Manual / Barcode Scanner Gun -->
         <div class="scanner-camera-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h4 style="margin:0; font-size:15px; color:#1e293b; display:flex; align-items:center; gap:8px;">
-                    <span>📷</span> Kamera Scanner QR
-                </h4>
-                <div style="display:flex; gap:6px;">
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="toggleCamera()" id="btnToggleCam">
-                        🔄 Ganti Kamera
-                    </button>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="restartScanner()">
-                        ⚡ Muat Ulang
-                    </button>
-                </div>
-            </div>
+            <h4 style="margin:0 0 12px; font-size:15px; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                <span>⌨️</span> Input / Cari Data Sertifikat
+            </h4>
+            <p style="font-size:13px; color:#64748b; line-height:1.5; margin-bottom:16px;">
+                Gunakan kolom ini untuk membantu mahasiswa yang tidak membawa smartphone, atau jika Anda menggunakan alat pemindai fisik (USB Barcode Scanner Gun).
+            </p>
 
-            <!-- Area Kamera HTML5 QR Code -->
-            <div id="reader"></div>
-
-            <div style="margin-top:16px;">
-                <label class="toggle-auto-checkin">
-                    <input type="checkbox" id="autoCheckinToggle" checked style="width:18px; height:18px; cursor:pointer;">
-                    <span>⚡ Mode Rekam Otomatis (Sekali Scan Langsung Tercatat)</span>
-                </label>
-            </div>
-
-            <div style="margin-top:20px; border-top:1px solid #e2e8f0; padding-top:16px;">
+            <div style="margin-bottom:16px;">
                 <label style="font-weight:700; font-size:13px; color:#334155; display:block; margin-bottom:6px;">
-                    ⌨️ Atau Input / Tembak Barcode Scanner :
+                    Nomor Sertifikat atau NIM Mahasiswa :
                 </label>
                 <div style="display:flex; gap:8px;">
                     <input type="text" id="manualInput" class="manual-scan-input" 
-                           placeholder="Ketik / Scan Nomor Sertifikat atau NIM..." 
+                           placeholder="Ketik / Tembak Barcode Nomor Sertifikat atau NIM..." 
                            autocomplete="off">
-                    <button type="button" class="btn btn-primary" onclick="lookupManualCode()" style="padding:0 20px;">
+                    <button type="button" class="btn btn-primary" onclick="lookupManualCode()" style="padding:0 22px; font-weight:700;">
                         Cari
                     </button>
                 </div>
-                <small style="color:#64748b; font-size:12px; margin-top:5px; display:block;">
-                    💡 Dukungan penuh untuk USB Barcode/QR Scanner Gun (otomatis diproses saat enter).
+                <small style="color:#64748b; font-size:12px; margin-top:6px; display:block;">
+                    💡 Tekan <strong>Enter</strong> untuk langsung mencari.
                 </small>
+            </div>
+
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px;">
+                <label class="toggle-auto-checkin" style="margin:0; background:none; border:none; padding:0;">
+                    <input type="checkbox" id="autoCheckinToggle" style="width:18px; height:18px; cursor:pointer;">
+                    <span>⚡ Mode Rekam Otomatis Saat Ditemukan</span>
+                </label>
             </div>
         </div>
 
         <!-- Kolom Kanan: Kartu Hasil & Konfirmasi Penyerahan -->
         <div class="result-display-card" id="resultCard">
             <div id="stateEmpty" style="text-align:center; padding:40px 20px; color:#94a3b8;">
-                <div style="font-size:52px; margin-bottom:12px;">📷</div>
-                <h3 style="font-size:17px; color:#334155; margin-bottom:6px;">Siap Memindai Sertifikat</h3>
+                <div style="font-size:52px; margin-bottom:12px;">🔍</div>
+                <h3 style="font-size:17px; color:#334155; margin-bottom:6px;">Siap Memproses Sertifikat</h3>
                 <p style="font-size:13.5px; max-width:360px; margin:0 auto; line-height:1.5;">
-                    Arahkan kamera ke QR Code yang tercetak di sertifikat mahasiswa, atau ketik NIM/Nomor Sertifikat pada kolom pencarian.
-                </p>
+                    Ketik NIM atau Nomor Sertifikat pada kolom pencarian di sebelah kiri untuk menampilkan rincian dan mencatat penyerahan fisik.
             </div>
 
             <div id="stateLoading" style="display:none; text-align:center; padding:40px 20px;">
@@ -773,7 +771,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- ══════════════════════════════════════════════════════════════
      TAB 2: DATA SELURUH SERTIFIKAT & STATUS PENGAMBILAN
      ══════════════════════════════════════════════════════════════ -->
-<div id="tab_content_data" style="display:none;">
+<div id="tab_content_data">
     <!-- Panel Filter -->
     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:20px;">
         <form method="GET" action="pengambilan-sertifikat.php">
@@ -966,15 +964,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- Load Library Scanner QR -->
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
 <script>
 var csrfToken = '<?= csrfToken() ?>';
-var html5QrcodeScanner = null;
-var currentCameraFacing = "environment"; // default kamera belakang
-var isProcessingScan = false;
-var lastScannedCode = '';
 var audioCtx = null;
 
 // Sound Effects via Web Audio API
@@ -1015,59 +1006,6 @@ function playBeep(type) {
             osc.stop(audioCtx.currentTime + 0.25);
         }
     } catch (e) {}
-}
-
-// Inisialisasi Kamera Scanner
-function startScanner() {
-    var readerEl = document.getElementById('reader');
-    if (!readerEl) return;
-
-    if (html5QrcodeScanner) {
-        try { html5QrcodeScanner.clear(); } catch(e) {}
-    }
-
-    html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", 
-        { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-            showTorchButtonIfSupported: true
-        }, 
-        false
-    );
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-}
-
-function restartScanner() {
-    startScanner();
-    showToast('Kamera pemindai dimuat ulang.', 'info', 2000);
-}
-
-function toggleCamera() {
-    restartScanner();
-}
-
-// Callback saat QR Code terbaca
-function onScanSuccess(decodedText, decodedResult) {
-    if (isProcessingScan) return;
-    if (decodedText === lastScannedCode) return; // cegah scan berulang kode yang sama dalam hitungan detik
-
-    isProcessingScan = true;
-    lastScannedCode = decodedText;
-
-    // Lookup data ke server
-    processLookup(decodedText, 'Scan QR');
-
-    // Buka kunci debounce setelah 3 detik
-    setTimeout(function() {
-        isProcessingScan = false;
-        lastScannedCode = '';
-    }, 3000);
-}
-
-function onScanFailure(error) {
-    // abaikan kegagalan frame biasa
 }
 
 // Input manual atau Barcode Gun
@@ -1362,7 +1300,8 @@ function switchTab(tab) {
     if (tab === 'scanner') {
         document.getElementById('tab_btn_scanner').classList.add('active');
         document.getElementById('tab_content_scanner').style.display = 'block';
-        if (!html5QrcodeScanner) startScanner();
+        var mInput = document.getElementById('manualInput');
+        if (mInput) mInput.focus();
     } else if (tab === 'data') {
         document.getElementById('tab_btn_data').classList.add('active');
         document.getElementById('tab_content_data').style.display = 'block';
@@ -1387,14 +1326,12 @@ function checkUrlParamLookup() {
     } catch(e) {}
 }
 
-// Jalankan scanner dan cek parameter saat halaman siap
+// Cek parameter saat halaman siap
 document.addEventListener('DOMContentLoaded', function() {
-    startScanner();
     checkUrlParamLookup();
 });
 // Jalankan langsung juga untuk lingkungan SPA
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    startScanner();
     checkUrlParamLookup();
 }
 </script>

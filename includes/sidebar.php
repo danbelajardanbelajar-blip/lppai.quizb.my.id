@@ -163,6 +163,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/tutorial-pengumuman.php" class="page-nav <?= menuActive('tutorial-pengumuman.php') ?>">
                 <span class="icon">🎉</span> Kelulusan Tutorial
             </a>
+            <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="page-nav <?= menuActive('ambil-sertifikat.php') ?>">
+                <span class="icon">📷</span> Scan Pengambilan Sertifikat
+            </a>
             <div class="menu-label">Absensi</div>
             <div class="menu-item has-submenu">
                 <a href="#" class="page-nav submenu-toggle <?= (in_array($currentPage, ['absensi-tutorial.php', 'absensi-alkhidmah.php'])) ? 'active' : '' ?>">

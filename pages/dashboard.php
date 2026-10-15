@@ -176,7 +176,10 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= $reg['nilai_akhir'] ? number_format($reg['nilai_akhir'], 1) : '-' ?></td>
                         <td>
                             <?php if (!empty($reg['nomor_sertifikat'])): ?>
-                                <a href="<?= BASE_URL ?>/tutorial-pengumuman.php" class="btn btn-sm btn-success" style="padding: 4px 10px; font-weight: bold; text-decoration: none;">🎉 Lihat Pengumuman Kelulusan</a>
+                                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <a href="<?= BASE_URL ?>/tutorial-pengumuman.php" class="btn btn-sm btn-success" style="padding: 4px 10px; font-weight: bold; text-decoration: none;">🎉 Pengumuman</a>
+                                    <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-sm btn-primary" style="padding: 4px 10px; font-weight: bold; text-decoration: none;">📷 Scan Ambil Sertifikat</a>
+                                </div>
                             <?php else: ?>
                                 <span style="font-size: 12px; color: #888;">Belum tersedia</span>
                             <?php endif; ?>

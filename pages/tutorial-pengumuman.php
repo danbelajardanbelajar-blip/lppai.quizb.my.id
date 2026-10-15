@@ -113,8 +113,9 @@ include __DIR__ . '/../includes/header.php';
                 <?php endif; ?>
             </div>
             
-            <div style="text-align: center; margin-top: 30px;">
-                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-primary" style="padding: 10px 24px; font-size: 16px;">🏠 Kembali ke Dashboard</a>
+            <div style="text-align: center; margin-top: 30px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="padding: 10px 24px; font-size: 16px; background-color: #10b981; text-decoration: none;">📷 Scan Pengambilan Sertifikat</a>
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-primary" style="padding: 10px 24px; font-size: 16px; text-decoration: none;">🏠 Kembali ke Dashboard</a>
             </div>
         </div>
 
