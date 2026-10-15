@@ -46,6 +46,10 @@ try {
     try {
         $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tgl_sertifikat_diambil DATETIME NULL AFTER is_sertifikat_diambil");
     } catch (Exception $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE pengambilan_sertifikat MODIFY COLUMN metode_pengambilan VARCHAR(50) NOT NULL DEFAULT 'Scan QR'");
+    } catch (Exception $e) {}
 } catch (Exception $e) {
     // Ignore if table/columns exist
 }
@@ -521,6 +525,36 @@ include __DIR__ . '/../includes/header.php';
         color: #334155;
         cursor: pointer;
     }
+
+    /* Style Khusus Import Excel/CSV */
+    .import-dropzone {
+        border: 2px dashed #94a3b8;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 36px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        position: relative;
+    }
+    .import-dropzone:hover, .import-dropzone.dragover {
+        border-color: #1a5632;
+        background: #f0fdf4;
+    }
+    .import-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .import-stat-box {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
 </style>
 
 <!-- Header Judul -->
@@ -530,6 +564,9 @@ include __DIR__ . '/../includes/header.php';
         <p style="font-size:13.5px; color:#64748b; margin:0;">Pindai QR Code pada sertifikat fisik atau input NIM untuk mencatat penyerahan sertifikat secara instan.</p>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" onclick="switchTab('import')" class="btn btn-primary" style="width:auto; display:inline-flex; align-items:center; gap:6px;">
+            📥 Import Excel / CSV
+        </button>
         <a href="cetak-tanda-terima-sertifikat.php?mode=rekap" target="_blank" class="btn btn-secondary" style="width:auto;">
             🖨️ Cetak Berita Acara Rekap
         </a>
@@ -590,6 +627,9 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="nav-tab-item" id="tab_btn_scanner" onclick="switchTab('scanner')">
         <span>⌨️</span> Pencatatan Manual / Bantuan Loket TU
+    </div>
+    <div class="nav-tab-item" id="tab_btn_import" onclick="switchTab('import')">
+        <span>📥</span> Import Data Excel / CSV
     </div>
 </div>
 
@@ -964,6 +1004,174 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════
+     TAB 4: IMPORT DATA EXCEL / CSV PENGAMBILAN SERTIFIKAT
+     ══════════════════════════════════════════════════════════════ -->
+<div id="tab_content_import" style="display:none;">
+    <div style="display:grid; grid-template-columns: 1fr; gap:24px;">
+        
+        <!-- Kartu Utama Upload -->
+        <div class="card" style="box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; border-radius: 14px;">
+            <div class="card-header" style="background:#ffffff; border-bottom:1px solid #f1f5f9; padding:20px 24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                <div>
+                    <h3 style="margin:0 0 4px; font-size:17px; font-weight:800; color:#1a5632; display:flex; align-items:center; gap:8px;">
+                        <span>📥</span> Unggah File Excel / CSV Pengambilan Sertifikat
+                    </h3>
+                    <p style="margin:0; font-size:13px; color:#64748b;">
+                        Sinkronisasi massal data mahasiswa yang sudah menerima sertifikat fisik tanpa pemindaian manual satu per satu.
+                    </p>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <a href="download-template-pengambilan.php?format=xlsx" class="btn btn-sm btn-secondary" style="font-weight:600; padding:6px 14px; font-size:12.5px; border-color:#cbd5e1;">
+                        📗 Unduh Template Excel (.xlsx)
+                    </a>
+                    <a href="download-template-pengambilan.php?format=csv" class="btn btn-sm btn-secondary" style="font-weight:600; padding:6px 14px; font-size:12.5px; border-color:#cbd5e1;">
+                        📄 Unduh Template CSV (.csv)
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-body" style="padding:24px;">
+                <!-- Petunjuk Format Singkat -->
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px; margin-bottom:24px;">
+                    <h5 style="margin:0 0 8px; font-size:13.5px; font-weight:700; color:#1e293b;">💡 Format Kolom File yang Didukung:</h5>
+                    <ul style="margin:0; padding-left:20px; font-size:13px; color:#475569; line-height:1.6;">
+                        <li><strong>NIM</strong> <em>(Wajib jika nomor sertifikat kosong)</em>: Nomor Induk Mahasiswa peserta tutorial.</li>
+                        <li><strong>Nomor Sertifikat</strong> <em>(Sangat disarankan / Opsional jika ada NIM)</em>: Contoh <code>001/LPPAI/SERT/2026</code>.</li>
+                        <li><strong>Tanggal Pengambilan</strong> <em>(Opsional)</em>: Format <code>YYYY-MM-DD</code> atau <code>DD/MM/YYYY</code>. Jika dikosongkan, sistem memakai tanggal default yang dipilih di bawah.</li>
+                        <li><strong>Nama Penerima & Catatan</strong> <em>(Opsional)</em>: Keterangan tambahan penerima fisik sertifikat.</li>
+                    </ul>
+                </div>
+
+                <!-- Form Upload -->
+                <form id="formImportExcel" onsubmit="submitExcelImport(event)" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+
+                    <!-- Drag & Drop Area -->
+                    <div class="import-dropzone" id="importDropzone" onclick="document.getElementById('excelFileInput').click()">
+                        <input type="file" id="excelFileInput" name="excel_file" accept=".xlsx, .xls, .csv" style="display:none;" onchange="handleFileSelected(this)">
+                        <div id="dropzoneContent">
+                            <div style="font-size:48px; margin-bottom:10px;">📤</div>
+                            <h4 style="margin:0 0 6px; font-size:16px; font-weight:700; color:#1e293b;">
+                                Klik untuk memilih file, atau seret & jatuhkan file ke sini
+                            </h4>
+                            <p style="margin:0; font-size:13px; color:#64748b;">
+                                Mendukung format <strong>.xlsx</strong>, <strong>.xls</strong>, atau <strong>.csv</strong> (Maksimal 10 MB)
+                            </p>
+                        </div>
+
+                        <!-- Tampilan saat file sudah dipilih -->
+                        <div id="selectedFileInfo" style="display:none; text-align:center;">
+                            <div style="font-size:42px; margin-bottom:8px;">📊</div>
+                            <div id="selectedFileName" style="font-size:15px; font-weight:700; color:#1a5632; margin-bottom:4px;"></div>
+                            <div id="selectedFileSize" style="font-size:12.5px; color:#64748b; margin-bottom:12px;"></div>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); resetSelectedFile();" style="font-size:12px; padding:4px 12px;">
+                                ❌ Ganti File
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Opsi Pengaturan Default Tanggal -->
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px; margin-top:20px; align-items:center;">
+                        <div>
+                            <label style="font-size:13px; font-weight:700; color:#334155; display:block; margin-bottom:6px;">
+                                Tanggal Pengambilan Default (Jika di file kosong) :
+                            </label>
+                            <input type="date" name="default_date" id="importDefaultDate" value="<?= date('Y-m-d') ?>" class="form-control" style="border:1px solid #cbd5e1; border-radius:8px; padding:8px 12px; font-size:13.5px; width:100%;">
+                            <small style="color:#64748b; font-size:11.5px; margin-top:4px; display:block;">
+                                Digunakan bila baris data di file Excel tidak mencantumkan tanggal.
+                            </small>
+                        </div>
+
+                        <div style="text-align:right; margin-top:auto;">
+                            <button type="submit" id="btnSubmitImport" class="btn btn-primary" style="padding:10px 28px; font-size:14.5px; font-weight:700; border-radius:10px; width:100%; max-width:320px; display:inline-flex; align-items:center; justify-content:center; gap:8px;">
+                                <span>🚀</span> Proses & Simpan Data
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Loading State / Progress -->
+                <div id="importLoadingState" style="display:none; margin-top:24px; text-align:center; padding:30px 20px; background:#f8fafc; border-radius:12px; border:1px solid #e2e8f0;">
+                    <div style="font-size:38px; animation: spin 1s infinite linear; display:inline-block; margin-bottom:12px;">⏳</div>
+                    <h4 style="margin:0 0 6px; font-size:16px; font-weight:700; color:#1a5632;">Sedang Memproses Data Excel...</h4>
+                    <p style="margin:0; font-size:13px; color:#64748b; max-width:480px; margin:0 auto;">
+                        Sistem sedang memvalidasi NIM, mencocokkan nomor sertifikat, dan mencatat status penyerahan fisik ke database. Harap tidak menutup halaman.
+                    </p>
+                    <div style="width:100%; max-width:450px; background:#e2e8f0; height:8px; border-radius:6px; margin:16px auto 0; overflow:hidden;">
+                        <div style="width:100%; height:100%; background:#1a5632; animation: indeterminate 1.5s infinite linear;"></div>
+                    </div>
+                </div>
+
+                <!-- Hasil / Laporan Sinkronisasi Import -->
+                <div id="importResultBox" style="display:none; margin-top:28px;">
+                    <hr style="border:none; border-top:1px dashed #cbd5e1; margin-bottom:24px;">
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+                        <h4 style="margin:0; font-size:16px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span>📊</span> Laporan Hasil Import Pengambilan
+                        </h4>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="window.location.reload();">
+                                🔄 Refresh Halaman & Rekap
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="switchTab('data');">
+                                📋 Lihat Tabel Monitoring
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Statistik Ringkas Hasil -->
+                    <div class="import-stat-grid">
+                        <div class="import-stat-box" style="border-top:4px solid #3b82f6;">
+                            <div style="font-size:24px; font-weight:800; color:#1e293b;" id="resTotalProcessed">0</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase;">Total Baris Diproses</div>
+                        </div>
+                        <div class="import-stat-box" style="border-top:4px solid #16a34a;">
+                            <div style="font-size:24px; font-weight:800; color:#16a34a;" id="resCountSuccess">0</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase;">✅ Berhasil Dicatat</div>
+                        </div>
+                        <div class="import-stat-box" style="border-top:4px solid #ca8a04;">
+                            <div style="font-size:24px; font-weight:800; color:#ca8a04;" id="resCountSkipped">0</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase;">⚠️ Sudah Diambil (Dilewati)</div>
+                        </div>
+                        <div class="import-stat-box" style="border-top:4px solid #dc2626;">
+                            <div style="font-size:24px; font-weight:800; color:#dc2626;" id="resCountNotFound">0</div>
+                            <div style="font-size:12px; color:#64748b; font-weight:600; text-transform:uppercase;">❌ Tidak Ditemukan / Gagal</div>
+                        </div>
+                    </div>
+
+                    <!-- Tabel Detail Hasil Import -->
+                    <div style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+                        <div style="background:#f8fafc; padding:12px 18px; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:13.5px; color:#334155;">
+                            Rincian Baris Data Excel
+                        </div>
+                        <div style="max-height:400px; overflow-y:auto;">
+                            <table class="table" style="margin:0; font-size:13px;">
+                                <thead style="position:sticky; top:0; background:#f1f5f9; z-index:2;">
+                                    <tr>
+                                        <th style="width:60px; text-align:center;">Baris</th>
+                                        <th>NIM</th>
+                                        <th>Nama Mahasiswa</th>
+                                        <th>Nomor Sertifikat</th>
+                                        <th style="width:140px; text-align:center;">Status</th>
+                                        <th>Keterangan / Alasan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="importResultTableBody">
+                                    <!-- Diisi via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
 <script>
 var csrfToken = '<?= csrfToken() ?>';
 var audioCtx = null;
@@ -1292,10 +1500,14 @@ function switchTab(tab) {
     document.getElementById('tab_btn_scanner').classList.remove('active');
     document.getElementById('tab_btn_data').classList.remove('active');
     document.getElementById('tab_btn_logs').classList.remove('active');
+    var tabBtnImport = document.getElementById('tab_btn_import');
+    if (tabBtnImport) tabBtnImport.classList.remove('active');
 
     document.getElementById('tab_content_scanner').style.display = 'none';
     document.getElementById('tab_content_data').style.display = 'none';
     document.getElementById('tab_content_logs').style.display = 'none';
+    var tabContentImport = document.getElementById('tab_content_import');
+    if (tabContentImport) tabContentImport.style.display = 'none';
 
     if (tab === 'scanner') {
         document.getElementById('tab_btn_scanner').classList.add('active');
@@ -1308,7 +1520,152 @@ function switchTab(tab) {
     } else if (tab === 'logs') {
         document.getElementById('tab_btn_logs').classList.add('active');
         document.getElementById('tab_content_logs').style.display = 'block';
+    } else if (tab === 'import') {
+        if (tabBtnImport) tabBtnImport.classList.add('active');
+        if (tabContentImport) tabContentImport.style.display = 'block';
     }
+}
+
+// ── LOGIKA KHUSUS IMPORT EXCEL / CSV ──
+function initImportDropzone() {
+    var dropzone = document.getElementById('importDropzone');
+    var fileInput = document.getElementById('excelFileInput');
+
+    if (!dropzone || !fileInput) return;
+
+    ['dragenter', 'dragover'].forEach(function(eventName) {
+        dropzone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('dragover');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(function(eventName) {
+        dropzone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        }, false);
+    });
+
+    dropzone.addEventListener('drop', function(e) {
+        var dt = e.dataTransfer;
+        var files = dt.files;
+        if (files.length) {
+            fileInput.files = files;
+            handleFileSelected(fileInput);
+        }
+    }, false);
+}
+
+function handleFileSelected(input) {
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        document.getElementById('dropzoneContent').style.display = 'none';
+        var info = document.getElementById('selectedFileInfo');
+        info.style.display = 'block';
+        document.getElementById('selectedFileName').textContent = file.name;
+        var sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        document.getElementById('selectedFileSize').textContent = sizeMB + ' MB (' + file.size.toLocaleString() + ' bytes)';
+    }
+}
+
+function resetSelectedFile() {
+    var fileInput = document.getElementById('excelFileInput');
+    if (fileInput) fileInput.value = '';
+    document.getElementById('selectedFileInfo').style.display = 'none';
+    document.getElementById('dropzoneContent').style.display = 'block';
+}
+
+function submitExcelImport(e) {
+    e.preventDefault();
+    var fileInput = document.getElementById('excelFileInput');
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+        showToast('Pilih file Excel (.xlsx, .xls) atau CSV (.csv) terlebih dahulu.', 'warning', 3000);
+        return;
+    }
+
+    var btn = document.getElementById('btnSubmitImport');
+    var loading = document.getElementById('importLoadingState');
+    var resultBox = document.getElementById('importResultBox');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Memproses Data...';
+    loading.style.display = 'block';
+    resultBox.style.display = 'none';
+
+    var formData = new FormData(document.getElementById('formImportExcel'));
+
+    fetch('ajax-import-pengambilan.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(res) {
+        return res.json();
+    })
+    .then(function(data) {
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> Proses & Simpan Data';
+
+        if (!data.success) {
+            playBeep('error');
+            showToast(data.message || 'Gagal memproses file.', 'error', 5000);
+            return;
+        }
+
+        playBeep('success');
+        showToast(data.message, 'success', 5000);
+
+        // Update Counter
+        document.getElementById('resTotalProcessed').textContent = data.total_processed || 0;
+        document.getElementById('resCountSuccess').textContent = data.count_success || 0;
+        document.getElementById('resCountSkipped').textContent = data.count_skipped || 0;
+        document.getElementById('resCountNotFound').textContent = data.count_not_found || 0;
+
+        // Render Table Rows
+        var tbody = document.getElementById('importResultTableBody');
+        tbody.innerHTML = '';
+
+        if (data.results && data.results.length) {
+            data.results.forEach(function(item) {
+                var tr = document.createElement('tr');
+                var badgeStyle = 'background:#e2e8f0; color:#475569;';
+                if (item.status_badge === 'success') {
+                    badgeStyle = 'background:#dcfce7; color:#15803d; font-weight:700;';
+                } else if (item.status_badge === 'warning') {
+                    badgeStyle = 'background:#fef9c3; color:#a16207; font-weight:700;';
+                } else if (item.status_badge === 'danger') {
+                    badgeStyle = 'background:#fee2e2; color:#b91c1c; font-weight:700;';
+                }
+
+                tr.innerHTML = `
+                    <td style="text-align:center; color:#64748b;">${item.row}</td>
+                    <td style="font-weight:700; font-family:monospace;">${escapeHtml(item.nim)}</td>
+                    <td>${escapeHtml(item.nama)}</td>
+                    <td><span style="font-family:monospace; color:#1a5632;">${escapeHtml(item.nomor_sertifikat)}</span></td>
+                    <td style="text-align:center;">
+                        <span class="badge" style="padding:4px 10px; border-radius:6px; font-size:11.5px; ${badgeStyle}">
+                            ${escapeHtml(item.status_text)}
+                        </span>
+                    </td>
+                    <td style="font-size:12px; color:#475569;">${escapeHtml(item.message)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        resultBox.style.display = 'block';
+        resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    })
+    .catch(function(err) {
+        loading.style.display = 'none';
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span> Proses & Simpan Data';
+        playBeep('error');
+        showToast('Terjadi kesalahan jaringan atau server: ' + err.message, 'error', 5000);
+    });
 }
 
 function checkUrlParamLookup() {
@@ -1326,13 +1683,15 @@ function checkUrlParamLookup() {
     } catch(e) {}
 }
 
-// Cek parameter saat halaman siap
+// Inisialisasi saat halaman siap
 document.addEventListener('DOMContentLoaded', function() {
     checkUrlParamLookup();
+    initImportDropzone();
 });
 // Jalankan langsung juga untuk lingkungan SPA
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     checkUrlParamLookup();
+    initImportDropzone();
 }
 </script>
 
