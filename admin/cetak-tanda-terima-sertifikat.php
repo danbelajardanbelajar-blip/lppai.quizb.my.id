@@ -3,25 +3,49 @@
  * LPPAI Corner - Cetak Tanda Terima & Berita Acara Pengambilan Sertifikat
  */
 require_once __DIR__ . '/../includes/auth.php';
-requireAdmin();
+requireLogin();
 
 $pdo = getDBConnection();
 $mode = $_GET['mode'] ?? 'single';
 $id   = (int)($_GET['id'] ?? 0);
+$noSert = trim($_GET['no'] ?? '');
+
+if (!isAdmin() && $mode !== 'single' && $id == 0 && empty($noSert)) {
+    header('Location: ' . BASE_URL . '/dashboard.php');
+    exit;
+}
 
 // ── MODE 1: TANDA TERIMA TUNGGAL (SLIP SERAH TERIMA) ─────────────
-if ($mode === 'single' || $id > 0) {
-    $stmt = $pdo->prepare("
-        SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp
-        FROM pengambilan_sertifikat ps
-        LEFT JOIN users u ON ps.nim = u.nim
-        WHERE ps.id = ?
-    ");
-    $stmt->execute([$id]);
+if ($mode === 'single' || $id > 0 || !empty($noSert)) {
+    if ($id > 0) {
+        $stmt = $pdo->prepare("
+            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp
+            FROM pengambilan_sertifikat ps
+            LEFT JOIN users u ON ps.nim = u.nim
+            WHERE ps.id = ?
+        ");
+        $stmt->execute([$id]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp
+            FROM pengambilan_sertifikat ps
+            LEFT JOIN users u ON ps.nim = u.nim
+            WHERE ps.nomor_sertifikat = ?
+            ORDER BY ps.id DESC LIMIT 1
+        ");
+        $stmt->execute([$noSert]);
+    }
     $data = $stmt->fetch();
 
     if (!$data) {
         die("Data tanda terima penyerahan sertifikat tidak ditemukan.");
+    }
+
+    if (!isAdmin()) {
+        $currentUser = getCurrentUser();
+        if ($data['nim'] !== $currentUser['nim']) {
+            die("Akses ditolak. Anda hanya berhak melihat tanda terima milik Anda sendiri.");
+        }
     }
     ?>
     <!DOCTYPE html>

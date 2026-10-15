@@ -382,15 +382,6 @@ $thnNow = date('Y');
             display: block;
             margin: 0 auto;
         }
-        .cert-qr-corner .qr-label {
-            font-family: 'Poppins', sans-serif;
-            font-size: 7.5px;
-            color: #475569;
-            font-weight: 600;
-            margin-top: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
         .grades-table {
             width: 100%;
             border-collapse: collapse;
@@ -563,7 +554,6 @@ $thnNow = date('Y');
                 <!-- QR Code di Pojok Atas (Kanan Atas / Kiri Atas) -->
                 <div class="cert-qr-corner top-right" id="qrCorner_<?= $data['reg_id'] ?>">
                     <div id="qrcode_cert_<?= $data['reg_id'] ?>"></div>
-                    <div class="qr-label">Validasi / Ambil</div>
                 </div>
 
                 <div class="cert-title">Sertifikat Kelulusan</div>
@@ -654,15 +644,15 @@ $thnNow = date('Y');
         <?php foreach ($students as $st): ?>
             <?php 
                 $noSert = !empty($st['nomor_sertifikat']) ? $st['nomor_sertifikat'] : 'UNLOCKED-' . $st['reg_id'];
-                $qrUrl = BASE_URL . '/admin/pengambilan-sertifikat.php?code=' . urlencode($noSert);
+                $qrUrl = BASE_URL . '/sertifikat.php?no=' . urlencode($noSert);
             ?>
             try {
                 var el = document.getElementById("qrcode_cert_<?= $st['reg_id'] ?>");
                 if (el) {
                     new QRCode(el, {
                         text: <?= json_encode($qrUrl) ?>,
-                        width: 68,
-                        height: 68,
+                        width: 70,
+                        height: 70,
                         correctLevel: QRCode.CorrectLevel.M
                     });
                 }

@@ -1372,13 +1372,30 @@ function switchTab(tab) {
     }
 }
 
-// Jalankan scanner saat halaman siap
+function checkUrlParamLookup() {
+    try {
+        var uParams = new URLSearchParams(window.location.search);
+        var uCode = uParams.get('code') || uParams.get('no') || uParams.get('nim');
+        if (uCode) {
+            var inputEl = document.getElementById('manualInput');
+            if (inputEl) {
+                inputEl.value = uCode;
+                switchTab('scanner');
+                lookupManualCode();
+            }
+        }
+    } catch(e) {}
+}
+
+// Jalankan scanner dan cek parameter saat halaman siap
 document.addEventListener('DOMContentLoaded', function() {
     startScanner();
+    checkUrlParamLookup();
 });
 // Jalankan langsung juga untuk lingkungan SPA
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     startScanner();
+    checkUrlParamLookup();
 }
 </script>
 

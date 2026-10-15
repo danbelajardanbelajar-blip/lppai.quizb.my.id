@@ -4,8 +4,21 @@
  */
 require_once __DIR__ . '/includes/auth.php';
 
+$redirectParam = $_GET['redirect'] ?? $_POST['redirect'] ?? '';
+$safeRedirect = '';
+if (!empty($redirectParam)) {
+    $parsed = parse_url($redirectParam);
+    if (!isset($parsed['host']) && !isset($parsed['scheme']) && substr($redirectParam, 0, 2) !== '//') {
+        $safeRedirect = ltrim($redirectParam, '/');
+    }
+}
+
 // Redirect if already logged in
 if (isLoggedIn()) {
+    if (!empty($safeRedirect)) {
+        header('Location: ' . BASE_URL . '/' . $safeRedirect);
+        exit;
+    }
     if (isAdmin()) {
         header('Location: ' . BASE_URL . '/admin/dashboard.php');
     } elseif (isDosen()) {
@@ -32,6 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($username) || empty($password)) {
         $error = 'Username dan password harus diisi.';
     } elseif (loginUser($username, $password)) {
+        if (!empty($safeRedirect)) {
+            header('Location: ' . BASE_URL . '/' . $safeRedirect);
+            exit;
+        }
         if (isAdmin()) {
             header('Location: ' . BASE_URL . '/admin/dashboard.php');
         } elseif (isDosen()) {
@@ -72,6 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" action="">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <?php if (!empty($safeRedirect)): ?>
+                <input type="hidden" name="redirect" value="<?= sanitize($safeRedirect) ?>">
+            <?php endif; ?>
 
             <div class="form-group">
                 <label for="username">Username</label>
