@@ -280,12 +280,22 @@ $thnNow = date('Y');
             color: #475569;
         }
 
+        .cert-title-container {
+            position: relative;
+            margin: 0 0 5px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .cert-title {
             font-family: 'Pinyon Script', cursive;
             font-size: 52px;
             color: #b45309;
-            margin: 0 0 5px;
+            margin: 0;
+            line-height: 1.1;
             letter-spacing: 1px;
+            text-align: center;
         }
         .cert-number {
             font-family: 'Poppins', sans-serif;
@@ -359,8 +369,9 @@ $thnNow = date('Y');
         }
         .cert-qr-corner {
             position: absolute;
-            top: 25px;
-            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 20px;
             text-align: center;
             background: #ffffff;
             padding: 5px;
@@ -372,11 +383,11 @@ $thnNow = date('Y');
         }
         .cert-qr-corner.top-left {
             right: auto;
-            left: 35px;
+            left: 20px;
         }
         .cert-qr-corner.top-right {
             left: auto;
-            right: 35px;
+            right: 20px;
         }
         .cert-qr-corner img, .cert-qr-corner canvas {
             display: block;
@@ -483,10 +494,21 @@ $thnNow = date('Y');
             <div class="form-group" style="margin-top:10px;">
                 <label>Posisi QR Code:</label>
                 <select id="selectQrPosition" class="form-control" onchange="changeQrPosition(this.value)">
-                    <option value="top-right" selected>Pojok Kanan Atas (Default)</option>
-                    <option value="top-left">Pojok Kiri Atas</option>
+                    <option value="top-right" selected>Kanan (Sejajar "Sertifikat Kelulusan")</option>
+                    <option value="top-left">Kiri (Sejajar "Sertifikat Kelulusan")</option>
                     <option value="hide">Sembunyikan QR Code</option>
                 </select>
+            </div>
+            
+            <div class="form-group" style="margin-top:10px;">
+                <label>Geser Presisi Vertikal QR (Atas / Bawah):</label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="range" id="qrOffsetY" min="-40" max="40" value="0" step="1" class="form-control" style="padding:0; flex:1;" oninput="adjustQrOffsetY(this.value)">
+                    <span id="qrOffsetYVal" style="font-size:12px; font-weight:700; width:45px; text-align:right;">0 px</span>
+                </div>
+                <small style="color:#64748b; font-size:11px; display:block; margin-top:3px;">
+                    Geser bila perlu penyesuaian milimeter terhadap kertas cetak fisik.
+                </small>
             </div>
             
             <div class="form-group" style="margin-top:10px;">
@@ -551,12 +573,13 @@ $thnNow = date('Y');
                 
 
 
-                <!-- QR Code di Pojok Atas (Kanan Atas / Kiri Atas) -->
-                <div class="cert-qr-corner top-right" id="qrCorner_<?= $data['reg_id'] ?>">
-                    <div id="qrcode_cert_<?= $data['reg_id'] ?>"></div>
+                <!-- Judul Sertifikat & QR Code Lurus Sejajar Judul -->
+                <div class="cert-title-container">
+                    <div class="cert-title">Sertifikat Kelulusan</div>
+                    <div class="cert-qr-corner top-right" id="qrCorner_<?= $data['reg_id'] ?>">
+                        <div id="qrcode_cert_<?= $data['reg_id'] ?>"></div>
+                    </div>
                 </div>
-
-                <div class="cert-title">Sertifikat Kelulusan</div>
                 <div class="cert-number"><?= htmlspecialchars($nomorSertifikat) ?></div>
 
                 <div class="cert-body">
@@ -659,6 +682,16 @@ $thnNow = date('Y');
             } catch(e) {}
         <?php endforeach; ?>
 
+        var currentQrOffsetY = 0;
+
+        function adjustQrOffsetY(val) {
+            currentQrOffsetY = parseInt(val) || 0;
+            document.getElementById('qrOffsetYVal').textContent = (currentQrOffsetY > 0 ? '+' : '') + currentQrOffsetY + ' px';
+            document.querySelectorAll('.cert-qr-corner').forEach(function(el) {
+                el.style.transform = 'translateY(calc(-50% + ' + currentQrOffsetY + 'px))';
+            });
+        }
+
         function changeQrPosition(pos) {
             document.querySelectorAll('.cert-qr-corner').forEach(function(el) {
                 if (pos === 'hide') {
@@ -672,6 +705,7 @@ $thnNow = date('Y');
                         el.classList.remove('top-left');
                         el.classList.add('top-right');
                     }
+                    el.style.transform = 'translateY(calc(-50% + ' + currentQrOffsetY + 'px))';
                 }
             });
         }
