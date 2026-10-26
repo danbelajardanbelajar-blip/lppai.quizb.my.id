@@ -65,12 +65,68 @@ if (!$active_pretes) {
 $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
 $roomsList  = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
 
-function parsePengujiList($pengujiStr) {
-    if (empty($pengujiStr)) return [];
+function parsePengujiList($pengujiStr, $tutorsList = []) {
+    if (empty($pengujiStr) || trim($pengujiStr) === '') return [];
+    $pengujiStr = trim($pengujiStr);
+
+    // 1. Jika sudah ada delimiter |||, pecah berdasarkan |||
     if (strpos($pengujiStr, '|||') !== false) {
-        return array_values(array_filter(array_map('trim', explode('|||', $pengujiStr))));
+        return array_values(array_filter(array_map('trim', explode('|||', $pengujiStr)), fn($v) => $v !== ''));
     }
-    return array_values(array_filter(array_map('trim', explode(',', $pengujiStr))));
+
+    // Normalisasi string pembantu
+    $norm = function($str) {
+        $str = mb_strtolower($str, 'UTF-8');
+        $str = preg_replace('/[`\'’‘]/u', "'", $str);
+        $str = preg_replace('/\s+/', ' ', $str);
+        return trim($str);
+    };
+
+    $pNorm = $norm($pengujiStr);
+
+    if (!empty($tutorsList)) {
+        // Cek kecocokan langsung dengan nama lengkap dosen
+        foreach ($tutorsList as $t) {
+            if ($norm($t['nama']) === $pNorm) {
+                return [trim($t['nama'])];
+            }
+        }
+
+        // Cek apakah string mengandung satu atau lebih nama dosen lengkap (urut dari nama terpanjang)
+        $sortedTutors = $tutorsList;
+        usort($sortedTutors, fn($a, $b) => strlen($b['nama']) - strlen($a['nama']));
+
+        $tempStr = $pNorm;
+        $matched = [];
+        foreach ($sortedTutors as $t) {
+            $tNorm = $norm($t['nama']);
+            if ($tNorm === '') continue;
+            if (($pos = mb_strpos($tempStr, $tNorm)) !== false) {
+                $matched[$pos] = $t['nama'];
+                $tempStr = substr_replace($tempStr, str_repeat('#', strlen($tNorm)), $pos, strlen($tNorm));
+            }
+        }
+        if (!empty($matched)) {
+            ksort($matched);
+            return array_values($matched);
+        }
+
+        // Cek kecocokan nama dasar sebelum koma (sebelum gelar)
+        foreach ($sortedTutors as $t) {
+            $baseName = trim(explode(',', $norm($t['nama']))[0]);
+            if (strlen($baseName) >= 4 && ($pos = mb_strpos($tempStr, $baseName)) !== false) {
+                $matched[$pos] = $t['nama'];
+                $tempStr = substr_replace($tempStr, str_repeat('#', strlen($baseName)), $pos, strlen($baseName));
+            }
+        }
+        if (!empty($matched)) {
+            ksort($matched);
+            return array_values($matched);
+        }
+    }
+
+    // JANGAN pecah koma karena koma memisahkan gelar akademis (seperti S. Fil. I., M.E.I, M.Phil)
+    return [$pengujiStr];
 }
 
 // Helper pencocokan cerdas nama penguji (kebal perbedaan gelar, spasi, dan tanda petik)
@@ -170,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     foreach ($days as $day) {
                         $dayLower = strtolower($day);
                         $pengujiStr = $active_pretes["penguji_$dayLower"] ?? '';
-                        $pengujiList = parsePengujiList($pengujiStr);
+                        $pengujiList = parsePengujiList($pengujiStr, $tutorsList);
 
                         if (empty($pengujiList)) {
                             continue; // Skip jika hari ini belum ada penguji yang diset
@@ -373,7 +429,7 @@ include __DIR__ . '/../includes/header.php';
                 foreach ($days as $day):
                     $dayLower = strtolower($day);
                     $pengujiStr = $active_pretes["penguji_$dayLower"] ?? '';
-                    $currentPenguji = parsePengujiList($pengujiStr);
+                    $currentPenguji = parsePengujiList($pengujiStr, $tutorsList);
                     
                     $totalKuota = (int)($active_pretes["kuota_$dayLower"] ?? 0);
                     $terisi = $registeredCounts[$day] ?? 0;

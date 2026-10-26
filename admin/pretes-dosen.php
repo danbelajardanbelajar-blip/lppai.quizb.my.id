@@ -679,18 +679,33 @@ window.populatePenguji = function(day, pengujiStr, kuotaVal) {
         if (pengujiStr.indexOf('|||') !== -1) {
             pengujiList = pengujiStr.split('|||');
         } else {
-            // Cek apakah string langsung cocok dengan salah satu dosen (hindari memecah koma pada gelar)
+            // Cek apakah string cocok dengan salah satu dosen (hindari memecah koma pada gelar akademis)
             let directMatch = false;
+            const norm = s => (s || '').toLowerCase().replace(/[`'’‘]/g, "'").replace(/\s+/g, ' ').trim();
+            const pNorm = norm(pengujiStr);
             for (let opt of firstSelect.options) {
-                if (opt.value && opt.value.trim().toLowerCase() === pengujiStr.trim().toLowerCase()) {
+                if (opt.value && norm(opt.value) === pNorm) {
                     directMatch = true;
+                    pengujiList = [opt.value];
                     break;
                 }
             }
-            if (directMatch) {
+            if (!directMatch) {
+                // Cek nama dasar sebelum koma
+                for (let opt of firstSelect.options) {
+                    if (opt.value) {
+                        const optBase = norm(opt.value).split(',')[0].trim();
+                        const pBase = pNorm.split(',')[0].trim();
+                        if (optBase.length >= 4 && (optBase === pBase || optBase.includes(pBase) || pBase.includes(optBase))) {
+                            directMatch = true;
+                            pengujiList = [opt.value];
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!directMatch) {
                 pengujiList = [pengujiStr.trim()];
-            } else {
-                pengujiList = pengujiStr.split(',');
             }
         }
     }
