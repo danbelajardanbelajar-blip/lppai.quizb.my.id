@@ -47,8 +47,15 @@ foreach ($allAnnouncements as $ann) {
     $tipe = $ann['tipe'];
     
     // 1. Jika sudah lulus, jangan tampilkan pengumuman pendaftaran tutorial
-    if ($isLulusTutorial && strpos($tipe, 'pendaftaran_') === 0) {
+    if ($isLulusTutorial && strpos($tipe, 'pendaftaran_') === 0 && $tipe !== 'pendaftaran_pretes') {
         continue;
+    }
+    
+    // 1b. Sembunyikan pengumuman pendaftaran pretes jika mahasiswa sudah terdaftar pretes atau sudah lulus pretes
+    if ($tipe === 'pendaftaran_pretes') {
+        if ($pretesRegistered > 0 || ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus')) {
+            continue;
+        }
     }
     
     // 2. Jika sudah terdaftar di gelombang tertentu, jangan tampilkan pengumuman pendaftarannya

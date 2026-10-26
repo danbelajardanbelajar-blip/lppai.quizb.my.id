@@ -8,9 +8,12 @@ requireAdmin();
 
 $pdo = getDBConnection();
 
-// Auto add link_tujuan column if not exists
+// Auto add link_tujuan column if not exists & ensure tipe is VARCHAR so it supports pretest
 try {
     $pdo->exec("ALTER TABLE announcements ADD COLUMN link_tujuan VARCHAR(255) DEFAULT NULL AFTER konten");
+} catch (Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE announcements MODIFY COLUMN tipe VARCHAR(50) NOT NULL");
 } catch (Exception $e) {}
 
 $user = getCurrentUser();
@@ -18,6 +21,8 @@ $message = '';
 $msgType = '';
 
 $tipeOptions = [
+    'pendaftaran_pretes'     => 'Pendaftaran Pretes',
+    'hasil_pretes'           => 'Pengumuman Hasil Pretes',
     'pendaftaran_gel1'       => 'Pendaftaran Tutorial Gel. 1 (Ganjil)',
     'pembagian_kelas_gel1'   => 'Pembagian Kelas Gel. 1 (Ganjil)',
     'kelulusan_gel1'         => 'Kelulusan Gel. 1 (Ganjil)',
@@ -32,6 +37,7 @@ $tipeOptions = [
 $linkOptions = [
     '' => '-- Tidak Ada Link --',
     '/pages/pretes-daftar.php' => 'Pendaftaran Pretes',
+    '/pages/pretes-peserta.php' => 'Jadwal & Hasil Pretes',
     '/pages/tutorial-pendaftaran.php' => 'Pendaftaran Tutorial',
     '/pages/tutorial-pembagian.php' => 'Cek Pembagian Kelas',
     '/pages/tutorial-pengumuman.php' => 'Cek Kelulusan Tutorial',
@@ -119,7 +125,7 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="form-group">
                 <label>Tipe Pengumuman</label>
-                <select name="tipe" required>
+                <select name="tipe" id="create_ann_tipe" required>
                     <option value="">-- Pilih Tipe --</option>
                     <?php foreach ($tipeOptions as $val => $label): ?>
                         <option value="<?= $val ?>"><?= $label ?></option>
@@ -132,7 +138,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-group">
                 <label>Link Aksi Mahasiswa (Opsional)</label>
-                <select name="link_tujuan">
+                <select name="link_tujuan" id="create_ann_link">
                     <?php foreach ($linkOptions as $val => $label): ?>
                         <option value="<?= $val ?>"><?= $label ?></option>
                     <?php endforeach; ?>
@@ -289,6 +295,28 @@ function closeAnnModal() {
     var m = document.getElementById('editAnnModal');
     if (m) m.classList.remove('show');
 }
+
+function bindAutoLink(tipeId, linkId) {
+    const tipeEl = document.getElementById(tipeId);
+    const linkEl = document.getElementById(linkId);
+    if (!tipeEl || !linkEl) return;
+    tipeEl.addEventListener('change', function() {
+        const val = this.value;
+        if (val === 'pendaftaran_pretes') {
+            linkEl.value = '/pages/pretes-daftar.php';
+        } else if (val === 'hasil_pretes') {
+            linkEl.value = '/pages/pretes-peserta.php';
+        } else if (val === 'pendaftaran_gel1' || val === 'pendaftaran_gel2' || val === 'pendaftaran_mandiri') {
+            linkEl.value = '/pages/tutorial-pendaftaran.php';
+        } else if (val.indexOf('pembagian_kelas') !== -1) {
+            linkEl.value = '/pages/tutorial-pembagian.php';
+        } else if (val.indexOf('kelulusan') !== -1) {
+            linkEl.value = '/pages/tutorial-pengumuman.php';
+        }
+    });
+}
+bindAutoLink('create_ann_tipe', 'create_ann_link');
+bindAutoLink('edit_ann_tipe', 'edit_ann_link');
 
 if (!window._editAnnBound) {
     window._editAnnBound = true;

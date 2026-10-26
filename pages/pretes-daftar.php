@@ -64,6 +64,15 @@ try {
 // Ambil Periode Pretes Aktif
 $active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
 
+// Ambil Pengumuman Pendaftaran Pretes Aktif
+$annPretes = null;
+try {
+    $stmtAnnPretes = $pdo->query("SELECT * FROM announcements WHERE tipe = 'pendaftaran_pretes' AND is_active = 1 ORDER BY created_at DESC LIMIT 1");
+    if ($stmtAnnPretes) {
+        $annPretes = $stmtAnnPretes->fetch();
+    }
+} catch (Exception $e) {}
+
 // Cek Registrasi Pretes Mahasiswa Saat Ini
 $stmt = $pdo->prepare("
     SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
@@ -235,6 +244,23 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         
+        <?php if ($annPretes): ?>
+        <!-- Pengumuman Resmi Pendaftaran Pretes dari Admin -->
+        <div class="announcement-card" style="margin-bottom:24px; background:#f0f9ff; border-left:4px solid #0ea5e9; padding:18px 20px; border-radius:10px;">
+            <div class="ann-title" style="color:#0284c7; font-weight:700; font-size:16px; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                <span>📢</span> <?= sanitize($annPretes['judul']) ?>
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-bottom:10px;">
+                🕐 Dipublikasikan pada: <?= date('d M Y, H:i', strtotime($annPretes['created_at'])) ?> WIB
+            </div>
+            <div style="font-size:14px; color:#334155; line-height:1.6;">
+                <?= nl2br(sanitize($annPretes['konten'])) ?>
+            </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #bae6fd; font-size:13px; color:#0369a1;">
+                🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong>Pukul 13.00 WIB (Jam 1 Siang)</strong>.
+            </div>
+        </div>
+        <?php else: ?>
         <!-- Info Pengumuman Pelaksanaan & Jam (Jam 1 / 13.00) -->
         <div class="announcement-card" style="margin-bottom:24px; background:#f0f9ff; border-left:4px solid #0ea5e9; padding:18px 20px; border-radius:10px;">
             <div class="ann-title" style="color:#0284c7; font-weight:700; font-size:16px; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
@@ -249,6 +275,7 @@ include __DIR__ . '/../includes/header.php';
                 </p>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Form Pemilihan Hari -->
         <form method="POST">
