@@ -24,7 +24,7 @@ $msgType = '';
 $isMessageHtml = false;
 
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
-$active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch() ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
 
 // Condition to exclude Lulus
 $notLulusSQL = "u.id NOT IN (

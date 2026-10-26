@@ -22,6 +22,17 @@ try {
     $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN tutors_senin VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_selasa VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_rabu VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_kamis VARCHAR(1000) DEFAULT NULL, ADD COLUMN tutors_jumat VARCHAR(1000) DEFAULT NULL");
 } catch (Exception $e) {}
 
+try {
+    $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN status ENUM('aktif','nonaktif') NOT NULL DEFAULT 'aktif'");
+} catch (Exception $e) {}
+
+try {
+    $activeCount = $pdo->query("SELECT COUNT(*) FROM master_gelombang WHERE status = 'aktif'")->fetchColumn();
+    if ($activeCount == 0) {
+        $pdo->exec("UPDATE master_gelombang SET status = 'aktif' ORDER BY created_at DESC LIMIT 1");
+    }
+} catch (Exception $e) {}
+
 $message = '';
 $msgType = '';
 
@@ -47,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $semester = $_POST['semester_tipe'] ?? '';
             $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
             $gelombang = $_POST['gelombang'] ?? '';
+            $status = $_POST['status'] ?? 'aktif';
             $ksenin = (int)($_POST['kuota_senin'] ?? 0);
             $kselasa = (int)($_POST['kuota_selasa'] ?? 0);
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
@@ -62,8 +74,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Semua field gelombang harus diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat, tutors_senin, tutors_selasa, tutors_rabu, tutors_kamis, tutors_jumat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat]);
+                if ($status === 'aktif') {
+                    $pdo->exec("UPDATE master_gelombang SET status = 'nonaktif' WHERE status = 'aktif'");
+                }
+                $pdo->prepare("INSERT INTO master_gelombang (semester, tahun_ajaran, gelombang, status, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat, tutors_senin, tutors_selasa, tutors_rabu, tutors_kamis, tutors_jumat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $status, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat]);
                 $message = 'Data Gelombang berhasil ditambahkan!';
                 $msgType = 'success';
             }
@@ -72,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $semester = $_POST['semester_tipe'] ?? '';
             $tahun_ajaran = $_POST['tahun_ajaran'] ?? '';
             $gelombang = $_POST['gelombang'] ?? '';
+            $status = $_POST['status'] ?? 'aktif';
             $ksenin = (int)($_POST['kuota_senin'] ?? 0);
             $kselasa = (int)($_POST['kuota_selasa'] ?? 0);
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
@@ -87,9 +103,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Data tidak valid.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=?, kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
-                    ->execute([$semester, $tahun_ajaran, $gelombang, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat, $id]);
+                if ($status === 'aktif') {
+                    $pdo->prepare("UPDATE master_gelombang SET status = 'nonaktif' WHERE id != ? AND status = 'aktif'")->execute([$id]);
+                }
+                $pdo->prepare("UPDATE master_gelombang SET semester=?, tahun_ajaran=?, gelombang=?, status=?, kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
+                    ->execute([$semester, $tahun_ajaran, $gelombang, $status, $ksenin, $kselasa, $krabu, $kkamis, $kjumat, $tsenin, $tselasa, $trabu, $tkamis, $tjumat, $id]);
                 $message = 'Gelombang berhasil diperbarui!';
+                $msgType = 'success';
+            }
+        } elseif ($action === 'set_active') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $pdo->exec("UPDATE master_gelombang SET status = 'nonaktif' WHERE status = 'aktif'");
+                $pdo->prepare("UPDATE master_gelombang SET status = 'aktif' WHERE id = ?")->execute([$id]);
+                $message = 'Gelombang pendaftaran berhasil diaktifkan!';
                 $msgType = 'success';
             }
         }
@@ -163,9 +190,16 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                         <option value="mandiri">Mandiri</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Status *</label>
+                    <select name="status" required>
+                        <option value="aktif">Aktif</option>
+                        <option value="nonaktif">Nonaktif</option>
+                    </select>
+                </div>
             </div>
             
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:14px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0; overflow-x:auto;">
                 <?php
                 renderTutorSelect('senin', $tutorsList);
                 renderTutorSelect('selasa', $tutorsList);
@@ -205,6 +239,7 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                         <th>Semester</th>
                         <th>Gelombang</th>
                         <th>Kuota (Sn-Jm)</th>
+                        <th>Status</th>
                         <th>Ditambahkan Pada</th>
                         <th>Aksi</th>
                     </tr>
@@ -234,7 +269,7 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                         }
                     }
                     foreach ($gelombangData as $g): ?>
-                    <tr>
+                    <tr <?= (($g['status'] ?? 'aktif') === 'aktif') ? 'style="background:#f0fdf4;"' : '' ?>>
                         <td><strong><?= sanitize($g['tahun_ajaran']) ?></strong></td>
                         <td><?= sanitize($g['semester']) ?></td>
                         <td><span class="badge badge-primary"><?= $gelLabels[$g['gelombang']] ?? $g['gelombang'] ?></span></td>
@@ -247,14 +282,31 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                                 <span>Jm: <b><?= $g['kuota_jumat'] ?? 0 ?></b></span>
                             </div>
                         </td>
+                        <td>
+                            <?php if (($g['status'] ?? 'aktif') === 'aktif'): ?>
+                                <span class="badge badge-success">Aktif</span>
+                            <?php else: ?>
+                                <span class="badge badge-secondary">Nonaktif</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= date('d M Y H:i', strtotime($g['created_at'])) ?></td>
                         <td style="white-space:nowrap;">
+                            <?php if (($g['status'] ?? 'aktif') !== 'aktif'): ?>
+                            <form method="POST" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="set_active">
+                                <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-success" title="Jadikan Gelombang Aktif">✅ Aktifkan</button>
+                            </form>
+                            <?php endif; ?>
+
                             <!-- Tombol Edit -->
                             <button type="button" class="btn btn-sm btn-warning btn-edit-gelombang"
                                 data-id="<?= $g['id'] ?>"
                                 data-semester="<?= htmlspecialchars($g['semester'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-tahun_ajaran="<?= htmlspecialchars($g['tahun_ajaran'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-gelombang="<?= htmlspecialchars($g['gelombang'], ENT_QUOTES, 'UTF-8') ?>"
+                                data-status="<?= htmlspecialchars($g['status'] ?? 'aktif', ENT_QUOTES, 'UTF-8') ?>"
                                 data-kuota_senin="<?= $g['kuota_senin'] ?? 0 ?>"
                                 data-kuota_selasa="<?= $g['kuota_selasa'] ?? 0 ?>"
                                 data-kuota_rabu="<?= $g['kuota_rabu'] ?? 0 ?>"
@@ -292,11 +344,11 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
 
 <!-- ── Modal Edit Gelombang ──────────────────────────────────────── -->
 <div class="modal-backdrop" id="editGelombangModal">
-    <div class="modal-content" style="max-width:500px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-            <h3 style="margin:0;">✏️ Edit Gelombang Pendaftaran</h3>
+    <div class="modal-content" style="max-width:1150px; width:95%; max-height:90vh; overflow-y:auto; border-radius:14px; padding:24px 28px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;border-bottom:1px solid #e2e8f0;padding-bottom:12px;">
+            <h3 style="margin:0; font-size:18px;">✏️ Edit Gelombang Pendaftaran</h3>
             <button type="button" class="btn-close-modal"
-                style="background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
+                style="background:none;border:none;font-size:24px;cursor:pointer;color:#9ca3af;line-height:1;padding:0;"
                 aria-label="Tutup">&times;</button>
         </div>
 
@@ -305,34 +357,43 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
             <input type="hidden" name="action" value="edit_gelombang">
             <input type="hidden" name="id" id="edit_id">
 
-            <div class="form-group">
-                <label>Semester *</label>
-                <select name="semester_tipe" id="edit_semester_tipe" required>
-                    <option value="">-- Pilih --</option>
-                    <option value="Ganjil">Ganjil</option>
-                    <option value="Genap">Genap</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Tahun Ajaran *</label>
-                <select name="tahun_ajaran" id="edit_tahun_ajaran" required>
-                    <option value="">-- Pilih Tahun --</option>
-                    <?php for($y=2017; $y<=2049; $y++): ?>
-                    <option value="<?= $y . '-' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Gelombang *</label>
-                <select name="gelombang" id="edit_gelombang" required>
-                    <option value="">-- Pilih --</option>
-                    <option value="gel1">Gelombang 1 (Ganjil)</option>
-                    <option value="gel2">Gelombang 2 (Genap)</option>
-                    <option value="mandiri">Mandiri</option>
-                </select>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:16px;">
+                <div class="form-group" style="margin:0;">
+                    <label>Semester *</label>
+                    <select name="semester_tipe" id="edit_semester_tipe" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="Ganjil">Ganjil</option>
+                        <option value="Genap">Genap</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label>Tahun Ajaran *</label>
+                    <select name="tahun_ajaran" id="edit_tahun_ajaran" required>
+                        <option value="">-- Pilih Tahun --</option>
+                        <?php for($y=2017; $y<=2049; $y++): ?>
+                        <option value="<?= $y . '-' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label>Gelombang *</label>
+                    <select name="gelombang" id="edit_gelombang" required>
+                        <option value="">-- Pilih --</option>
+                        <option value="gel1">Gelombang 1 (Ganjil)</option>
+                        <option value="gel2">Gelombang 2 (Genap)</option>
+                        <option value="mandiri">Mandiri</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label>Status Pendaftaran *</label>
+                    <select name="status" id="edit_status" required>
+                        <option value="aktif">Aktif</option>
+                        <option value="nonaktif">Nonaktif</option>
+                    </select>
+                </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:14px; margin-top:16px; margin-bottom:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0; overflow-x:auto;">
                 <?php
                 renderTutorSelect('senin', $tutorsList, true);
                 renderTutorSelect('selasa', $tutorsList, true);
@@ -342,9 +403,9 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                 ?>
             </div>
 
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-                <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan</button>
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:14px;">
+                <button type="button" class="btn btn-secondary btn-close-modal" style="width:auto; padding:8px 18px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="width:auto; padding:8px 22px;">💾 Simpan Perubahan</button>
             </div>
         </form>
     </div>
@@ -432,6 +493,7 @@ window.openGelombangModal = function(d) {
     document.getElementById('edit_semester_tipe').value = d.semester || '';
     document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
     document.getElementById('edit_gelombang').value = d.gelombang || '';
+    document.getElementById('edit_status').value = d.status || 'aktif';
     
     // We update the kuota inputs dynamically based on the tutors list
     window.populateTutors('senin', d.tutors_senin);
@@ -460,6 +522,7 @@ if (!window._editGelombangBound) {
                 semester: d.semester,
                 tahun_ajaran: d.tahun_ajaran,
                 gelombang: d.gelombang,
+                status: d.status,
                 tutors_senin: d.tutors_senin,
                 tutors_selasa: d.tutors_selasa,
                 tutors_rabu: d.tutors_rabu,
