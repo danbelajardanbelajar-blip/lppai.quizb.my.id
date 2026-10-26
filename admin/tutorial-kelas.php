@@ -26,13 +26,6 @@ try {
     $pdo->exec("ALTER TABLE master_gelombang ADD COLUMN status ENUM('aktif','nonaktif') NOT NULL DEFAULT 'aktif'");
 } catch (Exception $e) {}
 
-try {
-    $activeCount = $pdo->query("SELECT COUNT(*) FROM master_gelombang WHERE status = 'aktif'")->fetchColumn();
-    if ($activeCount == 0) {
-        $pdo->exec("UPDATE master_gelombang SET status = 'aktif' ORDER BY created_at DESC LIMIT 1");
-    }
-} catch (Exception $e) {}
-
 $message = '';
 $msgType = '';
 
@@ -125,6 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $pdo->exec("UPDATE master_gelombang SET status = 'nonaktif' WHERE status = 'aktif'");
                 $pdo->prepare("UPDATE master_gelombang SET status = 'aktif' WHERE id = ?")->execute([$id]);
                 $message = 'Gelombang pendaftaran berhasil diaktifkan!';
+                $msgType = 'success';
+            }
+        } elseif ($action === 'set_inactive') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $pdo->prepare("UPDATE master_gelombang SET status = 'nonaktif' WHERE id = ?")->execute([$id]);
+                $message = 'Gelombang pendaftaran berhasil dinonaktifkan!';
                 $msgType = 'success';
             }
         }
@@ -318,6 +318,13 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                                 <input type="hidden" name="action" value="set_active">
                                 <input type="hidden" name="id" value="<?= $g['id'] ?>">
                                 <button type="submit" class="btn btn-sm btn-success" title="Jadikan Gelombang Aktif">✅ Aktifkan</button>
+                            </form>
+                            <?php else: ?>
+                            <form method="POST" style="display:inline;" onsubmit="return confirm('Nonaktifkan gelombang pendaftaran ini?');">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="set_inactive">
+                                <input type="hidden" name="id" value="<?= $g['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary" style="border:1px solid #cbd5e1; background:#f8fafc;" title="Nonaktifkan Gelombang">⏹️ Nonaktifkan</button>
                             </form>
                             <?php endif; ?>
 
@@ -607,7 +614,7 @@ window.openGelombangModal = function(d) {
     }
     
     document.getElementById('edit_gelombang').value = d.gelombang || '';
-    document.getElementById('edit_status').value = d.status || 'aktif';
+    document.getElementById('edit_status').value = (d.status || 'aktif').toLowerCase();
     
     // Update daftar tutor secara dinamis
     window.populateTutors('senin', d.tutors_senin || '');
@@ -636,7 +643,7 @@ if (!window._editGelombangBound) {
                 semester: d.semester,
                 tahun_ajaran: d.tahun_ajaran,
                 gelombang: d.gelombang,
-                status: d.status,
+                status: btn.getAttribute('data-status') || d.status || 'aktif',
                 tutors_senin: btn.getAttribute('data-tutors_senin') || d.tutors_senin || d.tutorsSenin || '',
                 tutors_selasa: btn.getAttribute('data-tutors_selasa') || d.tutors_selasa || d.tutorsSelasa || '',
                 tutors_rabu: btn.getAttribute('data-tutors_rabu') || d.tutors_rabu || d.tutorsRabu || '',
