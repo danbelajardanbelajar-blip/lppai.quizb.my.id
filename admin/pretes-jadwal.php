@@ -73,6 +73,35 @@ function parsePengujiList($pengujiStr) {
     return array_values(array_filter(array_map('trim', explode(',', $pengujiStr))));
 }
 
+// Helper pencocokan cerdas nama penguji (kebal perbedaan gelar, spasi, dan tanda petik)
+function isPengujiMatch($targetName, $optionName) {
+    if (empty($targetName) || empty($optionName)) return false;
+    $targetName = trim($targetName);
+    $optionName = trim($optionName);
+    if ($targetName === $optionName) return true;
+
+    $norm = function($str) {
+        $str = mb_strtolower($str, 'UTF-8');
+        $str = preg_replace('/[`\'’‘]/u', "'", $str);
+        $str = preg_replace('/\s+/', ' ', $str);
+        return trim($str);
+    };
+
+    $tNorm = $norm($targetName);
+    $oNorm = $norm($optionName);
+    if ($tNorm === $oNorm) return true;
+
+    $tBase = trim(explode(',', $tNorm)[0]);
+    $oBase = trim(explode(',', $oNorm)[0]);
+    if (strlen($tBase) >= 4 && strlen($oBase) >= 4) {
+        if ($tBase === $oBase || strpos($oBase, $tBase) !== false || strpos($tBase, $oBase) !== false) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // ── Handle POST Actions ───────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $token = $_POST['csrf_token'] ?? '';
@@ -361,10 +390,18 @@ include __DIR__ . '/../includes/header.php';
                         <?php foreach($currentPenguji as $idx => $tName): ?>
                         <div class="tutor-row" style="display:flex; gap:4px; margin-bottom:4px;">
                             <select name="penguji_<?= $dayLower ?>[]" class="tutor-select" style="flex:1; padding:6px; border:1.5px solid #e5e7eb; border-radius:6px; font-size:13px;" onchange="calculateQEKuota('<?= $dayLower ?>')">
-                                <option value="">- Dosen Penguji -</option>
-                                <?php foreach($tutorsList as $t): ?>
-                                <option value="<?= sanitize($t['nama']) ?>" <?= ($t['nama'] === $tName) ? 'selected' : '' ?>><?= sanitize($t['nama']) ?></option>
+                                <option value="">-- Pilih Dosen Penguji --</option>
+                                <?php 
+                                $matchedAny = false;
+                                foreach($tutorsList as $t): 
+                                    $isSel = isPengujiMatch($tName, $t['nama']);
+                                    if ($isSel) $matchedAny = true;
+                                ?>
+                                <option value="<?= sanitize($t['nama']) ?>" <?= $isSel ? 'selected' : '' ?>><?= sanitize($t['nama']) ?></option>
                                 <?php endforeach; ?>
+                                <?php if (!$matchedAny && !empty($tName)): ?>
+                                <option value="<?= sanitize($tName) ?>" selected><?= sanitize($tName) ?></option>
+                                <?php endif; ?>
                             </select>
                             <?php if ($idx === 0): ?>
                             <button type="button" class="btn btn-sm btn-success add-tutor-btn" onclick="addQETutorRow('<?= $dayLower ?>')" style="padding:0 8px; font-weight:bold;">+</button>
@@ -681,11 +718,49 @@ function addQETutorRow(day) {
 </div>
 
 <script>
+function setPengujiSelectValue(selectElem, targetName) {
+    if (!selectElem) return;
+    if (!targetName || typeof targetName !== 'string' || targetName.trim() === '') {
+        selectElem.value = '';
+        return;
+    }
+    targetName = targetName.trim();
+    
+    selectElem.value = targetName;
+    if (selectElem.value === targetName && selectElem.selectedIndex > 0) return;
+    
+    const norm = str => (str || '').toLowerCase().replace(/[`'’‘]/g, "'").replace(/\s+/g, ' ').trim();
+    const targetNorm = norm(targetName);
+    for (let opt of selectElem.options) {
+        if (opt.value && norm(opt.value) === targetNorm) {
+            selectElem.value = opt.value;
+            return;
+        }
+    }
+    
+    const targetBase = targetNorm.split(',')[0].trim();
+    if (targetBase.length >= 4) {
+        for (let opt of selectElem.options) {
+            if (opt.value) {
+                const optBase = norm(opt.value).split(',')[0].trim();
+                if (optBase === targetBase || optBase.includes(targetBase) || targetBase.includes(optBase)) {
+                    selectElem.value = opt.value;
+                    return;
+                }
+            }
+        }
+    }
+    
+    const newOpt = new Option(targetName, targetName, true, true);
+    selectElem.add(newOpt);
+    selectElem.value = targetName;
+}
+
 function openPenugasanModal(regId, nama, nim, hari, dosen, ruangan) {
     document.getElementById('modal-reg-id').value = regId;
     document.getElementById('modal-mhs-info').textContent = nama + ' (' + nim + ')';
     document.getElementById('modal-hari').value = hari || 'Senin';
-    document.getElementById('modal-dosen').value = dosen || '';
+    setPengujiSelectValue(document.getElementById('modal-dosen'), dosen || '');
     document.getElementById('modal-ruangan').value = ruangan || '';
     document.getElementById('modal-edit-penugasan').style.display = 'flex';
 }
