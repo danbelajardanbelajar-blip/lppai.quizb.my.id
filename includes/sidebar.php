@@ -28,6 +28,9 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Manajemen Pretes</div>
+            <a href="<?= BASE_URL ?>/admin/pretes-dosen.php" class="page-nav <?= menuActive('pretes-dosen.php') ?>">
+                <span class="icon">👨‍🏫</span> Penguji & Kuota Pretes
+            </a>
             <a href="<?= BASE_URL ?>/admin/pretes-jadwal.php" class="page-nav <?= menuActive('pretes-jadwal.php') ?>">
                 <span class="icon">📅</span> Kelola Jadwal Pretes
             </a>

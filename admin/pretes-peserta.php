@@ -111,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // ── Fetch data ─────────────────────────────────────────────────────────────────
 $participants = $pdo->query("
-    SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.tanggal_daftar,
+    SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
            u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.email, u.no_hp
     FROM pretes_registrations pr
@@ -212,7 +212,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama</th>
                         <th>NIM</th>
                         <th>Prodi</th>
-                        <th>Periode</th>
+                        <th>Hari / Periode</th>
                         <th>Status Hadir</th>
                         <th style="min-width:140px;">Username Tes</th>
                         <th style="min-width:120px;">Password Tes</th>
@@ -226,7 +226,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($p['nim']) ?></td>
                         <td><?= sanitize($p['program_studi']) ?></td>
-                        <td><?= sanitize($p['periode']) ?></td>
+                        <td><?= sanitize(!empty($p['hari_pilihan']) ? ($p['hari_pilihan'] . ' (' . ($p['jam'] ?? '13.00 WIB') . ')') : $p['periode']) ?></td>
                         <td>
                             <!-- Dropdown status hadir -->
                             <form method="POST" style="display:inline;">

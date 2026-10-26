@@ -62,7 +62,7 @@ $schedules = $pdo->query(
 
 // ── Ambil daftar semua peserta (nama + nim saja, untuk informasi publik) ────────
 $participants = $pdo->query("
-    SELECT pr.id, pr.periode, pr.tanggal_daftar, pr.status,
+    SELECT pr.id, pr.periode, pr.hari_pilihan, pr.jam, pr.tanggal_daftar, pr.status,
            u.nama_lengkap, u.nim, u.program_studi
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
@@ -140,7 +140,19 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <!-- Info jadwal tes jika ada -->
-            <?php if ($myReg['tanggal']): ?>
+            <?php if (!empty($myReg['hari_pilihan'])): ?>
+            <div style="margin-top:16px;padding:14px 18px;background:#f8f9fa;border-radius:10px;
+                        display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <span style="font-size:28px;">📅</span>
+                <div>
+                    <strong>Jadwal Pretes Anda:</strong>
+                    Hari <strong><?= sanitize($myReg['hari_pilihan']) ?></strong>
+                    | Jam: <strong><?= sanitize($myReg['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
+                    | Penguji: <strong><?= sanitize($myReg['dosen_penguji'] ?? 'Menunggu pembagian') ?></strong>
+                    | Ruangan: <strong><?= sanitize($myReg['ruangan'] ?? ($myReg['ruangan_tes'] ?? 'Menunggu pembagian')) ?></strong>
+                </div>
+            </div>
+            <?php elseif ($myReg['tanggal']): ?>
             <div style="margin-top:16px;padding:14px 18px;background:#f8f9fa;border-radius:10px;
                         display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
                 <span style="font-size:28px;">📅</span>
@@ -251,7 +263,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama</th>
                         <th>NIM</th>
                         <th>Program Studi</th>
-                        <th>Periode</th>
+                        <th>Hari / Periode</th>
                         <th>Tgl Daftar</th>
                         <th>Status</th>
                     </tr>
@@ -268,7 +280,7 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td><?= sanitize($p['nim']) ?></td>
                         <td><?= sanitize($p['program_studi']) ?></td>
-                        <td><?= sanitize($p['periode']) ?></td>
+                        <td><?= sanitize(!empty($p['hari_pilihan']) ? ($p['hari_pilihan'] . ' (' . ($p['jam'] ?? '13.00 WIB') . ')') : $p['periode']) ?></td>
                         <td><?= date('d M Y', strtotime($p['tanggal_daftar'])) ?></td>
                         <td>
                             <?php

@@ -83,6 +83,20 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
 <?php endif; ?>
 
+<div class="card" style="margin-bottom:20px; background:#eff6ff; border-left:4px solid #3b82f6;">
+    <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h4 style="margin:0 0 4px; color:#1e40af;">👨‍🏫 Kelola Dosen Penguji & Kuota Pretes Harian</h4>
+            <p style="margin:0; font-size:14px; color:#1d4ed8;">
+                Pendaftaran pretes mahasiswa saat ini menggunakan alur pemilihan hari (pukul 13.00 WIB) dengan kuota berbasis kesediaan dosen penguji.
+            </p>
+        </div>
+        <a href="<?= BASE_URL ?>/admin/pretes-dosen.php" class="btn btn-primary" style="white-space:nowrap; padding:8px 16px; font-weight:600; text-decoration:none;">
+            👉 Buka Penguji & Kuota Pretes
+        </a>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">➕ Tambah Jadwal Pretes</div>
     <div class="card-body">
