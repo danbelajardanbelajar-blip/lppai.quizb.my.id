@@ -24,6 +24,19 @@ if (isLoggedIn()) {
     } elseif (isDosen()) {
         header('Location: ' . BASE_URL . '/dosen/dashboard.php');
     } else {
+        // Refresh status is_active langsung dari DB agar tidak terjebak di sesi lama
+        if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+            try {
+                $pdo = getDBConnection();
+                $stmt = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+                $freshStatus = $stmt->fetchColumn();
+                if ($freshStatus !== false && (int)$freshStatus == 1) {
+                    $_SESSION['is_active'] = 1;
+                }
+            } catch (Exception $e) {}
+        }
+
         if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
             header('Location: ' . BASE_URL . '/aktivasi.php');
         } else {

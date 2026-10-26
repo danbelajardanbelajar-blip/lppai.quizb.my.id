@@ -31,7 +31,21 @@ function requireLogin() {
         exit;
     }
     
-    // Jika mahasiswa dan belum aktif, paksa ke halaman aktivasi
+    // Sinkronisasi status is_active secara real-time dari DB jika di sesi masih 0
+    // Mencegah mahasiswa harus logout/login ulang saat admin menyetujui akun
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'mahasiswa' && isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+        try {
+            $pdo = getDBConnection();
+            $stmt = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+            $dbStatus = $stmt->fetchColumn();
+            if ($dbStatus !== false && (int)$dbStatus == 1) {
+                $_SESSION['is_active'] = 1;
+            }
+        } catch (Exception $e) {}
+    }
+
+    // Jika masih belum aktif, paksa ke halaman aktivasi
     // Cegah redirect loop jika sudah berada di halaman aktivasi.php
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'mahasiswa' && isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
         $current_script = basename($_SERVER['PHP_SELF']);

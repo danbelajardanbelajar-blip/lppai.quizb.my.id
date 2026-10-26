@@ -11,6 +11,27 @@ if (!isLoggedIn()) {
     exit;
 }
 
+// Sinkronisasi status aktivasi terkini dari database
+$pdo = getDBConnection();
+$userId = $_SESSION['user_id'] ?? 0;
+if ($userId > 0) {
+    try {
+        $stmtCheck = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+        $stmtCheck->execute([$userId]);
+        $currStatus = $stmtCheck->fetchColumn();
+        if ($currStatus !== false && (int)$currStatus == 1) {
+            $_SESSION['is_active'] = 1;
+        }
+    } catch (Exception $e) {}
+}
+
+// Endpoint AJAX untuk pengecekan status otomatis (polling)
+if (isset($_GET['ajax_check'])) {
+    header('Content-Type: application/json');
+    echo json_encode(['is_active' => (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 1)]);
+    exit;
+}
+
 // Jika bukan mahasiswa atau sudah aktif, kembalikan ke dashboard
 if ($_SESSION['role'] !== 'mahasiswa' || (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 1)) {
     header('Location: ' . BASE_URL . '/dashboard.php');
@@ -148,7 +169,44 @@ include __DIR__ . '/includes/header.php';
                 <?php endif; ?>
             </div>
         </form>
+
+        <hr style="margin: 25px 0;">
+        <div style="text-align: center;">
+            <p style="font-size: 0.9em; color: #6c757d; margin-bottom: 10px;">
+                Sudah menghubungi Admin atau menerima pesan WhatsApp persetujuan?
+            </p>
+            <a href="dashboard.php" class="btn btn-outline-primary" style="font-size: 0.95em; padding: 8px 20px;">
+                🔄 Cek Status Aktivasi Sekarang
+            </a>
+            <div id="pollingStatus" style="font-size: 0.8em; color: #888; margin-top: 10px;">
+                <span class="spinner-border spinner-border-sm" style="display:inline-block; width:12px; height:12px; border-width:2px; vertical-align:middle; margin-right:4px;"></span>
+                Memeriksa aktivasi secara otomatis...
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+// Polling otomatis setiap 5 detik untuk memeriksa apakah admin sudah menyetujui akun
+(function() {
+    let checkInterval = setInterval(function() {
+        fetch('aktivasi.php?ajax_check=1', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.is_active) {
+                    clearInterval(checkInterval);
+                    const statusEl = document.getElementById('pollingStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<span style="color:#28a745; font-weight:bold;">✅ Akun telah aktif! Mengalihkan ke dashboard...</span>';
+                    }
+                    setTimeout(function() {
+                        window.location.href = 'dashboard.php';
+                    }, 800);
+                }
+            })
+            .catch(err => console.debug('Status check paused:', err));
+    }, 5000);
+})();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

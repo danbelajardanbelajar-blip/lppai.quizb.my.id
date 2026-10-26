@@ -49,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Siapkan pesan ke mahasiswa
         $waText = "Halo {$namaMahasiswa},\n\n";
         $waText .= "Akun LPPAI Corner Anda telah *DISETUJUI* dan *AKTIF*.\n\n";
-        $waText .= "Silakan login kembali melalui tautan berikut:\n";
-        $waText .= "https://lppai.quizb.my.id/index.php\n\n";
+        $waText .= "Silakan masuk ke akun Anda melalui tautan berikut:\n";
+        $waText .= "https://lppai.quizb.my.id/dashboard.php\n\n";
         $waText .= "Terima kasih.";
 
         $waUrl = "https://wa.me/" . $waNumber . "?text=" . rawurlencode($waText);
