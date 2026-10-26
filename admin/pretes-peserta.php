@@ -94,6 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message = 'Credentials berhasil dihapus.';
             $msgType = 'success';
 
+        // ── Hapus data pendaftaran peserta pretes ─────────────────────────
+        } elseif ($action === 'delete_peserta') {
+            $regId = (int)($_POST['reg_id'] ?? 0);
+            if ($regId > 0) {
+                $pdo->prepare("DELETE FROM pretes_registrations WHERE id = ?")->execute([$regId]);
+                $message = 'Peserta pretes berhasil dihapus.';
+                $msgType = 'success';
+            }
+
         // ── Update status kehadiran ───────────────────────────────────────
         } elseif ($action === 'update_status') {
             $regId  = (int)($_POST['reg_id'] ?? 0);
@@ -216,7 +225,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Status Hadir</th>
                         <th style="min-width:140px;">Username Tes</th>
                         <th style="min-width:120px;">Password Tes</th>
-                        <th>Aksi Credentials</th>
+                        <th style="min-width:160px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -278,26 +287,29 @@ include __DIR__ . '/../includes/header.php';
                                 <span style="color:#ccc;font-size:12px;font-style:italic;">— belum ada —</span>
                             <?php endif; ?>
                         </td>
-                        <!-- Aksi Credentials -->
-                        <td style="display:flex;gap:4px;flex-wrap:wrap;">
-                            <!-- Tombol Edit -->
-                            <button type="button"
-                                class="btn btn-sm btn-warning"
-                                onclick="openEditModal(<?= $p['reg_id'] ?>, '<?= sanitize($p['nama_lengkap']) ?>', '<?= sanitize($p['username_tes'] ?? '') ?>', '<?= sanitize($p['password_tes'] ?? '') ?>')">
-                                ✏️ Edit
-                            </button>
-                            <!-- Tombol Hapus -->
-                            <?php if (!empty($p['username_tes'])): ?>
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action"  value="clear_credential">
-                                <input type="hidden" name="reg_id"  value="<?= $p['reg_id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-danger"
-                                    onclick="return confirm('Hapus credentials <?= sanitize($p['nama_lengkap']) ?>?')">
-                                    🗑️
+                        <!-- Aksi -->
+                        <td style="white-space:nowrap;">
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <!-- Tombol Edit Credentials -->
+                                <button type="button"
+                                    class="btn btn-sm btn-warning btn-edit-cred"
+                                    data-reg-id="<?= $p['reg_id'] ?>"
+                                    data-nama="<?= htmlspecialchars($p['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>"
+                                    data-username="<?= htmlspecialchars($p['username_tes'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                    data-password="<?= htmlspecialchars($p['password_tes'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                    title="Edit Credentials">
+                                    ✏️ Edit
                                 </button>
-                            </form>
-                            <?php endif; ?>
+                                <!-- Tombol Hapus Peserta -->
+                                <form method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus peserta <?= htmlspecialchars(addslashes($p['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> dari pendaftaran pretes? Tindakan ini tidak dapat dibatalkan.');">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="action" value="delete_peserta">
+                                    <input type="hidden" name="reg_id" value="<?= $p['reg_id'] ?>">
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Hapus Peserta Pretes">
+                                        🗑️ Hapus
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -332,12 +344,16 @@ include __DIR__ . '/../includes/header.php';
                     </button>
                 </div>
             </div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-                <button type="button" class="btn btn-sm btn-warning"
-                    onclick="document.getElementById('modal-edit-cred').style.display='none'">
-                    Batal
+            <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btn-modal-clear" style="display:none;" onclick="clearCredFromModal()">
+                    🗑️ Kosongkan Credentials
                 </button>
-                <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan</button>
+                <div style="display:flex;gap:10px;margin-left:auto;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="closeEditModal()">
+                        Batal
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="width:auto;">💾 Simpan</button>
+                </div>
             </div>
         </form>
     </div>
@@ -371,19 +387,48 @@ function openPasswordModal(regId) {
 // Buka modal edit credentials
 function openEditModal(regId, nama, username, password) {
     document.getElementById('modal-reg-id').value  = regId;
-    document.getElementById('modal-name').textContent = 'Peserta: ' + nama;
-    document.getElementById('modal-username').value  = username;
-    document.getElementById('modal-password').value  = password;
+    document.getElementById('modal-name').textContent = 'Peserta: ' + (nama || '');
+    document.getElementById('modal-username').value  = username || '';
+    document.getElementById('modal-password').value  = password || '';
+    
+    const clearBtn = document.getElementById('btn-modal-clear');
+    if (clearBtn) {
+        clearBtn.style.display = (username || password) ? 'inline-block' : 'none';
+    }
     document.getElementById('modal-edit-cred').style.display = 'flex';
 }
 
-// Tutup modal jika klik luar
-document.getElementById('modal-edit-cred').addEventListener('click', function(e) {
-    if (e.target === this) this.style.display = 'none';
+function closeEditModal() {
+    const m = document.getElementById('modal-edit-cred');
+    if (m) m.style.display = 'none';
+}
+
+function clearCredFromModal() {
+    if (confirm('Apakah Anda yakin ingin mengosongkan username dan password tes untuk peserta ini?')) {
+        const form = document.querySelector('#modal-edit-cred form');
+        const actionInput = form.querySelector('input[name="action"]');
+        if (actionInput) actionInput.value = 'clear_credential';
+        form.submit();
+    }
+}
+
+// Event delegation untuk tombol Edit Credentials agar selalu dapat diklik
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-edit-cred');
+    if (btn) {
+        const d = btn.dataset;
+        openEditModal(d.regId, d.nama, d.username, d.password);
+        return;
+    }
+    const modal = document.getElementById('modal-edit-cred');
+    if (e.target === modal) {
+        closeEditModal();
+    }
 });
+
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        document.getElementById('modal-edit-cred').style.display = 'none';
+        closeEditModal();
     }
 });
 
