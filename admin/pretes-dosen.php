@@ -614,13 +614,59 @@ window.addPengujiRow = function(day, isEdit) {
     window.calculateQuota(day, isEdit);
 };
 
-// Mengisi baris penguji pada modal edit
+// Helper pencocokan opsi Dosen Penguji secara cerdas
+window.setPengujiSelectValue = function(selectElem, targetName) {
+    if (!selectElem) return;
+    if (!targetName || typeof targetName !== 'string' || targetName.trim() === '') {
+        selectElem.value = '';
+        return;
+    }
+    targetName = targetName.trim();
+    
+    // 1. Direct match
+    selectElem.value = targetName;
+    if (selectElem.value === targetName && selectElem.selectedIndex > 0) return;
+    
+    // 2. Normalisasi tanda kutip dan spasi
+    const norm = function(str) {
+        return (str || '').toLowerCase().replace(/[`'’‘]/g, "'").replace(/\s+/g, ' ').trim();
+    };
+    const targetNorm = norm(targetName);
+    for (let opt of selectElem.options) {
+        if (opt.value && norm(opt.value) === targetNorm) {
+            selectElem.value = opt.value;
+            return;
+        }
+    }
+    
+    // 3. Substring match (nama dasar sebelum gelar)
+    const targetBase = targetNorm.split(',')[0].trim();
+    if (targetBase.length >= 4) {
+        for (let opt of selectElem.options) {
+            if (opt.value) {
+                const optBase = norm(opt.value).split(',')[0].trim();
+                if (optBase === targetBase || optBase.includes(targetBase) || targetBase.includes(optBase)) {
+                    selectElem.value = opt.value;
+                    return;
+                }
+            }
+        }
+    }
+    
+    // 4. Fallback: Tambahkan opsi jika belum ada di database user agar nama dosen tidak hilang/kosong
+    const newOpt = new Option(targetName, targetName, true, true);
+    selectElem.add(newOpt);
+    selectElem.value = targetName;
+};
+
+// Mengisi baris penguji pada modal edit secara akurat dan bersih
 window.populatePenguji = function(day, pengujiStr, kuotaVal) {
     const prefix = 'edit_';
     const container = document.getElementById(prefix + 'penguji_' + day + '_container');
     if (!container) return;
 
     const rows = container.querySelectorAll('.tutor-row');
+    // Sisakan hanya baris pertama
     for (let i = 1; i < rows.length; i++) {
         rows[i].remove();
     }
@@ -629,22 +675,40 @@ window.populatePenguji = function(day, pengujiStr, kuotaVal) {
     firstSelect.value = '';
 
     let pengujiList = [];
-    if (pengujiStr) {
+    if (pengujiStr && typeof pengujiStr === 'string' && pengujiStr.trim() !== '') {
         if (pengujiStr.indexOf('|||') !== -1) {
             pengujiList = pengujiStr.split('|||');
         } else {
-            pengujiList = pengujiStr.split(',');
+            // Cek apakah string langsung cocok dengan salah satu dosen (hindari memecah koma pada gelar)
+            let directMatch = false;
+            for (let opt of firstSelect.options) {
+                if (opt.value && opt.value.trim().toLowerCase() === pengujiStr.trim().toLowerCase()) {
+                    directMatch = true;
+                    break;
+                }
+            }
+            if (directMatch) {
+                pengujiList = [pengujiStr.trim()];
+            } else {
+                pengujiList = pengujiStr.split(',');
+            }
         }
     }
 
+    // Bersihkan spasi dan buang item kosong agar tidak membuat baris bertingkat yang kosong
+    pengujiList = pengujiList.map(p => p.trim()).filter(p => p !== '');
+
     if (pengujiList.length > 0) {
-        firstSelect.value = pengujiList[0].trim();
+        window.setPengujiSelectValue(firstSelect, pengujiList[0]);
+    } else {
+        firstSelect.value = '';
     }
 
+    // Buat baris baru hanya jika ada lebih dari 1 penguji riil
     for (let i = 1; i < pengujiList.length; i++) {
         const newRow = rows[0].cloneNode(true);
         const sel = newRow.querySelector('select');
-        sel.value = pengujiList[i].trim();
+        window.setPengujiSelectValue(sel, pengujiList[i]);
         const btn = newRow.querySelector('button');
         btn.textContent = '×';
         btn.classList.remove('btn-success', 'add-tutor-btn');
@@ -665,15 +729,41 @@ window.populatePenguji = function(day, pengujiStr, kuotaVal) {
 window.openPretesModal = function(d) {
     document.getElementById('edit_id').value = d.id;
     document.getElementById('edit_periode').value = d.periode || '';
-    document.getElementById('edit_tahun_ajaran').value = d.tahun || '';
+    
+    // Pencocokan Tahun Ajaran cerdas (2026 - 2027, 2026/2027, 2026-2027)
+    const tahunSelect = document.getElementById('edit_tahun_ajaran');
+    if (tahunSelect) {
+        const rawTahun = (d.tahun || '').trim();
+        const cleanTahun = rawTahun.replace(/[^0-9]/g, '');
+        let matched = false;
+        
+        tahunSelect.value = rawTahun;
+        if (tahunSelect.value === rawTahun && tahunSelect.selectedIndex > 0) {
+            matched = true;
+        } else {
+            for (let opt of tahunSelect.options) {
+                if (opt.value && opt.value.replace(/[^0-9]/g, '') === cleanTahun) {
+                    tahunSelect.value = opt.value;
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if (!matched && rawTahun !== '') {
+            const opt = new Option(rawTahun, rawTahun, true, true);
+            tahunSelect.add(opt);
+            tahunSelect.value = rawTahun;
+        }
+    }
+    
     document.getElementById('edit_jam').value = d.jam || '13.00 WIB (Jam 1)';
     document.getElementById('edit_status').value = d.status || 'aktif';
 
-    window.populatePenguji('senin', d.penguji_senin, d.kuota_senin);
-    window.populatePenguji('selasa', d.penguji_selasa, d.kuota_selasa);
-    window.populatePenguji('rabu', d.penguji_rabu, d.kuota_rabu);
-    window.populatePenguji('kamis', d.penguji_kamis, d.kuota_kamis);
-    window.populatePenguji('jumat', d.penguji_jumat, d.kuota_jumat);
+    window.populatePenguji('senin', d.penguji_senin || '', d.kuota_senin);
+    window.populatePenguji('selasa', d.penguji_selasa || '', d.kuota_selasa);
+    window.populatePenguji('rabu', d.penguji_rabu || '', d.kuota_rabu);
+    window.populatePenguji('kamis', d.penguji_kamis || '', d.kuota_kamis);
+    window.populatePenguji('jumat', d.penguji_jumat || '', d.kuota_jumat);
 
     const m = document.getElementById('editPretesModal');
     if (m) m.style.display = 'block';
@@ -705,16 +795,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 tahun: d.tahun,
                 jam: d.jam,
                 status: d.status,
-                kuota_senin: d.kuotaSenin,
-                kuota_selasa: d.kuotaSelasa,
-                kuota_rabu: d.kuotaRabu,
-                kuota_kamis: d.kuotaKamis,
-                kuota_jumat: d.kuotaJumat,
-                penguji_senin: d.pengujiSenin,
-                penguji_selasa: d.pengujiSelasa,
-                penguji_rabu: d.pengujiRabu,
-                penguji_kamis: d.pengujiKamis,
-                penguji_jumat: d.pengujiJumat
+                kuota_senin: btn.getAttribute('data-kuota-senin') || d.kuotaSenin,
+                kuota_selasa: btn.getAttribute('data-kuota-selasa') || d.kuotaSelasa,
+                kuota_rabu: btn.getAttribute('data-kuota-rabu') || d.kuotaRabu,
+                kuota_kamis: btn.getAttribute('data-kuota-kamis') || d.kuotaKamis,
+                kuota_jumat: btn.getAttribute('data-kuota-jumat') || d.kuotaJumat,
+                penguji_senin: btn.getAttribute('data-penguji-senin') || d.pengujiSenin || '',
+                penguji_selasa: btn.getAttribute('data-penguji-selasa') || d.pengujiSelasa || '',
+                penguji_rabu: btn.getAttribute('data-penguji-rabu') || d.pengujiRabu || '',
+                penguji_kamis: btn.getAttribute('data-penguji-kamis') || d.pengujiKamis || '',
+                penguji_jumat: btn.getAttribute('data-penguji-jumat') || d.pengujiJumat || ''
             });
         }
         if (e.target && e.target.id === 'editPretesModal') {

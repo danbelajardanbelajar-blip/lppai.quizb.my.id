@@ -64,11 +64,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
-            $tsenin = implode('|||', array_filter($_POST['tutors_senin'] ?? []));
-            $tselasa = implode('|||', array_filter($_POST['tutors_selasa'] ?? []));
-            $trabu = implode('|||', array_filter($_POST['tutors_rabu'] ?? []));
-            $tkamis = implode('|||', array_filter($_POST['tutors_kamis'] ?? []));
-            $tjumat = implode('|||', array_filter($_POST['tutors_jumat'] ?? []));
+            $cleanTutors = function($arr) {
+                if (!is_array($arr)) return '';
+                return implode('|||', array_values(array_filter(array_map('trim', $arr), function($v) { return $v !== ''; })));
+            };
+            $tsenin = $cleanTutors($_POST['tutors_senin'] ?? []);
+            $tselasa = $cleanTutors($_POST['tutors_selasa'] ?? []);
+            $trabu = $cleanTutors($_POST['tutors_rabu'] ?? []);
+            $tkamis = $cleanTutors($_POST['tutors_kamis'] ?? []);
+            $tjumat = $cleanTutors($_POST['tutors_jumat'] ?? []);
 
             if (empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Semua field gelombang harus diisi.';
@@ -93,11 +97,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $krabu = (int)($_POST['kuota_rabu'] ?? 0);
             $kkamis = (int)($_POST['kuota_kamis'] ?? 0);
             $kjumat = (int)($_POST['kuota_jumat'] ?? 0);
-            $tsenin = implode('|||', array_filter($_POST['tutors_senin'] ?? []));
-            $tselasa = implode('|||', array_filter($_POST['tutors_selasa'] ?? []));
-            $trabu = implode('|||', array_filter($_POST['tutors_rabu'] ?? []));
-            $tkamis = implode('|||', array_filter($_POST['tutors_kamis'] ?? []));
-            $tjumat = implode('|||', array_filter($_POST['tutors_jumat'] ?? []));
+            $cleanTutors = function($arr) {
+                if (!is_array($arr)) return '';
+                return implode('|||', array_values(array_filter(array_map('trim', $arr), function($v) { return $v !== ''; })));
+            };
+            $tsenin = $cleanTutors($_POST['tutors_senin'] ?? []);
+            $tselasa = $cleanTutors($_POST['tutors_selasa'] ?? []);
+            $trabu = $cleanTutors($_POST['tutors_rabu'] ?? []);
+            $tkamis = $cleanTutors($_POST['tutors_kamis'] ?? []);
+            $tjumat = $cleanTutors($_POST['tutors_jumat'] ?? []);
 
             if ($id <= 0 || empty($semester) || empty($tahun_ajaran) || empty($gelombang)) {
                 $message = 'Data tidak valid.';
@@ -246,26 +254,39 @@ function renderTutorSelect($day, $tutorsList, $isEdit = false) {
                 </thead>
                 <tbody>
                     <?php
-                    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
+                    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma atau delimiter
                     if (!function_exists('parseLegacyTutors')) {
                         function parseLegacyTutors($tutorsStr, $tutorsList) {
-                            if ($tutorsStr === '') return [];
+                            if ($tutorsStr === null || trim($tutorsStr) === '') return [];
+                            $tutorsStr = trim($tutorsStr);
                             if (strpos($tutorsStr, '|||') !== false) {
-                                return array_filter(array_map('trim', explode('|||', $tutorsStr)));
+                                return array_values(array_filter(array_map('trim', explode('|||', $tutorsStr)), function($v) { return $v !== ''; }));
                             }
                             $list = $tutorsList;
                             usort($list, function($a, $b) { return strlen($b['nama']) - strlen($a['nama']); });
                             $tempStr = $tutorsStr;
                             $matched = [];
                             foreach ($list as $t) {
-                                $nama = $t['nama'];
-                                while (($pos = strpos($tempStr, $nama)) !== false) {
+                                $nama = trim($t['nama']);
+                                if ($nama === '') continue;
+                                while (($pos = mb_stripos($tempStr, $nama)) !== false) {
                                     $matched[$pos] = $nama;
                                     $tempStr = substr_replace($tempStr, str_repeat('#', strlen($nama)), $pos, strlen($nama));
                                 }
+                                $namaBase = trim(explode(',', $nama)[0]);
+                                if (strlen($namaBase) >= 4) {
+                                    while (($pos = mb_stripos($tempStr, $namaBase)) !== false) {
+                                        $matched[$pos] = $nama;
+                                        $tempStr = substr_replace($tempStr, str_repeat('#', strlen($namaBase)), $pos, strlen($namaBase));
+                                    }
+                                }
                             }
-                            ksort($matched);
-                            return array_values($matched);
+                            if (!empty($matched)) {
+                                ksort($matched);
+                                return array_values($matched);
+                            }
+                            $fallback = array_values(array_filter(array_map('trim', explode(',', $tutorsStr)), function($v) { return $v !== ''; }));
+                            return !empty($fallback) ? $fallback : [$tutorsStr];
                         }
                     }
                     foreach ($gelombangData as $g): ?>
@@ -443,12 +464,58 @@ window.addTutorRow = function(day, isEdit) {
     container.appendChild(newRow);
 };
 
+window.setTutorSelectValue = function(selectElem, targetName) {
+    if (!selectElem) return;
+    if (!targetName || typeof targetName !== 'string' || targetName.trim() === '') {
+        selectElem.value = '';
+        return;
+    }
+    targetName = targetName.trim();
+    
+    // 1. Direct match
+    selectElem.value = targetName;
+    if (selectElem.value === targetName && selectElem.selectedIndex > 0) return;
+    
+    // 2. Normalisasi kutip dan spasi
+    const norm = function(str) {
+        return (str || '').toLowerCase().replace(/[`'’‘]/g, "'").replace(/\s+/g, ' ').trim();
+    };
+    const targetNorm = norm(targetName);
+    for (let opt of selectElem.options) {
+        if (opt.value && norm(opt.value) === targetNorm) {
+            selectElem.value = opt.value;
+            return;
+        }
+    }
+    
+    // 3. Substring match (nama dasar sebelum gelar)
+    const targetBase = targetNorm.split(',')[0].trim();
+    if (targetBase.length >= 4) {
+        for (let opt of selectElem.options) {
+            if (opt.value) {
+                const optBase = norm(opt.value).split(',')[0].trim();
+                if (optBase === targetBase || optBase.includes(targetBase) || targetBase.includes(optBase)) {
+                    selectElem.value = opt.value;
+                    return;
+                }
+            }
+        }
+    }
+    
+    // 4. Fallback: Tambahkan opsi secara dinamis agar data tidak pernah kosong/hilang
+    const newOpt = new Option(targetName, targetName, true, true);
+    selectElem.add(newOpt);
+    selectElem.value = targetName;
+};
+
 window.populateTutors = function(day, tutorsString) {
     const isEdit = true;
     const prefix = 'edit_';
     const container = document.getElementById(prefix + 'tutors_' + day + '_container');
+    if (!container) return;
+
     const rows = container.querySelectorAll('.tutor-row');
-    // Keep only the first row
+    // Sisakan baris pertama saja
     for(let i = 1; i < rows.length; i++) {
         rows[i].remove();
     }
@@ -456,7 +523,7 @@ window.populateTutors = function(day, tutorsString) {
     const firstSelect = container.querySelector('select');
     firstSelect.value = '';
     
-    if (!tutorsString) {
+    if (!tutorsString || typeof tutorsString !== 'string' || tutorsString.trim() === '') {
         window.calculateQuota(day, isEdit);
         return;
     }
@@ -465,17 +532,38 @@ window.populateTutors = function(day, tutorsString) {
     if (tutorsString.indexOf('|||') !== -1) {
         tutors = tutorsString.split('|||');
     } else {
-        tutors = tutorsString.split(',');
+        // Cek apakah seluruh string cocok langsung dengan salah satu tutor (menghindari split koma pada gelar)
+        let directMatch = false;
+        for (let opt of firstSelect.options) {
+            if (opt.value && opt.value.trim().toLowerCase() === tutorsString.trim().toLowerCase()) {
+                directMatch = true;
+                break;
+            }
+        }
+        if (directMatch) {
+            tutors = [tutorsString.trim()];
+        } else {
+            tutors = tutorsString.split(',');
+        }
     }
     
-    if (tutors.length > 0) {
-        firstSelect.value = tutors[0].trim();
+    // Bersihkan spasi dan buang elemen kosong
+    tutors = tutors.map(t => t.trim()).filter(t => t !== '');
+    
+    if (tutors.length === 0) {
+        firstSelect.value = '';
+        window.calculateQuota(day, isEdit);
+        return;
     }
     
+    // Set baris pertama
+    window.setTutorSelectValue(firstSelect, tutors[0]);
+    
+    // Tambah baris berikutnya jika ada tutor lebih dari 1
     for(let i = 1; i < tutors.length; i++) {
         const newRow = rows[0].cloneNode(true);
         const select = newRow.querySelector('select');
-        select.value = tutors[i].trim();
+        window.setTutorSelectValue(select, tutors[i]);
         const btn = newRow.querySelector('button');
         btn.textContent = 'x';
         btn.classList.replace('btn-success', 'btn-danger');
@@ -491,16 +579,42 @@ window.populateTutors = function(day, tutorsString) {
 window.openGelombangModal = function(d) {
     document.getElementById('edit_id').value = d.id;
     document.getElementById('edit_semester_tipe').value = d.semester || '';
-    document.getElementById('edit_tahun_ajaran').value = d.tahun_ajaran || '';
+    
+    // Pencocokan Tahun Ajaran yang cerdas (mendukung format 2025/2026, 2025-2026, 2025 - 2026)
+    const tahunSelect = document.getElementById('edit_tahun_ajaran');
+    if (tahunSelect) {
+        const rawTahun = (d.tahun_ajaran || '').trim();
+        const cleanTahun = rawTahun.replace(/[^0-9]/g, '');
+        let matched = false;
+        
+        tahunSelect.value = rawTahun;
+        if (tahunSelect.value === rawTahun && tahunSelect.selectedIndex > 0) {
+            matched = true;
+        } else {
+            for (let opt of tahunSelect.options) {
+                if (opt.value && opt.value.replace(/[^0-9]/g, '') === cleanTahun) {
+                    tahunSelect.value = opt.value;
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if (!matched && rawTahun !== '') {
+            const opt = new Option(rawTahun, rawTahun, true, true);
+            tahunSelect.add(opt);
+            tahunSelect.value = rawTahun;
+        }
+    }
+    
     document.getElementById('edit_gelombang').value = d.gelombang || '';
     document.getElementById('edit_status').value = d.status || 'aktif';
     
-    // We update the kuota inputs dynamically based on the tutors list
-    window.populateTutors('senin', d.tutors_senin);
-    window.populateTutors('selasa', d.tutors_selasa);
-    window.populateTutors('rabu', d.tutors_rabu);
-    window.populateTutors('kamis', d.tutors_kamis);
-    window.populateTutors('jumat', d.tutors_jumat);
+    // Update daftar tutor secara dinamis
+    window.populateTutors('senin', d.tutors_senin || '');
+    window.populateTutors('selasa', d.tutors_selasa || '');
+    window.populateTutors('rabu', d.tutors_rabu || '');
+    window.populateTutors('kamis', d.tutors_kamis || '');
+    window.populateTutors('jumat', d.tutors_jumat || '');
 
     document.getElementById('editGelombangModal').classList.add('show');
 };
@@ -523,11 +637,11 @@ if (!window._editGelombangBound) {
                 tahun_ajaran: d.tahun_ajaran,
                 gelombang: d.gelombang,
                 status: d.status,
-                tutors_senin: d.tutors_senin,
-                tutors_selasa: d.tutors_selasa,
-                tutors_rabu: d.tutors_rabu,
-                tutors_kamis: d.tutors_kamis,
-                tutors_jumat: d.tutors_jumat
+                tutors_senin: btn.getAttribute('data-tutors_senin') || d.tutors_senin || d.tutorsSenin || '',
+                tutors_selasa: btn.getAttribute('data-tutors_selasa') || d.tutors_selasa || d.tutorsSelasa || '',
+                tutors_rabu: btn.getAttribute('data-tutors_rabu') || d.tutors_rabu || d.tutorsRabu || '',
+                tutors_kamis: btn.getAttribute('data-tutors_kamis') || d.tutors_kamis || d.tutorsKamis || '',
+                tutors_jumat: btn.getAttribute('data-tutors_jumat') || d.tutors_jumat || d.tutorsJumat || ''
             });
             return;
         }

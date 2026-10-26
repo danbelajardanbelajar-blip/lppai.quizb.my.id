@@ -28,26 +28,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tahun_ajaran = str_replace('/', '-', $gel['tahun_ajaran']);
     $gelombang_name = $gel['gelombang'];
 
-    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma
+    // Fungsi untuk mem-parsing data dosen lama yang masih menggunakan koma atau delimiter
     if (!function_exists('parseLegacyTutors')) {
         function parseLegacyTutors($tutorsStr, $tutorsList) {
-            if ($tutorsStr === '') return [];
+            if ($tutorsStr === null || trim($tutorsStr) === '') return [];
+            $tutorsStr = trim($tutorsStr);
             if (strpos($tutorsStr, '|||') !== false) {
-                return array_filter(array_map('trim', explode('|||', $tutorsStr)));
+                return array_values(array_filter(array_map('trim', explode('|||', $tutorsStr)), function($v) { return $v !== ''; }));
             }
             $list = $tutorsList;
             usort($list, function($a, $b) { return strlen($b['nama']) - strlen($a['nama']); });
             $tempStr = $tutorsStr;
             $matched = [];
             foreach ($list as $t) {
-                $nama = $t['nama'];
-                while (($pos = strpos($tempStr, $nama)) !== false) {
+                $nama = trim($t['nama']);
+                if ($nama === '') continue;
+                while (($pos = mb_stripos($tempStr, $nama)) !== false) {
                     $matched[$pos] = $nama;
                     $tempStr = substr_replace($tempStr, str_repeat('#', strlen($nama)), $pos, strlen($nama));
                 }
+                $namaBase = trim(explode(',', $nama)[0]);
+                if (strlen($namaBase) >= 4) {
+                    while (($pos = mb_stripos($tempStr, $namaBase)) !== false) {
+                        $matched[$pos] = $nama;
+                        $tempStr = substr_replace($tempStr, str_repeat('#', strlen($namaBase)), $pos, strlen($namaBase));
+                    }
+                }
             }
-            ksort($matched);
-            return array_values($matched);
+            if (!empty($matched)) {
+                ksort($matched);
+                return array_values($matched);
+            }
+            $fallback = array_values(array_filter(array_map('trim', explode(',', $tutorsStr)), function($v) { return $v !== ''; }));
+            return !empty($fallback) ? $fallback : [$tutorsStr];
         }
     }
 
