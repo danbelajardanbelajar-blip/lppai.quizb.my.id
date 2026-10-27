@@ -91,7 +91,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     if (!$scannedCert) {
         echo json_encode([
             'success' => false,
-            'message' => 'Sertifikat dengan kode "' . htmlspecialchars($cleanCode) . '" tidak ditemukan dalam database atau belum diterbitkan.'
+            'message' => 'Sertifikat untuk NIM / kode "' . htmlspecialchars($cleanCode) . '" tidak ditemukan dalam database atau belum diterbitkan.'
         ]);
         exit;
     }
@@ -458,14 +458,17 @@ include __DIR__ . '/../includes/header.php';
         <!-- Input Manual / Cadangan jika kamera bermasalah -->
         <div style="border-top:1px solid #e2e8f0; padding-top:16px;">
             <label style="display:block; font-size:13px; font-weight:700; color:#334155; margin-bottom:6px;">
-                ⌨️ Atau Masukkan Nomor Sertifikat / Link Secara Manual:
+                ⌨️ Atau Masukkan NIM Secara Manual:
             </label>
             <div style="display:flex; gap:10px;">
-                <input type="text" id="manualInputMhs" class="form-control" placeholder="Contoh: 5618/U/L.3.11/A.2/IX/2026 atau tempel URL" value="<?= $myCert['nomor_sertifikat'] ?? '' ?>">
+                <input type="text" id="manualInputMhs" class="form-control" placeholder="Contoh: <?= htmlspecialchars($currentUser['nim'] ?: '24010001') ?>" value="<?= htmlspecialchars($currentUser['nim'] ?? '') ?>">
                 <button type="button" class="btn btn-primary" onclick="submitManualCode()" style="white-space:nowrap; padding:10px 20px;">
                     🔍 Konfirmasi
                 </button>
             </div>
+            <small style="color:#64748b; font-size:12px; margin-top:6px; display:block;">
+                NIM Anda otomatis terisi di atas. Klik <strong>Konfirmasi</strong> untuk mencatat pengambilan tanpa perlu menyalakan kamera.
+            </small>
         </div>
     </div>
 
@@ -560,7 +563,7 @@ function onMhsScanSuccess(decodedText, decodedResult) {
 function submitManualCode() {
     var code = document.getElementById('manualInputMhs').value.trim();
     if (!code) {
-        alert("Silakan masukkan nomor sertifikat atau scan QR Code terlebih dahulu.");
+        alert("Silakan masukkan NIM atau nomor sertifikat terlebih dahulu.");
         return;
     }
     processCertificateCode(code);
