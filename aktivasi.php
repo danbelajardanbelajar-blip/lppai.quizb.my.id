@@ -16,11 +16,18 @@ $pdo = getDBConnection();
 $userId = $_SESSION['user_id'] ?? 0;
 if ($userId > 0) {
     try {
-        $stmtCheck = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+        $stmtCheck = $pdo->prepare("SELECT is_active, nim, angkatan FROM users WHERE id = ?");
         $stmtCheck->execute([$userId]);
-        $currStatus = $stmtCheck->fetchColumn();
-        if ($currStatus !== false && (int)$currStatus == 1) {
-            $_SESSION['is_active'] = 1;
+        $currUser = $stmtCheck->fetch();
+        if ($currUser) {
+            $nim = trim($currUser['nim'] ?? '');
+            $angkatan = trim($currUser['angkatan'] ?? '');
+            if (substr($nim, 0, 2) === '24' || $angkatan === '2024') {
+                $_SESSION['is_active'] = 1;
+                $pdo->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$userId]);
+            } elseif ((int)($currUser['is_active'] ?? 0) == 1) {
+                $_SESSION['is_active'] = 1;
+            }
         }
     } catch (Exception $e) {}
 }

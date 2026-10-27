@@ -53,8 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $passwordRaw = '123456'; // Default password if no birth date
                     }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
-                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, angkatan, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $angkatan, $role]);
+                    $isActive = ($role !== 'mahasiswa' || $nim_prefix === '24' || $angkatan === '2024') ? 1 : 0;
+                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, angkatan, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $angkatan, $role, $isActive]);
                     $safeNim = sanitize($nim);
                     $safePass = sanitize($passwordRaw);
                     $message = "User berhasil ditambahkan! Login: Username=<strong>$safeNim</strong>, Password=<strong>$safePass</strong>";
@@ -173,6 +174,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $msgType = 'success';
                 }
             }
+        } elseif ($action === 'activate_nim24') {
+            $stmt = $pdo->prepare("UPDATE users SET is_active = 1 WHERE role = 'mahasiswa' AND (nim LIKE '24%' OR angkatan = '2024')");
+            $stmt->execute();
+            $count = $stmt->rowCount();
+            $message = "Berhasil mengaktifkan <strong>$count</strong> akun mahasiswa dengan NIM diawali 24 (Angkatan 2024).";
+            $msgType = 'success';
         }
     }
 }
@@ -213,7 +220,7 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- ── Import Pengguna dari Excel ─────────────────────────── -->
 <div class="card">
-    <div class="card-header">📥 Import Pengguna dari Excel</div>
+    <div class="card-header">📥 Import & Kelola Status Akun</div>
     <div class="card-body" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
         <a href="<?= BASE_URL ?>/admin/download-template-users.php" class="btn btn-primary" style="width:auto;">
             📄 Download Template Excel
@@ -222,7 +229,14 @@ include __DIR__ . '/../includes/header.php';
             onclick="document.getElementById('modal-import').style.display='flex'">
             📤 Import dari Excel
         </button>
-        <small style="color:#888;">Download template .xlsx, isi data, lalu upload kembali.</small>
+        <form method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin mengaktifkan semua akun mahasiswa NIM awalan 24 (Angkatan 2024) tanpa perlu aktivasi via WhatsApp?');">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="activate_nim24">
+            <button type="submit" class="btn btn-warning" style="width:auto;background:#e67e22;color:#fff;">
+                ⚡ Aktifkan Semua NIM 24
+            </button>
+        </form>
+        <small style="color:#888;">Download template .xlsx, isi data, atau aktifkan massal angkatan 2024.</small>
     </div>
 </div>
 

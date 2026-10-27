@@ -36,7 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Set Admin and Dosen as active by default so they aren't locked out
             $pdo->exec("UPDATE users SET is_active = 1 WHERE role IN ('admin', 'dosen')");
-            $message .= "Akun Admin dan Dosen diatur menjadi aktif secara default.";
+            $message .= "Akun Admin dan Dosen diatur menjadi aktif secara default. ";
+
+            // Set Mahasiswa dengan NIM berawalan 24 (Angkatan 2024) aktif secara default tanpa perlu aktivasi
+            $count24 = $pdo->exec("UPDATE users SET is_active = 1 WHERE role = 'mahasiswa' AND (nim LIKE '24%' OR angkatan = '2024')");
+            $message .= "Semua akun mahasiswa NIM diawali 24 ($count24 akun) diatur menjadi aktif secara otomatis.";
             
             $msgType = 'success';
         } catch (PDOException $e) {

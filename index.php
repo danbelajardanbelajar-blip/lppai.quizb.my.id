@@ -26,15 +26,25 @@ if (isLoggedIn()) {
     } else {
         // Refresh status is_active langsung dari DB agar tidak terjebak di sesi lama
         if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
-            try {
-                $pdo = getDBConnection();
-                $stmt = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
-                $stmt->execute([$_SESSION['user_id']]);
-                $freshStatus = $stmt->fetchColumn();
-                if ($freshStatus !== false && (int)$freshStatus == 1) {
-                    $_SESSION['is_active'] = 1;
-                }
-            } catch (Exception $e) {}
+            $nim = trim($_SESSION['nim'] ?? '');
+            $angkatan = trim($_SESSION['angkatan'] ?? '');
+            if (substr($nim, 0, 2) === '24' || $angkatan === '2024') {
+                $_SESSION['is_active'] = 1;
+                try {
+                    $pdo = getDBConnection();
+                    $pdo->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$_SESSION['user_id']]);
+                } catch (Exception $e) {}
+            } else {
+                try {
+                    $pdo = getDBConnection();
+                    $stmt = $pdo->prepare("SELECT is_active FROM users WHERE id = ?");
+                    $stmt->execute([$_SESSION['user_id']]);
+                    $freshStatus = $stmt->fetchColumn();
+                    if ($freshStatus !== false && (int)$freshStatus == 1) {
+                        $_SESSION['is_active'] = 1;
+                    }
+                } catch (Exception $e) {}
+            }
         }
 
         if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {

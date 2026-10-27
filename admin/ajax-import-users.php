@@ -181,8 +181,11 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
 
     // Insert (cost 8 agar lebih cepat saat import bulk)
     $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, angkatan, tanggal_lahir, role) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $angkatan, $tglLahirDB, $role]);
+    $nim_prefix = substr(trim($nim), 0, 2);
+    $isActive = ($role !== 'mahasiswa' || $nim_prefix === '24' || $angkatan === '2024') ? 1 : 0;
+    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, angkatan, tanggal_lahir, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $angkatan, $tglLahirDB, $role, $isActive]);
+
     $userId = $pdo->lastInsertId();
 
     // Jika angkatan berhasil diekstrak dan dia mahasiswa, langsung daftarkan ke tutorial

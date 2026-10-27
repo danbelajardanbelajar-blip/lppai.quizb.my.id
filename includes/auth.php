@@ -31,6 +31,19 @@ function requireLogin() {
         exit;
     }
     
+    // Mahasiswa dengan NIM berawalan 24 (angkatan 2024) otomatis aktif tanpa aktivasi
+    if (isset($_SESSION['role']) && $_SESSION['role'] === 'mahasiswa' && isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
+        $nim = trim($_SESSION['nim'] ?? '');
+        $angkatan = trim($_SESSION['angkatan'] ?? '');
+        if (substr($nim, 0, 2) === '24' || $angkatan === '2024') {
+            $_SESSION['is_active'] = 1;
+            try {
+                $pdo = getDBConnection();
+                $pdo->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$_SESSION['user_id']]);
+            } catch (Exception $e) {}
+        }
+    }
+
     // Sinkronisasi status is_active secara real-time dari DB jika di sesi masih 0
     // Mencegah mahasiswa harus logout/login ulang saat admin menyetujui akun
     if (isset($_SESSION['role']) && $_SESSION['role'] === 'mahasiswa' && isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
@@ -89,15 +102,30 @@ function loginUser($username, $password) {
         $_SESSION['role'] = $user['role'];
         $_SESSION['program_studi'] = $user['program_studi'];
         $_SESSION['fakultas'] = $user['fakultas'];
+        $_SESSION['angkatan'] = $user['angkatan'] ?? '';
         
-        // Cek kolom is_active jika ada di array user (setelah migrasi), jika belum ada anggap 1 agar aman sementara.
-        // Tapi kita akan paksa 0 untuk mahasiswa berdasarkan plan jika belum ada (walaupun setelah migrasi default 0).
-        // Lebih baik:
-        $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 0;
-        // Dosen/Admin otomatis aktif jika kolom is_active belum terupdate
+        // Cek kolom is_active jika ada di array user
+        $isActive = isset($user['is_active']) ? (int)$user['is_active'] : 0;
+        
+        // Dosen/Admin otomatis aktif
         if ($_SESSION['role'] !== 'mahasiswa') {
-            $_SESSION['is_active'] = 1;
+            $isActive = 1;
         }
+
+        // Mahasiswa dengan NIM berawalan 24 (angkatan 2024) otomatis aktif tanpa aktivasi
+        $nim = trim($user['nim'] ?? '');
+        $angkatan = trim($user['angkatan'] ?? '');
+        if ($_SESSION['role'] === 'mahasiswa' && (substr($nim, 0, 2) === '24' || $angkatan === '2024')) {
+            $isActive = 1;
+            // Sinkronkan ke database jika di DB belum berstatus 1
+            if (isset($user['is_active']) && (int)$user['is_active'] !== 1) {
+                try {
+                    $pdo->prepare("UPDATE users SET is_active = 1 WHERE id = ?")->execute([$user['id']]);
+                } catch (Exception $e) {}
+            }
+        }
+
+        $_SESSION['is_active'] = $isActive;
 
         return true;
     }
@@ -121,6 +149,7 @@ function getCurrentUser() {
         'role' => $_SESSION['role'],
         'program_studi' => $_SESSION['program_studi'] ?? '',
         'fakultas' => $_SESSION['fakultas'] ?? '',
+        'angkatan' => $_SESSION['angkatan'] ?? '',
         'is_active' => $_SESSION['is_active'] ?? 0,
     ];
 }
@@ -181,6 +210,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
             $_SESSION['role'] = $user['role'];
             $_SESSION['program_studi'] = $user['program_studi'];
             $_SESSION['fakultas'] = $user['fakultas'];
+            $_SESSION['angkatan'] = $user['angkatan'] ?? '';
             $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 1;
             unset($_SESSION['admin_login_as']);
             header('Location: ' . BASE_URL . '/admin/users.php');
