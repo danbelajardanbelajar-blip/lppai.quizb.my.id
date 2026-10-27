@@ -24,6 +24,18 @@ $stmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations WHERE user_id =
 $stmt->execute([$user['id']]);
 $pretesRegistered = $stmt->fetchColumn();
 
+// Get pretes registration details for student
+$stmt = $pdo->prepare("
+    SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
+    FROM pretes_registrations pr
+    LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+    WHERE pr.user_id = ?
+    ORDER BY pr.tanggal_daftar DESC
+    LIMIT 1
+");
+$stmt->execute([$user['id']]);
+$myPretesReg = $stmt->fetch();
+
 // Get tutorial registrations
 $stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? AND (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') ORDER BY tr.created_at DESC");
 $stmt->execute([$user['id']]);
@@ -136,6 +148,109 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- Pretes Registration & Schedule (Usulan 1) -->
+<?php if ($myPretesReg): ?>
+<div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary); box-shadow: var(--shadow);">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">✍️</span>
+            <div>
+                <h3 style="margin:0; font-size:17px; font-weight:700; color:var(--text-dark);">
+                    Jadwal & Status Pretes Anda
+                </h3>
+                <small style="color:var(--text-muted); font-size:12px;">
+                    Periode: <strong><?= sanitize($myPretesReg['periode'] ?? 'Periode Aktif') ?></strong>
+                </small>
+            </div>
+        </div>
+        <div>
+            <?php if ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus'): ?>
+                <span class="badge badge-success" style="font-size:13px; padding:6px 14px;">✅ Lulus Pretes<?= $pretesResult['nilai'] !== null ? ' (Nilai: ' . number_format($pretesResult['nilai'], 1) . ')' : '' ?></span>
+            <?php elseif ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'tidak_lulus'): ?>
+                <span class="badge badge-danger" style="font-size:13px; padding:6px 14px;">❌ Belum Lulus<?= $pretesResult['nilai'] !== null ? ' (Nilai: ' . number_format($pretesResult['nilai'], 1) . ')' : '' ?></span>
+            <?php else: ?>
+                <span class="badge badge-primary" style="font-size:13px; padding:6px 14px;">✅ Terdaftar Pretes</span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <div class="card-body" style="padding: 20px;">
+        <!-- Grid Detail Jadwal -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:18px;">
+            <!-- Hari Pilihan -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span style="font-size:18px;">📅</span>
+                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Hari Pilihan</span>
+                </div>
+                <div style="font-size:17px; font-weight:700; color:var(--primary);">
+                    <?= sanitize($myPretesReg['hari_pilihan'] ?: 'Jadwal Reguler') ?>
+                </div>
+            </div>
+
+            <!-- Jam Pelaksanaan -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span style="font-size:18px;">🕐</span>
+                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Jam Pelaksanaan</span>
+                </div>
+                <div style="font-size:16px; font-weight:700; color:#1e293b;">
+                    <?= sanitize($myPretesReg['jam'] ?: '13.00 WIB (Jam 1)') ?>
+                </div>
+            </div>
+
+            <!-- Ruangan Ujian -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span style="font-size:18px;">🏢</span>
+                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Ruangan Ujian</span>
+                </div>
+                <div style="font-size:15px; font-weight:600; color:#1e293b;">
+                    <?= sanitize($myPretesReg['ruangan'] ?? ($myPretesReg['ruangan_jadwal'] ?? 'Menunggu pembagian')) ?>
+                </div>
+            </div>
+
+            <!-- Dosen Penguji -->
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                    <span style="font-size:18px;">👨‍🏫</span>
+                    <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Dosen Penguji</span>
+                </div>
+                <div style="font-size:15px; font-weight:600; color:#1e293b;">
+                    <?= sanitize($myPretesReg['dosen_penguji'] ?: 'Menunggu pembagian') ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Akun CBT & Catatan -->
+        <div style="background: <?= !empty($myPretesReg['username_tes']) ? '#eff6ff' : '#fffbeb' ?>; border: 1px solid <?= !empty($myPretesReg['username_tes']) ? '#bfdbfe' : '#fde68a' ?>; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:20px;"><?= !empty($myPretesReg['username_tes']) ? '🔑' : '⏳' ?></span>
+                <span style="font-size:13px; color: <?= !empty($myPretesReg['username_tes']) ? '#1e40af' : '#92400e' ?>; font-weight:500;">
+                    <?php if (!empty($myPretesReg['username_tes'])): ?>
+                        Akun Tes Tulis CBT Anda <strong>sudah siap</strong>. Username: <code style="background:#dbeafe; padding:2px 6px; border-radius:4px; font-weight:700; color:#1e40af;"><?= sanitize($myPretesReg['username_tes']) ?></code>
+                    <?php else: ?>
+                        Akun Tes Tulis CBT <strong>sedang diproses TU</strong> dan akan dibagikan menjelang hari pelaksanaan.
+                    <?php endif; ?>
+                </span>
+            </div>
+            <div style="font-size:12px; color:var(--text-muted);">
+                ℹ️ Harap hadir 15 menit sebelum ujian dimulai
+            </div>
+        </div>
+
+        <!-- Tombol Aksi Cepat -->
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; text-decoration:none;">
+                🔑 Buka Akun CBT & Jadwal Lengkap
+            </a>
+            <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-secondary" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; text-decoration:none;">
+                📊 Cek Hasil Pretes
+            </a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Tutorial Registrations -->
 <?php if (!empty($tutorialRegs)): ?>
