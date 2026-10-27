@@ -4,6 +4,16 @@ class SessionDatabaseHandler implements SessionHandlerInterface {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id VARCHAR(128) NOT NULL PRIMARY KEY,
+                    data MEDIUMTEXT NOT NULL,
+                    timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX idx_timestamp (timestamp)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+        } catch (Exception $e) {}
     }
 
     #[\ReturnTypeWillChange]

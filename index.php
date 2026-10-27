@@ -128,6 +128,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        required autocomplete="current-password">
             </div>
 
+            <div class="form-group" style="display:flex;align-items:center;justify-content:flex-start;margin-top:-4px;margin-bottom:18px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13.5px;color:#475569;cursor:pointer;user-select:none;margin-bottom:0;">
+                    <input type="checkbox" name="remember_me" value="1" checked style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+                    <span>Ingat saya di perangkat ini</span>
+                </label>
+            </div>
+
             <button type="submit" class="btn btn-primary">Masuk</button>
         </form>
 

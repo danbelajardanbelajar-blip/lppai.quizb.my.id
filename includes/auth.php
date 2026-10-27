@@ -7,6 +7,24 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/SessionDatabaseHandler.php';
 
 if (session_status() === PHP_SESSION_NONE) {
+    // Konfigurasi masa aktif sesi tahan lama (30 hari = 2.592.000 detik)
+    $sessionLifetime = 30 * 24 * 60 * 60; // 30 hari
+    ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
+    ini_set('session.cookie_lifetime', (string)$sessionLifetime);
+
+    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+               || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+               || (defined('BASE_URL') && strpos(BASE_URL, 'https://') === 0);
+
+    session_set_cookie_params([
+        'lifetime' => $sessionLifetime,
+        'path'     => '/',
+        'domain'   => '',
+        'secure'   => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+
     $pdo = getDBConnection();
     $sessionHandler = new SessionDatabaseHandler($pdo);
     session_set_save_handler($sessionHandler, true);
@@ -127,6 +145,9 @@ function loginUser($username, $password) {
 
         $_SESSION['is_active'] = $isActive;
 
+        // Regenerasi ID sesi untuk keamanan (mencegah session fixation)
+        session_regenerate_id(true);
+
         return true;
     }
     return false;
@@ -135,6 +156,13 @@ function loginUser($username, $password) {
 function logoutUser() {
     session_unset();
     session_destroy();
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
     header('Location: ' . BASE_URL . '/index.php');
     exit;
 }
