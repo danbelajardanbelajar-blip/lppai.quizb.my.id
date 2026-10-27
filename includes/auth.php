@@ -140,6 +140,31 @@ function sanitize($input) {
     return htmlspecialchars(trim($input), ENT_QUOTES, 'UTF-8');
 }
 
+/**
+ * Standarisasi format nomor HP/WhatsApp ke format 628...
+ * Contoh: 0812... -> 62812..., 812... -> 62812..., +62812... -> 62812...
+ */
+function formatNoHp($noHp) {
+    if (empty($noHp)) return '';
+    $clean = preg_replace('/[^0-9]/', '', (string)$noHp);
+    if (empty($clean)) return '';
+
+    // Jika diawali 62...
+    if (substr($clean, 0, 2) === '62') {
+        return $clean;
+    }
+    // Jika diawali 0... (contoh 08...)
+    if (substr($clean, 0, 1) === '0') {
+        return '62' . substr($clean, 1);
+    }
+    // Jika langsung diawali 8... (contoh 812...)
+    if (substr($clean, 0, 1) === '8') {
+        return '62' . $clean;
+    }
+
+    return $clean;
+}
+
 // Global handler for Return to Admin
 if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
     if (isset($_SESSION['admin_login_as'])) {

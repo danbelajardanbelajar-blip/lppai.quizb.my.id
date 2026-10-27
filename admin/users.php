@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
             $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $email   = trim($_POST['email'] ?? '');
-            $noHp    = trim($_POST['no_hp'] ?? '');
+            $noHp    = formatNoHp(trim($_POST['no_hp'] ?? ''));
             $prodi   = trim($_POST['program_studi'] ?? '');
             $role    = $_POST['role'] ?? 'mahasiswa';
             
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id      = (int)($_POST['id'] ?? 0);
             $nama    = trim($_POST['nama_lengkap'] ?? '');
             $email   = trim($_POST['email'] ?? '');
-            $noHp    = trim($_POST['no_hp'] ?? '');
+            $noHp    = formatNoHp(trim($_POST['no_hp'] ?? ''));
             $prodi   = trim($_POST['program_studi'] ?? '');
             $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');

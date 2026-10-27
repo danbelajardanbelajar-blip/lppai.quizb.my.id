@@ -65,15 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $action = $_POST['action'];
 
         if ($action === 'update_nohp') {
-            $newNoHp = trim($_POST['no_hp']);
+            $newNoHp = trim($_POST['no_hp'] ?? '');
+            $cleanNoHp = formatNoHp($newNoHp);
+
             if (empty($newNoHp)) {
                 $message = 'Nomor HP tidak boleh kosong.';
                 $msgType = 'danger';
+            } elseif (strlen($cleanNoHp) < 10 || strlen($cleanNoHp) > 16) {
+                $message = 'Nomor WhatsApp tidak valid. Pastikan nomor yang dimasukkan benar (contoh: 08123456789 atau 628123456789).';
+                $msgType = 'danger';
             } else {
-                // Pastikan nomor HP formatnya benar (contoh: +62xxx atau 08xxx)
-                $pdo->prepare("UPDATE users SET no_hp = ? WHERE id = ?")->execute([$newNoHp, $userId]);
-                $noHp = $newNoHp;
-                $message = 'Nomor HP berhasil diperbarui.';
+                // Simpan nomor HP yang otomatis terstandarisasi dengan awalan 628
+                $pdo->prepare("UPDATE users SET no_hp = ? WHERE id = ?")->execute([$cleanNoHp, $userId]);
+                $noHp = $cleanNoHp;
+                $message = "Nomor WhatsApp berhasil disimpan dan distandarkan menjadi: <strong>$cleanNoHp</strong>";
                 $msgType = 'success';
             }
         } elseif ($action === 'request_activation') {
@@ -81,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Harap isi Nomor HP / WhatsApp Anda terlebih dahulu sebelum meminta aktivasi.';
                 $msgType = 'danger';
             } else {
+                $cleanNoHp = formatNoHp($noHp);
                 // Generate token
                 $token = bin2hex(random_bytes(32));
                 try {
@@ -103,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $waText .= "Saya mahasiswa meminta persetujuan aktivasi akun LPPAI Corner.\n";
                 $waText .= "NIM: " . $user['nim'] . "\n";
                 $waText .= "Nama: " . $user['nama_lengkap'] . "\n";
-                $waText .= "No. HP: " . $noHp . "\n\n";
+                $waText .= "No. HP: " . $cleanNoHp . "\n\n";
                 $waText .= "Berikut adalah link aktivasi akun saya (Hanya dapat diakses oleh Admin):\n";
                 $waText .= $activationLink;
 
@@ -149,9 +155,12 @@ include __DIR__ . '/includes/header.php';
             <div class="form-group">
                 <label>Koreksi / Isi Nomor WhatsApp Anda:</label>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" name="no_hp" value="<?= sanitize($noHp) ?>" class="form-control" placeholder="Contoh: 08123456789" required>
+                    <input type="text" name="no_hp" value="<?= sanitize($noHp) ?>" class="form-control" placeholder="Contoh: 08123456789 / 62812... / 812..." required>
                     <button type="submit" class="btn btn-secondary">Simpan Nomor</button>
                 </div>
+                <small style="color: #6c757d; font-size: 0.85em; display: block; margin-top: 6px;">
+                    💡 Nomor yang diketik diawali <code>08...</code>, <code>628...</code>, atau <code>8...</code> akan otomatis distandarkan dengan format <code>628...</code>.
+                </small>
             </div>
         </form>
 

@@ -40,11 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Aktifkan akun dan hapus token
         $pdo->prepare("UPDATE users SET is_active = 1, activation_token = NULL WHERE id = ?")->execute([$userId]);
         
-        // Bersihkan format nomor HP jika perlu (pastikan berawalan kode negara)
-        $waNumber = preg_replace('/[^0-9]/', '', $noHpMahasiswa);
-        if (substr($waNumber, 0, 1) === '0') {
-            $waNumber = '62' . substr($waNumber, 1);
-        }
+        // Bersihkan format nomor HP (pastikan selalu berawalan 628...)
+        $waNumber = formatNoHp($noHpMahasiswa);
 
         // Siapkan pesan ke mahasiswa
         $waText = "Halo {$namaMahasiswa},\n\n";
