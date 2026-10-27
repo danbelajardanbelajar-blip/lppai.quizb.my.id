@@ -170,14 +170,26 @@ $participants = $pdo->query("
 $totalPeserta    = count($participants);
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
 
-// Hitung sebaran hari peserta
+// Hitung sebaran hari, prodi, dan status peserta
 $dayCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$prodiCounts = [];
+$statusCounts = ['terdaftar' => 0, 'hadir' => 0, 'tidak_hadir' => 0];
+
 foreach ($participants as $p) {
     $dh = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
     if (isset($dayCounts[$dh])) {
         $dayCounts[$dh]++;
     }
+    $prd = trim($p['program_studi'] ?? '');
+    if ($prd !== '') {
+        $prodiCounts[$prd] = ($prodiCounts[$prd] ?? 0) + 1;
+    }
+    $st = strtolower(trim($p['status'] ?? 'terdaftar'));
+    if (isset($statusCounts[$st])) {
+        $statusCounts[$st]++;
+    }
 }
+ksort($prodiCounts);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -261,7 +273,108 @@ include __DIR__ . '/../includes/header.php';
                 <p>Belum ada mahasiswa yang mendaftar pretes.</p>
             </div>
         <?php else: ?>
-        <!-- Filter & Sebaran Hari Peserta Pretes -->
+        <!-- ── Filter Multi-Kolom di Atas Tabel Peserta Pretes ───────────── -->
+        <div class="filter-panel" style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:#eff6ff;color:#2563eb;font-size:16px;">
+                        🔍
+                    </span>
+                    <div>
+                        <strong style="font-size:14px;color:#0f172a;display:block;">Filter Data Peserta (Sesuai Kolom Tabel)</strong>
+                        <span style="font-size:12px;color:#64748b;">Filter instan berdasarkan Nama, NIM, Prodi, Hari Pelaksanaan, Status Kehadiran, atau Status Credentials</span>
+                    </div>
+                    <span id="filter-active-badge" style="display:none;background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid #bfdbfe;margin-left:6px;">
+                        0 Filter Aktif
+                    </span>
+                </div>
+                <button type="button" id="btn-reset-filters" class="btn btn-sm" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                    🔄 Reset Semua Filter
+                </button>
+            </div>
+
+            <!-- Grid Input Filter Sesuai Nama Kolom -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;">
+                <!-- Kolom 1: Nama -->
+                <div>
+                    <label for="filter-nama" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        👤 Nama Mahasiswa
+                    </label>
+                    <input type="text" id="filter-nama" placeholder="Cari nama..."
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
+                        onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
+                        onblur="this.style.borderColor='#cbd5e1';if(!this.value)this.style.background='#f8fafc'">
+                </div>
+
+                <!-- Kolom 2: NIM -->
+                <div>
+                    <label for="filter-nim" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        🔢 NIM
+                    </label>
+                    <input type="text" id="filter-nim" placeholder="Cari NIM..."
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
+                        onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
+                        onblur="this.style.borderColor='#cbd5e1';if(!this.value)this.style.background='#f8fafc'">
+                </div>
+
+                <!-- Kolom 3: Prodi -->
+                <div>
+                    <label for="filter-prodi" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        🎓 Program Studi
+                    </label>
+                    <select id="filter-prodi"
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
+                        <option value="">Semua Prodi (<?= count($prodiCounts) ?>)</option>
+                        <?php foreach ($prodiCounts as $prd => $cnt): ?>
+                            <option value="<?= sanitize($prd) ?>"><?= sanitize($prd) ?> (<?= $cnt ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Kolom 4: Hari / Periode -->
+                <div>
+                    <label for="filter-hari" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        📅 Hari Pelaksanaan
+                    </label>
+                    <select id="filter-hari"
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
+                        <option value="">Semua Hari (<?= $totalPeserta ?>)</option>
+                        <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                            <option value="<?= $day ?>"><?= $day ?> (<?= $dayCounts[$day] ?? 0 ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- Kolom 5: Status Hadir -->
+                <div>
+                    <label for="filter-status" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        📋 Status Hadir
+                    </label>
+                    <select id="filter-status"
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
+                        <option value="">Semua Status Kehadiran</option>
+                        <option value="terdaftar">Terdaftar (<?= $statusCounts['terdaftar'] ?? 0 ?>)</option>
+                        <option value="hadir">Hadir (<?= $statusCounts['hadir'] ?? 0 ?>)</option>
+                        <option value="tidak_hadir">Tidak Hadir (<?= $statusCounts['tidak_hadir'] ?? 0 ?>)</option>
+                    </select>
+                </div>
+
+                <!-- Kolom 6: Username Tes / Credentials -->
+                <div>
+                    <label for="filter-cred" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        🔑 Status Credentials
+                    </label>
+                    <select id="filter-cred"
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
+                        <option value="">Semua Status Credentials</option>
+                        <option value="has_cred">Sudah Ada (<?= $totalBerCredentials ?>)</option>
+                        <option value="no_cred">Belum Ada (<?= $totalPeserta - $totalBerCredentials ?>)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter & Sebaran Hari Peserta Pretes (Shortcut Badges) -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;background:#f8fafc;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;">
             <span style="font-size:13px;font-weight:600;color:#475569;">📅 Distribusi Hari:</span>
             <button type="button" class="btn-filter-day" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#e2e8f0;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
@@ -278,7 +391,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="table-responsive">
-            <table>
+            <table id="table-peserta-pretes">
                 <thead>
                     <tr>
                         <th>No</th>
@@ -296,14 +409,14 @@ include __DIR__ . '/../includes/header.php';
                     <?php foreach ($participants as $i => $p): ?>
                     <tr id="row-<?= $p['reg_id'] ?>">
                         <td><?= $i + 1 ?></td>
-                        <td><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
-                        <td><?= sanitize($p['nim']) ?></td>
-                        <td><?= sanitize($p['program_studi']) ?></td>
+                        <td data-search="<?= sanitize($p['nama_lengkap']) ?>"><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
+                        <td data-search="<?= sanitize($p['nim']) ?>"><?= sanitize($p['nim']) ?></td>
+                        <td data-search="<?= sanitize($p['program_studi']) ?>"><?= sanitize($p['program_studi']) ?></td>
                         <?php 
                         $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
                         ?>
-                        <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?> <?= sanitize($p['jam'] ?? '') ?>">
+                        <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?>">
                             <!-- Dropdown ubah hari pelaksanaan langsung -->
                             <form method="POST" style="display:inline-flex;align-items:center;gap:6px;margin:0;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -326,7 +439,7 @@ include __DIR__ . '/../includes/header.php';
                                 </span>
                             </form>
                         </td>
-                        <td>
+                        <td data-order="<?= sanitize($p['status']) ?>" data-search="<?= sanitize($p['status']) ?>">
                             <!-- Dropdown status hadir -->
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -343,7 +456,7 @@ include __DIR__ . '/../includes/header.php';
                             </form>
                         </td>
                         <!-- Username -->
-                        <td>
+                        <td data-order="<?= !empty($p['username_tes']) ? 1 : 0 ?>" data-search="<?= !empty($p['username_tes']) ? ('has_cred ' . sanitize($p['username_tes'])) : 'no_cred' ?>">
                             <?php if (!empty($p['username_tes'])): ?>
                                 <code style="background:#f0f7ff;padding:3px 8px;border-radius:6px;font-size:13px;color:#1a73e8;">
                                     <?= sanitize($p['username_tes']) ?>
@@ -540,20 +653,186 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Filter DataTables berdasarkan Hari Pelaksanaan
-document.querySelectorAll('.btn-filter-day').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var day = this.dataset.day || '';
-        if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('table')) {
-            $('table').DataTable().column(4).search(day).draw();
-        }
-        document.querySelectorAll('.btn-filter-day').forEach(function(b) {
+// ── Filter Multi-Kolom DataTables Peserta Pretes ──────────────────
+function getPretesTable() {
+    var tbl = $('#table-peserta-pretes');
+    if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(tbl)) {
+        return tbl.DataTable();
+    }
+    return null;
+}
+
+function updateDayBadges(activeDay) {
+    document.querySelectorAll('.btn-filter-day').forEach(function(b) {
+        var day = b.dataset.day || '';
+        if (day === activeDay) {
+            b.style.background = '#2563eb';
+            b.style.color = '#ffffff';
+            b.style.borderColor = '#2563eb';
+            var sp = b.querySelector('span');
+            if (sp) sp.style.color = '#ffffff';
+        } else {
             b.style.background = '#fff';
             b.style.color = '#334155';
-        });
-        this.style.background = '#e2e8f0';
+            b.style.borderColor = '#cbd5e1';
+            var sp = b.querySelector('span');
+            if (sp) sp.style.color = '#2563eb';
+        }
     });
-});
+}
+
+function applyPretesFilters() {
+    var dt = getPretesTable();
+    if (!dt) return;
+
+    var namaVal   = ($('#filter-nama').val() || '').trim();
+    var nimVal    = ($('#filter-nim').val() || '').trim();
+    var prodiVal  = $('#filter-prodi').val() || '';
+    var hariVal   = $('#filter-hari').val() || '';
+    var statusVal = $('#filter-status').val() || '';
+    var credVal   = $('#filter-cred').val() || '';
+
+    // Kolom 1: Nama
+    dt.column(1).search(namaVal);
+
+    // Kolom 2: NIM
+    dt.column(2).search(nimVal);
+
+    // Kolom 3: Prodi (Exact match jika dipilih)
+    if (prodiVal) {
+        dt.column(3).search('^' + $.fn.dataTable.util.escapeRegex(prodiVal) + '$', true, false);
+    } else {
+        dt.column(3).search('');
+    }
+
+    // Kolom 4: Hari (Exact match jika dipilih)
+    if (hariVal) {
+        dt.column(4).search('^' + $.fn.dataTable.util.escapeRegex(hariVal) + '$', true, false);
+    } else {
+        dt.column(4).search('');
+    }
+
+    // Kolom 5: Status Hadir (Exact match jika dipilih)
+    if (statusVal) {
+        dt.column(5).search('^' + $.fn.dataTable.util.escapeRegex(statusVal) + '$', true, false);
+    } else {
+        dt.column(5).search('');
+    }
+
+    // Kolom 6: Credentials (has_cred / no_cred)
+    if (credVal === 'has_cred') {
+        dt.column(6).search('has_cred');
+    } else if (credVal === 'no_cred') {
+        dt.column(6).search('no_cred');
+    } else {
+        dt.column(6).search('');
+    }
+
+    dt.draw();
+
+    // Sinkronkan badge shortcut distribusi hari
+    updateDayBadges(hariVal);
+
+    // Update indikator filter aktif
+    var activeCount = 0;
+    if (namaVal) activeCount++;
+    if (nimVal) activeCount++;
+    if (prodiVal) activeCount++;
+    if (hariVal) activeCount++;
+    if (statusVal) activeCount++;
+    if (credVal) activeCount++;
+
+    var badge = document.getElementById('filter-active-badge');
+    if (badge) {
+        if (activeCount > 0) {
+            badge.style.display = 'inline-block';
+            badge.textContent = activeCount + ' Filter Aktif';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    try {
+        sessionStorage.setItem('pretes_peserta_filter', JSON.stringify({
+            nama: namaVal,
+            nim: nimVal,
+            prodi: prodiVal,
+            hari: hariVal,
+            status: statusVal,
+            cred: credVal
+        }));
+    } catch(e) {}
+}
+
+function initPretesFilters() {
+    var checkTimer = setInterval(function() {
+        var dt = getPretesTable();
+        if (dt) {
+            clearInterval(checkTimer);
+            setupPretesFilters();
+        }
+    }, 100);
+    setTimeout(function() { clearInterval(checkTimer); }, 5000);
+}
+
+function setupPretesFilters() {
+    // Pulihkan filter dari sessionStorage bila ada
+    try {
+        var saved = JSON.parse(sessionStorage.getItem('pretes_peserta_filter') || '{}');
+        if (saved.nama)   $('#filter-nama').val(saved.nama);
+        if (saved.nim)    $('#filter-nim').val(saved.nim);
+        if (saved.prodi)  $('#filter-prodi').val(saved.prodi);
+        if (saved.hari)   $('#filter-hari').val(saved.hari);
+        if (saved.status) $('#filter-status').val(saved.status);
+        if (saved.cred)   $('#filter-cred').val(saved.cred);
+    } catch(e) {}
+
+    // Event input debounced untuk Nama dan NIM
+    var debounceTimer;
+    function debouncedApply() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(applyPretesFilters, 200);
+    }
+
+    $('#filter-nama').on('input', debouncedApply);
+    $('#filter-nim').on('input', debouncedApply);
+
+    // Event change untuk dropdown filter
+    $('#filter-prodi, #filter-hari, #filter-status, #filter-cred').on('change', applyPretesFilters);
+
+    // Tombol pill shortcut Distribusi Hari
+    document.querySelectorAll('.btn-filter-day').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var day = this.dataset.day || '';
+            $('#filter-hari').val(day);
+            applyPretesFilters();
+        });
+    });
+
+    // Tombol Reset Semua Filter
+    var resetBtn = document.getElementById('btn-reset-filters');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            $('#filter-nama').val('');
+            $('#filter-nim').val('');
+            $('#filter-prodi').val('');
+            $('#filter-hari').val('');
+            $('#filter-status').val('');
+            $('#filter-cred').val('');
+            try { sessionStorage.removeItem('pretes_peserta_filter'); } catch(e) {}
+            applyPretesFilters();
+        });
+    }
+
+    // Jalankan filter awal (misal jika ada state tersimpan)
+    applyPretesFilters();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPretesFilters);
+} else {
+    initPretesFilters();
+}
 
 // Generate password acak 6 karakter
 function generatePassword() {
