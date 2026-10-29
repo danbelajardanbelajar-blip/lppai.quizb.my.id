@@ -4,37 +4,7 @@
  * Menampilkan jadwal pretes, daftar peserta, dan credentials tes tulis pribadi.
  */
 
-// ── Handler AJAX: verifikasi password (harus di paling atas, sebelum HTML) ──
-if (isset($_POST['action']) && $_POST['action'] === 'verify_password') {
-    require_once __DIR__ . '/../includes/auth.php';
-    ob_clean();
-    header('Content-Type: application/json; charset=utf-8');
 
-    $ok  = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
-    $tok = $_POST['csrf_token'] ?? '';
-    $validTok = isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $tok);
-
-    if (!$ok)       { echo json_encode(['ok'=>false,'message'=>'Sesi habis. Muat ulang halaman.']); exit; }
-    if (!$validTok) { echo json_encode(['ok'=>false,'message'=>'Token tidak valid. Muat ulang halaman.']); exit; }
-
-    $pw = $_POST['password'] ?? '';
-    if ($pw === '') { echo json_encode(['ok'=>false,'message'=>'Password tidak boleh kosong.']); exit; }
-
-    try {
-        $pdo2 = getDBConnection();
-        $s = $pdo2->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
-        $s->execute([$_SESSION['user_id']]);
-        $u = $s->fetch();
-        if ($u && password_verify($pw, $u['password'])) {
-            echo json_encode(['ok' => true]);
-        } else {
-            echo json_encode(['ok'=>false,'message'=>'Password salah. Coba lagi.']);
-        }
-    } catch (Exception $e) {
-        echo json_encode(['ok'=>false,'message'=>'Kesalahan server.']);
-    }
-    exit;
-}
 
 define('PAGE_TITLE', 'Peserta & Jadwal Pretes');
 require_once __DIR__ . '/../includes/auth.php';
@@ -251,13 +221,13 @@ include __DIR__ . '/../includes/header.php';
                         ••••••
                     </div>
                     <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
-                        <button onclick="askAndShowPassword()"
+                        <button onclick="togglePassword()"
                                 id="btn-toggle-pass"
                                 style="background:#e65100;color:#fff;border:none;border-radius:8px;
                                        padding:6px 14px;cursor:pointer;font-size:13px;">
                             👁️ Tampilkan
                         </button>
-                        <button onclick="copyPasswordIfVisible('btn-copy-pass')"
+                        <button onclick="copyPassword('btn-copy-pass')"
                                 id="btn-copy-pass"
                                 style="background:#bf360c;color:#fff;border:none;border-radius:8px;
                                        padding:6px 14px;cursor:pointer;font-size:13px;">
@@ -606,155 +576,42 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- ── Modal Konfirmasi Password ─────────────────────────── -->
-<div id="modal-verify-pass"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;
-            align-items:center;justify-content:center;backdrop-filter:blur(3px);">
-    <div style="background:#fff;border-radius:16px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.25);
-                animation:modalIn .2s ease;overflow:hidden;">
-        <div style="background:#e65100;color:#fff;padding:18px 24px;
-                    font-weight:700;font-size:16px;">🔐 Konfirmasi Password</div>
-        <div style="padding:24px;">
-            <p style="margin:0 0 16px;color:#555;font-size:14px;">
-                Masukkan <strong>password akun</strong> Anda untuk melihat password tes tulis.
-            </p>
-            <div style="margin-bottom:12px;">
-                <input type="password" id="verify-pass-input"
-                    placeholder="Password akun Anda..."
-                    style="width:100%;box-sizing:border-box;padding:11px 14px;
-                           border:2px solid #e0e0e0;border-radius:10px;font-size:14px;
-                           font-family:inherit;"
-                    onkeydown="if(event.key==='Enter'){submitVerify();}"
-                    autocomplete="current-password">
-            </div>
-            <div id="verify-pass-error"
-                 style="display:none;color:#ef4444;font-size:13px;margin-bottom:12px;"></div>
-            <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button onclick="closeVerifyModal()"
-                    style="background:#f3f4f6;color:#555;border:none;border-radius:8px;
-                           padding:8px 18px;cursor:pointer;font-size:13px;font-family:inherit;">
-                    Batal
-                </button>
-                <button onclick="submitVerify()" id="verify-pass-btn"
-                    style="background:#e65100;color:#fff;border:none;border-radius:8px;
-                           padding:8px 20px;cursor:pointer;font-size:13px;font-weight:600;
-                           font-family:inherit;">
-                    🔓 Konfirmasi
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-@keyframes modalIn {
-    from { opacity:0; transform:translateY(-14px) scale(.97); }
-    to   { opacity:1; transform:translateY(0) scale(1); }
-}
-</style>
-
 <script>
-var _revealedPassword = null; // disimpan setelah verifikasi berhasil
-
-function askAndShowPassword() {
+function togglePassword() {
     const display = document.getElementById('password-display');
-    // Jika sudah terlihat, sembunyikan kembali
-    if (_revealedPassword !== null && display.textContent.trim() !== '••••••') {
+    const btn = document.getElementById('btn-toggle-pass');
+    const encInput = document.getElementById('__enc_pass');
+    if (!display || !encInput) return;
+
+    if (display.getAttribute('data-shown') === '1') {
         display.textContent = '••••••';
         display.style.letterSpacing = '6px';
-        document.getElementById('btn-toggle-pass').textContent = '👁️ Tampilkan';
-        return;
+        display.setAttribute('data-shown', '0');
+        if (btn) btn.textContent = '👁️ Tampilkan';
+    } else {
+        const plain = atob(encInput.value);
+        display.textContent = plain;
+        display.style.letterSpacing = 'normal';
+        display.setAttribute('data-shown', '1');
+        if (btn) btn.textContent = '🙈 Sembunyikan';
     }
-    // Buka modal
-    document.getElementById('verify-pass-input').value = '';
-    document.getElementById('verify-pass-error').style.display = 'none';
-    document.getElementById('modal-verify-pass').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => document.getElementById('verify-pass-input').focus(), 100);
 }
 
-function closeVerifyModal() {
-    document.getElementById('modal-verify-pass').style.display = 'none';
-    document.body.style.overflow = '';
-}
+function copyPassword(btnId) {
+    const encInput = document.getElementById('__enc_pass');
+    if (!encInput) return;
+    const plain = atob(encInput.value);
 
-function submitVerify() {
-    const pw  = document.getElementById('verify-pass-input').value;
-    const btn = document.getElementById('verify-pass-btn');
-    const err = document.getElementById('verify-pass-error');
-
-    if (!pw) {
-        err.textContent = 'Password tidak boleh kosong.';
-        err.style.display = 'block';
-        return;
+    const display = document.getElementById('password-display');
+    const btn = document.getElementById('btn-toggle-pass');
+    if (display && display.getAttribute('data-shown') !== '1') {
+        display.textContent = plain;
+        display.style.letterSpacing = 'normal';
+        display.setAttribute('data-shown', '1');
+        if (btn) btn.textContent = '🙈 Sembunyikan';
     }
 
-    btn.disabled = true;
-    btn.textContent = '⏳ Memverifikasi...';
-    err.style.display = 'none';
-
-    const fd = new FormData();
-    fd.append('csrf_token', <?= json_encode(csrfToken()) ?>);
-    fd.append('password', pw);
-
-    fetch(window.location.href, { method: 'POST', body: fd })
-        .then(r => r.text())
-        .then(text => {
-            let data;
-            try { data = JSON.parse(text); }
-            catch(e) {
-                err.textContent = 'Respons server tidak valid: ' + text.substring(0, 120);
-                err.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = '🔓 Konfirmasi';
-                return;
-            }
-            if (data.ok) {
-                const encoded = document.getElementById('__enc_pass').value;
-                _revealedPassword = atob(encoded);
-
-                const display = document.getElementById('password-display');
-                display.textContent = _revealedPassword;
-                display.style.letterSpacing = 'normal';
-                document.getElementById('btn-toggle-pass').textContent = '🙈 Sembunyikan';
-                closeVerifyModal();
-            } else {
-                err.textContent = data.message || 'Password salah.';
-                err.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = '🔓 Konfirmasi';
-                document.getElementById('verify-pass-input').select();
-            }
-        })
-        .catch(e => {
-            err.textContent = 'Koneksi gagal: ' + e.message;
-            err.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = '🔓 Konfirmasi';
-        });
-}
-
-function copyPasswordIfVisible(btnId) {
-    if (_revealedPassword === null) {
-        askAndShowPassword();
-        return;
-    }
-    navigator.clipboard.writeText(_revealedPassword).then(() => {
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            const original = btn.textContent;
-            btn.textContent = '✅ Tersalin!';
-            btn.style.background = '#28a745';
-            setTimeout(() => { btn.textContent = original; btn.style.background = ''; }, 2000);
-        }
-    }).catch(() => {
-        const el = document.createElement('textarea');
-        el.value = _revealedPassword;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-    });
+    copyText(plain, btnId);
 }
 
 function copyText(text, btnId) {
@@ -776,13 +633,7 @@ function copyText(text, btnId) {
     });
 }
 
-// Tutup modal klik di luar
-document.getElementById('modal-verify-pass').addEventListener('click', function(e) {
-    if (e.target === this) closeVerifyModal();
-});
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeVerifyModal();
-});
+
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
