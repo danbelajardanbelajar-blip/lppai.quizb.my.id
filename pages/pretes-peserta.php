@@ -165,6 +165,21 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
             <?php endif; ?>
+
+            <!-- Akses Cepat Langsung ke E-Ujian -->
+            <div style="margin-top:18px;padding:14px 18px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:24px;">🌐</span>
+                    <div>
+                        <strong style="color:#1e40af;font-size:14px;display:block;">Siap Mengerjakan Tes Tulis?</strong>
+                        <span style="color:#3b82f6;font-size:12.5px;">Gunakan username & password di atas untuk login pada platform CBT <strong>E-Ujian</strong></span>
+                    </div>
+                </div>
+                <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" class="btn"
+                   style="background:#2563eb;color:#ffffff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(37,99,235,0.25);">
+                    🚀 Buka Website E-Ujian ↗
+                </a>
+            </div>
         </div>
     </div>
 
@@ -190,6 +205,165 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php endif; ?>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PANDUAN PENGGUNAAN E-UJIAN (www.e-ujian.com) BAGI PESERTA PRETES
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="card" style="margin-bottom:28px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 4px 16px rgba(0,0,0,0.04);overflow:hidden;">
+        <div class="card-header" style="background:linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);color:#ffffff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.18);font-size:22px;">
+                    📖
+                </span>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.2px;">
+                        Panduan Penggunaan Platform E-Ujian (CBT Tes Tulis Pretes)
+                    </h3>
+                    <p style="margin:2px 0 0;font-size:12.5px;color:#dbeafe;">
+                        Tata cara resmi pengerjaan ujian berbasis komputer di <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" style="color:#ffffff;text-decoration:underline;font-weight:700;">www.e-ujian.com</a>
+                    </p>
+                </div>
+            </div>
+            <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer"
+               style="background:#ffffff;color:#1e3a8a;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+                🌐 Kunjungi e-ujian.com ↗
+            </a>
+        </div>
+
+        <div class="card-body" style="padding:24px;">
+            <!-- Info Pengantar -->
+            <div style="background:#f8fafc;border-left:4px solid #2563eb;padding:14px 16px;border-radius:8px;margin-bottom:24px;">
+                <p style="margin:0;font-size:13.5px;color:#334155;line-height:1.6;">
+                    Ujian tulis pretes LPPAI dilaksanakan secara digital menggunakan platform <strong>E-Ujian (Computer Based Test)</strong>. 
+                    Silakan ikuti petunjuk langkah demi langkah di bawah ini untuk memulai dan menyelesaikan ujian dengan lancar:
+                </p>
+            </div>
+
+            <!-- Grid 6 Langkah Panduan -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:18px;margin-bottom:24px;">
+                <!-- Langkah 1 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                1
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Salin Username & Password</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Gunakan tombol <strong>Salin Username</strong> dan <strong>Salin Password</strong> yang tertera pada kotak credentials di atas halaman ini. Pastikan tidak ada spasi tambahan saat menyalin.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        💡 Contoh: Username <code>TES24061002</code>
+                    </div>
+                </div>
+
+                <!-- Langkah 2 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                2
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Buka Website E-Ujian</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Buka tautan resmi portal ujian di <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">https://www.e-ujian.com/</a> atau link portal sekolah/kampus yang dibagikan oleh panitia.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        🌐 Disarankan peramban <strong>Google Chrome</strong>
+                    </div>
+                </div>
+
+                <!-- Langkah 3 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                3
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Login Sebagai Peserta</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Pilih menu <strong>Masuk / Login Siswa/Peserta</strong>. Masukkan Username dan Password yang telah Anda salin sebelumnya, lalu klik tombol <strong>Login / Masuk</strong>.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        🔑 Pastikan huruf besar/kecil sesuai
+                    </div>
+                </div>
+
+                <!-- Langkah 4 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                4
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Pilih Ujian & Masukkan Token</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Pada beranda dashboard peserta, buka menu <strong>Daftar Ujian</strong> / <strong>Ujian Aktif</strong>. Pilih sesi <strong>Pretes LPPAI</strong>. Jika diminta <strong>Token Ujian</strong>, mintalah kepada Pengawas Ruangan Anda.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        🎟️ Token diumumkan pengawas saat jam tes
+                    </div>
+                </div>
+
+                <!-- Langkah 5 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                5
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Kerjakan Soal dengan Teliti</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Klik <strong>Mulai Ujian</strong>. Jawab pertanyaan satu demi satu. Anda dapat berpindah nomor soal lewat nomor daftar soal, menandai ragu-ragu, dan memantau hitungan mundur sisa waktu ujian.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        ⏱️ Jawaban tersimpan otomatis ke server
+                    </div>
+                </div>
+
+                <!-- Langkah 6 -->
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
+                                6
+                            </span>
+                            <strong style="font-size:14px;color:#0f172a;">Selesai & Kirim Jawaban</strong>
+                        </div>
+                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
+                            Setelah semua nomor soal terjawab dan diperiksa kembali, klik tombol <strong>Selesai Ujian</strong> pada soal terakhir. Beri centang pada kotak konfirmasi persetujuan, lalu klik <strong>Selesai</strong>.
+                        </p>
+                    </div>
+                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
+                        ✅ Status ujian berubah menjadi "Selesai"
+                    </div>
+                </div>
+            </div>
+
+            <!-- Box Ketentuan Penting & FAQ -->
+            <div style="background:#fffbeb;border:1.5px solid #fef3c7;border-radius:12px;padding:16px 20px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <span style="font-size:20px;">⚠️</span>
+                    <strong style="font-size:14px;color:#92400e;">Hal-Hal Penting yang Wajib Diperhatikan Selama Tes:</strong>
+                </div>
+                <ul style="margin:0;padding-left:20px;font-size:13px;color:#78350f;line-height:1.7;">
+                    <li><strong>Jangan menutup tab atau menekan tombol Back</strong> pada browser selama tes berlangsung agar sesi ujian Anda tidak keluar otomatis.</li>
+                    <li><strong>Koneksi Terputus / Baterai Habis:</strong> Jika perangkat mendadak mati atau internet terputus, jawaban yang sudah Anda klik tetap tersimpan aman di server E-Ujian. Segera hidupkan perangkat, buka kembali E-Ujian, login, dan lanjutkan tes.</li>
+                    <li><strong>Hadir Tepat Waktu:</strong> Hadirlah di ruangan ujian minimal 15 menit sebelum jam pelaksanaan pretes yang ditentukan pada jadwal Anda.</li>
+                    <li><strong>Bantuan Pengawas:</strong> Apabila menemui kendala login atau token ujian tidak cocok, segera angkat tangan dan lapor kepada Pengawas Ruangan di lokasi.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 <?php endif; ?>
 
 <!-- ── Jadwal Pretes ─────────────────────────────────────────────── -->
