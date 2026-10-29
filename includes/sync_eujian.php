@@ -17,6 +17,17 @@ function runSyncEujianOfficial($pdo) {
 
     $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
+    // 1. Pastikan tabel system_settings ada DILUAR transaksi (karena DDL me-trigger implicit commit di MySQL)
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key VARCHAR(100) PRIMARY KEY,
+                setting_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (Throwable $ignore) {}
+
     try {
         // Ambil mapping seluruh peserta pretes yang terdaftar
         $stmtMap = $pdo->query("
@@ -79,29 +90,26 @@ function runSyncEujianOfficial($pdo) {
 
         // Simpan setting status sinkronisasi
         try {
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS system_settings (
-                    setting_key VARCHAR(100) PRIMARY KEY,
-                    setting_value TEXT,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-            ");
             $stmtSet = $pdo->prepare("REPLACE INTO system_settings (setting_key, setting_value) VALUES (?, ?)");
             $stmtSet->execute(['eujian_sync_official_v3', '1']);
         } catch (Throwable $ignore) {}
 
-        $pdo->commit();
+        if ($pdo->inTransaction()) {
+            $pdo->commit();
+        }
 
         return [
             'success' => true,
             'updated' => $updated,
             'matched' => $matched,
             'total'   => count($records),
-            'message' => "Berhasil menyinkronkan data E-Ujian resmi. Sebanyak $matched peserta dicocokkan dan credentials telah diperbarui ({NIM}.22205)."
+            'message' => "Berhasil menyinkronkan data E-Ujian resmi. Sebanyak $matched peserta terdaftar telah diselaraskan dengan akun resmi E-Ujian ({NIM}.22205)."
         ];
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+            try {
+                $pdo->rollBack();
+            } catch (Throwable $ignore) {}
         }
         return [
             'success' => false,
