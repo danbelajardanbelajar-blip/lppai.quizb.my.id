@@ -13,6 +13,52 @@ $pdo     = getDBConnection();
 $message = '';
 $msgType = '';
 
+/**
+ * Helper pembuat password acak dengan pilihan tipe karakter
+ * @param string $type 'campuran' | 'angka' | 'huruf'
+ * @param int $length panjang karakter password (default 6)
+ * @return string
+ */
+function generateCustomPassword($type = 'campuran', $length = 6) {
+    $length = max(4, min(16, (int)$length));
+    
+    if ($type === 'angka') {
+        $pool = '0123456789';
+        $pass = '';
+        $max = strlen($pool) - 1;
+        for ($i = 0; $i < $length; $i++) {
+            $pass .= $pool[random_int(0, $max)];
+        }
+        return $pass;
+    } elseif ($type === 'huruf') {
+        // Menggunakan huruf kapital yang mudah dibaca (menghindari I dan O)
+        $pool = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $pass = '';
+        $max = strlen($pool) - 1;
+        for ($i = 0; $i < $length; $i++) {
+            $pass .= $pool[random_int(0, $max)];
+        }
+        return $pass;
+    } else {
+        // Campuran angka dan huruf (memastikan setidaknya ada huruf dan angka)
+        $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        $digits  = '23456789';
+        $all     = $letters . $digits;
+
+        $chars = [
+            $letters[random_int(0, strlen($letters) - 1)],
+            $digits[random_int(0, strlen($digits) - 1)],
+        ];
+
+        for ($i = 2; $i < $length; $i++) {
+            $chars[] = $all[random_int(0, strlen($all) - 1)];
+        }
+
+        shuffle($chars);
+        return implode('', $chars);
+    }
+}
+
 // ── Handle actions ────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $token = $_POST['csrf_token'] ?? '';
@@ -24,18 +70,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // ── Generate credentials otomatis untuk SEMUA peserta ──────────────
         if ($action === 'generate_all') {
-            $prefix = trim($_POST['prefix'] ?? 'TES');
+            $prefix   = trim($_POST['prefix'] ?? 'TES');
+            $passType = trim($_POST['pass_type'] ?? 'campuran');
+            $passLen  = (int)($_POST['pass_len'] ?? 6);
+            if (!in_array($passType, ['campuran', 'angka', 'huruf'])) {
+                $passType = 'campuran';
+            }
+            if ($passLen < 4 || $passLen > 16) {
+                $passLen = 6;
+            }
+
             $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
             $rows   = $stmt->fetchAll();
             $count  = 0;
             foreach ($rows as $row) {
-                // Format: NIM mahasiswa sebagai username, random 6-char uppercase sebagai password
+                // Format: NIM mahasiswa sebagai username, random password sesuai opsi
                 $nimRow = $pdo->prepare("SELECT nim FROM users WHERE id = ?");
                 $nimRow->execute([$row['user_id']]);
                 $nim = $nimRow->fetchColumn();
 
                 $username = strtoupper($prefix) . $nim;
-                $password = strtoupper(substr(md5(uniqid($nim, true)), 0, 6));
+                $password = generateCustomPassword($passType, $passLen);
 
                 $upd = $pdo->prepare(
                     "UPDATE pretes_registrations
@@ -45,27 +100,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $upd->execute([$username, $password, $row['id']]);
                 $count += $upd->rowCount();
             }
-            $message = "Credentials berhasil digenerate untuk $count peserta (yang belum punya credentials).";
+            $tipeLabel = ($passType === 'angka') ? 'Hanya Angka' : (($passType === 'huruf') ? 'Hanya Huruf' : 'Campuran Huruf & Angka');
+            $message = "Credentials berhasil digenerate untuk <strong>$count peserta</strong> (yang belum punya credentials) dengan format password <strong>$tipeLabel</strong> ($passLen karakter).";
             $msgType = 'success';
 
         // ── Reset & regenerate SEMUA (paksa timpa) ────────────────────────
         } elseif ($action === 'regenerate_all') {
-            $prefix = trim($_POST['prefix'] ?? 'TES');
+            $prefix   = trim($_POST['prefix'] ?? 'TES');
+            $passType = trim($_POST['pass_type'] ?? 'campuran');
+            $passLen  = (int)($_POST['pass_len'] ?? 6);
+            if (!in_array($passType, ['campuran', 'angka', 'huruf'])) {
+                $passType = 'campuran';
+            }
+            if ($passLen < 4 || $passLen > 16) {
+                $passLen = 6;
+            }
+
             $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
             $rows   = $stmt->fetchAll();
+            $count  = 0;
             foreach ($rows as $row) {
                 $nimRow = $pdo->prepare("SELECT nim FROM users WHERE id = ?");
                 $nimRow->execute([$row['user_id']]);
                 $nim = $nimRow->fetchColumn();
 
                 $username = strtoupper($prefix) . $nim;
-                $password = strtoupper(substr(md5(uniqid($nim . rand(), true)), 0, 6));
+                $password = generateCustomPassword($passType, $passLen);
 
                 $pdo->prepare(
                     "UPDATE pretes_registrations SET username_tes = ?, password_tes = ? WHERE id = ?"
                 )->execute([$username, $password, $row['id']]);
+                $count++;
             }
-            $message = 'Semua credentials berhasil di-regenerate ulang!';
+            $tipeLabel = ($passType === 'angka') ? 'Hanya Angka' : (($passType === 'huruf') ? 'Hanya Huruf' : 'Campuran Huruf & Angka');
+            $message = "Semua credentials (<strong>$count peserta</strong>) berhasil di-regenerate ulang dengan format password <strong>$tipeLabel</strong> ($passLen karakter)!";
             $msgType = 'success';
 
         // ── Set / Edit credentials & hari individual ─────────────────────
@@ -225,39 +293,101 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- ── Generate Credentials Massal ──────────────────────────────── -->
 <div class="card" style="margin-bottom:24px;">
-    <div class="card-header">⚡ Generate Credentials Tes Tulis (Massal)</div>
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span style="font-weight:700;">⚡ Generate Credentials Tes Tulis (Massal)</span>
+        <span style="font-size:12px;color:var(--text-muted);">Format username & password dapat disesuaikan</span>
+    </div>
     <div class="card-body">
         <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
-            Sistem akan membuat <strong>username</strong> = Prefix + NIM, dan <strong>password</strong> = kode acak 6 karakter.<br>
+            Sistem akan membuat <strong>username</strong> = Prefix + NIM, dan <strong>password</strong> acak sesuai tipe karakter yang Anda pilih di bawah.<br>
             Credentials yang sudah ada <strong>tidak akan ditimpa</strong> oleh "Generate Baru". Gunakan "Regenerate Semua" untuk memaksa timpa.
         </p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-            <div class="form-group" style="margin:0;flex:0 0 200px;">
-                <label style="font-size:13px;margin-bottom:6px;display:block;">Prefix Username</label>
-                <input type="text" id="prefix-input" value="TES" placeholder="contoh: TES"
-                    style="padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;width:100%;">
+
+        <!-- Panel Opsi Pengaturan Credentials -->
+        <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:16px;">
+                <!-- 1. Prefix Username -->
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">Prefix Username</label>
+                    <input type="text" id="prefix-input" value="TES" placeholder="contoh: TES"
+                        oninput="updateSamplePreview()"
+                        style="padding:10px 14px;border:2px solid #cbd5e1;border-radius:10px;font-size:14px;width:100%;background:#fff;outline:none;font-weight:600;color:#1e293b;box-sizing:border-box;">
+                </div>
+
+                <!-- 2. Panjang Karakter Password -->
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">Panjang Password</label>
+                    <select id="pass-len-input" onchange="updateSamplePreview()"
+                        style="padding:10px 14px;border:2px solid #cbd5e1;border-radius:10px;font-size:14px;width:100%;background:#fff;outline:none;font-weight:600;color:#1e293b;cursor:pointer;box-sizing:border-box;">
+                        <option value="6" selected>6 Karakter (Standar)</option>
+                        <option value="8">8 Karakter</option>
+                        <option value="10">10 Karakter</option>
+                        <option value="4">4 Karakter</option>
+                    </select>
+                </div>
             </div>
-            <form method="POST" style="display:inline;" onsubmit="document.getElementById('prefix-gen').value=document.getElementById('prefix-input').value">
+
+            <!-- 3. Pilihan Tipe Karakter Password (Bisa dipilih / dicentang) -->
+            <div>
+                <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;display:block;">
+                    🔑 Pilihan Format Karakter Password:
+                </label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <!-- Opsi: Campuran (Huruf & Angka) -->
+                    <label class="pass-type-card" id="card-pass-campuran"
+                        style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:2px solid #3b82f6;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:#1d4ed8;transition:all 0.2s;">
+                        <input type="radio" name="pass_type_select" value="campuran" checked onchange="updatePassTypeUI()"
+                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
+                        <span>🔠🔢 Campuran (Huruf & Angka)</span>
+                    </label>
+
+                    <!-- Opsi: Hanya Angka -->
+                    <label class="pass-type-card" id="card-pass-angka"
+                        style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:2px solid #cbd5e1;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:#334155;transition:all 0.2s;">
+                        <input type="radio" name="pass_type_select" value="angka" onchange="updatePassTypeUI()"
+                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
+                        <span>🔢 Hanya Angka (0-9)</span>
+                    </label>
+
+                    <!-- Opsi: Hanya Huruf -->
+                    <label class="pass-type-card" id="card-pass-huruf"
+                        style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:2px solid #cbd5e1;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:#334155;transition:all 0.2s;">
+                        <input type="radio" name="pass_type_select" value="huruf" onchange="updatePassTypeUI()"
+                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
+                        <span>🔤 Hanya Huruf (A-Z)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tombol Eksekusi Massal -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+            <form method="POST" id="form-gen-all" style="display:inline;" onsubmit="syncGenFields(this)">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="action"     value="generate_all">
                 <input type="hidden" name="prefix"     id="prefix-gen" value="TES">
-                <button type="submit" class="btn btn-primary" style="width:auto;">
+                <input type="hidden" name="pass_type"  id="pass-type-gen" value="campuran">
+                <input type="hidden" name="pass_len"   id="pass-len-gen" value="6">
+                <button type="submit" class="btn btn-primary" style="width:auto;padding:11px 22px;font-weight:700;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 6px rgba(26,86,50,0.25);">
                     🔑 Generate Credentials Baru
                 </button>
             </form>
-            <form method="POST" style="display:inline;"
-                  onsubmit="return confirm('Yakin? Ini akan MENIMPA semua credentials yang sudah ada!')"
-                  onsubmit2="document.getElementById('prefix-regen').value=document.getElementById('prefix-input').value">
+            <form method="POST" id="form-regen-all" style="display:inline;"
+                  onsubmit="syncGenFields(this); return confirm('PERINGATAN: Yakin ingin me-regenerate semua credentials? Tindakan ini akan MENIMPA semua username dan password peserta yang sudah ada dengan format karakter yang Anda pilih saat ini!');">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="action"     value="regenerate_all">
                 <input type="hidden" name="prefix"     id="prefix-regen" value="TES">
-                <button type="submit" class="btn btn-sm btn-danger" style="width:auto;padding:10px 20px;">
+                <input type="hidden" name="pass_type"  id="pass-type-regen" value="campuran">
+                <input type="hidden" name="pass_len"   id="pass-len-regen" value="6">
+                <button type="submit" class="btn btn-sm btn-danger" style="width:auto;padding:11px 22px;font-weight:700;display:inline-flex;align-items:center;gap:8px;">
                     🔄 Regenerate Semua (Timpa)
                 </button>
             </form>
         </div>
-        <div style="margin-top:12px;padding:12px;background:#e8f5e9;border-radius:10px;font-size:13px;color:#2e7d32;">
-            💡 <strong>Contoh hasil:</strong> Prefix <code>TES</code> + NIM <code>2024010001</code> → Username: <code>TES2024010001</code>, Password: <code>AB12CD</code>
+
+        <!-- Live Preview Contoh Hasil -->
+        <div id="example-preview-box" style="margin-top:14px;padding:12px 16px;background:#e8f5e9;border-radius:10px;font-size:13px;color:#2e7d32;border:1px solid #c8e6c9;">
+            💡 <strong>Contoh hasil:</strong> Prefix <code>TES</code> + NIM <code>2024010001</code> → Username: <code>TES2024010001</code>, Password: <code>A8C2K9</code> (Campuran Huruf & Angka, 6 karakter)
         </div>
     </div>
 </div>
@@ -572,13 +702,28 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-group" style="margin-bottom:16px;">
                 <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Password Tes</label>
-                <div style="position:relative;">
+                <div style="position:relative;margin-bottom:8px;">
                     <input type="text" name="password_tes" id="modal-password" placeholder="contoh: AB12CD"
-                        style="width:100%;padding:10px 14px;padding-right:70px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;">
+                        style="width:100%;padding:10px 14px;padding-right:70px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;box-sizing:border-box;">
                     <button type="button" onclick="generatePassword()"
                         style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">
                         🎲 Acak
                     </button>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:6px 10px;border-radius:8px;border:1px solid #e2e8f0;">
+                    <span style="font-size:11.5px;color:#64748b;font-weight:600;">Format Acak:</span>
+                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <input type="radio" name="modal_pass_type" value="campuran" checked style="accent-color:#1a5632;">
+                        Campuran
+                    </label>
+                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <input type="radio" name="modal_pass_type" value="angka" style="accent-color:#1a5632;">
+                        Hanya Angka
+                    </label>
+                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <input type="radio" name="modal_pass_type" value="huruf" style="accent-color:#1a5632;">
+                        Hanya Huruf
+                    </label>
                 </div>
             </div>
             <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;">
@@ -853,20 +998,113 @@ if (document.readyState === 'loading') {
     initPretesFilters();
 }
 
-// Generate password acak 6 karakter
+// ── Helper & Sinkronisasi Generator Credentials Massal ─────────────
+function getSelectedPassType() {
+    var checked = document.querySelector('input[name="pass_type_select"]:checked');
+    return checked ? checked.value : 'campuran';
+}
+
+function getSelectedPassLen() {
+    var el = document.getElementById('pass-len-input');
+    return el ? el.value : '6';
+}
+
+function updatePassTypeUI() {
+    var selected = getSelectedPassType();
+    var options = ['campuran', 'angka', 'huruf'];
+    options.forEach(function(opt) {
+        var card = document.getElementById('card-pass-' + opt);
+        if (!card) return;
+        if (opt === selected) {
+            card.style.background = '#eff6ff';
+            card.style.borderColor = '#3b82f6';
+            card.style.color = '#1d4ed8';
+            card.style.fontWeight = '700';
+        } else {
+            card.style.background = '#ffffff';
+            card.style.borderColor = '#cbd5e1';
+            card.style.color = '#334155';
+            card.style.fontWeight = '600';
+        }
+    });
+    updateSamplePreview();
+}
+
+function updateSamplePreview() {
+    var prefix = (document.getElementById('prefix-input').value || 'TES').trim().toUpperCase();
+    var passType = getSelectedPassType();
+    var passLen = parseInt(getSelectedPassLen(), 10) || 6;
+
+    var samplePass = '';
+    var labelDesc = '';
+    if (passType === 'angka') {
+        samplePass = '8492013576'.substring(0, passLen);
+        labelDesc = 'Hanya Angka';
+    } else if (passType === 'huruf') {
+        samplePass = 'ABKXYZMQTR'.substring(0, passLen);
+        labelDesc = 'Hanya Huruf';
+    } else {
+        samplePass = 'A8C2K9M4P7'.substring(0, passLen);
+        labelDesc = 'Campuran Huruf & Angka';
+    }
+
+    var el = document.getElementById('example-preview-box');
+    if (el) {
+        el.innerHTML = '💡 <strong>Contoh hasil:</strong> Prefix <code>' + prefix + '</code> + NIM <code>2024010001</code> → Username: <code>' + prefix + '2024010001</code>, Password: <code>' + samplePass + '</code> (' + labelDesc + ', ' + passLen + ' karakter)';
+    }
+}
+
+function syncGenFields(form) {
+    var prefixVal = (document.getElementById('prefix-input').value || 'TES').trim();
+    var typeVal   = getSelectedPassType();
+    var lenVal    = getSelectedPassLen();
+
+    var pField = form.querySelector('input[name="prefix"]');
+    if (pField) pField.value = prefixVal;
+
+    var tField = form.querySelector('input[name="pass_type"]');
+    if (tField) tField.value = typeVal;
+
+    var lField = form.querySelector('input[name="pass_len"]');
+    if (lField) lField.value = lenVal;
+}
+
+// Generate password acak di Modal Edit Individual
 function generatePassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let pass = '';
-    for (let i = 0; i < 6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    var typeEl = document.querySelector('input[name="modal_pass_type"]:checked');
+    var type = typeEl ? typeEl.value : 'campuran';
+    var pass = '';
+
+    if (type === 'angka') {
+        const chars = '0123456789';
+        for (let i = 0; i < 6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    } else if (type === 'huruf') {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        for (let i = 0; i < 6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    } else {
+        const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+        const digits = '23456789';
+        const all = letters + digits;
+        let pArr = [
+            letters[Math.floor(Math.random() * letters.length)],
+            digits[Math.floor(Math.random() * digits.length)]
+        ];
+        for (let i = 2; i < 6; i++) {
+            pArr.push(all[Math.floor(Math.random() * all.length)]);
+        }
+        for (let i = pArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pArr[i], pArr[j]] = [pArr[j], pArr[i]];
+        }
+        pass = pArr.join('');
+    }
     document.getElementById('modal-password').value = pass;
 }
 
-// Sinkron prefix saat submit
+// Sinkron prefix saat submit form POST
 document.querySelectorAll('form[method="POST"]').forEach(form => {
     form.addEventListener('submit', function() {
-        const prefixInput = document.getElementById('prefix-input');
-        const prefixField = this.querySelector('input[name="prefix"]');
-        if (prefixInput && prefixField) prefixField.value = prefixInput.value;
+        syncGenFields(this);
     });
 });
 </script>
