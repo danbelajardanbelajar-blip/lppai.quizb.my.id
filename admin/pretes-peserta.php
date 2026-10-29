@@ -213,13 +213,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // ── Update status kehadiran ───────────────────────────────────────
                 // ── Sinkronkan dengan Data Resmi E-Ujian (414 Peserta) ───────────
         } elseif ($action === 'sync_eujian_official') {
-            require_once __DIR__ . '/../includes/sync_eujian.php';
-            $res = runSyncEujianOfficial($pdo);
-            if (!empty($res['success'])) {
-                $message = "<strong>Berhasil!</strong> " . htmlspecialchars($res['message']);
-                $msgType = 'success';
-            } else {
-                $message = "Gagal menyinkronkan data: " . htmlspecialchars($res['message'] ?? 'Terjadi kesalahan.');
+            try {
+                require_once __DIR__ . '/../includes/sync_eujian.php';
+                $res = runSyncEujianOfficial($pdo);
+                if (!empty($res['success'])) {
+                    $message = "<strong>Berhasil!</strong> " . htmlspecialchars($res['message']);
+                    $msgType = 'success';
+                } else {
+                    $message = "Gagal menyinkronkan data: " . htmlspecialchars($res['message'] ?? 'Terjadi kesalahan.');
+                    $msgType = 'danger';
+                }
+            } catch (Throwable $e) {
+                $message = "Kesalahan saat sinkronisasi: " . htmlspecialchars($e->getMessage());
                 $msgType = 'danger';
             }
         } elseif ($action === 'update_status') {
@@ -239,8 +244,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // ── Auto-sync credentials resmi E-Ujian jika belum pernah diselaraskan ─────────
 require_once __DIR__ . '/../includes/sync_eujian.php';
 $autoSyncRes = checkAutoSyncEujian($pdo);
-if ($autoSyncRes && !empty($autoSyncRes['updated']) && empty($message)) {
-    $message = "<strong>Sinkronisasi Otomatis E-Ujian:</strong> {$autoSyncRes['updated']} peserta telah otomatis diselaraskan dengan akun resmi E-Ujian ({NIM}.22205).";
+if ($autoSyncRes && (!empty($autoSyncRes['updated']) || !empty($autoSyncRes['matched'])) && empty($message)) {
+    $countShow = $autoSyncRes['matched'] ?? $autoSyncRes['updated'];
+    $message = "<strong>Sinkronisasi Otomatis E-Ujian:</strong> {$countShow} peserta telah otomatis diselaraskan dengan akun resmi E-Ujian ({NIM}.22205).";
     $msgType = 'success';
 }
 // ── Fetch data ─────────────────────────────────────────────────────────────────
