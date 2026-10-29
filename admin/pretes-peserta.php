@@ -264,7 +264,19 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- ── Tabel Peserta & Credentials ──────────────────────────────── -->
 <div class="card">
-    <div class="card-header">📋 Data Peserta & Credentials Tes Tulis (<?= $totalPeserta ?> peserta)</div>
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <span>📋 Data Peserta & Credentials Tes Tulis (<?= $totalPeserta ?> peserta)</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="pretes-peserta-export.php" class="btn btn-sm"
+               style="background:#16a34a;color:#ffffff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(22,163,74,0.25);">
+                📗 Halaman Export ke Excel
+            </a>
+            <button type="button" class="btn btn-sm" onclick="openExportModal()"
+               style="background:#0284c7;color:#ffffff;border:1px solid #0369a1;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(2,132,199,0.25);">
+                📥 Export ke Excel
+            </button>
+        </div>
+    </div>
     <div class="card-body">
         <?php if (empty($participants)): ?>
             <div class="empty-state">
@@ -288,9 +300,16 @@ include __DIR__ . '/../includes/header.php';
                         0 Filter Aktif
                     </span>
                 </div>
-                <button type="button" id="btn-reset-filters" class="btn btn-sm" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
-                    🔄 Reset Semua Filter
-                </button>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <button type="button" id="btn-export-filtered" class="btn btn-sm" onclick="exportCurrentFiltered('xlsx')" data-no-spa="true"
+                        title="Unduh file Excel (.xlsx) dengan filter yang sedang aktif"
+                        style="background:#15803d;border:1px solid #166534;color:#ffffff;font-weight:700;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                        📥 Export Sesuai Filter (.xlsx)
+                    </button>
+                    <button type="button" id="btn-reset-filters" class="btn btn-sm" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#334155;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                        🔄 Reset Semua Filter
+                    </button>
+                </div>
             </div>
 
             <!-- Grid Input Filter Sesuai Nama Kolom -->
@@ -849,6 +868,144 @@ document.querySelectorAll('form[method="POST"]').forEach(form => {
         const prefixField = this.querySelector('input[name="prefix"]');
         if (prefixInput && prefixField) prefixField.value = prefixInput.value;
     });
+});
+</script>
+
+
+<!-- ── Modal Pilihan Export ke Excel ────────────────────────────── -->
+<div id="modal-export-excel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:520px;box-shadow:0 10px 40px rgba(0,0,0,0.25);position:relative;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#dcfce7;color:#16a34a;font-size:20px;">
+                    📗
+                </span>
+                <div>
+                    <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">Export Data ke Excel (.xlsx)</h3>
+                    <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Pilih jenis ekspor data peserta & credentials pretes</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeExportModal()" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px;">
+                &times;
+            </button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+            <!-- Pilihan 1: Export Sesuai Filter Aktif -->
+            <a href="javascript:void(0)" onclick="exportCurrentFiltered('xlsx')" data-no-spa="true"
+               style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #16a34a;background:#f0fdf4;border-radius:12px;text-decoration:none;transition:all 0.2s;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:20px;">🎯</span>
+                    <div>
+                        <strong style="font-size:13.5px;color:#166534;display:block;">Export Sesuai Filter Saat Ini</strong>
+                        <span id="modal-export-filter-desc" style="font-size:11.5px;color:#15803d;">Mengekspor data berdasarkan pencarian, hari, prodi, dan status aktif</span>
+                    </div>
+                </div>
+                <span style="background:#16a34a;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.xlsx</span>
+            </a>
+
+            <!-- Pilihan 2: Export Semua Peserta -->
+            <a href="pretes-peserta-export.php?download=1&format=xlsx" data-no-spa="true"
+               style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#ffffff;border-radius:12px;text-decoration:none;transition:all 0.2s;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:20px;">👥</span>
+                    <div>
+                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Export SEMUA Peserta Pretes</strong>
+                        <span style="font-size:11.5px;color:#64748b;">Mengekspor seluruh <?= $totalPeserta ?> peserta (lengkap dengan username & password)</span>
+                    </div>
+                </div>
+                <span style="background:#0284c7;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.xlsx</span>
+            </a>
+
+            <!-- Pilihan 3: Buka Halaman Export Lengkap -->
+            <a href="pretes-peserta-export.php"
+               style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:12px;text-decoration:none;transition:all 0.2s;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:20px;">⚙️</span>
+                    <div>
+                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Buka Halaman Export Lengkap</strong>
+                        <span style="font-size:11.5px;color:#64748b;">Kustomisasi pilihan kolom, format CSV / Excel, dan lihat live preview</span>
+                    </div>
+                </div>
+                <span style="color:#64748b;font-size:18px;">➔</span>
+            </a>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="closeExportModal()" style="padding:8px 18px;border-radius:8px;">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Modal Export Excel Handlers
+function openExportModal() {
+    var modal = document.getElementById('modal-export-excel');
+    if (modal) {
+        var activeDesc = [];
+        var hariVal   = ($('#filter-hari').val() || '').trim();
+        var prodiVal  = ($('#filter-prodi').val() || '').trim();
+        var statusVal = ($('#filter-status').val() || '').trim();
+        var credVal   = ($('#filter-cred').val() || '').trim();
+        var namaVal   = ($('#filter-nama').val() || '').trim();
+        var nimVal    = ($('#filter-nim').val() || '').trim();
+
+        if (hariVal) activeDesc.push('Hari: ' + hariVal);
+        if (prodiVal) activeDesc.push('Prodi: ' + prodiVal);
+        if (statusVal) activeDesc.push('Status: ' + statusVal);
+        if (credVal) activeDesc.push('Cred: ' + (credVal === 'has_cred' ? 'Sudah Ada' : 'Belum Ada'));
+        if (namaVal) activeDesc.push('Nama: ' + namaVal);
+        if (nimVal) activeDesc.push('NIM: ' + nimVal);
+
+        var descEl = document.getElementById('modal-export-filter-desc');
+        if (descEl) {
+            if (activeDesc.length > 0) {
+                descEl.textContent = 'Filter aktif: ' + activeDesc.join(', ');
+            } else {
+                descEl.textContent = 'Tidak ada filter aktif (semua data diexport)';
+            }
+        }
+        modal.style.display = 'flex';
+    }
+}
+
+function closeExportModal() {
+    var modal = document.getElementById('modal-export-excel');
+    if (modal) modal.style.display = 'none';
+}
+
+function exportCurrentFiltered(format) {
+    format = format || 'xlsx';
+    var params = new URLSearchParams();
+    params.set('download', '1');
+    params.set('format', format);
+
+    var namaVal   = ($('#filter-nama').val() || '').trim();
+    var nimVal    = ($('#filter-nim').val() || '').trim();
+    var prodiVal  = ($('#filter-prodi').val() || '').trim();
+    var hariVal   = ($('#filter-hari').val() || '').trim();
+    var statusVal = ($('#filter-status').val() || '').trim();
+    var credVal   = ($('#filter-cred').val() || '').trim();
+
+    if (namaVal) params.set('nama', namaVal);
+    if (nimVal) params.set('nim', nimVal);
+    if (prodiVal) params.set('prodi', prodiVal);
+    if (hariVal) params.set('hari', hariVal);
+    if (statusVal) params.set('status', statusVal);
+    if (credVal) params.set('cred', credVal);
+
+    closeExportModal();
+    window.location.href = 'pretes-peserta-export.php?' + params.toString();
+}
+
+// Tutup modal export bila klik di luar modal
+document.addEventListener('click', function(e) {
+    var modal = document.getElementById('modal-export-excel');
+    if (e.target === modal) {
+        closeExportModal();
+    }
 });
 </script>
 

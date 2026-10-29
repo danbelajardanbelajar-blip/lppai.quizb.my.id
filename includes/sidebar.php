@@ -8,6 +8,9 @@ $isDosen = isset($currentUser) && $currentUser['role'] === 'dosen';
 
 function menuActive($page) {
     global $currentPage;
+    if ($page === 'pretes-peserta.php' && $currentPage === 'pretes-peserta-export.php') {
+        return 'active';
+    }
     return $currentPage === $page ? 'active' : '';
 }
 ?>
