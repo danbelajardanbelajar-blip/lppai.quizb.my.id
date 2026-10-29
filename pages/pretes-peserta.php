@@ -71,6 +71,20 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="card-body" style="padding:22px;">
+            <!-- PERINGATAN KRUSIAL: WAJIB MENCATAT DI KERTAS SEBELUM BUKA APP -->
+            <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.12);">
+                <span style="font-size:32px;line-height:1;flex-shrink:0;">📝</span>
+                <div style="font-size:13px;color:#92400e;line-height:1.6;">
+                    <strong style="font-size:14.5px;color:#b45309;display:block;margin-bottom:4px;">
+                        ⚠️ PERINGATAN PENTING: WAJIB DICATAT DI SECARIK KERTAS SEBELUM MEMBUKA APLIKASI!
+                    </strong>
+                    Aplikasi ujian (<strong>E-Ujian Browser</strong> / <strong>Safe Exam Browser</strong>) menerapkan sistem <em>Kiosk Mode</em> yang <strong>mengunci layar HP secara penuh</strong>. Saat aplikasi dibuka, <strong>Anda TIDAK DAPAT berpindah aplikasi atau membuka browser HP</strong> untuk melihat akun lagi.
+                    <br>
+                    👉 Oleh karena itu, <strong>SEBELUM MEMBUKA APLIKASI UJIAN, ANDA WAJIB MENCATAT DI KERTAS:</strong>
+                    <strong>1) Kode Lembaga: 22205</strong>, <strong>2) Username Tes</strong>, dan <strong>3) Password Tes</strong> Anda!
+                </div>
+            </div>
+
             <!-- Grid 4 Poin Utama -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;">
                 <!-- Poin 1: Wajib Install Exam Browser -->
@@ -191,8 +205,17 @@ include __DIR__ . '/../includes/header.php';
             <!-- Hidden: password ter-encode base64, hanya ditampilkan setelah verifikasi -->
             <input type="hidden" id="__enc_pass" value="<?= base64_encode($myReg['password_tes'] ?? '') ?>">
 
-            <div class="alert alert-info" style="margin-bottom:20px;">
-                ⚠️ Gunakan username dan password di bawah ini untuk mengakses soal tes tulis pretes. Jangan bagikan ke orang lain.
+            <!-- Peringatan Catat Kertas -->
+            <div style="background:#fff7ed;border:2px solid #ea580c;border-radius:12px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 2px 8px rgba(234,88,12,0.1);">
+                <span style="font-size:28px;line-height:1;flex-shrink:0;">✍️</span>
+                <div style="font-size:13px;color:#9a3412;line-height:1.6;">
+                    <strong style="color:#c2410c;font-size:14.5px;display:block;margin-bottom:4px;">
+                        JANGAN HANYA SALIN / COPY DI HP! WAJIB CATAT DI SECARIK KERTAS!
+                    </strong>
+                    Saat Anda membuka aplikasi E-Ujian Browser atau Safe Exam Browser, HP Anda akan terkunci otomatis (<em>kiosk mode</em>). Anda <strong>tidak dapat beralih ke aplikasi catatan atau membuka web ini lagi</strong> saat ujian berjalan.
+                    <br>
+                    Ambil secarik kertas dan pulpen sekarang, <strong>catat Username dan Password Anda di bawah ini</strong> untuk dibawa dan dilihat saat login di aplikasi ujian.
+                </div>
             </div>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:8px;">
@@ -385,14 +408,14 @@ include __DIR__ . '/../includes/header.php';
                             <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
                                 3
                             </span>
-                            <strong style="font-size:14px;color:#0f172a;">Login Sebagai Peserta</strong>
+                            <strong style="font-size:14px;color:#0f172a;">Login dari Catatan Kertas</strong>
                         </div>
                         <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Pilih menu <strong>Masuk / Login Siswa/Peserta</strong>. Masukkan Username dan Password yang telah Anda salin sebelumnya, lalu klik tombol <strong>Login / Masuk</strong>.
+                            Pilih menu <strong>Masuk / Login Siswa/Peserta</strong>. Ketikkan Username dan Password dari <strong>catatan kertas</strong> yang telah Anda tulis sebelumnya (karena HP terkunci tidak bisa membuka web lagi), lalu klik <strong>Login / Masuk</strong>.
                         </p>
                     </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        🔑 Pastikan huruf besar/kecil sesuai
+                    <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:8px;font-size:11.5px;color:#991b1b;font-weight:600;">
+                        📝 Ketik dari catatan kertas Anda
                     </div>
                 </div>
 
@@ -458,6 +481,7 @@ include __DIR__ . '/../includes/header.php';
                     <strong style="font-size:14px;color:#92400e;">Hal-Hal Penting yang Wajib Diperhatikan Selama Tes:</strong>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:13px;color:#78350f;line-height:1.7;">
+                    <li><strong>📝 Wajib Catat Credentials di Selembar Kertas:</strong> Karena E-Ujian Browser & Safe Exam Browser mengunci layar penuh HP (<em>Kiosk Mode</em>), Anda <strong>TIDAK BISA beralih ke aplikasi catatan, membuka Google Chrome, atau kembali ke web ini</strong> saat ujian berlangsung. Pastikan <strong>Kode Lembaga (22205), Username, dan Password</strong> sudah Anda catat di secarik kertas sebelum aplikasi dibuka!</li>
                     <li><strong>Aturan Larangan 2 HP (Sanksi Diskualifikasi):</strong> Peserta dilarang keras membawa / meletakkan 2 HP di atas meja ujian. Jika ketahuan membawa 2 HP di meja saat ujian hari Senin–Jumat, akun ujian akan <strong>langsung dimatikan otomatis oleh Pengawas</strong> dan <strong>tidak bisa mengerjakan kembali</strong>. HP kedua wajib dimatikan dan dimasukkan ke tas, lalu tas diletakkan di depan kelas.</li>
                     <li><strong>Try Out Mandiri:</strong> Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba ujian dari rumah menggunakan Kode Lembaga <code>22205</code> dan akun credentials Anda.</li>
                     <li><strong>Koneksi Terputus / Baterai Habis:</strong> Jika perangkat mendadak mati atau internet terputus, jawaban yang sudah Anda klik tetap tersimpan aman di server E-Ujian. Segera hidupkan perangkat, buka kembali E-Ujian, login, dan lanjutkan tes.</li>

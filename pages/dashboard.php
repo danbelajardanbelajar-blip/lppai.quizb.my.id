@@ -244,11 +244,11 @@ include __DIR__ . '/../includes/header.php';
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-size:20px;">🚨</span>
                 <div style="font-size:12.5px; color:#9f1239; line-height:1.5;">
-                    <strong>Info Wajib Pretes:</strong> Try Out Mandiri dari rumah <strong>Malam Ini s.d. Malam Senin</strong> | Wajib Install <strong>E-Ujian Browser (Android)</strong> atau <strong>Safe Exam Browser (iPhone)</strong> | Kode Lembaga: <strong>22205</strong> | <strong>Dilarang membawa 2 HP di meja ujian</strong> (dimatikan & tas di depan).
+                    <strong>Info Wajib Pretes:</strong> 📝 <strong>Wajib catat Username & Password di kertas</strong> (HP terkunci saat ujian) | Try Out Mandiri dari rumah <strong>Malam Ini s.d. Malam Senin</strong> | Wajib Install <strong>E-Ujian Browser (Android)</strong> atau <strong>Safe Exam Browser (iPhone)</strong> | Kode Lembaga: <strong>22205</strong> | <strong>Dilarang membawa 2 HP di meja ujian</strong> (dimatikan & tas di depan).
                 </div>
             </div>
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-sm btn-danger" style="white-space:nowrap; padding:6px 12px; font-size:12px; font-weight:700;">
-                Lihat Panduan & Aturan ➔
+                Lihat Panduan & Akun ➔
             </a>
         </div>
 
