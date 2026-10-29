@@ -155,6 +155,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $_SESSION['role'] = $user['role'];
                     $_SESSION['program_studi'] = $user['program_studi'];
                     $_SESSION['fakultas'] = $user['fakultas'];
+
+                    // Catat aktivitas login sebagai mode penyamaran admin
+                    recordLoginLog([
+                        'user_id' => $user['id'],
+                        'username' => $user['username'],
+                        'nama_lengkap' => $user['nama_lengkap'],
+                        'role' => $user['role'],
+                        'status' => 'success',
+                        'keterangan' => 'Login As oleh Admin (ID: ' . $_SESSION['admin_login_as'] . ')'
+                    ]);
+
                     header('Location: ' . BASE_URL . '/dashboard.php');
                     exit;
                 }

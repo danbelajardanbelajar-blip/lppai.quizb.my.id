@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/SessionDatabaseHandler.php';
+require_once __DIR__ . '/activity-logger.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     // Konfigurasi masa aktif sesi tahan lama (30 hari = 2.592.000 detik)
@@ -148,8 +149,29 @@ function loginUser($username, $password) {
         // Regenerasi ID sesi untuk keamanan (mencegah session fixation)
         session_regenerate_id(true);
 
+        // Catat aktivitas login berhasil
+        recordLoginLog([
+            'user_id' => $user['id'],
+            'username' => $user['username'],
+            'nama_lengkap' => $user['nama_lengkap'],
+            'role' => $user['role'],
+            'status' => 'success',
+            'keterangan' => 'Login reguler'
+        ]);
+
         return true;
     }
+
+    // Catat upaya login gagal
+    recordLoginLog([
+        'user_id' => ($user ? $user['id'] : null),
+        'username' => $username,
+        'nama_lengkap' => ($user ? $user['nama_lengkap'] : null),
+        'role' => ($user ? $user['role'] : null),
+        'status' => 'failed',
+        'keterangan' => 'Username atau password salah'
+    ]);
+
     return false;
 }
 
