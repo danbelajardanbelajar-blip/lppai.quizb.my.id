@@ -42,6 +42,8 @@ requireLogin();
 
 $user = getCurrentUser();
 $pdo  = getDBConnection();
+require_once __DIR__ . '/../includes/sync_eujian.php';
+checkAutoSyncEujian($pdo);
 
 // ── Ambil credentials & registrasi mahasiswa ini ──────────────────────────────
 $stmtMyReg = $pdo->prepare("
@@ -117,7 +119,7 @@ include __DIR__ . '/../includes/header.php';
                                 <div style="font-size:12px;color:#1e293b;">
                                     🤖 <strong>Android:</strong> E-Ujian Browser
                                 </div>
-                                <a href="https://play.google.com/store/apps/details?id=com.eujian.cbt" target="_blank" rel="noopener noreferrer"
+                                <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
                                    style="background:#0284c7;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
                                     Google Play ↗
                                 </a>
@@ -127,7 +129,7 @@ include __DIR__ . '/../includes/header.php';
                                 <div style="font-size:12px;color:#1e293b;">
                                     🍏 <strong>iPhone/iPad:</strong> Safe Exam Browser
                                 </div>
-                                <a href="https://apps.apple.com/app/safe-exam-browser/id1138834203" target="_blank" rel="noopener noreferrer"
+                                <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
                                    style="background:#0f766e;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
                                     App Store ↗
                                 </a>
@@ -380,9 +382,9 @@ include __DIR__ . '/../includes/header.php';
                         </p>
                     </div>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <a href="https://play.google.com/store/apps/details?id=com.eujian.cbt" target="_blank" rel="noopener noreferrer"
+                        <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
                            style="background:#0284c7;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">Play Store (Android) ↗</a>
-                        <a href="https://apps.apple.com/app/safe-exam-browser/id1138834203" target="_blank" rel="noopener noreferrer"
+                        <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
                            style="background:#0f766e;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">App Store (iOS) ↗</a>
                     </div>
                 </div>

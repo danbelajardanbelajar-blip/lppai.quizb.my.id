@@ -211,6 +211,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
 
         // ── Update status kehadiran ───────────────────────────────────────
+                // ── Sinkronkan dengan Data Resmi E-Ujian (414 Peserta) ───────────
+        } elseif ($action === 'sync_eujian_official') {
+            require_once __DIR__ . '/../includes/sync_eujian.php';
+            $res = runSyncEujianOfficial($pdo);
+            if (!empty($res['success'])) {
+                $message = "<strong>Berhasil!</strong> " . htmlspecialchars($res['message']);
+                $msgType = 'success';
+            } else {
+                $message = "Gagal menyinkronkan data: " . htmlspecialchars($res['message'] ?? 'Terjadi kesalahan.');
+                $msgType = 'danger';
+            }
         } elseif ($action === 'update_status') {
             $regId  = (int)($_POST['reg_id'] ?? 0);
             $status = $_POST['status'] ?? '';
@@ -225,6 +236,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// ── Auto-sync credentials resmi E-Ujian jika belum pernah diselaraskan ─────────
+require_once __DIR__ . '/../includes/sync_eujian.php';
+$autoSyncRes = checkAutoSyncEujian($pdo);
+if ($autoSyncRes && !empty($autoSyncRes['updated']) && empty($message)) {
+    $message = "<strong>Sinkronisasi Otomatis E-Ujian:</strong> {$autoSyncRes['updated']} peserta telah otomatis diselaraskan dengan akun resmi E-Ujian ({NIM}.22205).";
+    $msgType = 'success';
+}
 // ── Fetch data ─────────────────────────────────────────────────────────────────
 $participants = $pdo->query("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
@@ -291,6 +309,51 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- ── Panel Sinkronisasi Resmi Akun E-Ujian (414 Peserta) ──────────── -->
+<div class="card" style="margin-bottom:24px;border:1.5px solid #0284c7;background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);box-shadow:0 2px 8px rgba(2,132,199,0.12);">
+    <div class="card-body" style="padding:22px 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;">
+            <div style="flex:1;min-width:300px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                    <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:20px;box-shadow:0 2px 6px rgba(2,132,199,0.3);">
+                        🔄
+                    </span>
+                    <div>
+                        <strong style="font-size:16px;color:#0369a1;display:block;">Data & Credentials Resmi E-Ujian (414 Peserta)</strong>
+                        <span style="font-size:12.5px;color:#0284c7;font-weight:600;">Kode Lembaga: <strong>22205</strong> | Format Login: <strong>{NIM}.22205</strong></span>
+                    </div>
+                </div>
+                <p style="font-size:13.5px;color:#1e293b;line-height:1.55;margin:0 0 12px;">
+                    Username login <strong>E-Ujian</strong> tidak dibuat secara acak mandiri, melainkan menggunakan pola resmi <code>{NIM}.22205</code> dan <strong>Kode Akses 4-digit</strong> resmi.
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#334155;">
+                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
+                        👥 <strong>Total:</strong> 414 Peserta Resmi
+                    </span>
+                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
+                        🔐 <strong>Password:</strong> Kode Akses 4-Digit
+                    </span>
+                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
+                        📅 <strong>Distribusi Hari:</strong> Senin (93), Selasa (50), Rabu (134), Kamis (112), Jumat (25)
+                    </span>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+                <form method="POST" style="margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin menyinkronkan seluruh 414 akun resmi E-Ujian ({NIM}.22205 dan Kode Akses 4-digit) ke database peserta pretes?');">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="action"     value="sync_eujian_official">
+                    <button type="submit" class="btn"
+                        style="background:#0284c7;color:#ffffff;font-weight:700;font-size:13.5px;padding:12px 22px;border-radius:10px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 8px rgba(2,132,199,0.35);transition:all 0.2s;">
+                        🔄 Sinkronkan 414 Akun Resmi E-Ujian
+                    </button>
+                </form>
+                <span style="font-size:11.5px;color:#0369a1;">
+                    ⚡ Memperbarui username, password tes, dan hari ujian secara otomatis
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- ── Generate Credentials Massal ──────────────────────────────── -->
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -697,13 +760,13 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="form-group" style="margin-bottom:16px;">
                 <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Username Tes</label>
-                <input type="text" name="username_tes" id="modal-username" placeholder="contoh: TES2024010001"
+                <input type="text" name="username_tes" id="modal-username" placeholder="contoh: 24042062.22205"
                     style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;">
             </div>
             <div class="form-group" style="margin-bottom:16px;">
                 <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Password Tes</label>
                 <div style="position:relative;margin-bottom:8px;">
-                    <input type="text" name="password_tes" id="modal-password" placeholder="contoh: AB12CD"
+                    <input type="text" name="password_tes" id="modal-password" placeholder="contoh: 7402"
                         style="width:100%;padding:10px 14px;padding-right:70px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;box-sizing:border-box;">
                     <button type="button" onclick="generatePassword()"
                         style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">

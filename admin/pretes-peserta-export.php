@@ -8,6 +8,8 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/sync_eujian.php';
+checkAutoSyncEujian($pdo);
 
 // ── Daftar Kolom yang Tersedia untuk Diexport ───────────────────────────────────
 $availableColumns = [
