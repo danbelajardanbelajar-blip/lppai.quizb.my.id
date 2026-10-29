@@ -13,51 +13,7 @@ $pdo     = getDBConnection();
 $message = '';
 $msgType = '';
 
-/**
- * Helper pembuat password acak dengan pilihan tipe karakter
- * @param string $type 'campuran' | 'angka' | 'huruf'
- * @param int $length panjang karakter password (default 6)
- * @return string
- */
-function generateCustomPassword($type = 'campuran', $length = 6) {
-    $length = max(4, min(16, (int)$length));
-    
-    if ($type === 'angka') {
-        $pool = '0123456789';
-        $pass = '';
-        $max = strlen($pool) - 1;
-        for ($i = 0; $i < $length; $i++) {
-            $pass .= $pool[random_int(0, $max)];
-        }
-        return $pass;
-    } elseif ($type === 'huruf') {
-        // Menggunakan huruf kapital yang mudah dibaca (menghindari I dan O)
-        $pool = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        $pass = '';
-        $max = strlen($pool) - 1;
-        for ($i = 0; $i < $length; $i++) {
-            $pass .= $pool[random_int(0, $max)];
-        }
-        return $pass;
-    } else {
-        // Campuran angka dan huruf (memastikan setidaknya ada huruf dan angka)
-        $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        $digits  = '23456789';
-        $all     = $letters . $digits;
 
-        $chars = [
-            $letters[random_int(0, strlen($letters) - 1)],
-            $digits[random_int(0, strlen($digits) - 1)],
-        ];
-
-        for ($i = 2; $i < $length; $i++) {
-            $chars[] = $all[random_int(0, strlen($all) - 1)];
-        }
-
-        shuffle($chars);
-        return implode('', $chars);
-    }
-}
 
 // ── Handle actions ────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -68,73 +24,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } else {
         $action = $_POST['action'];
 
-        // ── Generate credentials otomatis untuk SEMUA peserta ──────────────
-        if ($action === 'generate_all') {
-            $prefix   = trim($_POST['prefix'] ?? 'TES');
-            $passType = trim($_POST['pass_type'] ?? 'campuran');
-            $passLen  = (int)($_POST['pass_len'] ?? 6);
-            if (!in_array($passType, ['campuran', 'angka', 'huruf'])) {
-                $passType = 'campuran';
+        // ── Impor Akun & Password Peserta dari File Excel / CSV E-Ujian ──
+        if ($action === 'import_excel') {
+            if (!isset($_FILES['excel_file']) || $_FILES['excel_file']['error'] !== UPLOAD_ERR_OK) {
+                $message = 'Pilih file Excel (.xlsx, .xls) atau CSV (.csv) untuk diunggah.';
+                $msgType = 'danger';
+            } else {
+                $file = $_FILES['excel_file'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                    $message = 'Format file tidak didukung. Mohon gunakan file .xlsx, .xls, atau .csv dari E-Ujian.';
+                    $msgType = 'danger';
+                } else {
+                    require_once __DIR__ . '/../includes/import_eujian_excel.php';
+                    $res = importEujianSpreadsheet($file['tmp_name'], $file['name'], $pdo);
+                    if ($res['success']) {
+                        $message = "<strong>Impor Berhasil:</strong> " . htmlspecialchars($res['message']);
+                        $msgType = 'success';
+                    } else {
+                        $message = "<strong>Gagal Impor:</strong> " . htmlspecialchars($res['message']);
+                        $msgType = 'danger';
+                    }
+                }
             }
-            if ($passLen < 4 || $passLen > 16) {
-                $passLen = 6;
-            }
-
-            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
-            $rows   = $stmt->fetchAll();
-            $count  = 0;
-            foreach ($rows as $row) {
-                // Format: NIM mahasiswa sebagai username, random password sesuai opsi
-                $nimRow = $pdo->prepare("SELECT nim FROM users WHERE id = ?");
-                $nimRow->execute([$row['user_id']]);
-                $nim = $nimRow->fetchColumn();
-
-                $username = strtoupper($prefix) . $nim;
-                $password = generateCustomPassword($passType, $passLen);
-
-                $upd = $pdo->prepare(
-                    "UPDATE pretes_registrations
-                     SET username_tes = ?, password_tes = ?
-                     WHERE id = ? AND (username_tes IS NULL OR username_tes = '')"
-                );
-                $upd->execute([$username, $password, $row['id']]);
-                $count += $upd->rowCount();
-            }
-            $tipeLabel = ($passType === 'angka') ? 'Hanya Angka' : (($passType === 'huruf') ? 'Hanya Huruf' : 'Campuran Huruf & Angka');
-            $message = "Credentials berhasil digenerate untuk <strong>$count peserta</strong> (yang belum punya credentials) dengan format password <strong>$tipeLabel</strong> ($passLen karakter).";
-            $msgType = 'success';
-
-        // ── Reset & regenerate SEMUA (paksa timpa) ────────────────────────
-        } elseif ($action === 'regenerate_all') {
-            $prefix   = trim($_POST['prefix'] ?? 'TES');
-            $passType = trim($_POST['pass_type'] ?? 'campuran');
-            $passLen  = (int)($_POST['pass_len'] ?? 6);
-            if (!in_array($passType, ['campuran', 'angka', 'huruf'])) {
-                $passType = 'campuran';
-            }
-            if ($passLen < 4 || $passLen > 16) {
-                $passLen = 6;
-            }
-
-            $stmt   = $pdo->query("SELECT id, user_id FROM pretes_registrations WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')");
-            $rows   = $stmt->fetchAll();
-            $count  = 0;
-            foreach ($rows as $row) {
-                $nimRow = $pdo->prepare("SELECT nim FROM users WHERE id = ?");
-                $nimRow->execute([$row['user_id']]);
-                $nim = $nimRow->fetchColumn();
-
-                $username = strtoupper($prefix) . $nim;
-                $password = generateCustomPassword($passType, $passLen);
-
-                $pdo->prepare(
-                    "UPDATE pretes_registrations SET username_tes = ?, password_tes = ? WHERE id = ?"
-                )->execute([$username, $password, $row['id']]);
-                $count++;
-            }
-            $tipeLabel = ($passType === 'angka') ? 'Hanya Angka' : (($passType === 'huruf') ? 'Hanya Huruf' : 'Campuran Huruf & Angka');
-            $message = "Semua credentials (<strong>$count peserta</strong>) berhasil di-regenerate ulang dengan format password <strong>$tipeLabel</strong> ($passLen karakter)!";
-            $msgType = 'success';
 
         // ── Set / Edit credentials & hari individual ─────────────────────
         } elseif ($action === 'set_credential') {
@@ -315,148 +227,88 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- ── Panel Sinkronisasi Resmi Akun E-Ujian (414 Peserta) ──────────── -->
-<div class="card" style="margin-bottom:24px;border:1.5px solid #0284c7;background:linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);box-shadow:0 2px 8px rgba(2,132,199,0.12);">
+<!-- ── Panel Integrasi & Impor Akun Resmi E-Ujian ────────────────────── -->
+<div class="card" style="margin-bottom:24px;border:1.5px solid #0284c7;background:#ffffff;box-shadow:0 2px 10px rgba(2,132,199,0.08);border-radius:14px;overflow:hidden;">
+    <div class="card-header" style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 22px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:20px;">🎓</span>
+            <strong style="font-size:15px;color:#fff;">Integrasi Akun & Password Resmi E-Ujian</strong>
+            <span style="background:rgba(255,255,255,0.22);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Kode Lembaga: 22205</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="download-template-eujian.php" data-no-spa="true"
+               class="btn btn-sm"
+               style="background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);color:#fff;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                📗 Unduh Template Excel (.xlsx)
+            </a>
+        </div>
+    </div>
     <div class="card-body" style="padding:22px 24px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;">
-            <div style="flex:1;min-width:300px;">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-                    <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:#0284c7;color:#ffffff;font-size:20px;box-shadow:0 2px 6px rgba(2,132,199,0.3);">
-                        🔄
-                    </span>
-                    <div>
-                        <strong style="font-size:16px;color:#0369a1;display:block;">Data & Credentials Resmi E-Ujian (414 Peserta)</strong>
-                        <span style="font-size:12.5px;color:#0284c7;font-weight:600;">Kode Lembaga: <strong>22205</strong> | Format Login: <strong>{NIM}.22205</strong></span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:24px;align-items:start;">
+            
+            <!-- Kolom Kiri: Form Upload Excel E-Ujian -->
+            <div style="background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:12px;padding:20px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                    <span style="font-size:18px;">📤</span>
+                    <strong style="font-size:14px;color:#0f172a;">Impor Akun & Password dari File Excel (.xlsx / .csv)</strong>
+                </div>
+                <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 14px;">
+                    Unggah file hasil ekspor dari <strong>E-Ujian</strong> (misal <code>PESERTA_xxxx.xlsx</code>) atau file spreadsheet lainnya. Sistem otomatis mencocokkan NIM dan menyelaraskan username (<code>{NIM}.22205</code>), password (kode akses), dan kelompok hari.
+                </p>
+
+                <form method="POST" enctype="multipart/form-data" data-no-spa="true" style="margin:0;">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="action"     value="import_excel">
+
+                    <div style="margin-bottom:14px;">
+                        <input type="file" name="excel_file" id="excelFileInput" accept=".xlsx,.xls,.csv" required
+                            style="width:100%;box-sizing:border-box;padding:9px 12px;background:#ffffff;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;color:#334155;cursor:pointer;">
+                        <span style="display:block;font-size:11.5px;color:#64748b;margin-top:4px;">
+                            Mendukung file: <strong>.xlsx</strong>, <strong>.xls</strong>, atau <strong>.csv</strong> dari E-Ujian
+                        </span>
+                    </div>
+
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <button type="submit" class="btn"
+                            style="background:#0284c7;color:#fff;border:none;font-weight:700;font-size:13px;padding:10px 20px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(2,132,199,0.3);transition:all 0.2s;">
+                            📤 Unggah & Impor Password
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Kolom Kanan: Info Format & Tombol Sinkronisasi Cepat -->
+            <div style="display:flex;flex-direction:column;justify-content:space-between;gap:14px;">
+                <div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <span style="font-size:18px;">ℹ️</span>
+                        <strong style="font-size:14px;color:#0f172a;">Ketentuan Format Akun E-Ujian</strong>
+                    </div>
+                    <ul style="margin:0;padding-left:18px;font-size:12.5px;color:#334155;line-height:1.65;">
+                        <li><strong>Username:</strong> Mengikuti format resmi E-Ujian <code>{NIM}.22205</code> (kolom <em>NOMOR PESERTA</em> atau <em>USERNAME LOGIN</em>).</li>
+                        <li><strong>Password:</strong> Kode akses 4-digit resmi dari E-Ujian (kolom <em>KODE AKSES</em>).</li>
+                        <li><strong>Hari Ujian:</strong> Mengikuti kelompok hari pretes (kolom <em>KELOMPOK</em>: Senin s.d. Jumat).</li>
+                    </ul>
+                </div>
+
+                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 16px;">
+                    <div style="display:justify-between;align-items:center;display:flex;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <strong style="font-size:13px;color:#1e40af;display:block;">Data Resmi Bawaan (414 Peserta)</strong>
+                            <span style="font-size:12px;color:#3b82f6;">Sudah terpasang di sistem. Klik tombol untuk sinkronkan kembali jika diperlukan.</span>
+                        </div>
+                        <form method="POST" style="margin:0;" onsubmit="return confirm('Sinkronkan kembali data 414 akun resmi E-Ujian bawaan ke database peserta pretes?');">
+                            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                            <input type="hidden" name="action"     value="sync_eujian_official">
+                            <button type="submit" class="btn btn-sm"
+                                style="background:#1d4ed8;color:#fff;border:none;font-weight:700;font-size:12px;padding:8px 16px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(29,78,216,0.3);">
+                                🔄 Sinkronkan 414 Akun Bawaan
+                            </button>
+                        </form>
                     </div>
                 </div>
-                <p style="font-size:13.5px;color:#1e293b;line-height:1.55;margin:0 0 12px;">
-                    Username login <strong>E-Ujian</strong> tidak dibuat secara acak mandiri, melainkan menggunakan pola resmi <code>{NIM}.22205</code> dan <strong>Kode Akses 4-digit</strong> resmi.
-                </p>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#334155;">
-                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
-                        👥 <strong>Total:</strong> 414 Peserta Resmi
-                    </span>
-                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
-                        🔐 <strong>Password:</strong> Kode Akses 4-Digit
-                    </span>
-                    <span style="background:#ffffff;padding:5px 12px;border-radius:8px;border:1px solid #bfdbfe;display:inline-flex;align-items:center;gap:6px;">
-                        📅 <strong>Distribusi Hari:</strong> Senin (93), Selasa (50), Rabu (134), Kamis (112), Jumat (25)
-                    </span>
-                </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-                <form method="POST" style="margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin menyinkronkan seluruh 414 akun resmi E-Ujian ({NIM}.22205 dan Kode Akses 4-digit) ke database peserta pretes?');">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="action"     value="sync_eujian_official">
-                    <button type="submit" class="btn"
-                        style="background:#0284c7;color:#ffffff;font-weight:700;font-size:13.5px;padding:12px 22px;border-radius:10px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 3px 8px rgba(2,132,199,0.35);transition:all 0.2s;">
-                        🔄 Sinkronkan 414 Akun Resmi E-Ujian
-                    </button>
-                </form>
-                <span style="font-size:11.5px;color:#0369a1;">
-                    ⚡ Memperbarui username, password tes, dan hari ujian secara otomatis
-                </span>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- ── Generate Credentials Massal ──────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <span style="font-weight:700;">⚡ Generate Credentials Tes Tulis (Massal)</span>
-        <span style="font-size:12px;color:var(--text-muted);">Format username & password dapat disesuaikan</span>
-    </div>
-    <div class="card-body">
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
-            Sistem akan membuat <strong>username</strong> = Prefix + NIM, dan <strong>password</strong> acak sesuai tipe karakter yang Anda pilih di bawah.<br>
-            Credentials yang sudah ada <strong>tidak akan ditimpa</strong> oleh "Generate Baru". Gunakan "Regenerate Semua" untuk memaksa timpa.
-        </p>
-
-        <!-- Panel Opsi Pengaturan Credentials -->
-        <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:18px;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:16px;">
-                <!-- 1. Prefix Username -->
-                <div class="form-group" style="margin:0;">
-                    <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">Prefix Username</label>
-                    <input type="text" id="prefix-input" value="TES" placeholder="contoh: TES"
-                        oninput="updateSamplePreview()"
-                        style="padding:10px 14px;border:2px solid #cbd5e1;border-radius:10px;font-size:14px;width:100%;background:#fff;outline:none;font-weight:600;color:#1e293b;box-sizing:border-box;">
-                </div>
-
-                <!-- 2. Panjang Karakter Password -->
-                <div class="form-group" style="margin:0;">
-                    <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;display:block;">Panjang Password</label>
-                    <select id="pass-len-input" onchange="updateSamplePreview()"
-                        style="padding:10px 14px;border:2px solid #cbd5e1;border-radius:10px;font-size:14px;width:100%;background:#fff;outline:none;font-weight:600;color:#1e293b;cursor:pointer;box-sizing:border-box;">
-                        <option value="6" selected>6 Karakter (Standar)</option>
-                        <option value="8">8 Karakter</option>
-                        <option value="10">10 Karakter</option>
-                        <option value="4">4 Karakter</option>
-                    </select>
-                </div>
             </div>
 
-            <!-- 3. Pilihan Tipe Karakter Password (Bisa dipilih / dicentang) -->
-            <div>
-                <label style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;display:block;">
-                    🔑 Pilihan Format Karakter Password:
-                </label>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                    <!-- Opsi: Campuran (Huruf & Angka) -->
-                    <label class="pass-type-card" id="card-pass-campuran"
-                        style="display:inline-flex;align-items:center;gap:8px;background:#eff6ff;border:2px solid #3b82f6;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:700;color:#1d4ed8;transition:all 0.2s;">
-                        <input type="radio" name="pass_type_select" value="campuran" checked onchange="updatePassTypeUI()"
-                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
-                        <span>🔠🔢 Campuran (Huruf & Angka)</span>
-                    </label>
-
-                    <!-- Opsi: Hanya Angka -->
-                    <label class="pass-type-card" id="card-pass-angka"
-                        style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:2px solid #cbd5e1;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:#334155;transition:all 0.2s;">
-                        <input type="radio" name="pass_type_select" value="angka" onchange="updatePassTypeUI()"
-                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
-                        <span>🔢 Hanya Angka (0-9)</span>
-                    </label>
-
-                    <!-- Opsi: Hanya Huruf -->
-                    <label class="pass-type-card" id="card-pass-huruf"
-                        style="display:inline-flex;align-items:center;gap:8px;background:#ffffff;border:2px solid #cbd5e1;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:#334155;transition:all 0.2s;">
-                        <input type="radio" name="pass_type_select" value="huruf" onchange="updatePassTypeUI()"
-                            style="accent-color:#2563eb;width:18px;height:18px;cursor:pointer;">
-                        <span>🔤 Hanya Huruf (A-Z)</span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tombol Eksekusi Massal -->
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-            <form method="POST" id="form-gen-all" style="display:inline;" onsubmit="syncGenFields(this)">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action"     value="generate_all">
-                <input type="hidden" name="prefix"     id="prefix-gen" value="TES">
-                <input type="hidden" name="pass_type"  id="pass-type-gen" value="campuran">
-                <input type="hidden" name="pass_len"   id="pass-len-gen" value="6">
-                <button type="submit" class="btn btn-primary" style="width:auto;padding:11px 22px;font-weight:700;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 6px rgba(26,86,50,0.25);">
-                    🔑 Generate Credentials Baru
-                </button>
-            </form>
-            <form method="POST" id="form-regen-all" style="display:inline;"
-                  onsubmit="syncGenFields(this); return confirm('PERINGATAN: Yakin ingin me-regenerate semua credentials? Tindakan ini akan MENIMPA semua username dan password peserta yang sudah ada dengan format karakter yang Anda pilih saat ini!');">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action"     value="regenerate_all">
-                <input type="hidden" name="prefix"     id="prefix-regen" value="TES">
-                <input type="hidden" name="pass_type"  id="pass-type-regen" value="campuran">
-                <input type="hidden" name="pass_len"   id="pass-len-regen" value="6">
-                <button type="submit" class="btn btn-sm btn-danger" style="width:auto;padding:11px 22px;font-weight:700;display:inline-flex;align-items:center;gap:8px;">
-                    🔄 Regenerate Semua (Timpa)
-                </button>
-            </form>
-        </div>
-
-        <!-- Live Preview Contoh Hasil -->
-        <div id="example-preview-box" style="margin-top:14px;padding:12px 16px;background:#e8f5e9;border-radius:10px;font-size:13px;color:#2e7d32;border:1px solid #c8e6c9;">
-            💡 <strong>Contoh hasil:</strong> Prefix <code>TES</code> + NIM <code>2024010001</code> → Username: <code>TES2024010001</code>, Password: <code>A8C2K9</code> (Campuran Huruf & Angka, 6 karakter)
         </div>
     </div>
 </div>
@@ -466,12 +318,16 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>📋 Data Peserta & Credentials Tes Tulis (<?= $totalPeserta ?> peserta)</span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('excelFileInput').scrollIntoView({behavior:'smooth'}); document.getElementById('excelFileInput').click();"
+               style="background:#0284c7;color:#ffffff;border:1px solid #0369a1;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(2,132,199,0.25);">
+                📤 Impor Excel
+            </button>
             <a href="pretes-peserta-export.php" class="btn btn-sm"
                style="background:#16a34a;color:#ffffff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(22,163,74,0.25);">
                 📗 Halaman Export ke Excel
             </a>
             <button type="button" class="btn btn-sm" onclick="openExportModal()"
-               style="background:#0284c7;color:#ffffff;border:1px solid #0369a1;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(2,132,199,0.25);">
+               style="background:#0f766e;color:#ffffff;border:1px solid #0d9488;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(15,118,110,0.25);">
                 📥 Export ke Excel
             </button>
         </div>
@@ -770,30 +626,10 @@ include __DIR__ . '/../includes/header.php';
                     style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;">
             </div>
             <div class="form-group" style="margin-bottom:16px;">
-                <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Password Tes</label>
-                <div style="position:relative;margin-bottom:8px;">
-                    <input type="text" name="password_tes" id="modal-password" placeholder="contoh: 7402"
-                        style="width:100%;padding:10px 14px;padding-right:70px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;box-sizing:border-box;">
-                    <button type="button" onclick="generatePassword()"
-                        style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--primary);color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;">
-                        🎲 Acak
-                    </button>
-                </div>
-                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#f8fafc;padding:6px 10px;border-radius:8px;border:1px solid #e2e8f0;">
-                    <span style="font-size:11.5px;color:#64748b;font-weight:600;">Format Acak:</span>
-                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-                        <input type="radio" name="modal_pass_type" value="campuran" checked style="accent-color:#1a5632;">
-                        Campuran
-                    </label>
-                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-                        <input type="radio" name="modal_pass_type" value="angka" style="accent-color:#1a5632;">
-                        Hanya Angka
-                    </label>
-                    <label style="font-size:11.5px;color:#334155;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-                        <input type="radio" name="modal_pass_type" value="huruf" style="accent-color:#1a5632;">
-                        Hanya Huruf
-                    </label>
-                </div>
+                <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Password Tes (Kode Akses E-Ujian)</label>
+                <input type="text" name="password_tes" id="modal-password" placeholder="contoh: 7402"
+                    style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                <span style="font-size:11.5px;color:#64748b;display:block;margin-top:4px;">Kode akses 4-digit sesuai data resmi dari E-Ujian.</span>
             </div>
             <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;">
                 <button type="button" class="btn btn-sm btn-outline-danger" id="btn-modal-clear" style="display:none;" onclick="clearCredFromModal()">
@@ -1067,115 +903,7 @@ if (document.readyState === 'loading') {
     initPretesFilters();
 }
 
-// ── Helper & Sinkronisasi Generator Credentials Massal ─────────────
-function getSelectedPassType() {
-    var checked = document.querySelector('input[name="pass_type_select"]:checked');
-    return checked ? checked.value : 'campuran';
-}
 
-function getSelectedPassLen() {
-    var el = document.getElementById('pass-len-input');
-    return el ? el.value : '6';
-}
-
-function updatePassTypeUI() {
-    var selected = getSelectedPassType();
-    var options = ['campuran', 'angka', 'huruf'];
-    options.forEach(function(opt) {
-        var card = document.getElementById('card-pass-' + opt);
-        if (!card) return;
-        if (opt === selected) {
-            card.style.background = '#eff6ff';
-            card.style.borderColor = '#3b82f6';
-            card.style.color = '#1d4ed8';
-            card.style.fontWeight = '700';
-        } else {
-            card.style.background = '#ffffff';
-            card.style.borderColor = '#cbd5e1';
-            card.style.color = '#334155';
-            card.style.fontWeight = '600';
-        }
-    });
-    updateSamplePreview();
-}
-
-function updateSamplePreview() {
-    var prefix = (document.getElementById('prefix-input').value || 'TES').trim().toUpperCase();
-    var passType = getSelectedPassType();
-    var passLen = parseInt(getSelectedPassLen(), 10) || 6;
-
-    var samplePass = '';
-    var labelDesc = '';
-    if (passType === 'angka') {
-        samplePass = '8492013576'.substring(0, passLen);
-        labelDesc = 'Hanya Angka';
-    } else if (passType === 'huruf') {
-        samplePass = 'ABKXYZMQTR'.substring(0, passLen);
-        labelDesc = 'Hanya Huruf';
-    } else {
-        samplePass = 'A8C2K9M4P7'.substring(0, passLen);
-        labelDesc = 'Campuran Huruf & Angka';
-    }
-
-    var el = document.getElementById('example-preview-box');
-    if (el) {
-        el.innerHTML = '💡 <strong>Contoh hasil:</strong> Prefix <code>' + prefix + '</code> + NIM <code>2024010001</code> → Username: <code>' + prefix + '2024010001</code>, Password: <code>' + samplePass + '</code> (' + labelDesc + ', ' + passLen + ' karakter)';
-    }
-}
-
-function syncGenFields(form) {
-    var prefixVal = (document.getElementById('prefix-input').value || 'TES').trim();
-    var typeVal   = getSelectedPassType();
-    var lenVal    = getSelectedPassLen();
-
-    var pField = form.querySelector('input[name="prefix"]');
-    if (pField) pField.value = prefixVal;
-
-    var tField = form.querySelector('input[name="pass_type"]');
-    if (tField) tField.value = typeVal;
-
-    var lField = form.querySelector('input[name="pass_len"]');
-    if (lField) lField.value = lenVal;
-}
-
-// Generate password acak di Modal Edit Individual
-function generatePassword() {
-    var typeEl = document.querySelector('input[name="modal_pass_type"]:checked');
-    var type = typeEl ? typeEl.value : 'campuran';
-    var pass = '';
-
-    if (type === 'angka') {
-        const chars = '0123456789';
-        for (let i = 0; i < 6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-    } else if (type === 'huruf') {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        for (let i = 0; i < 6; i++) pass += chars[Math.floor(Math.random() * chars.length)];
-    } else {
-        const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-        const digits = '23456789';
-        const all = letters + digits;
-        let pArr = [
-            letters[Math.floor(Math.random() * letters.length)],
-            digits[Math.floor(Math.random() * digits.length)]
-        ];
-        for (let i = 2; i < 6; i++) {
-            pArr.push(all[Math.floor(Math.random() * all.length)]);
-        }
-        for (let i = pArr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [pArr[i], pArr[j]] = [pArr[j], pArr[i]];
-        }
-        pass = pArr.join('');
-    }
-    document.getElementById('modal-password').value = pass;
-}
-
-// Sinkron prefix saat submit form POST
-document.querySelectorAll('form[method="POST"]').forEach(form => {
-    form.addEventListener('submit', function() {
-        syncGenFields(this);
-    });
-});
 </script>
 
 
