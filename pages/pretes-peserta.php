@@ -77,6 +77,132 @@ include __DIR__ . '/../includes/header.php';
 ═══════════════════════════════════════════════════════════════════ -->
 <?php if ($myReg): ?>
 
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PENGUMUMAN PENTING & ATURAN WAJIB PRETES CBT (E-UJIAN)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="card" style="border:2px solid #dc2626;background:#ffffff;margin-bottom:24px;border-radius:16px;box-shadow:0 4px 20px rgba(220,38,38,0.08);overflow:hidden;">
+        <div style="background:linear-gradient(135deg, #991b1b 0%, #dc2626 100%);color:#ffffff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,0.2);font-size:20px;">
+                    🚨
+                </span>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.3px;">
+                        PENGUMUMAN & ATURAN WAJIB TES TULIS PRETES (CBT E-UJIAN)
+                    </h3>
+                    <span style="font-size:12px;color:#fecaca;">Harap dibaca, dipersiapkan, dan dipatuhi oleh seluruh mahasiswa peserta pretes</span>
+                </div>
+            </div>
+            <span style="background:rgba(255,255,255,0.22);color:#ffffff;padding:5px 14px;border-radius:20px;font-size:11.5px;font-weight:800;letter-spacing:0.5px;">
+                WAJIB DIPATUHI
+            </span>
+        </div>
+
+        <div class="card-body" style="padding:22px;">
+            <!-- Grid 4 Poin Utama -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;">
+                <!-- Poin 1: Wajib Install Exam Browser -->
+                <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:22px;">📱</span>
+                            <strong style="color:#1e40af;font-size:13.5px;">1. Wajib Install Exam Browser</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
+                            Peserta <strong>wajib menginstall salah satu dari dua aplikasi</strong> berikut pada HP / perangkat ujian Anda:
+                        </p>
+                        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+                            <!-- Android -->
+                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                                <div style="font-size:12px;color:#1e293b;">
+                                    🤖 <strong>Android:</strong> E-Ujian Browser
+                                </div>
+                                <a href="https://play.google.com/store/apps/details?id=com.eujian.cbt" target="_blank" rel="noopener noreferrer"
+                                   style="background:#0284c7;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                                    Google Play ↗
+                                </a>
+                            </div>
+                            <!-- iPhone / iOS -->
+                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                                <div style="font-size:12px;color:#1e293b;">
+                                    🍏 <strong>iPhone/iPad:</strong> Safe Exam Browser
+                                </div>
+                                <a href="https://apps.apple.com/app/safe-exam-browser/id1138834203" target="_blank" rel="noopener noreferrer"
+                                   style="background:#0f766e;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                                    App Store ↗
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="font-size:11.5px;color:#64748b;line-height:1.4;">
+                        *(Pengguna PC / Laptop Windows & Mac juga menggunakan <strong>Safe Exam Browser</strong>)*
+                    </div>
+                </div>
+
+                <!-- Poin 2: Kode Lembaga -->
+                <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:22px;">🏫</span>
+                            <strong style="color:#166534;font-size:13.5px;">2. Kode Lembaga / Sekolah</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
+                            Saat pertama kali membuka aplikasi E-Ujian Browser / Safe Exam Browser, Anda diminta memasukkan Kode Lembaga:
+                        </p>
+                        <div style="background:#ffffff;border:2px dashed #16a34a;border-radius:10px;padding:12px;text-align:center;margin-bottom:8px;">
+                            <span style="font-size:11px;font-weight:700;color:#16a34a;display:block;letter-spacing:1px;margin-bottom:2px;">KODE RESMI LEMBAGA</span>
+                            <span style="font-family:monospace;font-size:30px;font-weight:900;color:#15803d;letter-spacing:4px;">
+                                22205
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" onclick="copyText('22205', 'btn-copy-lembaga-box')" id="btn-copy-lembaga-box"
+                            style="width:100%;background:#16a34a;color:#ffffff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;">
+                        📋 Salin Kode: 22205
+                    </button>
+                </div>
+
+                <!-- Poin 3: Try Out Mandiri dari Rumah -->
+                <div style="background:#fefce8;border:1.5px solid #fef08a;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:22px;">🏠</span>
+                            <strong style="color:#854d0e;font-size:13.5px;">3. Try Out Mandiri dari Rumah</strong>
+                        </div>
+                        <div style="background:#ca8a04;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;margin-bottom:8px;">
+                            Malam Ini s.d. Malam Senin
+                        </div>
+                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0;">
+                            Diadakan <strong>Try Out Mandiri dari rumah masing-masing</strong> mulai malam ini hingga malam Senin. Seluruh peserta diharapkan mencoba login dan simulasi pengerjaan agar familiar dengan aplikasi dan credentials Anda berjalan lancar.
+                        </p>
+                    </div>
+                    <div style="margin-top:10px;background:#ffffff;border:1px solid #fef08a;padding:8px 10px;border-radius:6px;font-size:11.5px;color:#713f12;">
+                        💡 Gunakan Username & Password tes Anda di bawah.
+                    </div>
+                </div>
+
+                <!-- Poin 4: Larangan 2 HP di Meja Ujian -->
+                <div style="background:#fff1f2;border:2px solid #fecdd3;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="font-size:22px;">⛔</span>
+                            <strong style="color:#9f1239;font-size:13.5px;">4. Dilarang Membawa 2 HP di Meja!</strong>
+                        </div>
+                        <div style="background:#e11d48;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;margin-bottom:8px;">
+                            Ujian Resmi Senin s.d. Jumat di Kampus
+                        </div>
+                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
+                            Pada hari pelaksanaan ujian di kampus, <strong>DILARANG membawa dua HP di meja ujian</strong>. Jika ketahuan membawa dua HP di mejanya, <strong>akun ujian akan langsung dimatikan otomatis oleh Pengawas Ruangan</strong> dan <strong>TIDAK BISA MENGERJAKAN KEMBALI</strong> (gugur/didiskualifikasi).
+                        </p>
+                    </div>
+                    <div style="background:#ffffff;border:1px dashed #e11d48;padding:8px 10px;border-radius:8px;font-size:11.5px;color:#9f1239;line-height:1.45;">
+                        🎒 <strong>Jika Membawa 2 HP:</strong> HP kedua wajib dinonaktifkan/silent, disimpan di dalam tas, dan <strong>tas WAJIB ditaruh di depan kelas / ruangan ujian</strong>.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php if (!empty($myReg['username_tes']) && !empty($myReg['password_tes'])): ?>
     <!-- Credentials sudah tersedia -->
     <div class="card" style="border:2px solid #1a73e8;margin-bottom:28px;position:relative;overflow:hidden;">
@@ -247,32 +373,36 @@ include __DIR__ . '/../includes/header.php';
                             <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
                                 1
                             </span>
-                            <strong style="font-size:14px;color:#0f172a;">Salin Username & Password</strong>
+                            <strong style="font-size:14px;color:#0f172a;">Install Exam Browser Sesuai HP</strong>
                         </div>
                         <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Gunakan tombol <strong>Salin Username</strong> dan <strong>Salin Password</strong> yang tertera pada kotak credentials di atas halaman ini. Pastikan tidak ada spasi tambahan saat menyalin.
+                            Peserta <strong>wajib menginstall salah satu dari dua aplikasi</strong>: <strong>E-Ujian Browser</strong> untuk Android, atau <strong>Safe Exam Browser (SEB)</strong> untuk iPhone/iPad (iOS).
                         </p>
                     </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        💡 Contoh: Username <code>TES24061002</code>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <a href="https://play.google.com/store/apps/details?id=com.eujian.cbt" target="_blank" rel="noopener noreferrer"
+                           style="background:#0284c7;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">Play Store (Android) ↗</a>
+                        <a href="https://apps.apple.com/app/safe-exam-browser/id1138834203" target="_blank" rel="noopener noreferrer"
+                           style="background:#0f766e;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">App Store (iOS) ↗</a>
                     </div>
                 </div>
 
                 <!-- Langkah 2 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
+                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex-direction:column;justify-content:space-between;transition:all 0.2s;">
                     <div>
                         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
                             <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
                                 2
                             </span>
-                            <strong style="font-size:14px;color:#0f172a;">Buka Website E-Ujian</strong>
+                            <strong style="font-size:14px;color:#0f172a;">Masukkan Kode Lembaga: 22205</strong>
                         </div>
                         <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Buka tautan resmi portal ujian di <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">https://www.e-ujian.com/</a> atau link portal sekolah/kampus yang dibagikan oleh panitia.
+                            Buka aplikasi ujian yang telah diinstall. Saat aplikasi meminta <strong>Kode Lembaga / ID Sekolah</strong>, ketik kode resmi: <strong>22205</strong>.
                         </p>
                     </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        🌐 Disarankan peramban <strong>Google Chrome</strong>
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 10px;border-radius:8px;font-size:12px;color:#166534;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+                        <span>Kode: <strong>22205</strong></span>
+                        <button type="button" onclick="copyText('22205', 'btn-copy-lbg-step')" id="btn-copy-lbg-step" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:10.5px;cursor:pointer;">Salin</button>
                     </div>
                 </div>
 
@@ -356,7 +486,8 @@ include __DIR__ . '/../includes/header.php';
                     <strong style="font-size:14px;color:#92400e;">Hal-Hal Penting yang Wajib Diperhatikan Selama Tes:</strong>
                 </div>
                 <ul style="margin:0;padding-left:20px;font-size:13px;color:#78350f;line-height:1.7;">
-                    <li><strong>Jangan menutup tab atau menekan tombol Back</strong> pada browser selama tes berlangsung agar sesi ujian Anda tidak keluar otomatis.</li>
+                    <li><strong>Aturan Larangan 2 HP (Sanksi Diskualifikasi):</strong> Peserta dilarang keras membawa / meletakkan 2 HP di atas meja ujian. Jika ketahuan membawa 2 HP di meja saat ujian hari Senin–Jumat, akun ujian akan <strong>langsung dimatikan otomatis oleh Pengawas</strong> dan <strong>tidak bisa mengerjakan kembali</strong>. HP kedua wajib dimatikan dan dimasukkan ke tas, lalu tas diletakkan di depan kelas.</li>
+                    <li><strong>Try Out Mandiri:</strong> Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba ujian dari rumah menggunakan Kode Lembaga <code>22205</code> dan akun credentials Anda.</li>
                     <li><strong>Koneksi Terputus / Baterai Habis:</strong> Jika perangkat mendadak mati atau internet terputus, jawaban yang sudah Anda klik tetap tersimpan aman di server E-Ujian. Segera hidupkan perangkat, buka kembali E-Ujian, login, dan lanjutkan tes.</li>
                     <li><strong>Hadir Tepat Waktu:</strong> Hadirlah di ruangan ujian minimal 15 menit sebelum jam pelaksanaan pretes yang ditentukan pada jadwal Anda.</li>
                     <li><strong>Bantuan Pengawas:</strong> Apabila menemui kendala login atau token ujian tidak cocok, segera angkat tangan dan lapor kepada Pengawas Ruangan di lokasi.</li>

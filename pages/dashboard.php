@@ -223,7 +223,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Status Akun CBT & Catatan -->
-        <div style="background: <?= !empty($myPretesReg['username_tes']) ? '#eff6ff' : '#fffbeb' ?>; border: 1px solid <?= !empty($myPretesReg['username_tes']) ? '#bfdbfe' : '#fde68a' ?>; border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div style="background: <?= !empty($myPretesReg['username_tes']) ? '#eff6ff' : '#fffbeb' ?>; border: 1px solid <?= !empty($myPretesReg['username_tes']) ? '#bfdbfe' : '#fde68a' ?>; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; align-items:center; gap:10px;">
                 <span style="font-size:20px;"><?= !empty($myPretesReg['username_tes']) ? '🔑' : '⏳' ?></span>
                 <span style="font-size:13px; color: <?= !empty($myPretesReg['username_tes']) ? '#1e40af' : '#92400e' ?>; font-weight:500;">
@@ -237,6 +237,19 @@ include __DIR__ . '/../includes/header.php';
             <div style="font-size:12px; color:var(--text-muted);">
                 ℹ️ Harap hadir 15 menit sebelum ujian dimulai
             </div>
+        </div>
+
+        <!-- Info Wajib Try Out & Exam Browser -->
+        <div style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:12px; padding:12px 16px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:20px;">🚨</span>
+                <div style="font-size:12.5px; color:#9f1239; line-height:1.5;">
+                    <strong>Info Wajib Pretes:</strong> Try Out Mandiri dari rumah <strong>Malam Ini s.d. Malam Senin</strong> | Wajib Install <strong>E-Ujian Browser (Android)</strong> atau <strong>Safe Exam Browser (iPhone)</strong> | Kode Lembaga: <strong>22205</strong> | <strong>Dilarang membawa 2 HP di meja ujian</strong> (dimatikan & tas di depan).
+                </div>
+            </div>
+            <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-sm btn-danger" style="white-space:nowrap; padding:6px 12px; font-size:12px; font-weight:700;">
+                Lihat Panduan & Aturan ➔
+            </a>
         </div>
 
         <!-- Tombol Aksi Cepat -->
