@@ -1,7 +1,7 @@
 <?php
 /**
  * LPPAI Corner - Peserta & Jadwal Pretes (Mahasiswa)
- * Menampilkan jadwal pretes, daftar peserta, dan credentials tes tulis pribadi.
+ * Menampilkan jadwal pretes, kredensial tes tulis pribadi, dan petunjuk pelaksanaan ujian.
  */
 
 define('PAGE_TITLE', 'Peserta & Jadwal Pretes');
@@ -25,25 +25,16 @@ $stmtMyReg = $pdo->prepare("
 $stmtMyReg->execute([$user['id']]);
 $myReg = $stmtMyReg->fetch();
 
-// ── Ambil semua jadwal pretes ──────────────────────────────────────────────────
+// ── Ambil jadwal pretes aktif untuk informasi sesi ─────────────────────────────
 $schedules = $pdo->query(
     "SELECT * FROM pretes_schedules WHERE (periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%') ORDER BY tanggal ASC, waktu_mulai ASC"
 )->fetchAll();
-
-// ── Ambil daftar semua peserta (nama + nim saja, untuk informasi publik) ────────
-$participants = $pdo->query("
-    SELECT pr.id, pr.periode, pr.hari_pilihan, pr.jam, pr.tanggal_daftar, pr.status,
-           u.nama_lengkap, u.nim, u.program_studi
-    FROM pretes_registrations pr
-    JOIN users u ON pr.user_id = u.id
-    ORDER BY u.nama_lengkap ASC
-")->fetchAll();
 
 include __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-/* ── Responsif Khusus Halaman Pretes Peserta ── */
+/* ── Layout & Responsif Khusus Halaman Pretes Mahasiswa ── */
 .pretes-info-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -81,15 +72,15 @@ include __DIR__ . '/../includes/header.php';
 .pretes-info-box {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 12px 14px;
     box-sizing: border-box;
     min-width: 0;
     overflow: hidden;
 }
 
 .pretes-step-box {
-    background: #f8fafc;
+    background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 14px;
@@ -99,6 +90,7 @@ include __DIR__ . '/../includes/header.php';
     box-sizing: border-box;
     min-width: 0;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
 @media (max-width: 960px) {
@@ -137,6 +129,9 @@ include __DIR__ . '/../includes/header.php';
     .pretes-info-grid > div:nth-child(4) {
         grid-column: span 2;
     }
+    .pretes-info-box {
+        padding: 10px 12px;
+    }
 }
 
 @media (max-width: 360px) {
@@ -158,19 +153,19 @@ include __DIR__ . '/../includes/header.php';
     <!-- ── 1. KARTU UTAMA: JADWAL PRETES & KREDENSIAL AKUN CBT ── -->
     <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:20px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;max-width:100%;">
         <!-- Header Kartu -->
-        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-sizing:border-box;max-width:100%;">
+        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 12px;box-sizing:border-box;max-width:100%;">
             <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-                <span style="font-size:22px;flex-shrink:0;">🔑</span>
+                <span style="font-size:24px;flex-shrink:0;">🔑</span>
                 <div style="min-width:0;">
                     <h3 style="margin:0;font-size:15px;font-weight:800;color:#ffffff;line-height:1.3;word-break:break-word;">
                         Jadwal & Akun Tes Pretes Anda
                     </h3>
-                    <div style="font-size:12px;color:#e0f2fe;word-break:break-word;">
+                    <div style="font-size:12px;color:#e0f2fe;word-break:break-word;margin-top:2px;">
                         Periode: <strong><?= sanitize($myReg['periode']) ?></strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
                     </div>
                 </div>
             </div>
-            <span style="background:rgba(255,255,255,0.2);color:#ffffff;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap;">
+            <span style="background:rgba(255,255,255,0.22);color:#ffffff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;letter-spacing:0.3px;">
                 Kode Sekolah: 22205
             </span>
         </div>
@@ -269,7 +264,7 @@ include __DIR__ . '/../includes/header.php';
                                 <li>Password: <strong><?= sanitize($myReg['password_tes']) ?></strong></li>
                             </ul>
                             <button type="button" onclick="copyText('22205', 'btn-copy-lbg-top')" id="btn-copy-lbg-top"
-                                style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;">
+                                style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
                                 📋 Salin Kode Sekolah: 22205
                             </button>
                         </div>
@@ -518,114 +513,93 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
+    <!-- ── 4. SESI JADWAL LAINNYA (ACCORDION / CLEAN CARDS) ── -->
+    <?php if (!empty($schedules)): ?>
+    <details style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:14px;margin-bottom:24px;overflow:hidden;box-sizing:border-box;box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+        <summary style="padding:14px 16px;font-size:13.5px;font-weight:700;color:#334155;cursor:pointer;background:#f8fafc;display:flex;align-items:center;justify-content:space-between;outline:none;user-select:none;">
+            <span style="display:flex;align-items:center;gap:8px;">
+                <span>📅</span>
+                <span>Informasi Sesi Jadwal Lainnya (<?= count($schedules) ?> Sesi)</span>
+            </span>
+            <span style="font-size:12px;color:#64748b;">▼</span>
+        </summary>
+        <div style="padding:14px;box-sizing:border-box;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:10px;">
+                <?php foreach ($schedules as $s): ?>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;<?= ($myReg && $myReg['periode'] === $s['periode']) ? 'border-color:#38bdf8;background:#f0f9ff;' : '' ?>">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <strong style="font-size:13px;color:#0f172a;"><?= sanitize($s['periode']) ?></strong>
+                        <?php if ($myReg && $myReg['periode'] === $s['periode']): ?>
+                            <span class="badge badge-primary" style="font-size:10px;">Sesi Anda</span>
+                        <?php else: ?>
+                            <span class="badge badge-success" style="font-size:10px;"><?= ucfirst($s['status']) ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div style="font-size:11.5px;color:#475569;line-height:1.6;">
+                        <div>📅 <?= date('d M Y', strtotime($s['tanggal'])) ?> (<?= date('H:i', strtotime($s['waktu_mulai'])) ?> - <?= date('H:i', strtotime($s['waktu_selesai'])) ?>)</div>
+                        <div>🏢 Ruangan: <strong><?= sanitize($s['ruangan']) ?></strong></div>
+                        <div>👥 Kuota: <?= $s['terisi'] ?> / <?= $s['kuota'] ?> peserta</div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </details>
+    <?php endif; ?>
+
+<?php else: ?>
+
+    <!-- ── MAHASISWA BELUM DAFTAR PRETES ── -->
+    <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:24px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;">
+        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:24px 18px;text-align:center;">
+            <span style="font-size:40px;display:block;margin-bottom:10px;">📝</span>
+            <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;">Anda Belum Terdaftar di Sesi Pretes</h3>
+            <p style="margin:0 auto 16px;font-size:13.5px;color:#e0f2fe;line-height:1.55;max-width:500px;">
+                Silakan pilih hari dan jam pelaksanaan pretes yang Anda inginkan melalui menu pendaftaran sebelum kuota terisi penuh.
+            </p>
+            <a href="<?= BASE_URL ?>/pretes-daftar.php"
+                style="background:#f59e0b;color:#ffffff;border:none;padding:11px 24px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(245,158,11,0.4);transition:all 0.2s;">
+                👉 Daftar Pretes Sekarang ➔
+            </a>
+        </div>
+
+        <div class="card-body" style="padding:18px 16px;">
+            <h4 style="margin:0 0 12px;font-size:14.5px;font-weight:800;color:#0f172a;">
+                📅 Sesi Jadwal Pretes yang Tersedia:
+            </h4>
+
+            <?php if (empty($schedules)): ?>
+                <div class="empty-state" style="padding:30px 10px;">
+                    <div class="icon">📅</div>
+                    <h3>Jadwal belum tersedia</h3>
+                    <p>Jadwal pretes akan ditampilkan ketika TU sudah menginputkan jadwal.</p>
+                </div>
+            <?php else: ?>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:12px;">
+                    <?php foreach ($schedules as $s): ?>
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;box-sizing:border-box;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <strong style="font-size:13.5px;color:#0f172a;"><?= sanitize($s['periode']) ?></strong>
+                            <span class="badge badge-success" style="font-size:11px;"><?= ucfirst($s['status']) ?></span>
+                        </div>
+                        <div style="font-size:12px;color:#475569;line-height:1.6;margin-bottom:12px;">
+                            <div>📅 <strong><?= date('d M Y', strtotime($s['tanggal'])) ?></strong></div>
+                            <div>⏰ Waktu: <?= date('H:i', strtotime($s['waktu_mulai'])) ?> - <?= date('H:i', strtotime($s['waktu_selesai'])) ?> WIB</div>
+                            <div>🏢 Ruangan: <strong><?= sanitize($s['ruangan']) ?></strong></div>
+                            <div>👥 Kuota Terisi: <strong><?= $s['terisi'] ?> / <?= $s['kuota'] ?></strong></div>
+                        </div>
+                        <a href="<?= BASE_URL ?>/pretes-daftar.php"
+                            style="background:#0284c7;color:#fff;display:block;text-align:center;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;">
+                            Pilih Sesi Ini ➔
+                        </a>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
 <?php endif; ?>
-
-<!-- ── Jadwal Pretes ─────────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;box-sizing:border-box;max-width:100%;">
-    <div class="card-header">📅 Jadwal Pretes</div>
-    <div class="card-body" style="box-sizing:border-box;max-width:100%;">
-        <?php if (empty($schedules)): ?>
-            <div class="empty-state">
-                <div class="icon">📅</div>
-                <h3>Jadwal belum tersedia</h3>
-                <p>Jadwal pretes akan ditampilkan ketika TU sudah menginputkan jadwal.</p>
-            </div>
-        <?php else: ?>
-        <div class="table-responsive" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">
-            <table style="width:100%;min-width:560px;">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Periode</th>
-                        <th>Tanggal</th>
-                        <th>Waktu</th>
-                        <th>Ruangan</th>
-                        <th>Kuota</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($schedules as $i => $s): ?>
-                    <tr <?= ($myReg && $myReg['periode'] === $s['periode']) ? 'style="background:#e8f0fe;"' : '' ?>>
-                        <td><?= $i + 1 ?></td>
-                        <td><?= sanitize($s['periode']) ?></td>
-                        <td><?= date('d M Y', strtotime($s['tanggal'])) ?></td>
-                        <td><?= date('H:i', strtotime($s['waktu_mulai'])) ?> - <?= date('H:i', strtotime($s['waktu_selesai'])) ?></td>
-                        <td><?= sanitize($s['ruangan']) ?></td>
-                        <td><?= $s['terisi'] ?>/<?= $s['kuota'] ?></td>
-                        <td>
-                            <?php
-                            $statusMap = ['aktif' => 'badge-success', 'selesai' => 'badge-info', 'dibatalkan' => 'badge-danger'];
-                            ?>
-                            <span class="badge <?= $statusMap[$s['status']] ?? 'badge-info' ?>">
-                                <?= ucfirst($s['status']) ?>
-                            </span>
-                            <?php if ($myReg && $myReg['periode'] === $s['periode']): ?>
-                                <span class="badge badge-primary" style="margin-left:4px;">← Jadwal Anda</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- ── Daftar Peserta (Publik) ───────────────────────────────────── -->
-<div class="card" style="box-sizing:border-box;max-width:100%;">
-    <div class="card-header">👥 Daftar Peserta Pretes (<?= count($participants) ?> peserta)</div>
-    <div class="card-body" style="box-sizing:border-box;max-width:100%;">
-        <?php if (empty($participants)): ?>
-            <div class="empty-state">
-                <div class="icon">👥</div>
-                <h3>Belum ada peserta terdaftar</h3>
-            </div>
-        <?php else: ?>
-        <div class="table-responsive" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">
-            <table style="width:100%;min-width:600px;">
-                <thead>
-                    <tr>
-                        <th>No</th>
-                        <th>Nama</th>
-                        <th>NIM</th>
-                        <th>Program Studi</th>
-                        <th>Hari / Periode</th>
-                        <th>Tgl Daftar</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($participants as $i => $p): ?>
-                    <tr <?= ($p['nim'] === $user['nim']) ? 'style="background:#e8f0fe;font-weight:600;"' : '' ?>>
-                        <td><?= $i + 1 ?></td>
-                        <td>
-                            <?= sanitize($p['nama_lengkap']) ?>
-                            <?php if ($p['nim'] === $user['nim']): ?>
-                                <span class="badge badge-primary" style="font-size:10px;margin-left:4px;">Anda</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?= sanitize($p['nim']) ?></td>
-                        <td><?= sanitize($p['program_studi']) ?></td>
-                        <td><?= sanitize(!empty($p['hari_pilihan']) ? ($p['hari_pilihan'] . ' (' . ($p['jam'] ?? '13.00 WIB') . ')') : $p['periode']) ?></td>
-                        <td><?= date('d M Y', strtotime($p['tanggal_daftar'])) ?></td>
-                        <td>
-                            <?php
-                            $statusBadge = ['terdaftar' => 'badge-info', 'hadir' => 'badge-success', 'tidak_hadir' => 'badge-danger'];
-                            ?>
-                            <span class="badge <?= $statusBadge[$p['status']] ?? 'badge-info' ?>">
-                                <?= ucfirst(str_replace('_', ' ', $p['status'])) ?>
-                            </span>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php endif; ?>
-    </div>
-</div>
 
 <script>
 function togglePassword() {
