@@ -45,587 +45,398 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- ═══════════════════════════════════════════════════════════════════
-     PANEL CREDENTIALS TES TULIS — ditampilkan paling atas & menonjol
+     INFORMASI RESMI & PANDUAN PRETES MAHASISWA
 ═══════════════════════════════════════════════════════════════════ -->
 <?php if ($myReg): ?>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         PENGUMUMAN PENTING & ATURAN WAJIB PRETES CBT (E-UJIAN)
-    ═══════════════════════════════════════════════════════════════════ -->
-    <div class="card" style="border:2px solid #dc2626;background:#ffffff;margin-bottom:24px;border-radius:16px;box-shadow:0 4px 20px rgba(220,38,38,0.08);overflow:hidden;">
-        <div style="background:linear-gradient(135deg, #991b1b 0%, #dc2626 100%);color:#ffffff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,0.2);font-size:20px;">
-                    🚨
-                </span>
+    <!-- ── 1. KARTU UTAMA: JADWAL PRETES & KREDENSIAL AKUN CBT ── -->
+    <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:20px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;">
+        <!-- Header Kartu -->
+        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:22px;">🔑</span>
                 <div>
-                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.3px;">
-                        PENGUMUMAN & ATURAN WAJIB TES TULIS PRETES (CBT E-UJIAN)
+                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;line-height:1.3;">
+                        Jadwal & Akun Tes Pretes Anda
                     </h3>
-                    <span style="font-size:12px;color:#fecaca;">Harap dibaca, dipersiapkan, dan dipatuhi oleh seluruh mahasiswa peserta pretes</span>
+                    <span style="font-size:12px;color:#e0f2fe;">
+                        Periode: <strong><?= sanitize($myReg['periode']) ?></strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
+                    </span>
                 </div>
             </div>
-            <span style="background:rgba(255,255,255,0.22);color:#ffffff;padding:5px 14px;border-radius:20px;font-size:11.5px;font-weight:800;letter-spacing:0.5px;">
-                WAJIB DIPATUHI
+            <span style="background:rgba(255,255,255,0.2);color:#ffffff;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;">
+                Kode Sekolah: 22205
             </span>
         </div>
 
-        <div class="card-body" style="padding:22px;">
-            <!-- PERINGATAN KRUSIAL: WAJIB MENCATAT DI KERTAS SEBELUM BUKA APP -->
-            <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:12px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 2px 8px rgba(245,158,11,0.12);">
-                <span style="font-size:32px;line-height:1;flex-shrink:0;">📝</span>
-                <div style="font-size:13px;color:#92400e;line-height:1.6;">
-                    <strong style="font-size:14.5px;color:#b45309;display:block;margin-bottom:4px;">
-                        ⚠️ PERINGATAN PENTING: WAJIB DICATAT DI SECARIK KERTAS SEBELUM MEMBUKA APLIKASI!
-                    </strong>
-                    Aplikasi ujian (<strong>E-Ujian Browser</strong> / <strong>Safe Exam Browser</strong>) menerapkan sistem <em>Kiosk Mode</em> yang <strong>mengunci layar HP secara penuh</strong>. Saat aplikasi dibuka, <strong>Anda TIDAK DAPAT berpindah aplikasi atau membuka browser HP</strong> untuk melihat akun lagi.
-                    <br>
-                    👉 Oleh karena itu, <strong>SEBELUM MEMBUKA APLIKASI UJIAN, ANDA WAJIB MENCATAT DI KERTAS:</strong>
-                    <strong>1) Kode Lembaga: 22205</strong>, <strong>2) Username Tes</strong>, dan <strong>3) Password Tes</strong> Anda!
+        <div class="card-body" style="padding:18px 16px;">
+            
+            <!-- Grid Ringkasan Jadwal Pribadi -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 140px), 1fr));gap:10px;margin-bottom:16px;">
+                <!-- Hari -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">📅 Hari Ujian</div>
+                    <div style="font-size:15px;font-weight:800;color:#0f172a;">
+                        <?= sanitize($myReg['hari_pilihan'] ?: 'Belum ditentukan') ?>
+                    </div>
+                </div>
+
+                <!-- Jam -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">⏰ Jam Pelaksanaan</div>
+                    <div style="font-size:15px;font-weight:800;color:#0f172a;">
+                        <?= sanitize($myReg['jam'] ?: '13.00 WIB (Jam 1)') ?>
+                    </div>
+                </div>
+
+                <!-- Ruangan -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">🏢 Ruangan</div>
+                    <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
+                        <?= sanitize($myReg['ruangan'] ?? ($myReg['ruangan_tes'] ?? 'Menunggu pembagian')) ?>
+                    </div>
+                </div>
+
+                <!-- Dosen Penguji -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">👨‍🏫 Dosen Penguji</div>
+                    <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
+                        <?= sanitize($myReg['dosen_penguji'] ?: 'Menunggu pembagian') ?>
+                    </div>
                 </div>
             </div>
 
-            <!-- Grid 4 Poin Utama -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;">
-                <!-- Poin 1: Wajib Install Exam Browser -->
-                <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:22px;">📱</span>
-                            <strong style="color:#1e40af;font-size:13.5px;">1. Wajib Install Exam Browser</strong>
-                        </div>
-                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
-                            Peserta <strong>wajib menginstall salah satu dari dua aplikasi</strong> berikut pada HP / perangkat ujian Anda:
-                        </p>
-                        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
-                            <!-- Android -->
-                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-                                <div style="font-size:12px;color:#1e293b;">
-                                    🤖 <strong>Android:</strong> E-Ujian Browser
-                                </div>
-                                <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
-                                   style="background:#0284c7;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
-                                    Google Play ↗
-                                </a>
-                            </div>
-                            <!-- iPhone / iOS -->
-                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                                <div style="font-size:12px;color:#1e293b;">
-                                    🍏 <strong>iPhone/iPad:</strong> Safe Exam Browser
-                                </div>
-                                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                                    <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
-                                       style="background:#0f766e;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
-                                        App Store ↗
-                                    </a>
-                                    <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
-                                       style="background:#16a34a;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;" title="Unduh file konfigurasi SEB untuk iPhone">
-                                        📥 File .seb
-                                    </a>
-                                    <a href="#panduan-seb-iphone"
-                                       style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">
-                                        Panduan ➔
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="font-size:11.5px;color:#64748b;line-height:1.4;">
-                        *(Pengguna PC / Laptop Windows & Mac juga menggunakan <strong>Safe Exam Browser</strong>)*
-                    </div>
-                </div>
+            <?php if (!empty($myReg['username_tes']) && !empty($myReg['password_tes'])): ?>
+                <!-- Hidden base64 password -->
+                <input type="hidden" id="__enc_pass" value="<?= base64_encode($myReg['password_tes'] ?? '') ?>">
 
-                <!-- Poin 2: Kode Lembaga -->
-                <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:22px;">🏫</span>
-                            <strong style="color:#166534;font-size:13.5px;">2. Kode Lembaga / Sekolah</strong>
+                <!-- Kotak Kredensial CBT -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:12px;margin-bottom:16px;">
+                    <!-- Username Box -->
+                    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px;text-align:center;box-sizing:border-box;">
+                        <span style="display:block;font-size:11.5px;font-weight:800;color:#0369a1;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
+                            USERNAME CBT
+                        </span>
+                        <div id="username-display" style="font-family:monospace;font-size:21px;font-weight:900;color:#0284c7;letter-spacing:1px;word-break:break-all;margin-bottom:10px;">
+                            <?= sanitize($myReg['username_tes']) ?>
                         </div>
-                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
-                            Saat pertama kali membuka aplikasi E-Ujian Browser / Safe Exam Browser, Anda diminta memasukkan Kode Lembaga:
-                        </p>
-                        <div style="background:#ffffff;border:2px dashed #16a34a;border-radius:10px;padding:12px;text-align:center;margin-bottom:8px;">
-                            <span style="font-size:11px;font-weight:700;color:#16a34a;display:block;letter-spacing:1px;margin-bottom:2px;">KODE RESMI LEMBAGA</span>
-                            <span style="font-family:monospace;font-size:30px;font-weight:900;color:#15803d;letter-spacing:4px;">
-                                22205
-                            </span>
-                        </div>
-                    </div>
-                    <button type="button" onclick="copyText('22205', 'btn-copy-lembaga-box')" id="btn-copy-lembaga-box"
-                            style="width:100%;background:#16a34a;color:#ffffff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;">
-                        📋 Salin Kode: 22205
-                    </button>
-                </div>
-
-                <!-- Poin 3: Try Out Mandiri dari Rumah -->
-                <div style="background:#fefce8;border:1.5px solid #fef08a;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:22px;">🏠</span>
-                            <strong style="color:#854d0e;font-size:13.5px;">3. Try Out Mandiri dari Rumah</strong>
-                        </div>
-                        <div style="background:#ca8a04;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;margin-bottom:8px;">
-                            Malam Ini s.d. Malam Senin
-                        </div>
-                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0;">
-                            Diadakan <strong>Try Out Mandiri dari rumah masing-masing</strong> mulai malam ini hingga malam Senin. Seluruh peserta diharapkan mencoba login dan simulasi pengerjaan agar familiar dengan aplikasi dan credentials Anda berjalan lancar.
-                        </p>
-                    </div>
-                    <div style="margin-top:10px;background:#ffffff;border:1px solid #fef08a;padding:8px 10px;border-radius:6px;font-size:11.5px;color:#713f12;">
-                        💡 Gunakan Username & Password tes Anda di bawah.
-                    </div>
-                </div>
-
-                <!-- Poin 4: Larangan 2 HP di Meja Ujian -->
-                <div style="background:#fff1f2;border:2px solid #fecdd3;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:22px;">⛔</span>
-                            <strong style="color:#9f1239;font-size:13.5px;">4. Dilarang Membawa 2 HP di Meja!</strong>
-                        </div>
-                        <div style="background:#e11d48;color:#ffffff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;display:inline-block;margin-bottom:8px;">
-                            Ujian Resmi Senin s.d. Jumat di Kampus
-                        </div>
-                        <p style="font-size:12.5px;color:#334155;line-height:1.55;margin:0 0 10px;">
-                            Pada hari pelaksanaan ujian di kampus, <strong>DILARANG membawa dua HP di meja ujian</strong>. Jika ketahuan membawa dua HP di mejanya, <strong>akun ujian akan langsung dimatikan otomatis oleh Pengawas Ruangan</strong> dan <strong>TIDAK BISA MENGERJAKAN KEMBALI</strong> (gugur/didiskualifikasi).
-                        </p>
-                    </div>
-                    <div style="background:#ffffff;border:1px dashed #e11d48;padding:8px 10px;border-radius:8px;font-size:11.5px;color:#9f1239;line-height:1.45;">
-                        🎒 <strong>Jika Membawa 2 HP:</strong> HP kedua wajib dinonaktifkan/silent, disimpan di dalam tas, dan <strong>tas WAJIB ditaruh di depan kelas / ruangan ujian</strong>.
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <?php if (!empty($myReg['username_tes']) && !empty($myReg['password_tes'])): ?>
-    <!-- Credentials sudah tersedia -->
-    <div class="card" style="border:2px solid #1a73e8;margin-bottom:28px;position:relative;overflow:hidden;">
-        <!-- Dekorasi background -->
-        <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
-                    background:rgba(26,115,232,0.08);border-radius:50%;pointer-events:none;"></div>
-        <div style="position:absolute;bottom:-20px;right:60px;width:80px;height:80px;
-                    background:rgba(26,115,232,0.05);border-radius:50%;pointer-events:none;"></div>
-
-        <div class="card-header" style="background:#1a73e8;color:#fff;font-weight:700;font-size:15px;">
-            🔑 Credentials Tes Tulis Pretes Anda
-        </div>
-        <div class="card-body">
-            <!-- Hidden: password ter-encode base64, hanya ditampilkan setelah verifikasi -->
-            <input type="hidden" id="__enc_pass" value="<?= base64_encode($myReg['password_tes'] ?? '') ?>">
-
-            <!-- Peringatan Catat Kertas -->
-            <div style="background:#fff7ed;border:2px solid #ea580c;border-radius:12px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;box-shadow:0 2px 8px rgba(234,88,12,0.1);">
-                <span style="font-size:28px;line-height:1;flex-shrink:0;">✍️</span>
-                <div style="font-size:13px;color:#9a3412;line-height:1.6;">
-                    <strong style="color:#c2410c;font-size:14.5px;display:block;margin-bottom:4px;">
-                        JANGAN HANYA SALIN / COPY DI HP! WAJIB CATAT DI SECARIK KERTAS!
-                    </strong>
-                    Saat Anda membuka aplikasi E-Ujian Browser atau Safe Exam Browser, HP Anda akan terkunci otomatis (<em>kiosk mode</em>). Anda <strong>tidak dapat beralih ke aplikasi catatan atau membuka web ini lagi</strong> saat ujian berjalan.
-                    <br>
-                    Ambil secarik kertas dan pulpen sekarang, <strong>catat Username dan Password Anda di bawah ini</strong> untuk dibawa dan dilihat saat login di aplikasi ujian.
-                </div>
-            </div>
-
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-bottom:8px;">
-                <!-- Username -->
-                <div style="background:#e8f0fe;border-radius:14px;padding:20px 24px;text-align:center;">
-                    <div style="color:#1a73e8;font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">USERNAME TES TULIS</div>
-                    <div id="username-display"
-                         style="font-family:monospace;font-size:22px;font-weight:800;color:#1565c0;
-                                letter-spacing:2px;word-break:break-all;">
-                        <?= sanitize($myReg['username_tes']) ?>
-                    </div>
-                    <button onclick="copyText('<?= sanitize($myReg['username_tes']) ?>', 'btn-copy-user')"
-                            id="btn-copy-user"
-                            style="margin-top:12px;background:#1a73e8;color:#fff;border:none;border-radius:8px;
-                                   padding:6px 18px;cursor:pointer;font-size:13px;transition:all .2s;">
-                        📋 Salin Username
-                    </button>
-                </div>
-
-                <!-- Password -->
-                <div style="background:#fff3e0;border-radius:14px;padding:20px 24px;text-align:center;">
-                    <div style="color:#e65100;font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:8px;">PASSWORD TES TULIS</div>
-                    <div id="password-display"
-                         style="font-family:monospace;font-size:22px;font-weight:800;color:#bf360c;
-                                letter-spacing:6px;">
-                        ••••••
-                    </div>
-                    <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
-                        <button onclick="togglePassword()"
-                                id="btn-toggle-pass"
-                                style="background:#e65100;color:#fff;border:none;border-radius:8px;
-                                       padding:6px 14px;cursor:pointer;font-size:13px;">
-                            👁️ Tampilkan
+                        <button type="button" onclick="copyText('<?= sanitize($myReg['username_tes']) ?>', 'btn-copy-user')" id="btn-copy-user"
+                            style="background:#0284c7;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                            📋 Salin Username
                         </button>
-                        <button onclick="copyPassword('btn-copy-pass')"
-                                id="btn-copy-pass"
-                                style="background:#bf360c;color:#fff;border:none;border-radius:8px;
-                                       padding:6px 14px;cursor:pointer;font-size:13px;">
-                            📋 Salin
+                    </div>
+
+                    <!-- Password Box -->
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:16px;text-align:center;box-sizing:border-box;">
+                        <span style="display:block;font-size:11.5px;font-weight:800;color:#c2410c;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
+                            PASSWORD / KODE AKSES
+                        </span>
+                        <div id="password-display" style="font-family:monospace;font-size:21px;font-weight:900;color:#ea580c;letter-spacing:4px;margin-bottom:10px;">
+                            ••••••
+                        </div>
+                        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                            <button type="button" onclick="togglePassword()" id="btn-toggle-pass"
+                                style="background:#ea580c;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+                                👁️ Tampilkan
+                            </button>
+                            <button type="button" onclick="copyPassword('btn-copy-pass')" id="btn-copy-pass"
+                                style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+                                📋 Salin
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Peringatan Utama: Wajib Catat di Kertas (Satu tempat saja, tidak diulang) -->
+                <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-sizing:border-box;">
+                    <span style="font-size:24px;line-height:1;flex-shrink:0;">✍️</span>
+                    <div style="font-size:13px;color:#92400e;line-height:1.55;">
+                        <strong style="color:#b45309;display:block;margin-bottom:3px;">
+                            Wajib Catat di Secarik Kertas Sekarang Sebelum Membuka Aplikasi!
+                        </strong>
+                        Aplikasi ujian mengunci layar HP secara penuh (<em>Kiosk Mode</em>), sehingga Anda <strong>tidak dapat berpindah ke web atau membuka catatan di HP</strong> saat ujian berlangsung.
+                        Ambil secarik kertas dan pulpen, lalu catat:
+                        <ul style="margin:6px 0 10px;padding-left:18px;">
+                            <li>Kode Sekolah: <strong>22205</strong></li>
+                            <li>Username: <strong><?= sanitize($myReg['username_tes']) ?></strong></li>
+                            <li>Password: <strong><?= sanitize($myReg['password_tes']) ?></strong></li>
+                        </ul>
+                        <button type="button" onclick="copyText('22205', 'btn-copy-lbg-top')" id="btn-copy-lbg-top"
+                            style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;">
+                            📋 Salin Kode Sekolah: 22205
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Info jadwal tes jika ada -->
-            <?php if (!empty($myReg['hari_pilihan'])): ?>
-            <div style="margin-top:16px;padding:14px 18px;background:#f8f9fa;border-radius:10px;
-                        display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                <span style="font-size:28px;">📅</span>
-                <div>
-                    <strong>Jadwal Pretes Anda:</strong>
-                    Hari <strong><?= sanitize($myReg['hari_pilihan']) ?></strong>
-                    | Jam: <strong><?= sanitize($myReg['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
-                    | Penguji: <strong><?= sanitize($myReg['dosen_penguji'] ?? 'Menunggu pembagian') ?></strong>
-                    | Ruangan: <strong><?= sanitize($myReg['ruangan'] ?? ($myReg['ruangan_tes'] ?? 'Menunggu pembagian')) ?></strong>
+            <?php else: ?>
+                <!-- Akun belum dikeluarkan TU -->
+                <div style="background:#eff6ff;border:1.5px dashed #93c5fd;border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px;box-sizing:border-box;">
+                    <span style="font-size:32px;">⏳</span>
+                    <div style="font-size:13px;color:#1e40af;line-height:1.5;">
+                        <strong style="display:block;margin-bottom:2px;">Akun CBT Sedang Dipersiapkan</strong>
+                        Anda sudah terdaftar pretes. Username dan password tes tulis sedang diproses oleh petugas TU dan akan dibagikan menjelang pelaksanaan pretes. Silakan cek kembali halaman ini secara berkala.
+                    </div>
                 </div>
-            </div>
-            <?php elseif ($myReg['tanggal']): ?>
-            <div style="margin-top:16px;padding:14px 18px;background:#f8f9fa;border-radius:10px;
-                        display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-                <span style="font-size:28px;">📅</span>
-                <div>
-                    <strong>Jadwal Tes Anda:</strong>
-                    <?= date('l, d M Y', strtotime($myReg['tanggal'])) ?>
-                    | <?= date('H:i', strtotime($myReg['waktu_mulai'])) ?> -
-                      <?= date('H:i', strtotime($myReg['waktu_selesai'])) ?>
-                    | <?= sanitize($myReg['ruangan_tes'] ?? '-') ?>
-                </div>
-            </div>
             <?php endif; ?>
 
-            <!-- Akses Cepat Langsung ke E-Ujian -->
-            <div style="margin-top:18px;padding:14px 18px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:24px;">🌐</span>
-                    <div>
-                        <strong style="color:#1e40af;font-size:14px;display:block;">Siap Mengerjakan Tes Tulis?</strong>
-                        <span style="color:#3b82f6;font-size:12.5px;">Gunakan username & password di atas untuk login pada platform CBT <strong>E-Ujian</strong></span>
-                    </div>
-                </div>
-                <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" class="btn"
-                   style="background:#2563eb;color:#ffffff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(37,99,235,0.25);">
-                    🚀 Buka Website E-Ujian ↗
-                </a>
-            </div>
         </div>
     </div>
 
-    <?php else: ?>
-    <!-- Terdaftar tapi credentials belum dikeluarkan -->
-    <div class="card" style="border:2px dashed #e0e0e0;margin-bottom:28px;">
-        <div class="card-header" style="background:#f5f5f5;color:#555;">
-            🔑 Credentials Tes Tulis Pretes
-        </div>
-        <div class="card-body">
-            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-                <div style="font-size:40px;">⏳</div>
+    <!-- ── 2. PANDUAN PENGERJAAN UJIAN (PILIH SESUAI PERANGKAT) ── -->
+    <div class="card" id="panduan-ujian" style="margin-bottom:20px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;">
+        <div id="panduan-seb-iphone" style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:20px;">📱</span>
                 <div>
-                    <h3 style="margin:0 0 6px;color:#555;">Credentials Belum Tersedia</h3>
-                    <p style="color:var(--text-muted);margin:0;">
-                        Anda sudah terdaftar pretes (periode: <strong><?= sanitize($myReg['periode']) ?></strong>).
-                        Username dan password untuk tes tulis akan diberikan oleh TU menjelang hari pelaksanaan pretes.
-                        Silakan cek kembali halaman ini secara berkala.
-                    </p>
+                    <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Petunjuk Masuk & Mengerjakan Ujian</h4>
+                    <span style="font-size:12px;color:#64748b;">Pilih jenis perangkat HP / laptop yang Anda gunakan:</span>
                 </div>
             </div>
-        </div>
-    </div>
-    <?php endif; ?>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         KHUSUS PENGGUNA IPHONE (iOS): FILE KONFIGURASI & PANDUAN SEB
-    ═══════════════════════════════════════════════════════════════════ -->
-    <div class="card" id="panduan-seb-iphone" style="margin-bottom:28px;border:2px solid #0f766e;border-radius:16px;background:#ffffff;box-shadow:0 6px 24px rgba(15,118,110,0.1);overflow:hidden;">
-        <div class="card-header" style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%);color:#ffffff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);font-size:24px;">
-                    🍏
-                </span>
-                <div>
-                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.2px;">
-                        Khusus Pengguna iPhone (iOS): File Konfigurasi Safe Exam Browser (SEB)
-                    </h3>
-                    <p style="margin:2px 0 0;font-size:12.5px;color:#ccfbf1;">
-                        Wajib diunduh & dipasangkan pada aplikasi Safe Exam Browser di iPhone peserta pretes
-                    </p>
-                </div>
-            </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <a href="sebs://<?= preg_replace('#^https?://#', '', BASE_URL) ?>/assets/downloads/seb-config-lppai.seb"
-                   class="btn" style="background:#ffffff;color:#0f766e;font-weight:800;padding:8px 16px;border-radius:8px;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-                    ⚡ Buka Langsung di SEB (iOS)
-                </a>
-                <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
-                   class="btn" style="background:#f59e0b;color:#ffffff;font-weight:800;padding:8px 16px;border-radius:8px;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-                    📥 Unduh File .seb
-                </a>
+            <!-- Segmented Tabs (Touch-Friendly & Anti Geser Kanan-Kiri) -->
+            <div style="display:flex;background:#e2e8f0;border-radius:10px;padding:3px;gap:4px;flex-wrap:wrap;width:100%;max-width:440px;box-sizing:border-box;">
+                <button type="button" id="device-btn-android" onclick="switchDeviceTab('android')"
+                    style="flex:1 1 120px;background:#0284c7;color:#fff;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
+                    🤖 Android
+                </button>
+                <button type="button" id="device-btn-ios" onclick="switchDeviceTab('ios')"
+                    style="flex:1 1 120px;background:#ffffff;color:#334155;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
+                    🍏 iPhone / iPad
+                </button>
+                <button type="button" id="device-btn-laptop" onclick="switchDeviceTab('laptop')"
+                    style="flex:1 1 100px;background:#ffffff;color:#334155;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
+                    💻 Laptop / PC
+                </button>
             </div>
         </div>
 
-        <div class="card-body" style="padding:24px;">
-            <!-- Penjelasan Pengantar -->
-            <div style="background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:12px;padding:16px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px;">
-                <span style="font-size:26px;flex-shrink:0;">ℹ️</span>
-                <div style="font-size:13px;color:#134e4a;line-height:1.65;">
-                    Aplikasi <strong>Safe Exam Browser (SEB)</strong> pada iPhone <strong>memerlukan file konfigurasi resmi (<code>seb-config-lppai.seb</code>)</strong> agar browser dapat otomatis membuka server CBT LPPAI dan mengunci layar secara aman (<em>kiosk mode</em>). Tanpa file ini, SEB pada iPhone tidak akan menampilkan halaman ujian.
+        <div class="card-body" style="padding:18px 16px;">
+            
+            <!-- ── TAB KONTEN 1: ANDROID ── -->
+            <div id="device-content-android">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#0369a1;">
+                    <span style="font-size:18px;">🤖</span>
+                    <strong style="font-size:13.5px;">4 Langkah Ujian untuk Pengguna HP Android:</strong>
                 </div>
-            </div>
 
-            <!-- 4 Langkah Pemasangan di iPhone -->
-            <h4 style="font-size:15px;color:#0f172a;margin-bottom:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
-                <span>📲</span> Langkah Pemasangan File Konfigurasi di iPhone:
-            </h4>
-
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:22px;">
-                <!-- Step 1 -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">1</span>
-                            <strong style="font-size:13.5px;color:#0f172a;">Install SEB dari App Store</strong>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr));gap:12px;">
+                    <!-- Step 1 -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">1</span>
+                                <strong style="font-size:13px;color:#0f172a;">Install E-Ujian Browser</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Buka Google Play Store di HP Android Anda, pasang aplikasi resmi <strong>E-Ujian Browser</strong>.
+                            </p>
                         </div>
-                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                            Buka App Store di iPhone, install aplikasi <strong>Safe Exam Browser</strong> resmi.
-                        </p>
-                    </div>
-                    <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
-                       style="background:#0f766e;color:#fff;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-                        🍏 Buka di App Store ↗
-                    </a>
-                </div>
-
-                <!-- Step 2 -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">2</span>
-                            <strong style="font-size:13.5px;color:#0f172a;">Buka di Safari iPhone</strong>
-                        </div>
-                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                            Buka halaman web ini melalui peramban <strong>Safari</strong> pada iPhone Anda, lalu klik tombol <strong>"⚡ Buka Langsung di SEB"</strong>.
-                        </p>
-                    </div>
-                    <span style="background:#e0f2fe;color:#0369a1;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
-                        Gunakan Safari Browser
-                    </span>
-                </div>
-
-                <!-- Step 3 -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">3</span>
-                            <strong style="font-size:13.5px;color:#0f172a;">Konfirmasi Buka di SEB</strong>
-                        </div>
-                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                            Saat muncul popup Safari: <em>"Buka halaman ini di 'Safe Exam Browser'?"</em>, klik <strong>Buka (Open)</strong>.
-                        </p>
-                    </div>
-                    <span style="background:#dcfce7;color:#15803d;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
-                        Otomatis terkonfigurasi
-                    </span>
-                </div>
-
-                <!-- Step 4 -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">4</span>
-                            <strong style="font-size:13.5px;color:#0f172a;">Login CBT dari Kertas</strong>
-                        </div>
-                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                            SEB akan otomatis mengunci layar iPhone. Ketik Username & Password Anda dari catatan kertas untuk mulai tes.
-                        </p>
-                    </div>
-                    <span style="background:#fee2e2;color:#991b1b;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
-                        Layar Terkunci Penuh
-                    </span>
-                </div>
-            </div>
-
-            <!-- Opsi Alternatif File Manual -->
-            <div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:10px;padding:14px 18px;font-size:12.5px;color:#92400e;line-height:1.6;">
-                <strong>💡 Opsi Alternatif (Jika Buka Langsung Tidak Merespon di iPhone):</strong>
-                <ol style="margin:6px 0 0;padding-left:20px;">
-                    <li>Klik tombol <strong>"📥 Unduh File .seb"</strong> untuk mengunduh <code>seb-config-lppai.seb</code> ke iPhone Anda.</li>
-                    <li>Buka aplikasi bawaan <strong>File (Files)</strong> di iPhone, buka tab <strong>Telusuri / Unduhan (Downloads)</strong>.</li>
-                    <li>Ketuk file <strong>seb-config-lppai.seb</strong>. Aplikasi Safe Exam Browser akan otomatis terbuka dan memuat konfigurasi.</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         PANDUAN PENGGUNAAN E-UJIAN (www.e-ujian.com) BAGI PESERTA PRETES
-    ═══════════════════════════════════════════════════════════════════ -->
-    <div class="card" style="margin-bottom:28px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 4px 16px rgba(0,0,0,0.04);overflow:hidden;">
-        <div class="card-header" style="background:linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);color:#ffffff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,0.18);font-size:22px;">
-                    📖
-                </span>
-                <div>
-                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.2px;">
-                        Panduan Penggunaan Platform E-Ujian (CBT Tes Tulis Pretes)
-                    </h3>
-                    <p style="margin:2px 0 0;font-size:12.5px;color:#dbeafe;">
-                        Tata cara resmi pengerjaan ujian berbasis komputer di <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer" style="color:#ffffff;text-decoration:underline;font-weight:700;">www.e-ujian.com</a>
-                    </p>
-                </div>
-            </div>
-            <a href="https://www.e-ujian.com/" target="_blank" rel="noopener noreferrer"
-               style="background:#ffffff;color:#1e3a8a;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-                🌐 Kunjungi e-ujian.com ↗
-            </a>
-        </div>
-
-        <div class="card-body" style="padding:24px;">
-            <!-- Info Pengantar -->
-            <div style="background:#f8fafc;border-left:4px solid #2563eb;padding:14px 16px;border-radius:8px;margin-bottom:24px;">
-                <p style="margin:0;font-size:13.5px;color:#334155;line-height:1.6;">
-                    Ujian tulis pretes LPPAI dilaksanakan secara digital menggunakan platform <strong>E-Ujian (Computer Based Test)</strong>. 
-                    Silakan ikuti petunjuk langkah demi langkah di bawah ini untuk memulai dan menyelesaikan ujian dengan lancar:
-                </p>
-            </div>
-
-            <!-- Grid 6 Langkah Panduan -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:18px;margin-bottom:24px;">
-                <!-- Langkah 1 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                1
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Install Exam Browser Sesuai HP</strong>
-                        </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Peserta <strong>wajib menginstall salah satu dari dua aplikasi</strong>: <strong>E-Ujian Browser</strong> untuk Android, atau <strong>Safe Exam Browser (SEB)</strong> untuk iPhone/iPad (iOS).
-                        </p>
-                    </div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                         <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
-                           style="background:#0284c7;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">Play Store (Android) ↗</a>
-                        <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
-                           style="background:#0f766e;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">App Store (iOS) ↗</a>
-                        <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
-                           style="background:#16a34a;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">📥 Config SEB (.seb)</a>
+                            style="background:#0284c7;color:#fff;padding:7px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;text-align:center;display:block;">
+                            📥 Buka Play Store ↗
+                        </a>
                     </div>
-                </div>
 
-                <!-- Langkah 2 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                2
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Masukkan Kode Lembaga: 22205</strong>
+                    <!-- Step 2 -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">2</span>
+                                <strong style="font-size:13px;color:#0f172a;">Masukkan Kode Sekolah</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Buka aplikasi. Ketika diminta kode lembaga / ID sekolah, ketik: <strong>22205</strong>.
+                            </p>
                         </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Buka aplikasi ujian yang telah diinstall. Saat aplikasi meminta <strong>Kode Lembaga / ID Sekolah</strong>, ketik kode resmi: <strong>22205</strong>.
-                        </p>
+                        <div style="background:#e0f2fe;color:#0369a1;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:700;text-align:center;">
+                            Kode: 22205
+                        </div>
                     </div>
-                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 10px;border-radius:8px;font-size:12px;color:#166534;font-weight:700;display:flex;justify-content:space-between;align-items:center;">
-                        <span>Kode: <strong>22205</strong></span>
-                        <button type="button" onclick="copyText('22205', 'btn-copy-lbg-step')" id="btn-copy-lbg-step" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:10.5px;cursor:pointer;">Salin</button>
-                    </div>
-                </div>
 
-                <!-- Langkah 3 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                3
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Login dari Catatan Kertas</strong>
+                    <!-- Step 3 -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">3</span>
+                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Masuk sebagai Siswa/Peserta. Ketikkan Username & Password sesuai catatan kertas Anda.
+                            </p>
                         </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Pilih menu <strong>Masuk / Login Siswa/Peserta</strong>. Ketikkan Username dan Password dari <strong>catatan kertas</strong> yang telah Anda tulis sebelumnya (karena HP terkunci tidak bisa membuka web lagi), lalu klik <strong>Login / Masuk</strong>.
-                        </p>
+                        <div style="background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;">
+                            📝 Ketik dari catatan kertas
+                        </div>
                     </div>
-                    <div style="background:#fef2f2;border:1px solid #fecaca;padding:8px 12px;border-radius:8px;font-size:11.5px;color:#991b1b;font-weight:600;">
-                        📝 Ketik dari catatan kertas Anda
-                    </div>
-                </div>
 
-                <!-- Langkah 4 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                4
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Pilih Ujian & Masukkan Token</strong>
+                    <!-- Step 4 -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">4</span>
+                                <strong style="font-size:13px;color:#0f172a;">Mulai Ujian</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Pilih sesi Pretes LPPAI, masukkan Token dari pengawas ruangan, lalu kerjakan hingga selesai.
+                            </p>
                         </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Pada beranda dashboard peserta, buka menu <strong>Daftar Ujian</strong> / <strong>Ujian Aktif</strong>. Pilih sesi <strong>Pretes LPPAI</strong>. Jika diminta <strong>Token Ujian</strong>, mintalah kepada Pengawas Ruangan Anda.
-                        </p>
-                    </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        🎟️ Token diumumkan pengawas saat jam tes
-                    </div>
-                </div>
-
-                <!-- Langkah 5 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                5
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Kerjakan Soal dengan Teliti</strong>
+                        <div style="background:#dcfce7;color:#15803d;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;text-align:center;">
+                            ✅ Jawaban tersimpan otomatis
                         </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Klik <strong>Mulai Ujian</strong>. Jawab pertanyaan satu demi satu. Anda dapat berpindah nomor soal lewat nomor daftar soal, menandai ragu-ragu, dan memantau hitungan mundur sisa waktu ujian.
-                        </p>
-                    </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        ⏱️ Jawaban tersimpan otomatis ke server
-                    </div>
-                </div>
-
-                <!-- Langkah 6 -->
-                <div style="background:#ffffff;border:1.5px solid #e2e8f0;border-radius:12px;padding:18px;position:relative;display:flex;flex-direction:column;justify-content:space-between;transition:all 0.2s;">
-                    <div>
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-                            <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:#dbeafe;color:#1e40af;font-size:14px;font-weight:800;">
-                                6
-                            </span>
-                            <strong style="font-size:14px;color:#0f172a;">Selesai & Kirim Jawaban</strong>
-                        </div>
-                        <p style="font-size:13px;color:#64748b;line-height:1.55;margin:0 0 12px;">
-                            Setelah semua nomor soal terjawab dan diperiksa kembali, klik tombol <strong>Selesai Ujian</strong> pada soal terakhir. Beri centang pada kotak konfirmasi persetujuan, lalu klik <strong>Selesai</strong>.
-                        </p>
-                    </div>
-                    <div style="background:#f1f5f9;padding:8px 12px;border-radius:8px;font-size:12px;color:#475569;">
-                        ✅ Status ujian berubah menjadi "Selesai"
                     </div>
                 </div>
             </div>
 
-            <!-- Box Ketentuan Penting & FAQ -->
-            <div style="background:#fffbeb;border:1.5px solid #fef3c7;border-radius:12px;padding:16px 20px;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                    <span style="font-size:20px;">⚠️</span>
-                    <strong style="font-size:14px;color:#92400e;">Hal-Hal Penting yang Wajib Diperhatikan Selama Tes:</strong>
+            <!-- ── TAB KONTEN 2: IPHONE / IPAD (iOS) ── -->
+            <div id="device-content-ios" style="display:none;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#0f766e;">
+                    <span style="font-size:18px;">🍏</span>
+                    <strong style="font-size:13.5px;">Langkah Ujian Khusus Pengguna iPhone (iOS):</strong>
                 </div>
-                <ul style="margin:0;padding-left:20px;font-size:13px;color:#78350f;line-height:1.7;">
-                    <li><strong>📝 Wajib Catat Credentials di Selembar Kertas:</strong> Karena E-Ujian Browser & Safe Exam Browser mengunci layar penuh HP (<em>Kiosk Mode</em>), Anda <strong>TIDAK BISA beralih ke aplikasi catatan, membuka Google Chrome, atau kembali ke web ini</strong> saat ujian berlangsung. Pastikan <strong>Kode Lembaga (22205), Username, dan Password</strong> sudah Anda catat di secarik kertas sebelum aplikasi dibuka!</li>
-                    <li><strong>Aturan Larangan 2 HP (Sanksi Diskualifikasi):</strong> Peserta dilarang keras membawa / meletakkan 2 HP di atas meja ujian. Jika ketahuan membawa 2 HP di meja saat ujian hari Senin–Jumat, akun ujian akan <strong>langsung dimatikan otomatis oleh Pengawas</strong> dan <strong>tidak bisa mengerjakan kembali</strong>. HP kedua wajib dimatikan dan dimasukkan ke tas, lalu tas diletakkan di depan kelas.</li>
-                    <li><strong>Try Out Mandiri:</strong> Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba ujian dari rumah menggunakan Kode Lembaga <code>22205</code> dan akun credentials Anda.</li>
-                    <li><strong>Koneksi Terputus / Baterai Habis:</strong> Jika perangkat mendadak mati atau internet terputus, jawaban yang sudah Anda klik tetap tersimpan aman di server E-Ujian. Segera hidupkan perangkat, buka kembali E-Ujian, login, dan lanjutkan tes.</li>
-                    <li><strong>Hadir Tepat Waktu:</strong> Hadirlah di ruangan ujian minimal 15 menit sebelum jam pelaksanaan pretes yang ditentukan pada jadwal Anda.</li>
-                    <li><strong>Bantuan Pengawas:</strong> Apabila menemui kendala login atau token ujian tidak cocok, segera angkat tangan dan lapor kepada Pengawas Ruangan di lokasi.</li>
-                </ul>
+
+                <div style="background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#134e4a;line-height:1.55;">
+                    💡 <strong>Catatan Khusus iPhone:</strong> Safe Exam Browser di iPhone memerlukan file konfigurasi resmi (<code>seb-config-lppai.seb</code>) agar browser otomatis mengunci layar dan menampilkan ujian.
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr));gap:12px;">
+                    <!-- Step 1 iOS -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">1</span>
+                                <strong style="font-size:13px;color:#0f172a;">Install Safe Exam Browser</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Buka App Store di iPhone, pasang aplikasi <strong>Safe Exam Browser</strong>.
+                            </p>
+                        </div>
+                        <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
+                            style="background:#0f766e;color:#fff;padding:7px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;text-align:center;display:block;">
+                            🍏 Buka App Store ↗
+                        </a>
+                    </div>
+
+                    <!-- Step 2 iOS -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">2</span>
+                                <strong style="font-size:13px;color:#0f172a;">Pasang Konfigurasi Ujian</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Buka web ini lewat Safari iPhone, klik tombol di bawah untuk otomatis membuka SEB:
+                            </p>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-direction:column;">
+                            <a href="sebs://<?= preg_replace('#^https?://#', '', BASE_URL) ?>/assets/downloads/seb-config-lppai.seb"
+                                style="background:#0f766e;color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;text-align:center;">
+                                ⚡ Buka Langsung di SEB (Safari)
+                            </a>
+                            <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
+                                style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;text-decoration:none;text-align:center;">
+                                📥 Atau Unduh File .seb
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 iOS -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">3</span>
+                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                SEB otomatis mengunci layar. Ketik Username & Password dari catatan kertas Anda.
+                            </p>
+                        </div>
+                        <div style="background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;">
+                            📝 Ketik dari catatan kertas
+                        </div>
+                    </div>
+
+                    <!-- Step 4 iOS -->
+                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">4</span>
+                                <strong style="font-size:13px;color:#0f172a;">Mulai Ujian</strong>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                                Masukkan Token dari Pengawas dan kerjakan soal sampai selesai.
+                            </p>
+                        </div>
+                        <div style="background:#dcfce7;color:#15803d;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;text-align:center;">
+                            ✅ Kiosk mode aktif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── TAB KONTEN 3: LAPTOP / PC ── -->
+            <div id="device-content-laptop" style="display:none;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#334155;">
+                    <span style="font-size:18px;">💻</span>
+                    <strong style="font-size:13.5px;">Ujian Menggunakan Laptop / PC:</strong>
+                </div>
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;font-size:12.5px;color:#334155;line-height:1.6;box-sizing:border-box;">
+                    <ul style="margin:0;padding-left:18px;">
+                        <li>Ujian di PC laboratorium kampus menggunakan aplikasi <strong>Safe Exam Browser (SEB)</strong> yang telah disiapkan panitia.</li>
+                        <li>Pastikan terhubung ke jaringan resmi yang ditentukan panitia pretes.</li>
+                        <li>Gunakan Username, Password, dan Token Ujian yang sama untuk memulai tes.</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── 3. ATURAN PENTING & TATA TERTIB PRETES ── -->
+    <div class="card" style="margin-bottom:22px;border:1.5px solid #e2e8f0;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;">
+        <div style="background:#fef2f2;border-bottom:1px solid #fecaca;padding:12px 18px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;">⚖️</span>
+            <strong style="font-size:13.5px;color:#991b1b;">Tata Tertib & Ketentuan Wajib Pretes</strong>
+        </div>
+        <div class="card-body" style="padding:16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:12px;">
+                
+                <!-- Poin 1: Try Out Mandiri -->
+                <div style="background:#fefce8;border:1px solid #fde047;border-radius:12px;padding:14px;box-sizing:border-box;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:18px;">🏠</span>
+                        <strong style="font-size:13px;color:#854d0e;">1. Try Out Mandiri dari Rumah</strong>
+                    </div>
+                    <div style="font-size:12px;color:#713f12;line-height:1.55;">
+                        Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba login simulasi dari rumah dengan Kode Sekolah <code>22205</code> dan akun Anda, agar terbiasa dengan aplikasi.
+                    </div>
+                </div>
+
+                <!-- Poin 2: Larangan 2 HP -->
+                <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px;box-sizing:border-box;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:18px;">⛔</span>
+                        <strong style="font-size:13px;color:#9f1239;">2. Dilarang 2 HP di Meja Ujian!</strong>
+                    </div>
+                    <div style="font-size:12px;color:#9f1239;line-height:1.55;">
+                        Saat ujian resmi di kampus, <strong>dilarang meletakkan 2 HP di atas meja</strong>. Pelanggaran berakibat <strong>akun dinonaktifkan otomatis oleh Pengawas (gugur)</strong>. HP cadangan wajib dimatikan & ditaruh di tas di depan kelas.
+                    </div>
+                </div>
+
+                <!-- Poin 3: Hadir Tepat Waktu -->
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;box-sizing:border-box;">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <span style="font-size:18px;">⏰</span>
+                        <strong style="font-size:13px;color:#166534;">3. Hadir 15 Menit Lebih Awal</strong>
+                    </div>
+                    <div style="font-size:12px;color:#166534;line-height:1.55;">
+                        Hadir di ruangan ujian 15 menit sebelum waktu tes. Jika koneksi terputus atau baterai habis saat ujian, jawaban tersimpan aman di server; segera hidupkan HP atau lapor pengawas di ruangan.
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
+
 <?php endif; ?>
 
 <!-- ── Jadwal Pretes ─────────────────────────────────────────────── -->
@@ -792,6 +603,47 @@ function copyText(text, btnId) {
     });
 }
 
+
+
+function switchDeviceTab(device) {
+    var tabs = ['android', 'ios', 'laptop'];
+    tabs.forEach(function(d) {
+        var content = document.getElementById('device-content-' + d);
+        var btn = document.getElementById('device-btn-' + d);
+        if (d === device) {
+            if (content) content.style.display = 'block';
+            if (btn) {
+                btn.style.background = '#0284c7';
+                btn.style.color = '#ffffff';
+                btn.style.fontWeight = '700';
+            }
+        } else {
+            if (content) content.style.display = 'none';
+            if (btn) {
+                btn.style.background = '#ffffff';
+                btn.style.color = '#334155';
+                btn.style.fontWeight = '600';
+            }
+        }
+    });
+    try { sessionStorage.setItem('pretes_device_tab', device); } catch(e) {}
+}
+
+// Inisialisasi tab perangkat
+try {
+    var savedDev = sessionStorage.getItem('pretes_device_tab');
+    if (!savedDev) {
+        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) savedDev = 'ios';
+    }
+    if (window.location.hash === '#panduan-seb-iphone' || savedDev === 'ios') {
+        switchDeviceTab('ios');
+    } else if (savedDev === 'laptop') {
+        switchDeviceTab('laptop');
+    } else {
+        switchDeviceTab('android');
+    }
+} catch(e) {}
 
 </script>
 
