@@ -47,6 +47,57 @@ function showToast(message, type, duration) {
     setTimeout(dismiss, duration);
 }
 
+
+/* =============================================
+   CLIPBOARD COPY HELPER
+   ============================================= */
+function copyToClipboard(text, btn) {
+    if (!text || text === '-') return;
+    function handleSuccess() {
+        if (typeof showToast === 'function') {
+            showToast('Nomor HP ' + text + ' berhasil disalin ke clipboard!', 'success', 2500);
+        }
+        if (btn) {
+            var oldHtml = btn.getAttribute('data-old-html') || btn.innerHTML;
+            btn.setAttribute('data-old-html', oldHtml);
+            btn.innerHTML = '<span>✓</span> <span>Tersalin!</span>';
+            btn.style.backgroundColor = '#dcfce7';
+            btn.style.borderColor = '#86efac';
+            btn.style.color = '#15803d';
+            setTimeout(function() {
+                btn.innerHTML = oldHtml;
+                btn.style.backgroundColor = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 2000);
+        }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(handleSuccess).catch(function() {
+            fallbackCopyText(text, handleSuccess);
+        });
+    } else {
+        fallbackCopyText(text, handleSuccess);
+    }
+}
+function fallbackCopyText(text, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        var successful = document.execCommand('copy');
+        if (successful && cb) cb();
+        else if (typeof showToast === 'function') showToast('Nomor HP: ' + text, 'info', 3000);
+    } catch (err) {
+        if (typeof showToast === 'function') showToast('Gagal menyalin: ' + text, 'warning', 3000);
+    }
+    document.body.removeChild(ta);
+}
 /* =============================================
    CONFIRM DIALOG
    ============================================= */

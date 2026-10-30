@@ -24,6 +24,7 @@ function ensureActivityLogTablesExist($pdo = null) {
                 username VARCHAR(100) NOT NULL,
                 nama_lengkap VARCHAR(150) NULL,
                 role VARCHAR(50) NULL,
+                no_hp VARCHAR(30) NULL,
                 ip_address VARCHAR(45) NULL,
                 user_agent VARCHAR(255) NULL,
                 device VARCHAR(50) NULL,
@@ -61,6 +62,14 @@ function ensureActivityLogTablesExist($pdo = null) {
                 INDEX idx_click_page_url (page_url)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+
+        // Pastikan kolom no_hp ada pada tabel user_login_logs jika tabel sudah dibuat sebelumnya
+        try {
+            $colCheck = $pdo->query("SHOW COLUMNS FROM user_login_logs LIKE 'no_hp'");
+            if ($colCheck && $colCheck->rowCount() === 0) {
+                $pdo->exec("ALTER TABLE user_login_logs ADD COLUMN no_hp VARCHAR(30) NULL AFTER role");
+            }
+        } catch (Exception $colEx) {}
 
         $ensured = true;
     } catch (Exception $e) {
@@ -141,13 +150,23 @@ function recordLoginLog(array $data) {
         $username = trim($data['username'] ?? '');
         $namaLengkap = !empty($data['nama_lengkap']) ? trim($data['nama_lengkap']) : null;
         $role = !empty($data['role']) ? trim($data['role']) : null;
+        $noHp = !empty($data['no_hp']) ? trim($data['no_hp']) : null;
         $status = ($data['status'] ?? 'success') === 'failed' ? 'failed' : 'success';
         $keterangan = !empty($data['keterangan']) ? substr(trim($data['keterangan']), 0, 255) : null;
 
+        // Ambil no_hp dari tabel users jika belum ada di data
+        if (empty($noHp) && !empty($userId)) {
+            try {
+                $st = $pdo->prepare("SELECT no_hp FROM users WHERE id = ? LIMIT 1");
+                $st->execute([$userId]);
+                $noHp = $st->fetchColumn() ?: null;
+            } catch (Exception $e) {}
+        }
+
         $stmt = $pdo->prepare("
             INSERT INTO user_login_logs 
-            (user_id, username, nama_lengkap, role, ip_address, user_agent, device, browser, status, keterangan) 
-            VALUES (:user_id, :username, :nama_lengkap, :role, :ip_address, :user_agent, :device, :browser, :status, :keterangan)
+            (user_id, username, nama_lengkap, role, no_hp, ip_address, user_agent, device, browser, status, keterangan) 
+            VALUES (:user_id, :username, :nama_lengkap, :role, :no_hp, :ip_address, :user_agent, :device, :browser, :status, :keterangan)
         ");
 
         return $stmt->execute([
@@ -155,6 +174,7 @@ function recordLoginLog(array $data) {
             'username' => $username,
             'nama_lengkap' => $namaLengkap,
             'role' => $role,
+            'no_hp' => $noHp,
             'ip_address' => $ip,
             'user_agent' => $uaInfo['raw_ua'],
             'device' => $uaInfo['device'],
@@ -229,8 +249,10 @@ function getRecentLoginLogs($limit = 50) {
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 50;
         $stmt = $pdo->query("
-            SELECT * FROM user_login_logs 
-            ORDER BY created_at DESC 
+            SELECT l.*, COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp
+            FROM user_login_logs l
+            LEFT JOIN users u ON (l.user_id = u.id OR (l.user_id IS NULL AND l.username = u.username))
+            ORDER BY l.created_at DESC 
             LIMIT $lim
         ");
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];

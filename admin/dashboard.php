@@ -171,6 +171,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Pengguna</th>
                         <th>Role</th>
                         <th>Username / NIM</th>
+                        <th>No. HP</th>
                         <th>IP & Lokasi</th>
                         <th>Perangkat / Browser</th>
                         <th>Status</th>
@@ -182,6 +183,7 @@ include __DIR__ . '/../includes/header.php';
                     $no = 1;
                     foreach ($recentLogins as $log): 
                         $nama = !empty($log['nama_lengkap']) ? $log['nama_lengkap'] : '-';
+                        $noHp = !empty($log['no_hp']) ? trim($log['no_hp']) : '';
                         $deviceIcon = ($log['device'] === 'Mobile' ? '📱' : ($log['device'] === 'Tablet' ? '📟' : '💻'));
                         $timeStr = date('d/m/Y H:i:s', strtotime($log['created_at']));
                     ?>
@@ -195,6 +197,21 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td><?= renderRoleBadge($log['role']) ?></td>
                         <td><code><?= sanitize($log['username']) ?></code></td>
+                        <td>
+                            <?php if (!empty($noHp) && $noHp !== '-'): ?>
+                                <button type="button" 
+                                        class="btn-copy-hp" 
+                                        onclick="copyToClipboard('<?= sanitize($noHp) ?>', this)" 
+                                        title="Klik untuk menyalin nomor HP ke clipboard"
+                                        style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:3px 8px; border-radius:6px; cursor:pointer; font-size:12px; font-family:monospace; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s ease;">
+                                    <span>📱</span>
+                                    <span class="hp-number"><?= sanitize($noHp) ?></span>
+                                    <span class="copy-icon" style="font-size:10px; opacity:0.65;">📋</span>
+                                </button>
+                            <?php else: ?>
+                                <span style="color:#9ca3af; font-size:12px;">-</span>
+                            <?php endif; ?>
+                        </td>
                         <td style="font-size:12px;">
                             <span style="font-family:monospace;background:#f3f4f6;padding:2px 6px;border-radius:4px;">
                                 <?= sanitize($log['ip_address'] ?: '127.0.0.1') ?>
@@ -356,5 +373,63 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function copyToClipboard(text, btn) {
+    if (!text || text === '-') return;
+
+    function handleSuccess() {
+        if (typeof showToast === 'function') {
+            showToast('Nomor HP ' + text + ' berhasil disalin ke clipboard!', 'success', 2500);
+        }
+        if (btn) {
+            var oldHtml = btn.getAttribute('data-old-html') || btn.innerHTML;
+            btn.setAttribute('data-old-html', oldHtml);
+            btn.innerHTML = '<span>✓</span> <span>Tersalin!</span>';
+            btn.style.backgroundColor = '#dcfce7';
+            btn.style.borderColor = '#86efac';
+            btn.style.color = '#15803d';
+            setTimeout(function() {
+                btn.innerHTML = oldHtml;
+                btn.style.backgroundColor = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 2000);
+        }
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(handleSuccess).catch(function() {
+            fallbackCopyText(text, handleSuccess);
+        });
+    } else {
+        fallbackCopyText(text, handleSuccess);
+    }
+}
+
+function fallbackCopyText(text, cb) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        var successful = document.execCommand('copy');
+        if (successful && cb) {
+            cb();
+        } else if (typeof showToast === 'function') {
+            showToast('Nomor HP: ' + text, 'info', 3000);
+        }
+    } catch (err) {
+        if (typeof showToast === 'function') {
+            showToast('Gagal menyalin otomatis: ' + text, 'warning', 3000);
+        }
+    }
+    document.body.removeChild(ta);
+}
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

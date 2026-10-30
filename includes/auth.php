@@ -155,6 +155,7 @@ function loginUser($username, $password) {
             'username' => $user['username'],
             'nama_lengkap' => $user['nama_lengkap'],
             'role' => $user['role'],
+            'no_hp' => $user['no_hp'] ?? null,
             'status' => 'success',
             'keterangan' => 'Login reguler'
         ]);
@@ -168,6 +169,7 @@ function loginUser($username, $password) {
         'username' => $username,
         'nama_lengkap' => ($user ? $user['nama_lengkap'] : null),
         'role' => ($user ? $user['role'] : null),
+        'no_hp' => ($user ? ($user['no_hp'] ?? null) : null),
         'status' => 'failed',
         'keterangan' => 'Username atau password salah'
     ]);

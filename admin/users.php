@@ -162,6 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         'username' => $user['username'],
                         'nama_lengkap' => $user['nama_lengkap'],
                         'role' => $user['role'],
+                        'no_hp' => $user['no_hp'] ?? null,
                         'status' => 'success',
                         'keterangan' => 'Login As oleh Admin (ID: ' . $_SESSION['admin_login_as'] . ')'
                     ]);
