@@ -23,9 +23,9 @@ $currentUser = getCurrentUser();
 </head>
 <body>
 <?php if (isset($_SESSION['admin_login_as'])): ?>
-<div style="background-color:#f59e0b; color:#fff; padding:12px 20px; text-align:center; font-weight:600; position:sticky; top:0; z-index:99999; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; justify-content:center; align-items:center; gap:16px; font-size:14px;">
+<div style="background-color:#f59e0b; color:#fff; padding:10px 14px; text-align:center; font-weight:600; position:sticky; top:0; z-index:99999; box-shadow:0 2px 4px rgba(0,0,0,0.1); display:flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:8px 14px; font-size:13px; max-width:100%; box-sizing:border-box;">
     <span>⚠️ Mode Penyamaran: Anda sedang masuk sebagai <strong><?= sanitize($currentUser['nama_lengkap']) ?></strong>.</span>
-    <a href="?action=return_admin" style="background:#b45309; color:#fff; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:13px; border:1px solid #92400e; transition:0.2s;">🔙 Kembali ke Admin</a>
+    <a href="?action=return_admin" style="background:#b45309; color:#fff; padding:5px 12px; border-radius:6px; text-decoration:none; font-size:12px; border:1px solid #92400e; transition:0.2s; white-space:nowrap;">🔙 Kembali ke Admin</a>
 </div>
 <?php endif; ?>
 <div class="app-wrapper">

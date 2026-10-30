@@ -4,8 +4,6 @@
  * Menampilkan jadwal pretes, daftar peserta, dan credentials tes tulis pribadi.
  */
 
-
-
 define('PAGE_TITLE', 'Peserta & Jadwal Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
@@ -44,53 +42,161 @@ $participants = $pdo->query("
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<style>
+/* ── Responsif Khusus Halaman Pretes Peserta ── */
+.pretes-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pretes-cred-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pretes-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pretes-rules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pretes-info-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.pretes-step-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 960px) {
+    .pretes-steps-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .pretes-rules-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .pretes-info-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .pretes-cred-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .pretes-steps-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .pretes-info-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .pretes-info-grid > div:nth-child(3),
+    .pretes-info-grid > div:nth-child(4) {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 360px) {
+    .pretes-info-grid {
+        grid-template-columns: 1fr;
+    }
+    .pretes-info-grid > div:nth-child(3),
+    .pretes-info-grid > div:nth-child(4) {
+        grid-column: span 1;
+    }
+}
+</style>
+
 <!-- ═══════════════════════════════════════════════════════════════════
      INFORMASI RESMI & PANDUAN PRETES MAHASISWA
 ═══════════════════════════════════════════════════════════════════ -->
 <?php if ($myReg): ?>
 
     <!-- ── 1. KARTU UTAMA: JADWAL PRETES & KREDENSIAL AKUN CBT ── -->
-    <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:20px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;">
+    <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:20px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;max-width:100%;">
         <!-- Header Kartu -->
-        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:22px;">🔑</span>
-                <div>
-                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;line-height:1.3;">
+        <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-sizing:border-box;max-width:100%;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <span style="font-size:22px;flex-shrink:0;">🔑</span>
+                <div style="min-width:0;">
+                    <h3 style="margin:0;font-size:15px;font-weight:800;color:#ffffff;line-height:1.3;word-break:break-word;">
                         Jadwal & Akun Tes Pretes Anda
                     </h3>
-                    <span style="font-size:12px;color:#e0f2fe;">
+                    <div style="font-size:12px;color:#e0f2fe;word-break:break-word;">
                         Periode: <strong><?= sanitize($myReg['periode']) ?></strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
-                    </span>
+                    </div>
                 </div>
             </div>
-            <span style="background:rgba(255,255,255,0.2);color:#ffffff;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;">
+            <span style="background:rgba(255,255,255,0.2);color:#ffffff;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap;">
                 Kode Sekolah: 22205
             </span>
         </div>
 
-        <div class="card-body" style="padding:18px 16px;">
+        <div class="card-body" style="padding:16px 14px;box-sizing:border-box;max-width:100%;">
             
             <!-- Grid Ringkasan Jadwal Pribadi -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 140px), 1fr));gap:10px;margin-bottom:16px;">
+            <div class="pretes-info-grid">
                 <!-- Hari -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">📅 Hari Ujian</div>
-                    <div style="font-size:15px;font-weight:800;color:#0f172a;">
+                    <div style="font-size:15px;font-weight:800;color:#0f172a;word-break:break-word;">
                         <?= sanitize($myReg['hari_pilihan'] ?: 'Belum ditentukan') ?>
                     </div>
                 </div>
 
                 <!-- Jam -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">⏰ Jam Pelaksanaan</div>
-                    <div style="font-size:15px;font-weight:800;color:#0f172a;">
+                    <div style="font-size:15px;font-weight:800;color:#0f172a;word-break:break-word;">
                         <?= sanitize($myReg['jam'] ?: '13.00 WIB (Jam 1)') ?>
                     </div>
                 </div>
 
                 <!-- Ruangan -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">🏢 Ruangan</div>
                     <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
                         <?= sanitize($myReg['ruangan'] ?? ($myReg['ruangan_tes'] ?? 'Menunggu pembagian')) ?>
@@ -98,7 +204,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
 
                 <!-- Dosen Penguji -->
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;box-sizing:border-box;">
+                <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">👨‍🏫 Dosen Penguji</div>
                     <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
                         <?= sanitize($myReg['dosen_penguji'] ?: 'Menunggu pembagian') ?>
@@ -111,36 +217,36 @@ include __DIR__ . '/../includes/header.php';
                 <input type="hidden" id="__enc_pass" value="<?= base64_encode($myReg['password_tes'] ?? '') ?>">
 
                 <!-- Kotak Kredensial CBT -->
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:12px;margin-bottom:16px;">
+                <div class="pretes-cred-grid">
                     <!-- Username Box -->
-                    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px;text-align:center;box-sizing:border-box;">
+                    <div style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:16px 12px;text-align:center;box-sizing:border-box;min-width:0;">
                         <span style="display:block;font-size:11.5px;font-weight:800;color:#0369a1;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
                             USERNAME CBT
                         </span>
-                        <div id="username-display" style="font-family:monospace;font-size:21px;font-weight:900;color:#0284c7;letter-spacing:1px;word-break:break-all;margin-bottom:10px;">
+                        <div id="username-display" style="font-family:monospace;font-size:20px;font-weight:900;color:#0284c7;letter-spacing:1px;word-break:break-all;margin-bottom:10px;">
                             <?= sanitize($myReg['username_tes']) ?>
                         </div>
                         <button type="button" onclick="copyText('<?= sanitize($myReg['username_tes']) ?>', 'btn-copy-user')" id="btn-copy-user"
-                            style="background:#0284c7;color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                            style="background:#0284c7;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;max-width:100%;">
                             📋 Salin Username
                         </button>
                     </div>
 
                     <!-- Password Box -->
-                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:16px;text-align:center;box-sizing:border-box;">
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:16px 12px;text-align:center;box-sizing:border-box;min-width:0;">
                         <span style="display:block;font-size:11.5px;font-weight:800;color:#c2410c;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
                             PASSWORD / KODE AKSES
                         </span>
-                        <div id="password-display" style="font-family:monospace;font-size:21px;font-weight:900;color:#ea580c;letter-spacing:4px;margin-bottom:10px;">
+                        <div id="password-display" style="font-family:monospace;font-size:20px;font-weight:900;color:#ea580c;letter-spacing:4px;margin-bottom:10px;word-break:break-all;">
                             ••••••
                         </div>
                         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
                             <button type="button" onclick="togglePassword()" id="btn-toggle-pass"
-                                style="background:#ea580c;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+                                style="background:#ea580c;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">
                                 👁️ Tampilkan
                             </button>
                             <button type="button" onclick="copyPassword('btn-copy-pass')" id="btn-copy-pass"
-                                style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+                                style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">
                                 📋 Salin
                             </button>
                         </div>
@@ -148,31 +254,33 @@ include __DIR__ . '/../includes/header.php';
                 </div>
 
                 <!-- Peringatan Utama: Wajib Catat di Kertas (Satu tempat saja, tidak diulang) -->
-                <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;box-sizing:border-box;">
-                    <span style="font-size:24px;line-height:1;flex-shrink:0;">✍️</span>
-                    <div style="font-size:13px;color:#92400e;line-height:1.55;">
-                        <strong style="color:#b45309;display:block;margin-bottom:3px;">
-                            Wajib Catat di Secarik Kertas Sekarang Sebelum Membuka Aplikasi!
-                        </strong>
-                        Aplikasi ujian mengunci layar HP secara penuh (<em>Kiosk Mode</em>), sehingga Anda <strong>tidak dapat berpindah ke web atau membuka catatan di HP</strong> saat ujian berlangsung.
-                        Ambil secarik kertas dan pulpen, lalu catat:
-                        <ul style="margin:6px 0 10px;padding-left:18px;">
-                            <li>Kode Sekolah: <strong>22205</strong></li>
-                            <li>Username: <strong><?= sanitize($myReg['username_tes']) ?></strong></li>
-                            <li>Password: <strong><?= sanitize($myReg['password_tes']) ?></strong></li>
-                        </ul>
-                        <button type="button" onclick="copyText('22205', 'btn-copy-lbg-top')" id="btn-copy-lbg-top"
-                            style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;">
-                            📋 Salin Kode Sekolah: 22205
-                        </button>
+                <div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;padding:14px;box-sizing:border-box;max-width:100%;margin-bottom:4px;">
+                    <div style="display:flex;align-items:flex-start;gap:10px;">
+                        <span style="font-size:24px;line-height:1;flex-shrink:0;">✍️</span>
+                        <div style="font-size:13px;color:#92400e;line-height:1.55;min-width:0;word-break:break-word;">
+                            <strong style="color:#b45309;display:block;margin-bottom:4px;">
+                                Wajib Catat di Secarik Kertas Sekarang Sebelum Membuka Aplikasi!
+                            </strong>
+                            Aplikasi ujian mengunci layar HP secara penuh (<em>Kiosk Mode</em>), sehingga Anda <strong>tidak dapat membuka catatan di HP</strong> saat ujian berlangsung.
+                            Ambil secarik kertas dan pulpen, lalu catat:
+                            <ul style="margin:6px 0 10px;padding-left:18px;">
+                                <li>Kode Sekolah: <strong>22205</strong></li>
+                                <li>Username: <strong><?= sanitize($myReg['username_tes']) ?></strong></li>
+                                <li>Password: <strong><?= sanitize($myReg['password_tes']) ?></strong></li>
+                            </ul>
+                            <button type="button" onclick="copyText('22205', 'btn-copy-lbg-top')" id="btn-copy-lbg-top"
+                                style="background:#f59e0b;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;">
+                                📋 Salin Kode Sekolah: 22205
+                            </button>
+                        </div>
                     </div>
                 </div>
 
             <?php else: ?>
                 <!-- Akun belum dikeluarkan TU -->
-                <div style="background:#eff6ff;border:1.5px dashed #93c5fd;border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px;box-sizing:border-box;">
-                    <span style="font-size:32px;">⏳</span>
-                    <div style="font-size:13px;color:#1e40af;line-height:1.5;">
+                <div style="background:#eff6ff;border:1.5px dashed #93c5fd;border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px;box-sizing:border-box;max-width:100%;">
+                    <span style="font-size:32px;flex-shrink:0;">⏳</span>
+                    <div style="font-size:13px;color:#1e40af;line-height:1.5;min-width:0;word-break:break-word;">
                         <strong style="display:block;margin-bottom:2px;">Akun CBT Sedang Dipersiapkan</strong>
                         Anda sudah terdaftar pretes. Username dan password tes tulis sedang diproses oleh petugas TU dan akan dibagikan menjelang pelaksanaan pretes. Silakan cek kembali halaman ini secara berkala.
                     </div>
@@ -182,45 +290,34 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <!-- ── 2. PANDUAN PENGERJAAN UJIAN (PILIH SESUAI PERANGKAT) ── -->
-    <div class="card" id="panduan-ujian" style="margin-bottom:20px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;">
-        <div id="panduan-seb-iphone" style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:20px;">📱</span>
-                <div>
-                    <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Petunjuk Masuk & Mengerjakan Ujian</h4>
-                    <span style="font-size:12px;color:#64748b;">Pilih tipe HP yang Anda gunakan untuk ujian:</span>
-                </div>
-            </div>
-
-            <!-- Segmented Tabs (Touch-Friendly & Anti Geser Kanan-Kiri) -->
-            <div style="display:flex;background:#e2e8f0;border-radius:10px;padding:3px;gap:4px;flex-wrap:wrap;width:100%;max-width:320px;box-sizing:border-box;">
-                <button type="button" id="device-btn-android" onclick="switchDeviceTab('android')"
-                    style="flex:1 1 120px;background:#0284c7;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
-                    🤖 Android
-                </button>
-                <button type="button" id="device-btn-ios" onclick="switchDeviceTab('ios')"
-                    style="flex:1 1 120px;background:#ffffff;color:#334155;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
-                    🍏 iPhone / iPad
-                </button>
+    <!-- ── 2. PANDUAN PENGERJAAN UJIAN (ATAS: ANDROID, BAWAH: IPHONE) ── -->
+    <div class="card" id="panduan-ujian" style="margin-bottom:20px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;max-width:100%;">
+        <div style="background:#f8fafc;border-bottom:1.5px solid #e2e8f0;padding:14px 18px;display:flex;align-items:center;gap:10px;box-sizing:border-box;">
+            <span style="font-size:22px;flex-shrink:0;">📱</span>
+            <div style="min-width:0;">
+                <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;word-break:break-word;">Petunjuk Masuk & Mengerjakan Ujian</h4>
+                <span style="font-size:12px;color:#64748b;">Ikuti panduan berikut sesuai tipe HP yang Anda gunakan untuk ujian</span>
             </div>
         </div>
 
-        <div class="card-body" style="padding:18px 16px;">
+        <div class="card-body" style="padding:18px 14px;box-sizing:border-box;max-width:100%;">
             
-            <!-- ── TAB KONTEN 1: ANDROID ── -->
-            <div id="device-content-android">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#0369a1;">
-                    <span style="font-size:18px;">🤖</span>
-                    <strong style="font-size:13.5px;">4 Langkah Ujian untuk Pengguna HP Android:</strong>
+            <!-- ── BAGIAN 1: PENGGUNA HP ANDROID (ATAS) ── -->
+            <div id="section-panduan-android" style="margin-bottom:28px;padding-bottom:24px;border-bottom:2px dashed #e2e8f0;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 14px;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:10px;">
+                    <span style="font-size:22px;flex-shrink:0;">🤖</span>
+                    <div style="min-width:0;">
+                        <strong style="font-size:14px;color:#0369a1;display:block;word-break:break-word;">1. Khusus Pengguna HP Android (E-Ujian Browser)</strong>
+                        <span style="font-size:12px;color:#0284c7;">Wajib gunakan aplikasi resmi E-Ujian Browser dari Google Play Store</span>
+                    </div>
                 </div>
 
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr));gap:12px;">
-                    <!-- Step 1 -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                <div class="pretes-steps-grid">
+                    <!-- Step 1 Android -->
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">1</span>
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">1</span>
                                 <strong style="font-size:13px;color:#0f172a;">Install E-Ujian Browser</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
@@ -228,95 +325,98 @@ include __DIR__ . '/../includes/header.php';
                             </p>
                         </div>
                         <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
-                            style="background:#0284c7;color:#fff;padding:7px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;text-align:center;display:block;">
+                            style="background:#0284c7;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;text-align:center;display:block;">
                             📥 Buka Play Store ↗
                         </a>
                     </div>
 
-                    <!-- Step 2 -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <!-- Step 2 Android -->
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">2</span>
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">2</span>
                                 <strong style="font-size:13px;color:#0f172a;">Masukkan Kode Sekolah</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
                                 Buka aplikasi. Ketika diminta kode lembaga / ID sekolah, ketik: <strong>22205</strong>.
                             </p>
                         </div>
-                        <div style="background:#e0f2fe;color:#0369a1;padding:6px 10px;border-radius:6px;font-size:12px;font-weight:700;text-align:center;">
+                        <div style="background:#e0f2fe;color:#0369a1;padding:7px 10px;border-radius:6px;font-size:12px;font-weight:700;text-align:center;">
                             Kode: 22205
                         </div>
                     </div>
 
-                    <!-- Step 3 -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <!-- Step 3 Android -->
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">3</span>
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">3</span>
                                 <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
                                 Masuk sebagai Siswa/Peserta. Ketikkan Username & Password sesuai catatan kertas Anda.
                             </p>
                         </div>
-                        <div style="background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;">
+                        <div style="background:#fef3c7;color:#92400e;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;text-align:center;">
                             📝 Ketik dari catatan kertas
                         </div>
                     </div>
 
-                    <!-- Step 4 -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <!-- Step 4 Android -->
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">4</span>
+                                <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">4</span>
                                 <strong style="font-size:13px;color:#0f172a;">Mulai Ujian</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
                                 Pilih sesi Pretes LPPAI, masukkan Token dari pengawas ruangan, lalu kerjakan hingga selesai.
                             </p>
                         </div>
-                        <div style="background:#dcfce7;color:#15803d;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;text-align:center;">
+                        <div style="background:#dcfce7;color:#15803d;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:700;text-align:center;">
                             ✅ Jawaban tersimpan otomatis
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ── TAB KONTEN 2: IPHONE / IPAD (iOS) ── -->
-            <div id="device-content-ios" style="display:none;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;color:#0f766e;">
-                    <span style="font-size:18px;">🍏</span>
-                    <strong style="font-size:13.5px;">Langkah Ujian Khusus Pengguna iPhone (iOS):</strong>
+            <!-- ── BAGIAN 2: PENGGUNA IPHONE / IPAD (BAWAH) ── -->
+            <div id="panduan-seb-iphone">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 14px;background:#f0fdf4;border:1.5px solid #a7f3d0;border-radius:10px;">
+                    <span style="font-size:22px;flex-shrink:0;">🍏</span>
+                    <div style="min-width:0;">
+                        <strong style="font-size:14px;color:#065f46;display:block;word-break:break-word;">2. Khusus Pengguna iPhone / iPad (Safe Exam Browser)</strong>
+                        <span style="font-size:12px;color:#047857;">Wajib gunakan Safe Exam Browser (SEB) & pasang file konfigurasi resmi</span>
+                    </div>
                 </div>
 
-                <div style="background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#134e4a;line-height:1.55;">
-                    💡 <strong>Catatan Khusus iPhone:</strong> Safe Exam Browser di iPhone memerlukan file konfigurasi resmi (<code>seb-config-lppai.seb</code>) agar browser otomatis mengunci layar dan menampilkan ujian.
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#475569;line-height:1.55;box-sizing:border-box;word-break:break-word;">
+                    💡 <strong>Catatan Khusus iPhone:</strong> Safe Exam Browser di iPhone memerlukan file konfigurasi resmi (<code>seb-config-lppai.seb</code>) agar browser otomatis mengunci layar dan langsung membuka ujian.
                 </div>
 
-                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr));gap:12px;">
+                <div class="pretes-steps-grid">
                     <!-- Step 1 iOS -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">1</span>
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">1</span>
                                 <strong style="font-size:13px;color:#0f172a;">Install Safe Exam Browser</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                                Buka App Store di iPhone, pasang aplikasi <strong>Safe Exam Browser</strong>.
+                                Buka App Store di iPhone, pasang aplikasi resmi <strong>Safe Exam Browser</strong>.
                             </p>
                         </div>
                         <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
-                            style="background:#0f766e;color:#fff;padding:7px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;text-align:center;display:block;">
+                            style="background:#0f766e;color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;text-align:center;display:block;">
                             🍏 Buka App Store ↗
                         </a>
                     </div>
 
                     <!-- Step 2 iOS -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">2</span>
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">2</span>
                                 <strong style="font-size:13px;color:#0f172a;">Pasang Konfigurasi Ujian</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
@@ -325,93 +425,91 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <div style="display:flex;gap:6px;flex-direction:column;">
                             <a href="sebs://<?= preg_replace('#^https?://#', '', BASE_URL) ?>/assets/downloads/seb-config-lppai.seb"
-                                style="background:#0f766e;color:#fff;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;text-align:center;">
+                                style="background:#0f766e;color:#fff;padding:8px 10px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;text-align:center;">
                                 ⚡ Buka Langsung di SEB (Safari)
                             </a>
                             <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
-                                style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;padding:6px 8px;border-radius:6px;font-size:10.5px;font-weight:600;text-decoration:none;text-align:center;">
+                                style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;padding:7px 8px;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;text-align:center;">
                                 📥 Atau Unduh File .seb
                             </a>
                         </div>
                     </div>
 
                     <!-- Step 3 iOS -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">3</span>
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">3</span>
                                 <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
                                 SEB otomatis mengunci layar. Ketik Username & Password dari catatan kertas Anda.
                             </p>
                         </div>
-                        <div style="background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:600;text-align:center;">
+                        <div style="background:#fef3c7;color:#92400e;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;text-align:center;">
                             📝 Ketik dari catatan kertas
                         </div>
                     </div>
 
                     <!-- Step 4 iOS -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box;">
+                    <div class="pretes-step-box">
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;">4</span>
+                                <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">4</span>
                                 <strong style="font-size:13px;color:#0f172a;">Mulai Ujian</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
                                 Masukkan Token dari Pengawas dan kerjakan soal sampai selesai.
                             </p>
                         </div>
-                        <div style="background:#dcfce7;color:#15803d;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;text-align:center;">
+                        <div style="background:#dcfce7;color:#15803d;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:700;text-align:center;">
                             ✅ Kiosk mode aktif
                         </div>
                     </div>
                 </div>
             </div>
 
-
-
         </div>
     </div>
 
     <!-- ── 3. ATURAN PENTING & TATA TERTIB PRETES ── -->
-    <div class="card" style="margin-bottom:22px;border:1.5px solid #e2e8f0;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;">
-        <div style="background:#fef2f2;border-bottom:1px solid #fecaca;padding:12px 18px;display:flex;align-items:center;gap:8px;">
-            <span style="font-size:18px;">⚖️</span>
-            <strong style="font-size:13.5px;color:#991b1b;">Tata Tertib & Ketentuan Wajib Pretes</strong>
+    <div class="card" style="margin-bottom:22px;border:1.5px solid #e2e8f0;border-radius:16px;background:#ffffff;box-shadow:0 3px 12px rgba(0,0,0,0.03);overflow:hidden;box-sizing:border-box;max-width:100%;">
+        <div style="background:#fef2f2;border-bottom:1px solid #fecaca;padding:12px 18px;display:flex;align-items:center;gap:8px;box-sizing:border-box;">
+            <span style="font-size:18px;flex-shrink:0;">⚖️</span>
+            <strong style="font-size:13.5px;color:#991b1b;word-break:break-word;">Tata Tertib & Ketentuan Wajib Pretes</strong>
         </div>
-        <div class="card-body" style="padding:16px;">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 250px), 1fr));gap:12px;">
+        <div class="card-body" style="padding:16px 14px;box-sizing:border-box;max-width:100%;">
+            <div class="pretes-rules-grid">
                 
                 <!-- Poin 1: Try Out Mandiri -->
-                <div style="background:#fefce8;border:1px solid #fde047;border-radius:12px;padding:14px;box-sizing:border-box;">
+                <div style="background:#fefce8;border:1px solid #fde047;border-radius:12px;padding:14px;box-sizing:border-box;min-width:0;overflow:hidden;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                        <span style="font-size:18px;">🏠</span>
+                        <span style="font-size:18px;flex-shrink:0;">🏠</span>
                         <strong style="font-size:13px;color:#854d0e;">1. Try Out Mandiri dari Rumah</strong>
                     </div>
-                    <div style="font-size:12px;color:#713f12;line-height:1.55;">
+                    <div style="font-size:12px;color:#713f12;line-height:1.55;word-break:break-word;">
                         Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba login simulasi dari rumah dengan Kode Sekolah <code>22205</code> dan akun Anda, agar terbiasa dengan aplikasi.
                     </div>
                 </div>
 
                 <!-- Poin 2: Larangan 2 HP -->
-                <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px;box-sizing:border-box;">
+                <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:12px;padding:14px;box-sizing:border-box;min-width:0;overflow:hidden;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                        <span style="font-size:18px;">⛔</span>
+                        <span style="font-size:18px;flex-shrink:0;">⛔</span>
                         <strong style="font-size:13px;color:#9f1239;">2. Dilarang 2 HP di Meja Ujian!</strong>
                     </div>
-                    <div style="font-size:12px;color:#9f1239;line-height:1.55;">
+                    <div style="font-size:12px;color:#9f1239;line-height:1.55;word-break:break-word;">
                         Saat ujian resmi di kampus, <strong>dilarang meletakkan 2 HP di atas meja</strong>. Pelanggaran berakibat <strong>akun dinonaktifkan otomatis oleh Pengawas (gugur)</strong>. HP cadangan wajib dimatikan & ditaruh di tas di depan kelas.
                     </div>
                 </div>
 
                 <!-- Poin 3: Hadir Tepat Waktu -->
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;box-sizing:border-box;">
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;box-sizing:border-box;min-width:0;overflow:hidden;">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                        <span style="font-size:18px;">⏰</span>
+                        <span style="font-size:18px;flex-shrink:0;">⏰</span>
                         <strong style="font-size:13px;color:#166534;">3. Hadir 15 Menit Lebih Awal</strong>
                     </div>
-                    <div style="font-size:12px;color:#166534;line-height:1.55;">
+                    <div style="font-size:12px;color:#166534;line-height:1.55;word-break:break-word;">
                         Hadir di ruangan ujian 15 menit sebelum waktu tes. Jika koneksi terputus atau baterai habis saat ujian, jawaban tersimpan aman di server; segera hidupkan HP atau lapor pengawas di ruangan.
                     </div>
                 </div>
@@ -423,9 +521,9 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- ── Jadwal Pretes ─────────────────────────────────────────────── -->
-<div class="card" style="margin-bottom:24px;">
+<div class="card" style="margin-bottom:24px;box-sizing:border-box;max-width:100%;">
     <div class="card-header">📅 Jadwal Pretes</div>
-    <div class="card-body">
+    <div class="card-body" style="box-sizing:border-box;max-width:100%;">
         <?php if (empty($schedules)): ?>
             <div class="empty-state">
                 <div class="icon">📅</div>
@@ -433,8 +531,8 @@ include __DIR__ . '/../includes/header.php';
                 <p>Jadwal pretes akan ditampilkan ketika TU sudah menginputkan jadwal.</p>
             </div>
         <?php else: ?>
-        <div class="table-responsive">
-            <table>
+        <div class="table-responsive" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">
+            <table style="width:100%;min-width:560px;">
                 <thead>
                     <tr>
                         <th>No</th>
@@ -476,17 +574,17 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ── Daftar Peserta (Publik) ───────────────────────────────────── -->
-<div class="card">
+<div class="card" style="box-sizing:border-box;max-width:100%;">
     <div class="card-header">👥 Daftar Peserta Pretes (<?= count($participants) ?> peserta)</div>
-    <div class="card-body">
+    <div class="card-body" style="box-sizing:border-box;max-width:100%;">
         <?php if (empty($participants)): ?>
             <div class="empty-state">
                 <div class="icon">👥</div>
                 <h3>Belum ada peserta terdaftar</h3>
             </div>
         <?php else: ?>
-        <div class="table-responsive">
-            <table>
+        <div class="table-responsive" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:100%;box-sizing:border-box;">
+            <table style="width:100%;min-width:600px;">
                 <thead>
                     <tr>
                         <th>No</th>
@@ -585,47 +683,6 @@ function copyText(text, btnId) {
         document.body.removeChild(el);
     });
 }
-
-
-
-function switchDeviceTab(device) {
-    var tabs = ['android', 'ios'];
-    tabs.forEach(function(d) {
-        var content = document.getElementById('device-content-' + d);
-        var btn = document.getElementById('device-btn-' + d);
-        if (d === device) {
-            if (content) content.style.display = 'block';
-            if (btn) {
-                btn.style.background = '#0284c7';
-                btn.style.color = '#ffffff';
-                btn.style.fontWeight = '700';
-            }
-        } else {
-            if (content) content.style.display = 'none';
-            if (btn) {
-                btn.style.background = '#ffffff';
-                btn.style.color = '#334155';
-                btn.style.fontWeight = '600';
-            }
-        }
-    });
-    try { sessionStorage.setItem('pretes_device_tab', device); } catch(e) {}
-}
-
-// Inisialisasi tab perangkat
-try {
-    var savedDev = sessionStorage.getItem('pretes_device_tab');
-    if (!savedDev) {
-        var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        if (isIOS) savedDev = 'ios';
-    }
-    if (window.location.hash === '#panduan-seb-iphone' || savedDev === 'ios') {
-        switchDeviceTab('ios');
-    } else {
-        switchDeviceTab('android');
-    }
-} catch(e) {}
-
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
