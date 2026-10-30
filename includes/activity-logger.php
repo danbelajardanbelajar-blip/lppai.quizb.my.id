@@ -226,15 +226,16 @@ function getRecentLoginLogs($limit = 50) {
     try {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
-        $stmt = $pdo->prepare("
+        $lim = (int)$limit;
+        if ($lim <= 0) $lim = 50;
+        $stmt = $pdo->query("
             SELECT * FROM user_login_logs 
             ORDER BY created_at DESC 
-            LIMIT :lim
+            LIMIT $lim
         ");
-        $stmt->bindValue(':lim', (int)$limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Exception $e) {
+        error_log("Error getRecentLoginLogs: " . $e->getMessage());
         return [];
     }
 }
@@ -246,15 +247,16 @@ function getRecentClickLogs($limit = 100) {
     try {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
-        $stmt = $pdo->prepare("
+        $lim = (int)$limit;
+        if ($lim <= 0) $lim = 100;
+        $stmt = $pdo->query("
             SELECT * FROM user_click_logs 
             ORDER BY created_at DESC 
-            LIMIT :lim
+            LIMIT $lim
         ");
-        $stmt->bindValue(':lim', (int)$limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Exception $e) {
+        error_log("Error getRecentClickLogs: " . $e->getMessage());
         return [];
     }
 }

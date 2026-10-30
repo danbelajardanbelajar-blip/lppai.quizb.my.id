@@ -149,6 +149,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="javascript:void(0)" onclick="window.location.reload()" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:4px 9px;text-decoration:none;">🔄 Segarkan</a>
             <span class="badge badge-success"><?= number_format($activityStats['login_today']) ?> Login Hari Ini</span>
             <span class="badge badge-primary"><?= number_format($activityStats['total_login']) ?> Total Riwayat</span>
         </div>
@@ -229,6 +230,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <a href="javascript:void(0)" onclick="window.location.reload()" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:4px 9px;text-decoration:none;">🔄 Segarkan</a>
             <span class="badge badge-success"><?= number_format($activityStats['click_today']) ?> Klik Hari Ini</span>
             <span class="badge badge-primary"><?= number_format($activityStats['total_click']) ?> Total Aktivitas</span>
         </div>

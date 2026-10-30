@@ -531,7 +531,8 @@ document.addEventListener('click', function(e) {
     if (!href || href === '#' || href.indexOf('logout') !== -1) return;
 
     e.preventDefault();
-    e.stopImmediatePropagation();
+    if (typeof window.trackUserClick === 'function') { window.trackUserClick(link, 'menu'); }
+    e.stopPropagation();
     SPA.navigate(href, true);
 }, true);
 
@@ -575,7 +576,8 @@ document.addEventListener('click', function(e) {
     if (!el) return;
 
     e.preventDefault();
-    e.stopImmediatePropagation();
+    if (typeof window.trackUserClick === 'function') { window.trackUserClick(el, 'action'); }
+    e.stopPropagation();
 
     var msg = el.dataset.confirm;
     var table = el.dataset.table || '';
