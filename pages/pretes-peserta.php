@@ -189,23 +189,19 @@ include __DIR__ . '/../includes/header.php';
                 <span style="font-size:20px;">📱</span>
                 <div>
                     <h4 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Petunjuk Masuk & Mengerjakan Ujian</h4>
-                    <span style="font-size:12px;color:#64748b;">Pilih jenis perangkat HP / laptop yang Anda gunakan:</span>
+                    <span style="font-size:12px;color:#64748b;">Pilih tipe HP yang Anda gunakan untuk ujian:</span>
                 </div>
             </div>
 
             <!-- Segmented Tabs (Touch-Friendly & Anti Geser Kanan-Kiri) -->
-            <div style="display:flex;background:#e2e8f0;border-radius:10px;padding:3px;gap:4px;flex-wrap:wrap;width:100%;max-width:440px;box-sizing:border-box;">
+            <div style="display:flex;background:#e2e8f0;border-radius:10px;padding:3px;gap:4px;flex-wrap:wrap;width:100%;max-width:320px;box-sizing:border-box;">
                 <button type="button" id="device-btn-android" onclick="switchDeviceTab('android')"
-                    style="flex:1 1 120px;background:#0284c7;color:#fff;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
+                    style="flex:1 1 120px;background:#0284c7;color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
                     🤖 Android
                 </button>
                 <button type="button" id="device-btn-ios" onclick="switchDeviceTab('ios')"
-                    style="flex:1 1 120px;background:#ffffff;color:#334155;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
+                    style="flex:1 1 120px;background:#ffffff;color:#334155;border:none;padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
                     🍏 iPhone / iPad
-                </button>
-                <button type="button" id="device-btn-laptop" onclick="switchDeviceTab('laptop')"
-                    style="flex:1 1 100px;background:#ffffff;color:#334155;border:none;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:all 0.2s;">
-                    💻 Laptop / PC
                 </button>
             </div>
         </div>
@@ -373,20 +369,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- ── TAB KONTEN 3: LAPTOP / PC ── -->
-            <div id="device-content-laptop" style="display:none;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#334155;">
-                    <span style="font-size:18px;">💻</span>
-                    <strong style="font-size:13.5px;">Ujian Menggunakan Laptop / PC:</strong>
-                </div>
-                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;font-size:12.5px;color:#334155;line-height:1.6;box-sizing:border-box;">
-                    <ul style="margin:0;padding-left:18px;">
-                        <li>Ujian di PC laboratorium kampus menggunakan aplikasi <strong>Safe Exam Browser (SEB)</strong> yang telah disiapkan panitia.</li>
-                        <li>Pastikan terhubung ke jaringan resmi yang ditentukan panitia pretes.</li>
-                        <li>Gunakan Username, Password, dan Token Ujian yang sama untuk memulai tes.</li>
-                    </ul>
-                </div>
-            </div>
+
 
         </div>
     </div>
@@ -606,7 +589,7 @@ function copyText(text, btnId) {
 
 
 function switchDeviceTab(device) {
-    var tabs = ['android', 'ios', 'laptop'];
+    var tabs = ['android', 'ios'];
     tabs.forEach(function(d) {
         var content = document.getElementById('device-content-' + d);
         var btn = document.getElementById('device-btn-' + d);
@@ -638,8 +621,6 @@ try {
     }
     if (window.location.hash === '#panduan-seb-iphone' || savedDev === 'ios') {
         switchDeviceTab('ios');
-    } else if (savedDev === 'laptop') {
-        switchDeviceTab('laptop');
     } else {
         switchDeviceTab('android');
     }
