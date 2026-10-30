@@ -109,14 +109,24 @@ include __DIR__ . '/../includes/header.php';
                                 </a>
                             </div>
                             <!-- iPhone / iOS -->
-                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                            <div style="background:#ffffff;border:1px solid #bfdbfe;padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                                 <div style="font-size:12px;color:#1e293b;">
                                     🍏 <strong>iPhone/iPad:</strong> Safe Exam Browser
                                 </div>
-                                <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
-                                   style="background:#0f766e;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
-                                    App Store ↗
-                                </a>
+                                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                    <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
+                                       style="background:#0f766e;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                                        App Store ↗
+                                    </a>
+                                    <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
+                                       style="background:#16a34a;color:#ffffff;padding:5px 11px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;white-space:nowrap;" title="Unduh file konfigurasi SEB untuk iPhone">
+                                        📥 File .seb
+                                    </a>
+                                    <a href="#panduan-seb-iphone"
+                                       style="background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">
+                                        Panduan ➔
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -327,6 +337,129 @@ include __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 
     <!-- ═══════════════════════════════════════════════════════════════════
+         KHUSUS PENGGUNA IPHONE (iOS): FILE KONFIGURASI & PANDUAN SEB
+    ═══════════════════════════════════════════════════════════════════ -->
+    <div class="card" id="panduan-seb-iphone" style="margin-bottom:28px;border:2px solid #0f766e;border-radius:16px;background:#ffffff;box-shadow:0 6px 24px rgba(15,118,110,0.1);overflow:hidden;">
+        <div class="card-header" style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%);color:#ffffff;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);font-size:24px;">
+                    🍏
+                </span>
+                <div>
+                    <h3 style="margin:0;font-size:16px;font-weight:800;color:#ffffff;letter-spacing:0.2px;">
+                        Khusus Pengguna iPhone (iOS): File Konfigurasi Safe Exam Browser (SEB)
+                    </h3>
+                    <p style="margin:2px 0 0;font-size:12.5px;color:#ccfbf1;">
+                        Wajib diunduh & dipasangkan pada aplikasi Safe Exam Browser di iPhone peserta pretes
+                    </p>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="sebs://<?= preg_replace('#^https?://#', '', BASE_URL) ?>/assets/downloads/seb-config-lppai.seb"
+                   class="btn" style="background:#ffffff;color:#0f766e;font-weight:800;padding:8px 16px;border-radius:8px;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+                    ⚡ Buka Langsung di SEB (iOS)
+                </a>
+                <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
+                   class="btn" style="background:#f59e0b;color:#ffffff;font-weight:800;padding:8px 16px;border-radius:8px;font-size:12.5px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+                    📥 Unduh File .seb
+                </a>
+            </div>
+        </div>
+
+        <div class="card-body" style="padding:24px;">
+            <!-- Penjelasan Pengantar -->
+            <div style="background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:12px;padding:16px 20px;margin-bottom:22px;display:flex;align-items:flex-start;gap:14px;">
+                <span style="font-size:26px;flex-shrink:0;">ℹ️</span>
+                <div style="font-size:13px;color:#134e4a;line-height:1.65;">
+                    Aplikasi <strong>Safe Exam Browser (SEB)</strong> pada iPhone <strong>memerlukan file konfigurasi resmi (<code>seb-config-lppai.seb</code>)</strong> agar browser dapat otomatis membuka server CBT LPPAI dan mengunci layar secara aman (<em>kiosk mode</em>). Tanpa file ini, SEB pada iPhone tidak akan menampilkan halaman ujian.
+                </div>
+            </div>
+
+            <!-- 4 Langkah Pemasangan di iPhone -->
+            <h4 style="font-size:15px;color:#0f172a;margin-bottom:14px;font-weight:700;display:flex;align-items:center;gap:8px;">
+                <span>📲</span> Langkah Pemasangan File Konfigurasi di iPhone:
+            </h4>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:22px;">
+                <!-- Step 1 -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">1</span>
+                            <strong style="font-size:13.5px;color:#0f172a;">Install SEB dari App Store</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                            Buka App Store di iPhone, install aplikasi <strong>Safe Exam Browser</strong> resmi.
+                        </p>
+                    </div>
+                    <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
+                       style="background:#0f766e;color:#fff;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+                        🍏 Buka di App Store ↗
+                    </a>
+                </div>
+
+                <!-- Step 2 -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">2</span>
+                            <strong style="font-size:13.5px;color:#0f172a;">Buka di Safari iPhone</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                            Buka halaman web ini melalui peramban <strong>Safari</strong> pada iPhone Anda, lalu klik tombol <strong>"⚡ Buka Langsung di SEB"</strong>.
+                        </p>
+                    </div>
+                    <span style="background:#e0f2fe;color:#0369a1;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
+                        Gunakan Safari Browser
+                    </span>
+                </div>
+
+                <!-- Step 3 -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">3</span>
+                            <strong style="font-size:13.5px;color:#0f172a;">Konfirmasi Buka di SEB</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                            Saat muncul popup Safari: <em>"Buka halaman ini di 'Safe Exam Browser'?"</em>, klik <strong>Buka (Open)</strong>.
+                        </p>
+                    </div>
+                    <span style="background:#dcfce7;color:#15803d;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
+                        Otomatis terkonfigurasi
+                    </span>
+                </div>
+
+                <!-- Step 4 -->
+                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                            <span style="background:#0f766e;color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;">4</span>
+                            <strong style="font-size:13.5px;color:#0f172a;">Login CBT dari Kertas</strong>
+                        </div>
+                        <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 10px;">
+                            SEB akan otomatis mengunci layar iPhone. Ketik Username & Password Anda dari catatan kertas untuk mulai tes.
+                        </p>
+                    </div>
+                    <span style="background:#fee2e2;color:#991b1b;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:700;display:inline-block;">
+                        Layar Terkunci Penuh
+                    </span>
+                </div>
+            </div>
+
+            <!-- Opsi Alternatif File Manual -->
+            <div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:10px;padding:14px 18px;font-size:12.5px;color:#92400e;line-height:1.6;">
+                <strong>💡 Opsi Alternatif (Jika Buka Langsung Tidak Merespon di iPhone):</strong>
+                <ol style="margin:6px 0 0;padding-left:20px;">
+                    <li>Klik tombol <strong>"📥 Unduh File .seb"</strong> untuk mengunduh <code>seb-config-lppai.seb</code> ke iPhone Anda.</li>
+                    <li>Buka aplikasi bawaan <strong>File (Files)</strong> di iPhone, buka tab <strong>Telusuri / Unduhan (Downloads)</strong>.</li>
+                    <li>Ketuk file <strong>seb-config-lppai.seb</strong>. Aplikasi Safe Exam Browser akan otomatis terbuka dan memuat konfigurasi.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
          PANDUAN PENGGUNAAN E-UJIAN (www.e-ujian.com) BAGI PESERTA PRETES
     ═══════════════════════════════════════════════════════════════════ -->
     <div class="card" style="margin-bottom:28px;border:1.5px solid #cbd5e1;border-radius:16px;background:#ffffff;box-shadow:0 4px 16px rgba(0,0,0,0.04);overflow:hidden;">
@@ -374,11 +507,13 @@ include __DIR__ . '/../includes/header.php';
                             Peserta <strong>wajib menginstall salah satu dari dua aplikasi</strong>: <strong>E-Ujian Browser</strong> untuk Android, atau <strong>Safe Exam Browser (SEB)</strong> untuk iPhone/iPad (iOS).
                         </p>
                     </div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                         <a href="https://play.google.com/store/apps/details?id=com.doovera.eujianbrowser" target="_blank" rel="noopener noreferrer"
                            style="background:#0284c7;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">Play Store (Android) ↗</a>
                         <a href="https://apps.apple.com/id/app/safeexambrowser/id1155002964?l=id" target="_blank" rel="noopener noreferrer"
                            style="background:#0f766e;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">App Store (iOS) ↗</a>
+                        <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb"
+                           style="background:#16a34a;color:#fff;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">📥 Config SEB (.seb)</a>
                     </div>
                 </div>
 

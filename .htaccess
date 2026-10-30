@@ -1,6 +1,9 @@
 Options -Indexes
 DirectoryIndex index.php
 
+# Safe Exam Browser configuration MIME type
+AddType application/seb .seb
+
 RewriteEngine On
 RewriteBase /
 

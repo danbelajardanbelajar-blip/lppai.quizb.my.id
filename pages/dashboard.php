@@ -252,6 +252,24 @@ include __DIR__ . '/../includes/header.php';
             </a>
         </div>
 
+        <!-- Banner Khusus Pengguna iPhone (Config SEB) -->
+        <div style="background:#f0fdfa; border:1.5px solid #99f6e4; border-radius:12px; padding:12px 16px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:22px;">🍏</span>
+                <div style="font-size:12.5px; color:#134e4a; line-height:1.5;">
+                    <strong style="color:#0f766e;">Pengguna iPhone (iOS)?</strong> Wajib pasang file konfigurasi <code>seb-config-lppai.seb</code> agar Safe Exam Browser otomatis terhubung ke ujian.
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb" class="btn btn-sm" style="background:#0f766e; color:#ffffff; padding:6px 12px; font-size:12px; font-weight:700; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                    📥 Unduh File .seb
+                </a>
+                <a href="<?= BASE_URL ?>/pretes-peserta.php#panduan-seb-iphone" class="btn btn-sm btn-light" style="padding:6px 12px; font-size:12px; border:1px solid #99f6e4; color:#0f766e; font-weight:600; border-radius:6px; text-decoration:none;">
+                    📖 Panduan iPhone ➔
+                </a>
+            </div>
+        </div>
+
         <!-- Tombol Aksi Cepat -->
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; text-decoration:none;">
