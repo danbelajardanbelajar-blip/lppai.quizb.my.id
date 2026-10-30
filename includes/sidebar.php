@@ -124,6 +124,9 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Sistem</div>
+            <a href="<?= BASE_URL ?>/admin/log-aktivitas.php" class="page-nav <?= menuActive('log-aktivitas.php') ?>">
+                <span class="icon">📜</span> Log Aktivitas
+            </a>
             <a href="<?= BASE_URL ?>/admin/backup-restore.php" class="page-nav <?= menuActive('backup-restore.php') ?>">
                 <span class="icon">💾</span> Backup & Restore
             </a>
