@@ -89,10 +89,9 @@ foreach ($groups as $group) {
         .sheet { position: relative; overflow: hidden; width: 210mm; height: 296mm; margin: 0 auto 20px; padding: 12mm; background: white; box-shadow: 0 2px 12px #0001; }
         .sheet-content { position: absolute; top: 12mm; left: 12mm; width: 186mm; transform-origin: top left; display: flow-root; }
         .kop { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 4px double #15583c; }
-        .kop img { width: 21mm; height: 21mm; object-fit: contain; }
-        .kop-text { flex: 1; text-align: center; padding-right: 21mm; }
-        .kop h1 { font-size: 13pt; margin: 0 0 3px; }
-        .kop p { margin: 2px 0; font-size: 9pt; }
+        .kop img { width: 12mm; height: 12mm; object-fit: contain; }
+        .kop-text { flex: 1; text-align: center; }
+        .kop h1, .kop p { font-size: 11pt; font-weight: bold; line-height: 1.5; margin: 0; }
         h2 { text-align: center; font-size: 13pt; letter-spacing: 1px; margin: 17px 0 3px; }
         .subtitle { text-align: center; margin: 0 0 16px; font-size: 9pt; }
         .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; margin-bottom: 14px; font-size: 9pt; }
@@ -137,9 +136,8 @@ foreach ($groups as $group) {
         <header class="kop">
             <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI">
             <div class="kop-text">
-                <h1>LEMBAGA PENGEMBANGAN<br>PENDIDIKAN AGAMA ISLAM</h1>
-                <p><strong>LPPAI</strong></p>
-                <p>lppai.quizb.my.id</p>
+                <h1>Lembaga Pembinaan dan Pengembangan Agama Islam (LPPAI)</h1>
+                <p>Universitas Islam Darul Ulum Lamongan (UNISDA)</p>
             </div>
         </header>
         <h2>DAFTAR HADIR PESERTA PRETES</h2>
