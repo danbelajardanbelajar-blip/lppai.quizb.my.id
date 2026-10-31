@@ -95,3 +95,20 @@ function pretesCanAssess($user, $registration) {
         && trim($user['nama_lengkap']) !== ''
         && trim($registration['dosen_penguji'] ?? '') === trim($user['nama_lengkap']));
 }
+
+function pretesProgress($participants) {
+    $progress = ['total' => count($participants), 'hadir' => 0, 'lengkap' => 0, 'sebagian' => 0, 'kosong' => 0];
+    foreach ($participants as $row) {
+        if (($row['status'] ?? '') === 'hadir') $progress['hadir']++;
+        $scores = json_decode($row['scores_json'] ?? '{}', true);
+        $filled = 0;
+        foreach (pretesComponents() as $key => $label) {
+            $value = is_array($scores) ? ($scores[$key] ?? null) : null;
+            if ($value !== null && $value !== '' && is_numeric($value) && (float)$value >= 0 && (float)$value <= 100) $filled++;
+        }
+        if ($filled === count(pretesComponents())) $progress['lengkap']++;
+        elseif ($filled > 0) $progress['sebagian']++;
+        else $progress['kosong']++;
+    }
+    return $progress;
+}

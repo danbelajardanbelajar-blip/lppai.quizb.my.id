@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $pdo->commit();
         $_SESSION['pretes_flash'] = $message;
-        header('Location: ?' . http_build_query(['pretes_id' => $periodId, 'registration_id' => $_POST['registration_id'] ?? '']));
+        header('Location: ?' . http_build_query(['pretes_id' => $periodId, 'registration_id' => $_POST['registration_id'] ?? '', 'session_id' => $_POST['session_id'] ?? '']) . (isset($sessionId) ? '#qr-session-' . (int)$sessionId : '#nilai-pretes'));
         exit;
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -99,9 +99,25 @@ include __DIR__ . '/header.php';
     <p style="margin-bottom:0;">Jumlah peserta: <strong><?= count($participants) ?></strong> · Waktu: <strong>13.00 WIB</strong>. Nilai rinci disimpan sebagai penilaian; penetapan hasil dan kelulusan tetap dilakukan admin.</p>
 </div></div>
 <?php if (!$participants): ?><div class="alert alert-info">Belum ada peserta yang ditugaskan pada periode ini.</div><?php endif; ?>
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;">
+<style>
+    .pretes-qr-sessions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:14px; align-items:start; margin-bottom:24px; }
+    .pretes-qr-session { margin:0; }
+    .pretes-qr-session summary { display:flex; align-items:center; gap:12px; padding:16px; cursor:pointer; list-style:none; min-height:76px; }
+    .pretes-qr-session summary::-webkit-details-marker { display:none; }
+    .pretes-qr-session summary::after { content:'+'; font-size:24px; color:var(--primary); }
+    .pretes-qr-session[open] summary::after { content:'−'; }
+    .pretes-qr-session[open] summary { border-bottom:1px solid var(--border); }
+    .pretes-qr-session summary:focus-visible { outline:2px solid var(--primary); outline-offset:-3px; border-radius:12px; }
+    .pretes-qr-session .session-label { flex:1; min-width:0; overflow-wrap:anywhere; }
+    .pretes-qr-session .session-label small { display:block; color:var(--text-muted); margin-top:4px; }
+    .pretes-qr-session .session-state { font-size:11px; font-weight:700; padding:4px 8px; border-radius:20px; background:#f1f5f9; color:#475569; white-space:nowrap; }
+    .pretes-qr-session .session-state.is-open { background:#dcfce7; color:#166534; }
+</style>
+<div class="pretes-qr-sessions" id="absensi-pretes">
 <?php foreach ($groups as $group): $scope = $group['scope']; $session = pretesSession($pdo, $scope); $url = pretesAttendanceUrl($session); ?>
-<div class="card"><div class="card-header">QR Absensi · <?= sanitize($scope['hari']) ?></div><div class="card-body" style="text-align:center;">
+<details class="card pretes-qr-session" id="qr-session-<?= (int)$session['id'] ?>" <?= (int)($_GET['session_id'] ?? 0) === (int)$session['id'] ? 'open' : '' ?>>
+    <summary><span class="session-label"><strong>QR Absensi · <?= sanitize($scope['hari']) ?></strong><small><?= sanitize($scope['ruangan'] ?: 'Ruangan belum ditentukan') ?> · <?= $group['count'] ?> peserta</small></span><span class="session-state <?= $session['is_open'] ? 'is-open' : '' ?>"><?= $session['is_open'] ? 'Dibuka' : 'Ditutup' ?></span></summary>
+    <div class="card-body" style="text-align:center;">
     <p><strong><?= sanitize($scope['penguji'] ?: 'Belum ditentukan') ?></strong><br><?= sanitize($scope['ruangan'] ?: 'Ruangan belum ditentukan') ?> · <?= $group['count'] ?> peserta</p>
     <div class="pretes-qr" data-url="<?= sanitize($url) ?>" style="display:inline-block;padding:12px;background:white;"></div>
     <p><strong><?= $session['is_open'] ? 'Absensi dibuka (otomatis ditutup 2 jam setelah dibuka)' : 'Absensi ditutup' ?></strong></p>
@@ -110,7 +126,7 @@ include __DIR__ . '/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>"><input type="hidden" name="session_id" value="<?= (int)$session['id'] ?>">
         <button name="action" value="<?= $session['is_open'] ? 'close_attendance' : 'open_attendance' ?>" class="btn <?= $session['is_open'] ? 'btn-danger' : 'btn-success' ?>" style="width:auto;"><?= $session['is_open'] ? 'Tutup Absensi' : 'Buka Absensi (2 Jam)' ?></button>
     </form>
-</div></div>
+</div></details>
 <?php endforeach; ?>
 </div>
 <?php if ($selected):
@@ -159,7 +175,7 @@ include __DIR__ . '/header.php';
         .pretes-participants .participant-name { font-size:14px; line-height:1.5; }
     }
 </style>
-<div class="card"><div class="card-header">Peserta & Nilai Pretes</div><div class="card-body"><table class="pretes-participants">
+<div class="card" id="peserta-pretes"><div class="card-header">Peserta & Nilai Pretes</div><div class="card-body"><table class="pretes-participants">
     <thead><tr><th>Nama Mahasiswa</th><th class="participant-action">Input Nilai</th></tr></thead><tbody>
     <?php foreach ($participants as $row): ?>
     <tr><td class="participant-name"><?= sanitize($row['nama_lengkap']) ?></td><td class="participant-action"><a class="btn btn-primary input-score" aria-label="Input nilai <?= sanitize($row['nama_lengkap']) ?>" href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes">Input Nilai</a></td></tr>
@@ -184,8 +200,20 @@ document.querySelectorAll('.pretes-score-row').forEach(function(row) {
     input.addEventListener('input', updatePresets);
     updatePresets();
 });
-document.querySelectorAll('.pretes-qr').forEach(function(el) {
-    new QRCode(el, {text:el.dataset.url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});
+document.querySelectorAll('.pretes-qr-session').forEach(function(details) {
+    function renderSessionQr() {
+        if (!details.open) return;
+        document.querySelectorAll('.pretes-qr-session').forEach(function(other) {
+            if (other !== details) other.open = false;
+        });
+        var el = details.querySelector('.pretes-qr');
+        if (!el.dataset.rendered) {
+            new QRCode(el, {text:el.dataset.url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});
+            el.dataset.rendered = 'true';
+        }
+    }
+    details.addEventListener('toggle', renderSessionQr);
+    renderSessionQr();
 });
 </script>
 <?php include __DIR__ . '/footer.php'; ?>

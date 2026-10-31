@@ -8,6 +8,20 @@ requireDosen();
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/pretes-helper.php';
+ensurePretesFeatures($pdo);
+$pretesPeriod = $pdo->query("SELECT id, periode FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1")->fetch();
+$pretesParticipants = [];
+if ($pretesPeriod) {
+    $stmt = $pdo->prepare('SELECT pr.dosen_penguji, pr.status, pa.scores_json FROM pretes_registrations pr
+        JOIN users u ON u.id = pr.user_id
+        LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
+        WHERE pr.periode = ? AND TRIM(pr.dosen_penguji) = ?');
+    $stmt->execute([$pretesPeriod['periode'], trim($user['nama_lengkap'])]);
+    $pretesParticipants = array_values(array_filter($stmt->fetchAll(), fn($row) => pretesCanAssess($user, $row)));
+}
+$pretesProgress = pretesProgress($pretesParticipants);
+$pretesUrl = BASE_URL . '/dosen/pretes.php' . ($pretesPeriod ? '?pretes_id=' . (int)$pretesPeriod['id'] : '');
 
 // Get tutorial classes taught by this dosen
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%')");
@@ -66,11 +80,29 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- Recent Classes -->
-<div class="card"><div class="card-header">Pretes</div><div class="card-body">
-    <p>Lihat peserta yang ditugaskan kepada Anda, isi 12 komponen nilai, dan buka QR absensi pretes.</p>
-    <a href="<?= BASE_URL ?>/dosen/pretes.php" class="btn btn-primary" data-no-spa style="width:auto;">Penilaian & Absensi Pretes</a>
-</div></div>
+<style>
+    .pretes-dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px; margin-bottom:24px; }
+    .pretes-dashboard .card { margin:0; min-width:0; }
+    .pretes-dashboard .pretes-total { display:flex; align-items:baseline; gap:8px; margin:12px 0; }
+    .pretes-dashboard .pretes-total strong { font-size:32px; color:var(--primary); }
+    .pretes-dashboard .pretes-total span { color:var(--text-muted); }
+    .pretes-dashboard .btn { width:auto; min-height:44px; margin-top:12px; }
+    .pretes-dashboard p { overflow-wrap:anywhere; }
+</style>
+<div class="pretes-dashboard">
+    <div class="card" id="info-absensi-pretes"><div class="card-header">Info Absensi Pretes</div><div class="card-body">
+        <p><?= sanitize($pretesPeriod['periode'] ?? 'Belum ada periode pretes') ?></p>
+        <div class="pretes-total"><strong><?= $pretesProgress['hadir'] ?></strong><span>dari <?= $pretesProgress['total'] ?> peserta hadir</span></div>
+        <p><?= $pretesProgress['total'] - $pretesProgress['hadir'] ?> peserta belum tercatat hadir.</p>
+        <a href="<?= sanitize($pretesUrl) ?>#absensi-pretes" class="btn btn-primary" data-no-spa>Kelola Absensi & QR</a>
+    </div></div>
+    <div class="card" id="info-nilai-pretes"><div class="card-header">Info Input Nilai Pretes</div><div class="card-body">
+        <p><?= sanitize($pretesPeriod['periode'] ?? 'Belum ada periode pretes') ?></p>
+        <div class="pretes-total"><strong><?= $pretesProgress['lengkap'] ?></strong><span>dari <?= $pretesProgress['total'] ?> peserta dinilai lengkap</span></div>
+        <p><?= $pretesProgress['sebagian'] ?> peserta diisi sebagian · <?= $pretesProgress['kosong'] ?> belum diisi.</p>
+        <a href="<?= sanitize($pretesUrl) ?>#peserta-pretes" class="btn btn-primary" data-no-spa>Input Nilai Peserta</a>
+    </div></div>
+</div>
 
 <!-- Recent Classes -->
 <div class="card">

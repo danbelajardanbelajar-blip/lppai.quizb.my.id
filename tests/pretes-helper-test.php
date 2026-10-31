@@ -30,4 +30,14 @@ checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor B'], $
 checkPretes(!pretesCanAssess(['role' => 'mahasiswa', 'nama_lengkap' => 'Tutor A'], $registration), 'Mahasiswa tidak boleh menilai.');
 checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => ''], ['dosen_penguji' => '']), 'Nama dosen kosong tidak boleh mendapatkan akses.');
 checkPretes(pretesCanAssess(['role' => 'admin'], $registration), 'Admin harus dapat memeriksa nilai.');
-echo "PASS: 12 komponen, validasi nilai, pengelompokan sesi, dan izin penilaian.\n";
+$allZero = array_fill_keys(array_keys(pretesComponents()), 0);
+$progress = pretesProgress([
+    ['status' => 'hadir', 'scores_json' => json_encode($allZero)],
+    ['status' => 'terdaftar', 'scores_json' => '{"ujian_tulis":0}'],
+    ['status' => 'tidak_hadir', 'scores_json' => '{"ujian_tulis":null}'],
+    ['status' => 'hadir', 'scores_json' => 'invalid json'],
+    ['status' => 'terdaftar', 'scores_json' => '{"unknown":80,"ujian_tulis":101}'],
+]);
+checkPretes($progress === ['total' => 5, 'hadir' => 2, 'lengkap' => 1, 'sebagian' => 1, 'kosong' => 3], 'Progres harus membedakan nilai nol, kosong, sebagian, lengkap, dan data tidak valid.');
+checkPretes(pretesProgress([]) === ['total' => 0, 'hadir' => 0, 'lengkap' => 0, 'sebagian' => 0, 'kosong' => 0], 'Progres kosong harus tetap valid.');
+echo "PASS: 12 komponen, validasi nilai, pengelompokan sesi, izin penilaian, dan ringkasan progres.\n";
