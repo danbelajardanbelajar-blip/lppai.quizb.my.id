@@ -1,9 +1,10 @@
 <?php
 /**
- * LPPAI Corner - Admin: Pengaturan Tutor & Sesi Pretes
- * Halaman terpadu untuk mengelola tutor/penguji serta pengaturan sesi pretes secara bebas
+ * LPPAI Corner - Admin: Pengaturan Sesi & Penguji / Tutor Pretes
+ * Halaman terpadu untuk mengelola sesi ujian pretes per dosen, per ruang, dan per hari
+ * (Fokus murni pada konfigurasi sesi, jadwal, ruangan, dan penguji tanpa menampilkan daftar mahasiswa)
  */
-define('PAGE_TITLE', 'Pengaturan Tutor & Sesi Pretes');
+define('PAGE_TITLE', 'Pengaturan Sesi & Penguji Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-helper.php';
@@ -12,7 +13,7 @@ $pdo = getDBConnection();
 $message = '';
 $msgType = '';
 
-// Auto-migration aman untuk tabel dan kolom terkait tutor, penguji, dan sesi
+// Auto-migration aman untuk tabel dan kolom terkait tutor, ruangan, dan sesi
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS master_pretes (
@@ -50,6 +51,14 @@ try {
 // Pastikan fitur pretes assessments dan absensi terinisialisasi
 ensurePretesFeatures($pdo);
 
+// Kolom pendukung pada pretes_attendance_sessions
+try {
+    $pdo->exec("ALTER TABLE pretes_attendance_sessions ADD COLUMN jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'");
+} catch (Exception $e) {}
+try {
+    $pdo->exec("ALTER TABLE pretes_attendance_sessions ADD COLUMN kuota INT DEFAULT 30");
+} catch (Exception $e) {}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parsePengujiList($pengujiStr) {
     if (empty($pengujiStr) || trim($pengujiStr) === '') return [];
@@ -60,7 +69,6 @@ function parsePengujiList($pengujiStr) {
     return [$pengujiStr];
 }
 
-// Helper pencocokan cerdas nama penguji (kebal perbedaan gelar, spasi, dan tanda petik)
 function isPengujiMatch($targetName, $optionName) {
     if (empty($targetName) || empty($optionName)) return false;
     $targetName = trim($targetName);
@@ -97,73 +105,12 @@ $presetSesiJam = [
     '09.30 WIB (Pagi 2)',
 ];
 
-// ── 1. HANDLE AJAX REQUESTS ───────────────────────────────────────────────────
+// ── 1. HANDLE AJAX & FORM POST ACTIONS ────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $token  = $_POST['csrf_token'] ?? '';
 
-    // AJAX 1: Update Dosen Penguji Peserta secara Instan (1-Klik via Dropdown)
-    if ($action === 'update_tutor_ajax') {
-        header('Content-Type: application/json; charset=utf-8');
-        if (!verifyCsrf($token)) {
-            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid atau telah kedaluwarsa. Silakan refresh halaman.']);
-            exit;
-        }
-        $regId = (int)($_POST['reg_id'] ?? 0);
-        $tutor = trim((string)($_POST['dosen_penguji'] ?? ''));
-
-        if ($regId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'ID peserta tidak valid.']);
-            exit;
-        }
-
-        try {
-            $stmt = $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE id = ?");
-            $stmt->execute([$tutor !== '' ? $tutor : null, $regId]);
-            echo json_encode([
-                'success' => true,
-                'message' => 'Dosen penguji telah dirubah',
-                'reg_id'  => $regId,
-                'dosen_penguji' => $tutor
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Gagal mengubah dosen penguji: ' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    // AJAX 2: Update Sesi / Jam Peserta secara Instan (1-Klik via Dropdown)
-    if ($action === 'update_jam_ajax') {
-        header('Content-Type: application/json; charset=utf-8');
-        if (!verifyCsrf($token)) {
-            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid atau telah kedaluwarsa.']);
-            exit;
-        }
-        $regId = (int)($_POST['reg_id'] ?? 0);
-        $jam   = trim((string)($_POST['jam'] ?? ''));
-
-        if ($regId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'ID peserta tidak valid.']);
-            exit;
-        }
-
-        try {
-            $valJam = $jam !== '' ? $jam : '13.00 WIB (Jam 1)';
-            $stmt = $pdo->prepare("UPDATE pretes_registrations SET jam = ? WHERE id = ?");
-            $stmt->execute([$valJam, $regId]);
-            echo json_encode([
-                'success' => true,
-                'message' => 'Sesi jam pretes telah dirubah',
-                'reg_id'  => $regId,
-                'jam'     => $valJam
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => 'Gagal mengubah sesi jam: ' . $e->getMessage()]);
-        }
-        exit;
-    }
-
-    // AJAX 3: Buka / Tutup Sesi Absensi Pretes (Instant Toggle)
+    // AJAX: Buka / Tutup Sesi Absensi Pretes (Instant Toggle)
     if ($action === 'toggle_session_ajax') {
         header('Content-Type: application/json; charset=utf-8');
         if (!verifyCsrf($token)) {
@@ -184,12 +131,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE id = ?")
                     ->execute([$duration, $sessionId]);
                 $msg = "Sesi absensi berhasil dibuka selama $duration jam.";
-                $isOpen = true;
             } else {
                 $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = NULL WHERE id = ?")
                     ->execute([$sessionId]);
                 $msg = "Sesi absensi berhasil ditutup.";
-                $isOpen = false;
             }
 
             $stmt = $pdo->prepare("SELECT open_until, (open_until > NOW()) as is_open FROM pretes_attendance_sessions WHERE id = ?");
@@ -209,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    // AJAX 4: Reset Token Sesi Presensi
+    // AJAX: Reset Token Sesi Presensi
     if ($action === 'reset_session_token_ajax') {
         header('Content-Type: application/json; charset=utf-8');
         if (!verifyCsrf($token)) {
@@ -240,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    // AJAX 5: Toggle Status Aktif/Nonaktif Tutor Cepat
+    // AJAX: Toggle Status Aktif/Nonaktif Tutor Cepat
     if ($action === 'toggle_tutor_status_ajax') {
         header('Content-Type: application/json; charset=utf-8');
         if (!verifyCsrf($token)) {
@@ -262,8 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 exit;
             }
             $newStatus = $current ? 0 : 1;
-            $upd = $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = 'dosen'");
-            $upd->execute([$newStatus, $tutorId]);
+            $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = 'dosen'")->execute([$newStatus, $tutorId]);
 
             echo json_encode([
                 'success'   => true,
@@ -276,71 +220,175 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    // ── 2. HANDLE STANDARD POST ACTIONS ───────────────────────────────────────
+    // ── STANDARD POST ACTIONS ─────────────────────────────────────────────────
     if (!verifyCsrf($token)) {
         $message = 'Sesi tidak valid atau telah kedaluwarsa.';
         $msgType = 'danger';
     } else {
 
-        // A. PENGATURAN JAM DEFAULT PERIODE MASTER
-        if ($action === 'update_master_jam') {
-            $masterId  = (int)($_POST['master_id'] ?? 0);
-            $customJam = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+        // A. TAMBAH SESI PRETES BARU (PER DOSEN, RUANG, HARI, JAM)
+        if ($action === 'create_session') {
+            $periode = trim($_POST['periode'] ?? '');
+            $hari    = trim($_POST['hari'] ?? 'Senin');
+            $jam     = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+            $penguji = trim($_POST['penguji'] ?? '');
+            $ruangan = trim($_POST['ruangan'] ?? '');
+            $kuota   = max(1, (int)($_POST['kuota'] ?? 30));
 
-            if ($masterId <= 0 || empty($customJam)) {
-                $message = 'Periode dan jam sesi wajib diisi.';
-                $msgType = 'danger';
-            } else {
-                $pdo->prepare("UPDATE master_pretes SET jam = ? WHERE id = ?")->execute([$customJam, $masterId]);
-                $message = "Jam sesi default periode berhasil diatur menjadi <strong>" . htmlspecialchars($customJam) . "</strong>.";
-                $msgType = 'success';
+            if ($jam === '__CUSTOM__') {
+                $jam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
             }
 
-        // B. ATUR / PINDAHKAN SESI JAM PESERTA SECARA MASSAL
-        } elseif ($action === 'bulk_update_jam') {
-            $periode       = trim($_POST['periode'] ?? '');
-            $targetHari    = trim($_POST['filter_hari'] ?? '');
-            $targetPenguji = trim($_POST['filter_penguji'] ?? '');
-            $newJam        = trim($_POST['new_jam'] ?? '');
-            $customJamText = trim($_POST['custom_jam_text'] ?? '');
+            if (empty($periode) || empty($hari) || empty($penguji) || empty($ruangan)) {
+                $message = 'Hari, Jam, Dosen Penguji, dan Ruangan wajib diisi.';
+                $msgType = 'danger';
+            } else {
+                $scope = ['periode' => $periode, 'hari' => $hari, 'penguji' => $penguji, 'ruangan' => $ruangan];
+                $hash  = pretesScopeHash($scope);
+
+                // Cek apakah kombinasi sesi ini sudah ada
+                $check = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ?");
+                $check->execute([$hash]);
+                if ($check->fetch()) {
+                    $message = 'Sesi untuk dosen <strong>' . htmlspecialchars($penguji) . '</strong> di ruangan <strong>' . htmlspecialchars($ruangan) . '</strong> pada hari ' . htmlspecialchars($hari) . ' sudah terdaftar.';
+                    $msgType = 'warning';
+                } else {
+                    $tokenStr = bin2hex(random_bytes(24));
+                    $ins = $pdo->prepare("
+                        INSERT INTO pretes_attendance_sessions 
+                        (scope_hash, periode, hari, penguji, ruangan, jam, kuota, token)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $ins->execute([$hash, $periode, $hari, $penguji, $ruangan, $jam, $kuota, $tokenStr]);
+                    $message = "Sesi pretes berhasil ditambahkan untuk <strong>" . htmlspecialchars($penguji) . "</strong> di <strong>" . htmlspecialchars($ruangan) . "</strong> ($hari · $jam).";
+                    $msgType = 'success';
+                }
+            }
+
+        // B. EDIT SESI PRETES LENGKAP (PER DOSEN, RUANG, HARI & JAM)
+        } elseif ($action === 'edit_session') {
+            $sessionId = (int)($_POST['session_id'] ?? 0);
+            $newHari   = trim($_POST['hari'] ?? 'Senin');
+            $newJam    = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+            $newPenguji= trim($_POST['penguji'] ?? '');
+            $newRuangan= trim($_POST['ruangan'] ?? '');
+            $newKuota  = max(1, (int)($_POST['kuota'] ?? 30));
+            $syncMhs   = isset($_POST['sync_mhs']) ? 1 : 0;
 
             if ($newJam === '__CUSTOM__') {
-                $newJam = $customJamText;
+                $newJam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
             }
 
-            if (empty($newJam)) {
-                $message = 'Silakan tentukan jam / sesi pelaksanaan baru.';
+            if ($sessionId <= 0 || empty($newPenguji) || empty($newRuangan)) {
+                $message = 'Data sesi, dosen penguji, dan ruangan tidak boleh kosong.';
                 $msgType = 'danger';
             } else {
-                $sql = "UPDATE pretes_registrations SET jam = ? WHERE 1=1";
-                $params = [$newJam];
+                $stmtOld = $pdo->prepare("SELECT * FROM pretes_attendance_sessions WHERE id = ?");
+                $stmtOld->execute([$sessionId]);
+                $oldSess = $stmtOld->fetch();
 
-                if (!empty($periode)) {
-                    $sql .= " AND periode = ?";
-                    $params[] = $periode;
+                if (!$oldSess) {
+                    $message = 'Sesi pretes tidak ditemukan.';
+                    $msgType = 'danger';
+                } else {
+                    $newScope = [
+                        'periode' => $oldSess['periode'],
+                        'hari'    => $newHari,
+                        'penguji' => $newPenguji,
+                        'ruangan' => $newRuangan
+                    ];
+                    $newHash = pretesScopeHash($newScope);
+
+                    $pdo->prepare("
+                        UPDATE pretes_attendance_sessions 
+                        SET hari = ?, jam = ?, penguji = ?, ruangan = ?, kuota = ?, scope_hash = ?
+                        WHERE id = ?
+                    ")->execute([$newHari, $newJam, $newPenguji, $newRuangan, $newKuota, $newHash, $sessionId]);
+
+                    $mhsNotice = '';
+                    if ($syncMhs) {
+                        // Perbarui data mahasiswa yang sebelumnya diplot ke sesi ini
+                        $updMhs = $pdo->prepare("
+                            UPDATE pretes_registrations 
+                            SET hari_pilihan = ?, dosen_penguji = ?, ruangan = ?, jam = ?
+                            WHERE periode = ?
+                              AND (hari_pilihan = ? OR (? = '' AND hari_pilihan IS NULL))
+                              AND (TRIM(dosen_penguji) = ? OR (? = '' AND (dosen_penguji IS NULL OR dosen_penguji = '')))
+                              AND (TRIM(ruangan) = ? OR (? = '' AND (ruangan IS NULL OR ruangan = '')))
+                        ");
+                        $updMhs->execute([
+                            $newHari, $newPenguji, $newRuangan, $newJam,
+                            $oldSess['periode'],
+                            $oldSess['hari'], $oldSess['hari'],
+                            trim($oldSess['penguji']), trim($oldSess['penguji']),
+                            trim($oldSess['ruangan']), trim($oldSess['ruangan'])
+                        ]);
+                        $affected = $updMhs->rowCount();
+                        if ($affected > 0) {
+                            $mhsNotice = " (Penugasan $affected mahasiswa pada sesi ini otomatis diperbarui).";
+                        }
+                    }
+
+                    $message = "Sesi pretes berhasil diperbarui menjadi <strong>" . htmlspecialchars($newPenguji) . "</strong> di <strong>" . htmlspecialchars($newRuangan) . "</strong> ($newHari · $newJam)." . $mhsNotice;
+                    $msgType = 'success';
                 }
-                if (!empty($targetHari) && $targetHari !== 'Semua') {
-                    $sql .= " AND hari_pilihan = ?";
-                    $params[] = $targetHari;
+            }
+
+        // C. HAPUS SESI PRETES
+        } elseif ($action === 'delete_session') {
+            $sessionId = (int)($_POST['session_id'] ?? 0);
+            if ($sessionId > 0) {
+                $stmtOld = $pdo->prepare("SELECT * FROM pretes_attendance_sessions WHERE id = ?");
+                $stmtOld->execute([$sessionId]);
+                $sData = $stmtOld->fetch();
+                if ($sData) {
+                    $pdo->prepare("DELETE FROM pretes_attendance_sessions WHERE id = ?")->execute([$sessionId]);
+                    $message = "Sesi pretes untuk <strong>" . htmlspecialchars($sData['penguji']) . "</strong> di <strong>" . htmlspecialchars($sData['ruangan']) . "</strong> berhasil dihapus.";
+                    $msgType = 'success';
                 }
-                if (!empty($targetPenguji) && $targetPenguji !== 'Semua') {
-                    if ($targetPenguji === '__EMPTY__') {
-                        $sql .= " AND (dosen_penguji IS NULL OR dosen_penguji = '')";
-                    } else {
-                        $sql .= " AND TRIM(dosen_penguji) = ?";
-                        $params[] = trim($targetPenguji);
+            }
+
+        // D. DUPLIKASI SESI DARI SATU HARI KE HARI LAIN (PLOT CEPAT)
+        } elseif ($action === 'duplicate_day_sessions') {
+            $periode   = trim($_POST['periode'] ?? '');
+            $fromHari  = trim($_POST['from_hari'] ?? '');
+            $toHari    = trim($_POST['to_hari'] ?? '');
+
+            if (empty($fromHari) || empty($toHari) || $fromHari === $toHari) {
+                $message = 'Pilih hari sumber dan hari tujuan yang berbeda.';
+                $msgType = 'danger';
+            } else {
+                $stmtSrc = $pdo->prepare("SELECT * FROM pretes_attendance_sessions WHERE periode = ? AND hari = ?");
+                $stmtSrc->execute([$periode, $fromHari]);
+                $srcSessions = $stmtSrc->fetchAll();
+
+                $insertedCount = 0;
+                foreach ($srcSessions as $src) {
+                    $newScope = [
+                        'periode' => $periode,
+                        'hari'    => $toHari,
+                        'penguji' => $src['penguji'],
+                        'ruangan' => $src['ruangan']
+                    ];
+                    $newHash = pretesScopeHash($newScope);
+
+                    $check = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ?");
+                    $check->execute([$newHash]);
+                    if (!$check->fetch()) {
+                        $tokenStr = bin2hex(random_bytes(24));
+                        $pdo->prepare("
+                            INSERT INTO pretes_attendance_sessions 
+                            (scope_hash, periode, hari, penguji, ruangan, jam, kuota, token)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ")->execute([$newHash, $periode, $toHari, $src['penguji'], $src['ruangan'], $src['jam'], $src['kuota'], $tokenStr]);
+                        $insertedCount++;
                     }
                 }
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($params);
-                $affected = $stmt->rowCount();
-
-                $message = "Berhasil memperbarui sesi waktu pretes menjadi <strong>" . htmlspecialchars($newJam) . "</strong> untuk <strong>$affected mahasiswa</strong>.";
+                $message = "Berhasil menyalin <strong>$insertedCount sesi</strong> dari hari $fromHari ke hari $toHari.";
                 $msgType = 'success';
             }
 
-        // C. BUKA SEMUA SESI ABSENSI PRETES (2 JAM)
+        // E. BUKA / TUTUP SEMUA SESI PRETES
         } elseif ($action === 'open_all_sessions') {
             $periode    = trim($_POST['periode'] ?? '');
             $targetHari = trim($_POST['filter_hari'] ?? '');
@@ -361,10 +409,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $stmt->execute($params);
             $affected = $stmt->rowCount();
 
-            $message = "Berhasil <strong>membuka $affected sesi absensi</strong> selama $duration jam untuk scan QR mandiri.";
+            $message = "Berhasil <strong>membuka $affected sesi absensi</strong> selama $duration jam untuk scan QR presensi.";
             $msgType = 'success';
 
-        // D. TUTUP SEMUA SESI ABSENSI PRETES
         } elseif ($action === 'close_all_sessions') {
             $periode    = trim($_POST['periode'] ?? '');
             $targetHari = trim($_POST['filter_hari'] ?? '');
@@ -387,258 +434,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message = "Seluruh sesi absensi ($affected sesi) berhasil <strong>ditutup</strong>.";
             $msgType = 'info';
 
-        // E. BUKA / TUTUP SATU SESI (FALLBACK POST)
-        } elseif ($action === 'open_attendance' || $action === 'close_attendance') {
-            $sessionId = (int)($_POST['session_id'] ?? 0);
-            if ($sessionId > 0) {
-                if ($action === 'open_attendance') {
-                    $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = DATE_ADD(NOW(), INTERVAL 2 HOUR) WHERE id = ?")->execute([$sessionId]);
-                    $message = 'Sesi absensi berhasil dibuka selama 2 jam.';
-                    $msgType = 'success';
-                } else {
-                    $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = NULL WHERE id = ?")->execute([$sessionId]);
-                    $message = 'Sesi absensi berhasil ditutup.';
-                    $msgType = 'info';
-                }
-            }
+        // F. PENGATURAN JAM DEFAULT PERIODE MASTER
+        } elseif ($action === 'update_master_jam') {
+            $masterId  = (int)($_POST['master_id'] ?? 0);
+            $customJam = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
 
-        // F. TAMBAH TUTOR / PENGUJI BARU
-        } elseif ($action === 'create_tutor') {
-            $nama     = trim($_POST['nama_lengkap'] ?? '');
-            $nim      = trim($_POST['nim'] ?? ''); // NIDN / NIP
-            $username = trim($_POST['username'] ?? '');
-            $email    = trim($_POST['email'] ?? '');
-            $noHp     = formatNoHp(trim($_POST['no_hp'] ?? ''));
-            $password = trim($_POST['password'] ?? '123456');
-            $isActive = isset($_POST['is_active']) ? 1 : 0;
-
-            if (empty($username)) {
-                $username = !empty($nim) ? $nim : strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $nama));
-            }
-
-            if (empty($nama) || empty($username)) {
-                $message = 'Nama lengkap dan Username/NIDN wajib diisi.';
+            if ($masterId <= 0 || empty($customJam)) {
+                $message = 'Periode dan jam sesi wajib diisi.';
                 $msgType = 'danger';
             } else {
-                $chk = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-                $chk->execute([$username]);
-                if ($chk->fetch()) {
-                    $message = 'Username/NIDN <strong>' . htmlspecialchars($username) . '</strong> sudah digunakan.';
-                    $msgType = 'danger';
-                } else {
-                    $hash = password_hash($password, PASSWORD_DEFAULT);
-                    $ins = $pdo->prepare("
-                        INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, role, is_active)
-                        VALUES (?, ?, ?, ?, ?, ?, 'dosen', ?)
-                    ");
-                    $ins->execute([$username, $hash, $nama, $nim, $email, $noHp, $isActive]);
-                    $message = 'Tutor / Dosen Penguji <strong>' . htmlspecialchars($nama) . '</strong> berhasil ditambahkan!';
-                    $msgType = 'success';
-                }
-            }
-
-        // G. EDIT DATA TUTOR / PENGUJI (DENGAN OPSI SINKRONISASI OTOMATIS)
-        } elseif ($action === 'update_tutor') {
-            $id          = (int)($_POST['id'] ?? 0);
-            $nama        = trim($_POST['nama_lengkap'] ?? '');
-            $nim         = trim($_POST['nim'] ?? '');
-            $username    = trim($_POST['username'] ?? '');
-            $email       = trim($_POST['email'] ?? '');
-            $noHp        = formatNoHp(trim($_POST['no_hp'] ?? ''));
-            $isActive    = isset($_POST['is_active']) ? 1 : 0;
-            $syncCascade = isset($_POST['sync_cascade']) ? 1 : 0;
-
-            if ($id <= 0 || empty($nama) || empty($username)) {
-                $message = 'ID, Nama lengkap, dan Username wajib diisi.';
-                $msgType = 'danger';
-            } else {
-                $chkUser = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
-                $chkUser->execute([$username, $id]);
-                if ($chkUser->fetch()) {
-                    $message = 'Username sudah digunakan oleh akun lain.';
-                    $msgType = 'danger';
-                } else {
-                    $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
-                    $stmtOld->execute([$id]);
-                    $oldName = $stmtOld->fetchColumn();
-
-                    $upd = $pdo->prepare("
-                        UPDATE users 
-                        SET nama_lengkap = ?, nim = ?, username = ?, email = ?, no_hp = ?, is_active = ?
-                        WHERE id = ? AND role = 'dosen'
-                    ");
-                    $upd->execute([$nama, $nim, $username, $email, $noHp, $isActive, $id]);
-
-                    $syncInfo = '';
-                    if ($syncCascade && $oldName && trim($oldName) !== $nama) {
-                        $stmtReg = $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE TRIM(dosen_penguji) = ?");
-                        $stmtReg->execute([$nama, trim($oldName)]);
-                        $affectedReg = $stmtReg->rowCount();
-
-                        $masters = $pdo->query("SELECT id, penguji_senin, penguji_selasa, penguji_rabu, penguji_kamis, penguji_jumat FROM master_pretes")->fetchAll();
-                        foreach ($masters as $m) {
-                            $mUpdates = [];
-                            $mParams = [];
-                            foreach (['penguji_senin', 'penguji_selasa', 'penguji_rabu', 'penguji_kamis', 'penguji_jumat'] as $col) {
-                                $list = parsePengujiList($m[$col] ?? '');
-                                $changed = false;
-                                foreach ($list as &$item) {
-                                    if (trim($item) === trim($oldName)) {
-                                        $item = $nama;
-                                        $changed = true;
-                                    }
-                                }
-                                unset($item);
-                                if ($changed) {
-                                    $mUpdates[] = "$col = ?";
-                                    $mParams[] = implode('|||', array_unique($list));
-                                }
-                            }
-                            if (!empty($mUpdates)) {
-                                $mParams[] = $m['id'];
-                                $pdo->prepare("UPDATE master_pretes SET " . implode(', ', $mUpdates) . " WHERE id = ?")->execute($mParams);
-                            }
-                        }
-
-                        try {
-                            $stmtSes = $pdo->prepare("UPDATE pretes_attendance_sessions SET penguji = ? WHERE TRIM(penguji) = ?");
-                            $stmtSes->execute([$nama, trim($oldName)]);
-                        } catch (Exception $e) {}
-
-                        $syncInfo = " (Nama penguji pada $affectedReg peserta dan jadwal master juga telah disinkronkan).";
-                    }
-
-                    $message = 'Data tutor <strong>' . htmlspecialchars($nama) . '</strong> berhasil diperbarui!' . $syncInfo;
-                    $msgType = 'success';
-                }
-            }
-
-        // H. RESET PASSWORD TUTOR
-        } elseif ($action === 'reset_password_tutor') {
-            $id          = (int)($_POST['id'] ?? 0);
-            $newPassword = trim($_POST['new_password'] ?? '');
-
-            if ($id <= 0 || empty($newPassword)) {
-                $message = 'Password baru tidak boleh kosong.';
-                $msgType = 'danger';
-            } else {
-                $hash = password_hash($newPassword, PASSWORD_DEFAULT);
-                $pdo->prepare("UPDATE users SET password = ? WHERE id = ? AND role = 'dosen'")->execute([$hash, $id]);
-                $message = 'Password tutor berhasil direset!';
+                $pdo->prepare("UPDATE master_pretes SET jam = ? WHERE id = ?")->execute([$customJam, $masterId]);
+                $message = "Jam sesi default periode berhasil diatur menjadi <strong>" . htmlspecialchars($customJam) . "</strong>.";
                 $msgType = 'success';
             }
 
-        // I. HAPUS ATAU NONAKTIFKAN TUTOR
-        } elseif ($action === 'delete_tutor') {
-            $id = (int)($_POST['id'] ?? 0);
-            if ($id > 0) {
-                $stmtName = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
-                $stmtName->execute([$id]);
-                $tName = $stmtName->fetchColumn();
-
-                if ($tName) {
-                    $assignedCount = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations WHERE TRIM(dosen_penguji) = ?");
-                    $assignedCount->execute([trim($tName)]);
-                    $cnt = (int)$assignedCount->fetchColumn();
-
-                    if ($cnt > 0) {
-                        $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = ?")->execute([$id]);
-                        $message = 'Tutor <strong>' . htmlspecialchars($tName) . '</strong> telah dinonaktifkan (karena memiliki ' . $cnt . ' riwayat bimbingan peserta).';
-                        $msgType = 'warning';
-                    } else {
-                        $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'dosen'")->execute([$id]);
-                        $message = 'Tutor <strong>' . htmlspecialchars($tName) . '</strong> berhasil dihapus.';
-                        $msgType = 'success';
-                    }
-                }
-            }
-
-        // J. BULK REASSIGN / TRANSFER TUTOR MASSAL
-        } elseif ($action === 'bulk_reassign_tutor') {
-            $fromTutor   = trim($_POST['from_tutor'] ?? '');
-            $toTutor     = trim($_POST['to_tutor'] ?? '');
-            $filterHari  = trim($_POST['filter_hari'] ?? '');
-            $periode     = trim($_POST['periode'] ?? '');
-
-            if (empty($toTutor)) {
-                $message = 'Silakan pilih Tutor Pengganti / Tujuan.';
-                $msgType = 'danger';
-            } else {
-                $sql = "UPDATE pretes_registrations SET dosen_penguji = ? WHERE 1=1";
-                $params = [$toTutor === '__EMPTY__' ? null : $toTutor];
-
-                if (!empty($periode)) {
-                    $sql .= " AND periode = ?";
-                    $params[] = $periode;
-                }
-
-                if ($fromTutor === '__EMPTY__') {
-                    $sql .= " AND (dosen_penguji IS NULL OR dosen_penguji = '')";
-                } elseif (!empty($fromTutor)) {
-                    $sql .= " AND TRIM(dosen_penguji) = ?";
-                    $params[] = trim($fromTutor);
-                }
-
-                if (!empty($filterHari) && $filterHari !== 'Semua') {
-                    $sql .= " AND hari_pilihan = ?";
-                    $params[] = $filterHari;
-                }
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($params);
-                $affected = $stmt->rowCount();
-
-                $toLabel = $toTutor === '__EMPTY__' ? 'Dikosongkan (Belum Ditentukan)' : htmlspecialchars($toTutor);
-                $message = "Berhasil memindahkan <strong>$affected mahasiswa</strong> ke tutor penguji: <strong>$toLabel</strong>.";
-                $msgType = 'success';
-            }
-
-        // K. DISTRIBUSI / BAGI RATA TUTOR OTOMATIS (AUTO DISTRIBUTE)
-        } elseif ($action === 'auto_distribute_tutors') {
-            $targetHari    = trim($_POST['distribute_hari'] ?? '');
-            $periode       = trim($_POST['periode'] ?? '');
-            $selectedTutor = $_POST['distribute_tutors'] ?? [];
-
-            if (empty($selectedTutor) || !is_array($selectedTutor)) {
-                $message = 'Pilih setidaknya satu tutor untuk menerima pembagian peserta.';
-                $msgType = 'danger';
-            } else {
-                $selectedTutor = array_values(array_filter(array_map('trim', $selectedTutor)));
-                $numTutors = count($selectedTutor);
-
-                $sql = "SELECT id FROM pretes_registrations WHERE (dosen_penguji IS NULL OR dosen_penguji = '')";
-                $params = [];
-                if (!empty($periode)) {
-                    $sql .= " AND periode = ?";
-                    $params[] = $periode;
-                }
-                if (!empty($targetHari) && $targetHari !== 'Semua') {
-                    $sql .= " AND hari_pilihan = ?";
-                    $params[] = $targetHari;
-                }
-                $sql .= " ORDER BY hari_pilihan ASC, id ASC";
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute($params);
-                $unassigned = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-                if (empty($unassigned)) {
-                    $message = 'Tidak ada mahasiswa tanpa tutor pada kriteria yang dipilih.';
-                    $msgType = 'warning';
-                } else {
-                    $updStmt = $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE id = ?");
-                    $idx = 0;
-                    foreach ($unassigned as $regId) {
-                        $assignedTutor = $selectedTutor[$idx % $numTutors];
-                        $updStmt->execute([$assignedTutor, $regId]);
-                        $idx++;
-                    }
-                    $message = "Berhasil mendistribusikan <strong>" . count($unassigned) . " mahasiswa</strong> secara merata kepada $numTutors tutor penguji.";
-                    $msgType = 'success';
-                }
-            }
-
-        // L. SIMPAN PLOTTING JADWAL HARIAN TUTOR MASTER PRETES
+        // G. SIMPAN PLOTTING JADWAL HARIAN TUTOR MASTER PRETES
         } elseif ($action === 'update_master_jadwal_tutor') {
             $masterId = (int)($_POST['master_id'] ?? 0);
             if ($masterId <= 0) {
@@ -668,37 +478,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $masterId
                 ]);
 
-                $message = 'Jadwal dan plotting tutor harian pada master pretes berhasil disimpan!';
+                $message = 'Jadwal tutor harian dan kuota master pretes berhasil disimpan!';
                 $msgType = 'success';
             }
 
-        // M. KOSONGKAN PENUGASAN TUTOR MASSAL
-        } elseif ($action === 'clear_tutor_massal') {
-            $periode    = trim($_POST['periode'] ?? '');
-            $targetHari = trim($_POST['clear_hari'] ?? '');
+        // H. MASTER DATA TUTOR (TAMBAH, EDIT, RESET PASSWORD, HAPUS)
+        } elseif ($action === 'create_tutor') {
+            $nama     = trim($_POST['nama_lengkap'] ?? '');
+            $nim      = trim($_POST['nim'] ?? '');
+            $username = trim($_POST['username'] ?? '');
+            $email    = trim($_POST['email'] ?? '');
+            $noHp     = formatNoHp(trim($_POST['no_hp'] ?? ''));
+            $password = trim($_POST['password'] ?? '123456');
+            $isActive = isset($_POST['is_active']) ? 1 : 0;
 
-            $sql = "UPDATE pretes_registrations SET dosen_penguji = NULL WHERE 1=1";
-            $params = [];
-            if (!empty($periode)) {
-                $sql .= " AND periode = ?";
-                $params[] = $periode;
-            }
-            if (!empty($targetHari) && $targetHari !== 'Semua') {
-                $sql .= " AND hari_pilihan = ?";
-                $params[] = $targetHari;
+            if (empty($username)) {
+                $username = !empty($nim) ? $nim : strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $nama));
             }
 
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $affected = $stmt->rowCount();
+            if (empty($nama) || empty($username)) {
+                $message = 'Nama lengkap dan Username/NIDN wajib diisi.';
+                $msgType = 'danger';
+            } else {
+                $chk = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+                $chk->execute([$username]);
+                if ($chk->fetch()) {
+                    $message = 'Username/NIDN <strong>' . htmlspecialchars($username) . '</strong> sudah digunakan.';
+                    $msgType = 'danger';
+                } else {
+                    $hash = password_hash($password, PASSWORD_DEFAULT);
+                    $pdo->prepare("
+                        INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, role, is_active)
+                        VALUES (?, ?, ?, ?, ?, ?, 'dosen', ?)
+                    ")->execute([$username, $hash, $nama, $nim, $email, $noHp, $isActive]);
+                    $message = 'Tutor / Penguji <strong>' . htmlspecialchars($nama) . '</strong> berhasil ditambahkan!';
+                    $msgType = 'success';
+                }
+            }
 
-            $message = "Penugasan tutor untuk <strong>$affected mahasiswa</strong> telah dikosongkan.";
-            $msgType = 'info';
+        } elseif ($action === 'update_tutor') {
+            $id          = (int)($_POST['id'] ?? 0);
+            $nama        = trim($_POST['nama_lengkap'] ?? '');
+            $nim         = trim($_POST['nim'] ?? '');
+            $username    = trim($_POST['username'] ?? '');
+            $email       = trim($_POST['email'] ?? '');
+            $noHp        = formatNoHp(trim($_POST['no_hp'] ?? ''));
+            $isActive    = isset($_POST['is_active']) ? 1 : 0;
+            $syncCascade = isset($_POST['sync_cascade']) ? 1 : 0;
+
+            if ($id <= 0 || empty($nama) || empty($username)) {
+                $message = 'ID, Nama lengkap, dan Username wajib diisi.';
+                $msgType = 'danger';
+            } else {
+                $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
+                $stmtOld->execute([$id]);
+                $oldName = $stmtOld->fetchColumn();
+
+                $pdo->prepare("
+                    UPDATE users 
+                    SET nama_lengkap = ?, nim = ?, username = ?, email = ?, no_hp = ?, is_active = ?
+                    WHERE id = ? AND role = 'dosen'
+                ")->execute([$nama, $nim, $username, $email, $noHp, $isActive, $id]);
+
+                if ($syncCascade && $oldName && trim($oldName) !== $nama) {
+                    $pdo->prepare("UPDATE pretes_attendance_sessions SET penguji = ? WHERE TRIM(penguji) = ?")->execute([$nama, trim($oldName)]);
+                    $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE TRIM(dosen_penguji) = ?")->execute([$nama, trim($oldName)]);
+                }
+
+                $message = 'Data tutor <strong>' . htmlspecialchars($nama) . '</strong> berhasil diperbarui!';
+                $msgType = 'success';
+            }
+
+        } elseif ($action === 'reset_password_tutor') {
+            $id          = (int)($_POST['id'] ?? 0);
+            $newPassword = trim($_POST['new_password'] ?? '');
+
+            if ($id <= 0 || empty($newPassword)) {
+                $message = 'Password baru tidak boleh kosong.';
+                $msgType = 'danger';
+            } else {
+                $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+                $pdo->prepare("UPDATE users SET password = ? WHERE id = ? AND role = 'dosen'")->execute([$hash, $id]);
+                $message = 'Password tutor berhasil direset!';
+                $msgType = 'success';
+            }
+
+        } elseif ($action === 'delete_tutor') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id > 0) {
+                $stmtName = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
+                $stmtName->execute([$id]);
+                $tName = $stmtName->fetchColumn();
+                if ($tName) {
+                    $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = ?")->execute([$id]);
+                    $message = 'Tutor <strong>' . htmlspecialchars($tName) . '</strong> telah dinonaktifkan.';
+                    $msgType = 'warning';
+                }
+            }
         }
     }
 }
 
-// ── 3. QUERY DATA PERIODE & MASTER PRETES ──────────────────────────────────────
+// ── 2. QUERY DATA PERIODE & MASTER PRETES ──────────────────────────────────────
 $periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes ORDER BY id DESC")->fetchAll();
 
 $selectedPeriodName = trim($_GET['periode'] ?? '');
@@ -730,102 +611,117 @@ if (!$currentMaster) {
 $periodeName = $currentMaster['periode'] ?? 'Pretes';
 $defaultPeriodeJam = $currentMaster['jam'] ?? '13.00 WIB (Jam 1)';
 
-// ── 4. QUERY MASTER TUTOR (ROLE DOSEN) DENGAN STATISTIK BEBAN ──────────────────
-$tutorsQuery = "
-    SELECT u.id, u.username, u.nama_lengkap, u.nim, u.email, u.no_hp, u.is_active, u.created_at,
-           COUNT(pr.id) as total_peserta,
-           SUM(CASE WHEN pa.scores_json IS NOT NULL THEN 1 ELSE 0 END) as sudah_dinilai,
-           SUM(CASE WHEN pr.id IS NOT NULL AND pa.scores_json IS NULL THEN 1 ELSE 0 END) as belum_dinilai
-    FROM users u
-    LEFT JOIN pretes_registrations pr ON TRIM(pr.dosen_penguji) = TRIM(u.nama_lengkap) AND pr.periode = ?
-    LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
-    WHERE u.role = 'dosen'
-    GROUP BY u.id, u.username, u.nama_lengkap, u.nim, u.email, u.no_hp, u.is_active, u.created_at
-    ORDER BY u.nama_lengkap ASC
-";
-$stmtTut = $pdo->prepare($tutorsQuery);
-$stmtTut->execute([$periodeName]);
-$tutors = $stmtTut->fetchAll();
-
-// List tutor aktif saja untuk dropdown
+// ── 3. QUERY MASTER TUTOR (ROLE DOSEN) ─────────────────────────────────────────
+$tutors = $pdo->query("SELECT id, username, nama_lengkap, nim, email, no_hp, is_active FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
 $activeTutors = array_filter($tutors, fn($t) => (int)$t['is_active'] === 1);
 
-// ── 5. QUERY PESERTA PRETES PERIODE AKTIF BESERTA PRESENSI ────────────────────
-$stmtPart = $pdo->prepare("
-    SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.status, pr.tanggal_daftar,
-           u.nim, u.nama_lengkap, u.program_studi, u.no_hp,
-           CASE WHEN pa.scores_json IS NOT NULL THEN 1 ELSE 0 END as is_assessed,
-           ar.attended_at
+// ── 4. QUERY DAFTAR RUANGAN ───────────────────────────────────────────────────
+$roomsDb = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
+$allRoomNames = array_column($roomsDb, 'ruang');
+
+// Ambil juga nama ruangan unik yang pernah tersimpan di sesi atau pendaftaran
+$extraRooms = $pdo->query("
+    SELECT DISTINCT ruangan FROM pretes_attendance_sessions WHERE ruangan IS NOT NULL AND ruangan != ''
+    UNION 
+    SELECT DISTINCT ruangan FROM pretes_registrations WHERE ruangan IS NOT NULL AND ruangan != ''
+")->fetchAll(PDO::FETCH_COLUMN);
+
+foreach ($extraRooms as $er) {
+    if (!empty($er) && !in_array($er, $allRoomNames)) {
+        $allRoomNames[] = $er;
+    }
+}
+sort($allRoomNames);
+
+// ── 5. AUTO-SINKRONISASI SESI DARI DATA PENDAFTARAN YANG SUDAH ADA ────────────
+try {
+    $assignedCombos = $pdo->prepare("
+        SELECT DISTINCT hari_pilihan, dosen_penguji, ruangan, jam
+        FROM pretes_registrations
+        WHERE periode = ? AND (dosen_penguji IS NOT NULL AND dosen_penguji != '')
+    ");
+    $assignedCombos->execute([$periodeName]);
+    foreach ($assignedCombos->fetchAll() as $ac) {
+        $scope = [
+            'periode' => $periodeName,
+            'hari'    => ucfirst(strtolower(trim($ac['hari_pilihan'] ?? ''))) ?: 'Senin',
+            'penguji' => trim($ac['dosen_penguji'] ?? ''),
+            'ruangan' => trim($ac['ruangan'] ?? ''),
+        ];
+        if (empty($scope['penguji']) || empty($scope['ruangan'])) continue;
+
+        $hash = pretesScopeHash($scope);
+        $chk = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ?");
+        $chk->execute([$hash]);
+        if (!$chk->fetch()) {
+            $sessJam = !empty($ac['jam']) ? $ac['jam'] : $defaultPeriodeJam;
+            $tok = bin2hex(random_bytes(24));
+            $pdo->prepare("
+                INSERT INTO pretes_attendance_sessions 
+                (scope_hash, periode, hari, penguji, ruangan, jam, kuota, token)
+                VALUES (?, ?, ?, ?, ?, ?, 30, ?)
+            ")->execute([$hash, $scope['periode'], $scope['hari'], $scope['penguji'], $scope['ruangan'], $sessJam, $tok]);
+        }
+    }
+} catch (Exception $e) {}
+
+// ── 6. QUERY STATISTIK MAHASISWA SECARA AGREGAT (TANPA MENAMPILKAN NAMA) ──────
+$stmtAgg = $pdo->prepare("
+    SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam,
+           COUNT(pr.id) as total_mhs,
+           COUNT(ar.registration_id) as total_hadir
     FROM pretes_registrations pr
-    JOIN users u ON pr.user_id = u.id
-    LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
     LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id
     WHERE pr.periode = ?
-    ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), pr.jam ASC, pr.dosen_penguji ASC, u.nama_lengkap ASC
+    GROUP BY pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam
 ");
-$stmtPart->execute([$periodeName]);
-$participants = $stmtPart->fetchAll();
+$stmtAgg->execute([$periodeName]);
+$aggregates = $stmtAgg->fetchAll();
 
-// Statistik Peserta
-$totalParticipants = count($participants);
-$totalWithTutor    = count(array_filter($participants, fn($p) => !empty(trim($p['dosen_penguji'] ?? ''))));
-$totalUnassigned   = $totalParticipants - $totalWithTutor;
-$totalAssessed     = count(array_filter($participants, fn($p) => (int)$p['is_assessed'] === 1));
-$totalHadirGlobal  = count(array_filter($participants, fn($p) => !empty($p['attended_at'])));
+// ── 7. QUERY DAFTAR SESI LENGKAP PADA PERIODE INI ─────────────────────────────
+$stmtSess = $pdo->prepare("
+    SELECT id, scope_hash, periode, hari, penguji, ruangan, jam, kuota, token, open_until,
+           (open_until > NOW()) as is_open, created_at
+    FROM pretes_attendance_sessions
+    WHERE periode = ?
+    ORDER BY FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), jam ASC, ruangan ASC, penguji ASC
+");
+$stmtSess->execute([$periodeName]);
+$rawSessions = $stmtSess->fetchAll();
 
-// ── 6. PENGELOMPOKAN & QUERY SESI PRETES (SESI ABSENSI & PELAKSANAAN) ──────────
-$sessionGroups = [];
-foreach ($participants as $p) {
-    $scope = pretesScope($p);
-    $hash  = pretesScopeHash($scope);
-    if (!isset($sessionGroups[$hash])) {
-        $sessionGroups[$hash] = [
-            'scope'        => $scope,
-            'jam'          => $p['jam'] ?: $defaultPeriodeJam,
-            'count'        => 0,
-            'hadir'        => 0,
-            'participants' => []
-        ];
+// Pasangkan data agregat mhs ke masing-masing sesi
+$allSessions = [];
+$uniqueRoomsUsed = [];
+$totalSesiOpen = 0;
+
+foreach ($rawSessions as $sess) {
+    $matchMhs = 0;
+    $matchHadir = 0;
+    foreach ($aggregates as $agg) {
+        if ($agg['hari_pilihan'] === $sess['hari']
+            && trim($agg['dosen_penguji'] ?? '') === trim($sess['penguji'] ?? '')
+            && trim($agg['ruangan'] ?? '') === trim($sess['ruangan'] ?? '')) {
+            $matchMhs += (int)$agg['total_mhs'];
+            $matchHadir += (int)$agg['total_hadir'];
+        }
     }
-    $sessionGroups[$hash]['count']++;
-    if (!empty($p['attended_at'])) {
-        $sessionGroups[$hash]['hadir']++;
+    $sess['total_mhs']   = $matchMhs;
+    $sess['total_hadir'] = $matchHadir;
+    $sess['url']         = pretesAttendanceUrl($sess);
+
+    if (!empty($sess['ruangan']) && !in_array($sess['ruangan'], $uniqueRoomsUsed)) {
+        $uniqueRoomsUsed[] = $sess['ruangan'];
     }
-    $sessionGroups[$hash]['participants'][] = $p;
+    if ((bool)$sess['is_open']) {
+        $totalSesiOpen++;
+    }
+
+    $allSessions[] = $sess;
 }
 
-// Inisialisasi dan sinkronisasi sesi ke database pretes_attendance_sessions
-$allSessionsList = [];
-foreach ($sessionGroups as $hash => $grp) {
-    $sessData = pretesSession($pdo, $grp['scope']);
-    $allSessionsList[] = [
-        'session_id' => (int)$sessData['id'],
-        'scope'      => $grp['scope'],
-        'jam'        => $grp['jam'],
-        'count'      => $grp['count'],
-        'hadir'      => $grp['hadir'],
-        'is_open'    => (bool)($sessData['is_open'] ?? false),
-        'open_until' => $sessData['open_until'] ?? null,
-        'token'      => $sessData['token'] ?? '',
-        'url'        => pretesAttendanceUrl($sessData)
-    ];
-}
+$totalSessionsCount = count($allSessions);
 
-// Urutkan sesi berdasarkan Hari (Senin-Jumat), Jam, dan Penguji
-usort($allSessionsList, function($a, $b) {
-    $order = ['Senin' => 1, 'Selasa' => 2, 'Rabu' => 3, 'Kamis' => 4, 'Jumat' => 5];
-    $dayA = $order[$a['scope']['hari']] ?? 99;
-    $dayB = $order[$b['scope']['hari']] ?? 99;
-    if ($dayA !== $dayB) return $dayA - $dayB;
-    if ($a['jam'] !== $b['jam']) return strcmp($a['jam'], $b['jam']);
-    return strcmp($a['scope']['penguji'], $b['scope']['penguji']);
-});
-
-$totalSessionsCount = count($allSessionsList);
-$openSessionsCount  = count(array_filter($allSessionsList, fn($s) => $s['is_open']));
-$closedSessionsCount= $totalSessionsCount - $openSessionsCount;
-
-// Parsing jadwal penguji master harian
+// Jadwal master harian
 $masterSenin  = parsePengujiList($currentMaster['penguji_senin'] ?? '');
 $masterSelasa = parsePengujiList($currentMaster['penguji_selasa'] ?? '');
 $masterRabu   = parsePengujiList($currentMaster['penguji_rabu'] ?? '');
@@ -840,14 +736,14 @@ $daysInfo = [
     'Jumat'  => ['date' => '6 Nov 2026', 'penguji' => $masterJumat,  'kuota' => (int)($currentMaster['kuota_jumat'] ?? 30)],
 ];
 
-$activeTab = $_GET['tab'] ?? 'penugasan';
+$activeTab = $_GET['tab'] ?? 'sesi';
 
 include __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-/* Styling Elegan & Modern LPPAI Pengaturan Tutor & Sesi */
-.tutor-hero-card {
+/* Styling Elegan Pengaturan Sesi & Penguji LPPAI */
+.sesi-hero-card {
     background: linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%);
     color: #fff;
     border-radius: 16px;
@@ -857,8 +753,8 @@ include __DIR__ . '/../includes/header.php';
     position: relative;
     overflow: hidden;
 }
-.tutor-hero-card::after {
-    content: "🧑‍🏫";
+.sesi-hero-card::after {
+    content: "⏱️";
     position: absolute;
     right: 20px;
     bottom: -15px;
@@ -866,13 +762,13 @@ include __DIR__ . '/../includes/header.php';
     opacity: 0.12;
     pointer-events: none;
 }
-.tutor-stats-grid {
+.sesi-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
 }
-.tutor-stat-item {
+.sesi-stat-item {
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
@@ -883,11 +779,11 @@ include __DIR__ . '/../includes/header.php';
     box-shadow: 0 2px 4px rgba(0,0,0,0.03);
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.tutor-stat-item:hover {
+.sesi-stat-item:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0,0,0,0.06);
 }
-.tutor-stat-icon {
+.sesi-stat-icon {
     width: 48px;
     height: 48px;
     border-radius: 12px;
@@ -897,13 +793,13 @@ include __DIR__ . '/../includes/header.php';
     font-size: 24px;
     flex-shrink: 0;
 }
-.tutor-stat-val {
+.sesi-stat-val {
     font-size: 24px;
     font-weight: 700;
     color: #0f172a;
     line-height: 1.1;
 }
-.tutor-stat-lbl {
+.sesi-stat-lbl {
     font-size: 12px;
     color: #64748b;
     font-weight: 500;
@@ -945,34 +841,6 @@ include __DIR__ . '/../includes/header.php';
     border-bottom-color: #0284c7;
     background: #fff;
     border-radius: 8px 8px 0 0;
-}
-
-/* Inline Tutor & Jam Dropdowns Interactive */
-.select-tutor-inline, .select-jam-inline {
-    width: 100%;
-    padding: 6px 9px;
-    border: 1.5px solid #cbd5e1;
-    border-radius: 8px;
-    font-size: 12.5px;
-    font-weight: 500;
-    color: #1e293b;
-    background-color: #fff;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.3s;
-}
-.select-tutor-inline:focus, .select-jam-inline:focus {
-    border-color: #0284c7;
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-}
-.select-tutor-inline.updating, .select-jam-inline.updating {
-    opacity: 0.6;
-    pointer-events: none;
-    background-color: #f1f5f9;
-}
-.select-tutor-inline.updated-success, .select-jam-inline.updated-success {
-    border-color: #10b981 !important;
-    background-color: #ecfdf5 !important;
 }
 
 /* Modals */
@@ -1033,10 +901,10 @@ input:checked + .slider:before { transform: translateX(16px); }
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
 }
 .day-pill-Senin  { background: #fee2e2; color: #991b1b; }
 .day-pill-Selasa { background: #fef3c7; color: #92400e; }
@@ -1060,12 +928,12 @@ input:checked + .slider:before { transform: translateX(16px); }
     <?php endif; ?>
 
     <!-- HERO HEADER CARD -->
-    <div class="tutor-hero-card">
+    <div class="sesi-hero-card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
             <div>
-                <h1 style="font-size:24px; font-weight:800; margin-bottom:6px; color:#fff;">🧑‍🏫 Pengaturan Tutor & Sesi Pretes LPPAI</h1>
+                <h1 style="font-size:24px; font-weight:800; margin-bottom:6px; color:#fff;">⏱️ Pengaturan Sesi & Penguji Pretes</h1>
                 <p style="font-size:14px; opacity:0.9; margin:0; max-width:680px;">
-                    Pusat kendali pengaturan tutor/penguji serta sesi pelaksanaan pretes. Kelola akun tutor, sesi waktu ujian, QR absensi mandiri, transfer tutor massal, dan plotting harian.
+                    Pusat kendali pengaturan jadwal sesi pretes <strong>per dosen, per ruang, dan per hari</strong>. Atur waktu pelaksanaan, kuota, kontrol pembukaan absensi QR, serta master penguji LPPAI.
                 </p>
             </div>
             <!-- Period Selector Switcher -->
@@ -1083,161 +951,92 @@ input:checked + .slider:before { transform: translateX(16px); }
         </div>
     </div>
 
-    <!-- STATS COUNTER GLOBAL -->
-    <div class="tutor-stats-grid">
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#e0f2fe; color:#0284c7;">👨‍🏫</div>
+    <!-- STATS COUNTER UTAMA -->
+    <div class="sesi-stats-grid">
+        <div class="sesi-stat-item">
+            <div class="sesi-stat-icon" style="background:#e0f2fe; color:#0284c7;">👨‍🏫</div>
             <div>
-                <div class="tutor-stat-val"><?= count($activeTutors) ?> <span style="font-size:14px; color:#94a3b8; font-weight:400;">/ <?= count($tutors) ?></span></div>
-                <div class="tutor-stat-lbl">Tutor Aktif / Terdaftar</div>
+                <div class="sesi-stat-val"><?= count($activeTutors) ?> <span style="font-size:14px; color:#94a3b8; font-weight:400;">/ <?= count($tutors) ?></span></div>
+                <div class="sesi-stat-lbl">Tutor / Penguji Aktif</div>
             </div>
         </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#f1f5f9; color:#475569;">👥</div>
+        <div class="sesi-stat-item">
+            <div class="sesi-stat-icon" style="background:#f3e8ff; color:#7e22ce;">⏱️</div>
             <div>
-                <div class="tutor-stat-val"><?= $totalParticipants ?></div>
-                <div class="tutor-stat-lbl">Total Mahasiswa Terdaftar</div>
+                <div class="sesi-stat-val"><?= $totalSessionsCount ?></div>
+                <div class="sesi-stat-lbl">Total Sesi Pretes Terbentuk</div>
             </div>
         </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#dcfce7; color:#16a34a;">✅</div>
+        <div class="sesi-stat-item">
+            <div class="sesi-stat-icon" style="background:#fef3c7; color:#b45309;">🏢</div>
             <div>
-                <div class="tutor-stat-val"><?= $totalWithTutor ?> <span style="font-size:13px; color:#16a34a; font-weight:500;">(<?= $totalParticipants > 0 ? round(($totalWithTutor/$totalParticipants)*100) : 0 ?>%)</span></div>
-                <div class="tutor-stat-lbl">Sudah Ditugaskan Tutor</div>
+                <div class="sesi-stat-val"><?= count($uniqueRoomsUsed) ?></div>
+                <div class="sesi-stat-lbl">Ruangan Digunakan</div>
             </div>
         </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#fee2e2; color:#dc2626;">⏳</div>
+        <div class="sesi-stat-item">
+            <div class="sesi-stat-icon" style="background:#dcfce7; color:#15803d;">🟢</div>
             <div>
-                <div class="tutor-stat-val"><?= $totalUnassigned ?></div>
-                <div class="tutor-stat-lbl">Belum Memiliki Tutor</div>
+                <div class="sesi-stat-val"><?= $totalSesiOpen ?></div>
+                <div class="sesi-stat-lbl">Sesi Absensi Aktif / Buka</div>
             </div>
         </div>
     </div>
 
     <!-- TAB NAVIGATION -->
     <div class="custom-tabs">
-        <a href="?periode=<?= urlencode($periodeName) ?>&tab=penugasan" class="custom-tab-btn <?= $activeTab === 'penugasan' ? 'active' : '' ?>">
-            <span>📋</span> Penugasan Peserta per Tutor & Sesi
-        </a>
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=sesi" class="custom-tab-btn <?= $activeTab === 'sesi' ? 'active' : '' ?>">
-            <span>⏱️</span> Pengaturan Sesi Pretes
-        </a>
-        <a href="?periode=<?= urlencode($periodeName) ?>&tab=master" class="custom-tab-btn <?= $activeTab === 'master' ? 'active' : '' ?>">
-            <span>🧑‍🏫</span> Manajemen Data Master Tutor (Dosen)
+            <span>⏱️</span> Pengaturan Sesi (Per Dosen, Per Ruang & Per Hari)
         </a>
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=jadwal" class="custom-tab-btn <?= $activeTab === 'jadwal' ? 'active' : '' ?>">
-            <span>📅</span> Plotting Jadwal Harian (Master Pretes)
+            <span>📅</span> Plotting Jadwal Harian & Kuota (`master_pretes`)
+        </a>
+        <a href="?periode=<?= urlencode($periodeName) ?>&tab=master" class="custom-tab-btn <?= $activeTab === 'master' ? 'active' : '' ?>">
+            <span>🧑‍🏫</span> Kelola Master Data Dosen Penguji / Tutor
         </a>
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=rekap" class="custom-tab-btn <?= $activeTab === 'rekap' ? 'active' : '' ?>">
-            <span>📊</span> Rekap Beban & Progress Penilaian
+            <span>📊</span> Rekap Beban Sesi per Dosen
         </a>
     </div>
 
     <!-- =======================================================================
-         TAB 1: PENUGASAN PESERTA PER TUTOR & SESI JAM (INLINE AJAX + BULK TOOLS)
+         TAB 1: PENGATURAN SESI PRETES (PER DOSEN, PER RUANG, PER HARI)
          ======================================================================= -->
-    <?php if ($activeTab === 'penugasan'): ?>
+    <?php if ($activeTab === 'sesi'): ?>
     
-    <!-- TOOLS PANEL: BULK REASSIGN & AUTO DISTRIBUTE -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:20px;">
-        
-        <!-- CARD 1: TUKAR / PINDAHKAN TUTOR MASSAL -->
-        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                <span>🔄</span> Tukar / Pindahkan Tutor Massal
-            </div>
-            <form method="POST" data-no-spa onsubmit="return confirm('Pindahkan mahasiswa sesuai filter ini ke tutor tujuan?');">
+    <!-- ACTION TOOLBAR: TAMBAH SESI, DUPLIKASI, BUKA/TUTUP SEMUA -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="openAddSessionModal()" style="display:inline-flex; align-items:center; gap:6px; font-weight:700; border-radius:8px; padding:8px 16px;">
+                <span>➕</span> Tambah Sesi Pretes Baru
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="openDuplicateDayModal()" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; border-radius:8px; padding:8px 14px;">
+                <span>📑</span> Salin Sesi ke Hari Lain
+            </button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Buka seluruh sesi absensi selama 2 jam sekarang?');">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="bulk_reassign_tutor">
+                <input type="hidden" name="action" value="open_all_sessions">
                 <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:4px;">TUTOR SUMBER</label>
-                        <select name="from_tutor" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-                            <option value="">-- Semua Tutor --</option>
-                            <option value="__EMPTY__">⚠️ [Khusus Mahasiswa Belum Ada Tutor]</option>
-                            <?php foreach ($tutors as $t): ?>
-                            <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?> (<?= $t['total_peserta'] ?> mhs)</option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:4px;">FILTER HARI</label>
-                        <select name="filter_hari" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-                            <option value="Semua">Semua Hari</option>
-                            <option value="Senin">Senin (2 Nov)</option>
-                            <option value="Selasa">Selasa (3 Nov)</option>
-                            <option value="Rabu">Rabu (4 Nov)</option>
-                            <option value="Kamis">Kamis (5 Nov)</option>
-                            <option value="Jumat">Jumat (6 Nov)</option>
-                        </select>
-                    </div>
-                </div>
+                <button type="submit" class="btn btn-success" style="font-weight:700; font-size:12px; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:5px;">
+                    <span>🟢</span> Buka Semua Sesi (2 Jam)
+                </button>
+            </form>
 
-                <div style="margin-bottom:12px;">
-                    <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:4px;">PINDAHKAN KE TUTOR TUJUAN</label>
-                    <select name="to_tutor" required style="width:100%; padding:7px 9px; border-radius:6px; border:1.5px solid #0284c7; font-size:12px; background:#fff; font-weight:600;">
-                        <option value="">-- Pilih Tutor Pengganti --</option>
-                        <option value="__EMPTY__">❌ Kosongkan Penugasan (Jadikan Belum Ada Penguji)</option>
-                        <?php foreach ($activeTutors as $t): ?>
-                        <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 12px; font-size:13px; font-weight:600;">
-                    🚀 Terapkan Pemindahan Massal
+            <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Tutup seluruh sesi absensi sekarang?');">
+                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                <input type="hidden" name="action" value="close_all_sessions">
+                <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+                <button type="submit" class="btn btn-danger" style="font-weight:700; font-size:12px; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:5px;">
+                    <span>🔒</span> Tutup Semua Sesi
                 </button>
             </form>
         </div>
-
-        <!-- CARD 2: DISTRIBUSI / BAGI RATA OTOMATIS -->
-        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-                <span>⚖️</span> Bagi Rata Mahasiswa Kosong (Auto Distribute)
-            </div>
-            <form method="POST" data-no-spa onsubmit="return confirm('Bagi rata mahasiswa yang belum memiliki tutor kepada tutor-tutor terpilih?');">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="auto_distribute_tutors">
-                <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
-
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:4px;">HARI TARGET</label>
-                    <select name="distribute_hari" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-                        <option value="Semua">Semua Hari (Total <?= $totalUnassigned ?> mhs kosong)</option>
-                        <option value="Senin">Senin (2 Nov)</option>
-                        <option value="Selasa">Selasa (3 Nov)</option>
-                        <option value="Rabu">Rabu (4 Nov)</option>
-                        <option value="Kamis">Kamis (5 Nov)</option>
-                        <option value="Jumat">Jumat (6 Nov)</option>
-                    </select>
-                </div>
-
-                <div style="margin-bottom:12px;">
-                    <label style="font-size:11px; font-weight:600; color:#64748b; display:block; margin-bottom:4px;">
-                        PILIH TUTOR YANG MENERIMA PEMBAGIAN (Centang):
-                    </label>
-                    <div style="max-height:95px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; background:#f8fafc;">
-                        <?php foreach ($activeTutors as $t): ?>
-                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#334155; margin-bottom:4px; cursor:pointer;">
-                            <input type="checkbox" name="distribute_tutors[]" value="<?= sanitize($t['nama_lengkap']) ?>" checked>
-                            <span><?= sanitize($t['nama_lengkap']) ?></span>
-                        </label>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 12px; font-size:13px; font-weight:600; background:#059669; border-color:#059669;">
-                    ⚡ Bagi Rata Otomatis Sekarang
-                </button>
-            </form>
-        </div>
-
     </div>
 
-    <!-- FILTER BUTTONS FOR TABLE -->
+    <!-- FILTER BAR HARI & RUANGAN UNTUK TABEL SESI -->
     <div class="card" style="margin-bottom:14px; border-radius:12px; padding:14px 18px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -1250,337 +1049,56 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Jumat" style="border-radius:20px; font-size:12px; padding:4px 12px;">Jumat (6 Nov)</button>
             </div>
             <div style="font-size:12px; color:#64748b;">
-                💡 <em>Ubah tutor & sesi jam langsung pada kolom dropdown tabel untuk update seketika tanpa reload!</em>
+                💡 <em>Klik tombol <strong>✏️ Edit Sesi</strong> pada baris untuk mengubah dosen, ruang, hari, dan jam sesi.</em>
             </div>
         </div>
     </div>
 
-    <!-- TABEL DATA PESERTA PRETES DENGAN INLINE DROPDOWN TUTOR & SESI JAM -->
-    <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
-        <table id="table-penugasan" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
-                    <th style="width:40px; text-align:center;">No</th>
-                    <th style="width:100px;">NIM</th>
-                    <th>Nama Mahasiswa</th>
-                    <th>Program Studi</th>
-                    <th style="min-width:180px;">Hari & Sesi Jam (Edit Bebas)</th>
-                    <th style="width:110px;">Ruangan</th>
-                    <th style="min-width:220px; background:#eff6ff;">🧑‍🏫 Dosen Penguji (Edit Bebas)</th>
-                    <th style="width:100px; text-align:center;">Presensi & Penilaian</th>
-                    <th style="width:60px; text-align:center;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php $no = 1; foreach ($participants as $p): 
-                    $currentTutor = trim($p['dosen_penguji'] ?? '');
-                    $currentJam   = trim($p['jam'] ?? $defaultPeriodeJam);
-                    $dayPill      = $p['hari_pilihan'] ? 'day-pill-' . $p['hari_pilihan'] : '';
-                ?>
-                <tr id="row-reg-<?= $p['reg_id'] ?>" style="border-bottom:1px solid #f1f5f9;">
-                    <td style="text-align:center; color:#94a3b8; font-weight:600;"><?= $no++ ?></td>
-                    <td style="font-weight:600; color:#0f172a;"><?= sanitize($p['nim']) ?></td>
-                    <td>
-                        <strong style="color:#1e293b;"><?= sanitize($p['nama_lengkap']) ?></strong>
-                        <?php if (!empty($p['no_hp'])): ?>
-                        <br><a href="https://wa.me/<?= formatNoHp($p['no_hp']) ?>" target="_blank" style="font-size:11px; color:#10b981; text-decoration:none;">📲 WhatsApp</a>
-                        <?php endif; ?>
-                    </td>
-                    <td style="color:#475569; font-size:12px;"><?= sanitize($p['program_studi'] ?: '-') ?></td>
-                    
-                    <!-- KOLOM HARI & SESI JAM (INLINE AJAX SELECT) -->
-                    <td>
-                        <?php if ($p['hari_pilihan']): ?>
-                        <span class="day-pill-badge <?= $dayPill ?>"><?= sanitize($p['hari_pilihan']) ?></span>
-                        <?php else: ?>
-                        <span style="color:#94a3b8; font-size:11px;">Belum pilih hari</span>
-                        <?php endif; ?>
-
-                        <!-- Interactive Sesi Jam Dropdown -->
-                        <select class="select-jam-inline" 
-                                data-reg-id="<?= $p['reg_id'] ?>" 
-                                data-orig-val="<?= htmlspecialchars($currentJam, ENT_QUOTES, 'UTF-8') ?>"
-                                title="Klik untuk mengubah sesi jam pretes peserta ini"
-                                style="margin-top:4px;">
-                            <?php 
-                            $matchedJamInList = false;
-                            foreach ($presetSesiJam as $psj): 
-                                $isJamMatch = ($currentJam === $psj);
-                                if ($isJamMatch) $matchedJamInList = true;
-                            ?>
-                            <option value="<?= sanitize($psj) ?>" <?= $isJamMatch ? 'selected' : '' ?>>
-                                <?= sanitize($psj) ?>
-                            </option>
-                            <?php endforeach; ?>
-                            
-                            <?php if (!empty($currentJam) && !$matchedJamInList): ?>
-                            <option value="<?= sanitize($currentJam) ?>" selected>
-                                ⏱️ <?= sanitize($currentJam) ?>
-                            </option>
-                            <?php endif; ?>
-                        </select>
-                    </td>
-
-                    <td>
-                        <span style="font-size:12px; font-weight:500; color:#334155;"><?= sanitize($p['ruangan'] ?: 'Belum diplot') ?></span>
-                    </td>
-                    
-                    <!-- KOLOM DOSEN PENGUJI LIVE DROPDOWN AJAX -->
-                    <td style="background:#fafafa;" data-sort="<?= htmlspecialchars($currentTutor, ENT_QUOTES, 'UTF-8') ?>" data-filter="<?= htmlspecialchars($currentTutor, ENT_QUOTES, 'UTF-8') ?>">
-                        <select class="select-tutor-inline" 
-                                data-reg-id="<?= $p['reg_id'] ?>" 
-                                data-orig-val="<?= htmlspecialchars($currentTutor, ENT_QUOTES, 'UTF-8') ?>"
-                                title="Klik untuk mengganti Dosen Penguji">
-                            <option value="" style="color:#dc2626;">-- ⚠️ Belum Ditugaskan / Kosong --</option>
-                            <?php 
-                            $matchedInOptions = false;
-                            foreach ($activeTutors as $t): 
-                                $isMatch = isPengujiMatch($currentTutor, $t['nama_lengkap']);
-                                if ($isMatch) $matchedInOptions = true;
-                            ?>
-                            <option value="<?= sanitize($t['nama_lengkap']) ?>" <?= $isMatch ? 'selected' : '' ?>>
-                                <?= sanitize($t['nama_lengkap']) ?>
-                            </option>
-                            <?php endforeach; ?>
-                            
-                            <?php if (!empty($currentTutor) && !$matchedInOptions): ?>
-                            <option value="<?= sanitize($currentTutor) ?>" selected>
-                                📌 <?= sanitize($currentTutor) ?> (Tersimpan)
-                            </option>
-                            <?php endif; ?>
-                        </select>
-                    </td>
-
-                    <td style="text-align:center;">
-                        <?php if (!empty($p['attended_at'])): ?>
-                            <span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700; display:block; margin-bottom:3px;">
-                                📱 Hadir Presensi
-                            </span>
-                        <?php else: ?>
-                            <span class="badge" style="background:#f1f5f9; color:#94a3b8; font-size:10px; padding:2px 6px; border-radius:4px; display:block; margin-bottom:3px;">
-                                Belum Absen
-                            </span>
-                        <?php endif; ?>
-
-                        <?php if ((int)$p['is_assessed'] === 1): ?>
-                            <span class="badge" style="background:#e0e7ff; color:#3730a3; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700; display:block;">
-                                Sudah Dinilai
-                            </span>
-                        <?php else: ?>
-                            <span class="badge" style="background:#f8fafc; color:#64748b; font-size:10px; padding:2px 6px; border-radius:4px; display:block;">
-                                Belum Dinilai
-                            </span>
-                        <?php endif; ?>
-                    </td>
-
-                    <td style="text-align:center;">
-                        <button type="button" class="btn btn-sm btn-outline-danger btn-reset-tutor" 
-                                data-reg-id="<?= $p['reg_id'] ?>" 
-                                title="Kosongkan Dosen Penguji" 
-                                style="padding:3px 7px; font-size:12px; border-radius:6px; border:1px solid #fca5a5; color:#dc2626; background:#fff; cursor:pointer;">
-                            ✕
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- =======================================================================
-         TAB 2: PENGATURAN SESI PRETES (SESI WAKTU & KONTROL ABSENSI QR)
-         ======================================================================= -->
-    <?php elseif ($activeTab === 'sesi'): ?>
-    
-    <!-- STATS COUNTER KHUSUS SESI PRETES -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#f3e8ff; color:#7e22ce;">⏱️</div>
-            <div>
-                <div class="tutor-stat-val"><?= $totalSessionsCount ?></div>
-                <div class="tutor-stat-lbl">Total Sesi Terbentuk</div>
-            </div>
-        </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#dcfce7; color:#15803d;">🟢</div>
-            <div>
-                <div class="tutor-stat-val"><?= $openSessionsCount ?></div>
-                <div class="tutor-stat-lbl">Sesi Absensi Aktif / Buka</div>
-            </div>
-        </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#f1f5f9; color:#64748b;">🔒</div>
-            <div>
-                <div class="tutor-stat-val"><?= $closedSessionsCount ?></div>
-                <div class="tutor-stat-lbl">Sesi Absensi Ditutup</div>
-            </div>
-        </div>
-        <div class="tutor-stat-item">
-            <div class="tutor-stat-icon" style="background:#e0f2fe; color:#0369a1;">📱</div>
-            <div>
-                <div class="tutor-stat-val"><?= $totalHadirGlobal ?></div>
-                <div class="tutor-stat-lbl">Mahasiswa Hadir Presensi</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ACTION CARDS: SETTING JAM DEFAULT & BULK UPDATE SESI -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:24px;">
-        
-        <!-- CARD 1: PENGATURAN JAM DEFAULT PERIODE MASTER -->
-        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-                <span>⚙️</span> Jam Default Periode Pretes
-            </div>
-            <p style="font-size:12px; color:#64748b; margin-bottom:14px;">
-                Jam default yang digunakan saat pendaftaran mahasiswa baru dan pada kartu ujian pretes.
-            </p>
-            <form method="POST" data-no-spa>
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="update_master_jam">
-                <input type="hidden" name="master_id" value="<?= $currentMaster['id'] ?>">
-
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px; text-transform:uppercase;">Jam Default Periode</label>
-                    <input type="text" name="jam" value="<?= htmlspecialchars($defaultPeriodeJam, ENT_QUOTES, 'UTF-8') ?>" required placeholder="Contoh: 13.00 WIB (Jam 1)" style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600;">
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 14px; font-size:13px; font-weight:600;">
-                    💾 Simpan Jam Default Periode
-                </button>
-            </form>
-        </div>
-
-        <!-- CARD 2: ATUR SESI JAM MAHASISWA SECARA MASSAL -->
-        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
-                <span>⚡</span> Atur Sesi / Jam Mahasiswa Massal
-            </div>
-            <p style="font-size:12px; color:#64748b; margin-bottom:14px;">
-                Ubah sesi jam sekaligus untuk seluruh peserta pada hari atau tutor penguji tertentu.
-            </p>
-            <form method="POST" data-no-spa onsubmit="return confirm('Terapkan perubahan sesi jam ini ke seluruh mahasiswa yang sesuai filter?');">
-                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                <input type="hidden" name="action" value="bulk_update_jam">
-                <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
-                    <div>
-                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">FILTER HARI</label>
-                        <select name="filter_hari" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-                            <option value="Semua">Semua Hari</option>
-                            <option value="Senin">Senin (2 Nov)</option>
-                            <option value="Selasa">Selasa (3 Nov)</option>
-                            <option value="Rabu">Rabu (4 Nov)</option>
-                            <option value="Kamis">Kamis (5 Nov)</option>
-                            <option value="Jumat">Jumat (6 Nov)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">FILTER TUTOR</label>
-                        <select name="filter_penguji" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
-                            <option value="Semua">Semua Penguji</option>
-                            <option value="__EMPTY__">[Belum Ditentukan]</option>
-                            <?php foreach ($activeTutors as $t): ?>
-                            <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">PILIH SESI WAKTU BARU</label>
-                    <select name="new_jam" id="bulk-new-jam-select" required style="width:100%; padding:7px 9px; border-radius:6px; border:1.5px solid #0284c7; font-size:12px; font-weight:600; background:#fff;">
-                        <?php foreach ($presetSesiJam as $psj): ?>
-                        <option value="<?= sanitize($psj) ?>"><?= sanitize($psj) ?></option>
-                        <?php endforeach; ?>
-                        <option value="__CUSTOM__">✏️ Ketik Jam / Sesi Manual...</option>
-                    </select>
-                    <input type="text" name="custom_jam_text" id="bulk-custom-jam-text" placeholder="Masukkan jam kustom (misal: 10.00 WIB)" style="display:none; width:100%; margin-top:6px; padding:7px 10px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:12px;">
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 14px; font-size:13px; font-weight:600; background:#0284c7;">
-                    🚀 Terapkan Perubahan Sesi Jam
-                </button>
-            </form>
-        </div>
-
-    </div>
-
-    <!-- SESI BATCH CONTROLS: BUKA SEMUA / TUTUP SEMUA -->
-    <div class="card" style="margin-bottom:18px; border-radius:12px; padding:16px 20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
-            <div>
-                <h4 style="margin:0 0 2px 0; font-size:15px; font-weight:700; color:#1e293b;">Kontrol Cepat Sesi Absensi Mandiri</h4>
-                <p style="margin:0; font-size:12px; color:#64748b;">Buka atau tutup seluruh sesi absensi secara serentak untuk memudahkan mahasiswa melakukan presensi di lokasi ujian.</p>
-            </div>
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Buka seluruh sesi absensi selama 2 jam sekarang?');">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="action" value="open_all_sessions">
-                    <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
-                    <button type="submit" class="btn btn-success" style="font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-                        <span>🟢</span> Buka Semua Sesi (2 Jam)
-                    </button>
-                </form>
-
-                <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Tutup seluruh sesi absensi sekarang?');">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="action" value="close_all_sessions">
-                    <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
-                    <button type="submit" class="btn btn-danger" style="font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-                        <span>🔒</span> Tutup Semua Sesi
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- TABEL SELURUH SESI PRETES & KONTROL ABSENSI -->
+    <!-- TABEL SELURUH SESI PRETES (FOKUS: DOSEN, RUANG, HARI, JAM) -->
     <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
         <table id="table-sesi-pretes" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
                 <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
                     <th style="width:40px; text-align:center;">No</th>
-                    <th style="width:110px;">Hari</th>
-                    <th style="min-width:140px;">Sesi Waktu</th>
-                    <th>Dosen Penguji</th>
-                    <th style="width:120px;">Ruangan</th>
-                    <th style="width:130px; text-align:center;">Peserta & Presensi</th>
-                    <th style="width:130px; text-align:center;">Status Sesi</th>
-                    <th style="width:200px; text-align:center;">Aksi Kontrol Sesi</th>
+                    <th style="width:110px;">Hari Pretes</th>
+                    <th style="min-width:140px;">Sesi Waktu / Jam</th>
+                    <th style="min-width:200px;">🧑‍🏫 Dosen Penguji / Tutor</th>
+                    <th style="min-width:150px;">🏢 Ruangan Ujian</th>
+                    <th style="width:110px; text-align:center;">Kuota</th>
+                    <th style="width:130px; text-align:center;">Status Absensi</th>
+                    <th style="width:180px; text-align:center;">Aksi Pengaturan Sesi</th>
                 </tr>
             </thead>
             <tbody>
                 <?php 
                 $sNo = 1; 
-                foreach ($allSessionsList as $sess): 
-                    $dayPill = 'day-pill-' . $sess['scope']['hari'];
-                    $isOpen  = $sess['is_open'];
+                foreach ($allSessions as $sess): 
+                    $dayPill = 'day-pill-' . $sess['hari'];
+                    $isOpen  = (bool)$sess['is_open'];
                 ?>
-                <tr id="session-row-<?= $sess['session_id'] ?>" style="border-bottom:1px solid #f1f5f9;">
+                <tr id="session-row-<?= $sess['id'] ?>" style="border-bottom:1px solid #f1f5f9;">
                     <td style="text-align:center; color:#94a3b8; font-weight:600;"><?= $sNo++ ?></td>
                     <td>
-                        <span class="day-pill-badge <?= $dayPill ?>"><?= sanitize($sess['scope']['hari']) ?></span>
+                        <span class="day-pill-badge <?= $dayPill ?>"><?= sanitize($sess['hari']) ?></span>
                     </td>
                     <td>
-                        <strong style="color:#0f172a;"><?= sanitize($sess['jam']) ?></strong>
+                        <strong style="color:#0f172a; font-size:13px;"><?= sanitize($sess['jam']) ?></strong>
                     </td>
                     <td>
-                        <strong style="color:#1e293b;"><?= sanitize($sess['scope']['penguji'] ?: 'Belum ditentukan') ?></strong>
+                        <strong style="color:#1e293b; font-size:13.5px;"><?= sanitize($sess['penguji']) ?></strong>
                     </td>
                     <td>
-                        <span style="font-weight:500; color:#475569;"><?= sanitize($sess['scope']['ruangan'] ?: 'Belum diplot') ?></span>
+                        <span class="badge" style="background:#f1f5f9; color:#1e293b; font-size:12px; font-weight:600; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+                            🏢 <?= sanitize($sess['ruangan']) ?>
+                        </span>
                     </td>
                     <td style="text-align:center;">
-                        <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; padding:3px 8px; border-radius:6px; font-size:11px;">
-                            <?= $sess['count'] ?> Mhs
-                        </span>
-                        <div style="font-size:11px; color:#16a34a; font-weight:600; margin-top:2px;">
-                            📱 <?= $sess['hadir'] ?> Hadir
+                        <span style="font-weight:700; color:#0f172a;"><?= (int)$sess['kuota'] ?> Kursi</span>
+                        <div style="font-size:11px; color:#64748b; margin-top:2px;">
+                            (<?= $sess['total_mhs'] ?> mhs terdaftar)
                         </div>
                     </td>
-                    <td style="text-align:center;" id="session-status-cell-<?= $sess['session_id'] ?>">
+                    <td style="text-align:center;" id="session-status-cell-<?= $sess['id'] ?>">
                         <?php if ($isOpen): ?>
                         <span class="badge" style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;">
                             <span style="width:6px; height:6px; border-radius:50%; background:#16a34a; animation:pulseGlow 1.5s infinite;"></span> BUKA
@@ -1593,117 +1111,40 @@ input:checked + .slider:before { transform: translateX(16px); }
                     </td>
                     <td style="text-align:center;">
                         <div style="display:inline-flex; gap:6px; align-items:center;">
+                            <!-- Tombol Edit Sesi Lengkap (Modal) -->
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary"
+                                    onclick="openEditSessionModal(<?= htmlspecialchars(json_encode($sess), ENT_QUOTES, 'UTF-8') ?>)"
+                                    title="Edit Sesi (Ubah Dosen, Ruang, Hari, atau Jam)"
+                                    style="padding:4px 9px; font-size:12px; border-radius:6px; font-weight:600;">
+                                ✏️ Edit
+                            </button>
+
                             <!-- Tombol Buka/Tutup Sesi (AJAX 1-Klik) -->
                             <button type="button" 
                                     class="btn btn-sm btn-toggle-session-ajax <?= $isOpen ? 'btn-danger' : 'btn-success' ?>"
-                                    data-session-id="<?= $sess['session_id'] ?>"
+                                    data-session-id="<?= $sess['id'] ?>"
                                     data-target-state="<?= $isOpen ? 'close' : 'open' ?>"
                                     title="<?= $isOpen ? 'Tutup Sesi Absensi' : 'Buka Sesi Absensi Selama 2 Jam' ?>"
                                     style="padding:4px 9px; font-size:11.5px; border-radius:6px; font-weight:600;">
                                 <?= $isOpen ? '🔒 Tutup' : '🟢 Buka' ?>
                             </button>
 
-                            <!-- Tombol Buka Modal QR Code -->
+                            <!-- Tombol QR Code Absensi -->
                             <button type="button" 
                                     class="btn btn-sm btn-secondary"
-                                    onclick="openSessionQrModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['scope']['hari'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['jam'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['scope']['penguji'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['scope']['ruangan'], ENT_QUOTES, 'UTF-8') ?>', <?= $sess['count'] ?>, <?= $isOpen ? 'true' : 'false' ?>, '<?= htmlspecialchars($sess['url'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['open_until'] ?? '', ENT_QUOTES, 'UTF-8') ?>')"
+                                    onclick="openSessionQrModal(<?= $sess['id'] ?>, '<?= htmlspecialchars($sess['hari'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['jam'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['penguji'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['ruangan'], ENT_QUOTES, 'UTF-8') ?>', <?= $sess['total_mhs'] ?>, <?= $isOpen ? 'true' : 'false' ?>, '<?= htmlspecialchars($sess['url'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['open_until'] ?? '', ENT_QUOTES, 'UTF-8') ?>')"
                                     title="Tampilkan QR Code Absensi"
                                     style="padding:4px 9px; font-size:11.5px; border-radius:6px;">
                                 📱 QR
                             </button>
 
-                            <!-- Tombol Salin URL Langsung -->
-                            <button type="button" 
-                                    class="btn btn-sm btn-secondary btn-copy-link"
-                                    data-url="<?= htmlspecialchars($sess['url'], ENT_QUOTES, 'UTF-8') ?>"
-                                    title="Salin Link Presensi Mahasiswa"
-                                    style="padding:4px 8px; font-size:11.5px; border-radius:6px;">
-                                📋
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- =======================================================================
-         TAB 3: MANAJEMEN DATA MASTER TUTOR (ROLE DOSEN)
-         ======================================================================= -->
-    <?php elseif ($activeTab === 'master'): ?>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-        <div>
-            <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin:0;">Daftar Akun Tutor & Dosen Penguji</h3>
-            <p style="font-size:13px; color:#64748b; margin:2px 0 0 0;">Pengguna dengan role <strong>'dosen'</strong> yang berhak melakukan pengujian dan penilaian pretes.</p>
-        </div>
-        <button type="button" class="btn btn-primary" onclick="openAddTutorModal()" style="display:flex; align-items:center; gap:6px; border-radius:8px;">
-            <span>➕</span> Tambah Tutor Baru
-        </button>
-    </div>
-
-    <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
-        <table id="table-master-tutors" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
-                    <th style="width:40px; text-align:center;">No</th>
-                    <th style="width:120px;">NIDN / NIP</th>
-                    <th>Nama Lengkap & Gelar</th>
-                    <th>Username</th>
-                    <th>WhatsApp / No HP</th>
-                    <th>Email</th>
-                    <th style="width:80px; text-align:center;">Status</th>
-                    <th style="width:120px; text-align:center;">Beban Mahasiswa</th>
-                    <th style="width:130px; text-align:center;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php $tNo = 1; foreach ($tutors as $tut): ?>
-                <tr style="border-bottom:1px solid #f1f5f9;">
-                    <td style="text-align:center; color:#94a3b8;"><?= $tNo++ ?></td>
-                    <td style="font-weight:600; color:#475569;"><?= sanitize($tut['nim'] ?: '-') ?></td>
-                    <td>
-                        <strong style="color:#0f172a; font-size:14px;"><?= sanitize($tut['nama_lengkap']) ?></strong>
-                    </td>
-                    <td style="color:#64748b; font-family:monospace;"><?= sanitize($tut['username']) ?></td>
-                    <td>
-                        <?php if (!empty($tut['no_hp'])): ?>
-                        <a href="https://wa.me/<?= formatNoHp($tut['no_hp']) ?>" target="_blank" style="color:#059669; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-                            <span>💬</span> <?= sanitize($tut['no_hp']) ?>
-                        </a>
-                        <?php else: ?>
-                        <span style="color:#94a3b8;">-</span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="color:#64748b;"><?= sanitize($tut['email'] ?: '-') ?></td>
-                    <td style="text-align:center;">
-                        <label class="switch" title="Klik untuk mengaktifkan / menonaktifkan tutor">
-                            <input type="checkbox" class="tutor-status-toggle" data-tutor-id="<?= $tut['id'] ?>" <?= $tut['is_active'] ? 'checked' : '' ?>>
-                            <span class="slider"></span>
-                        </label>
-                    </td>
-                    <td style="text-align:center;">
-                        <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; padding:4px 10px; border-radius:12px; font-size:12px;">
-                            <?= $tut['total_peserta'] ?> mhs
-                        </span>
-                    </td>
-                    <td style="text-align:center;">
-                        <div style="display:inline-flex; gap:6px;">
-                            <button type="button" class="btn btn-sm btn-secondary" 
-                                    onclick="openEditTutorModal(<?= htmlspecialchars(json_encode($tut), ENT_QUOTES, 'UTF-8') ?>)"
-                                    title="Edit Profil & Data Tutor" style="padding:4px 8px; font-size:12px;">
-                                ✏️ Edit
-                            </button>
-                            <button type="button" class="btn btn-sm btn-secondary" 
-                                    onclick="openResetPassModal(<?= $tut['id'] ?>, '<?= htmlspecialchars($tut['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>')"
-                                    title="Reset Password Tutor" style="padding:4px 8px; font-size:12px;">
-                                🔑
-                            </button>
-                            <form method="POST" data-no-spa style="display:inline;" onsubmit="return confirm('Hapus/nonaktifkan tutor <?= htmlspecialchars($tut['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>?');">
+                            <!-- Tombol Hapus Sesi -->
+                            <form method="POST" data-no-spa style="display:inline;" onsubmit="return confirm('Hapus sesi untuk penguji <?= htmlspecialchars($sess['penguji'], ENT_QUOTES, 'UTF-8') ?> di ruang <?= htmlspecialchars($sess['ruangan'], ENT_QUOTES, 'UTF-8') ?>?');">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="delete_tutor">
-                                <input type="hidden" name="id" value="<?= $tut['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" style="padding:4px 8px; font-size:12px;" title="Hapus Tutor">
+                                <input type="hidden" name="action" value="delete_session">
+                                <input type="hidden" name="session_id" value="<?= $sess['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" style="padding:4px 7px; font-size:11px; border-radius:6px;" title="Hapus Sesi">
                                     🗑️
                                 </button>
                             </form>
@@ -1716,7 +1157,7 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 4: PLOTTING JADWAL HARIAN TUTOR PRETES (MASTER_PRETES)
+         TAB 2: PLOTTING JADWAL HARIAN TUTOR MASTER PRETES
          ======================================================================= -->
     <?php elseif ($activeTab === 'jadwal'): ?>
     <div class="card" style="border-radius:12px; padding:24px; margin-bottom:24px;">
@@ -1787,13 +1228,94 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 5: REKAP BEBAN & PROGRESS PENILAIAN TUTOR
+         TAB 3: MANAJEMEN DATA MASTER TUTOR (ROLE DOSEN)
+         ======================================================================= -->
+    <?php elseif ($activeTab === 'master'): ?>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+        <div>
+            <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin:0;">Daftar Akun Tutor & Dosen Penguji</h3>
+            <p style="font-size:13px; color:#64748b; margin:2px 0 0 0;">Pengguna dengan role <strong>'dosen'</strong> yang berhak melakukan pengujian dan penilaian pretes.</p>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openAddTutorModal()" style="display:flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>➕</span> Tambah Tutor Baru
+        </button>
+    </div>
+
+    <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
+        <table id="table-master-tutors" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                    <th style="width:40px; text-align:center;">No</th>
+                    <th style="width:120px;">NIDN / NIP</th>
+                    <th>Nama Lengkap & Gelar</th>
+                    <th>Username</th>
+                    <th>WhatsApp / No HP</th>
+                    <th>Email</th>
+                    <th style="width:80px; text-align:center;">Status</th>
+                    <th style="width:130px; text-align:center;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $tNo = 1; foreach ($tutors as $tut): ?>
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                    <td style="text-align:center; color:#94a3b8;"><?= $tNo++ ?></td>
+                    <td style="font-weight:600; color:#475569;"><?= sanitize($tut['nim'] ?: '-') ?></td>
+                    <td>
+                        <strong style="color:#0f172a; font-size:14px;"><?= sanitize($tut['nama_lengkap']) ?></strong>
+                    </td>
+                    <td style="color:#64748b; font-family:monospace;"><?= sanitize($tut['username']) ?></td>
+                    <td>
+                        <?php if (!empty($tut['no_hp'])): ?>
+                        <a href="https://wa.me/<?= formatNoHp($tut['no_hp']) ?>" target="_blank" style="color:#059669; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                            <span>💬</span> <?= sanitize($tut['no_hp']) ?>
+                        </a>
+                        <?php else: ?>
+                        <span style="color:#94a3b8;">-</span>
+                        <?php endif; ?>
+                    </td>
+                    <td style="color:#64748b;"><?= sanitize($tut['email'] ?: '-') ?></td>
+                    <td style="text-align:center;">
+                        <label class="switch" title="Klik untuk mengaktifkan / menonaktifkan tutor">
+                            <input type="checkbox" class="tutor-status-toggle" data-tutor-id="<?= $tut['id'] ?>" <?= $tut['is_active'] ? 'checked' : '' ?>>
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                    <td style="text-align:center;">
+                        <div style="display:inline-flex; gap:6px;">
+                            <button type="button" class="btn btn-sm btn-secondary" 
+                                    onclick="openEditTutorModal(<?= htmlspecialchars(json_encode($tut), ENT_QUOTES, 'UTF-8') ?>)"
+                                    title="Edit Profil & Data Tutor" style="padding:4px 8px; font-size:12px;">
+                                ✏️ Edit
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary" 
+                                    onclick="openResetPassModal(<?= $tut['id'] ?>, '<?= htmlspecialchars($tut['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>')"
+                                    title="Reset Password Tutor" style="padding:4px 8px; font-size:12px;">
+                                🔑
+                            </button>
+                            <form method="POST" data-no-spa style="display:inline;" onsubmit="return confirm('Nonaktifkan tutor <?= htmlspecialchars($tut['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>?');">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="action" value="delete_tutor">
+                                <input type="hidden" name="id" value="<?= $tut['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" style="padding:4px 8px; font-size:12px;" title="Nonaktifkan Tutor">
+                                    🗑️
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- =======================================================================
+         TAB 4: REKAP BEBAN SESI PER DOSEN PENGUJI
          ======================================================================= -->
     <?php elseif ($activeTab === 'rekap'): ?>
     <div style="margin-bottom:16px;">
-        <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin:0 0 4px 0;">📊 Rekap Beban & Progress Penilaian Tutor</h3>
+        <h3 style="font-size:18px; font-weight:700; color:#1e293b; margin:0 0 4px 0;">📊 Rekap Beban Sesi per Dosen Penguji</h3>
         <p style="font-size:13px; color:#64748b; margin:0;">
-            Pantau jumlah mahasiswa yang ditugaskan kepada setiap tutor, progress penilaian yang telah dilakukan, serta kirim pengingat WhatsApp.
+            Pantau jumlah sesi ujian dan ruangan yang diampu oleh masing-masing dosen penguji pada periode pretes ini.
         </p>
     </div>
 
@@ -1803,24 +1325,20 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
                     <th style="width:40px; text-align:center;">No</th>
                     <th>Dosen Penguji</th>
-                    <th style="width:140px;">Kontak WhatsApp</th>
-                    <th style="width:110px; text-align:center;">Total Diuji</th>
-                    <th style="width:110px; text-align:center;">Sudah Dinilai</th>
-                    <th style="width:110px; text-align:center;">Belum Dinilai</th>
-                    <th style="min-width:180px;">Progress Penilaian</th>
-                    <th style="width:160px; text-align:center;">Aksi Pengingat</th>
+                    <th style="width:150px;">Kontak WhatsApp</th>
+                    <th style="width:130px; text-align:center;">Jumlah Sesi Diampu</th>
+                    <th>Daftar Ruangan & Hari</th>
+                    <th style="width:140px; text-align:center;">Aksi Kontak</th>
                 </tr>
             </thead>
             <tbody>
                 <?php 
                 $rNo = 1; 
                 foreach ($tutors as $tut): 
-                    $total = (int)$tut['total_peserta'];
-                    $done  = (int)$tut['sudah_dinilai'];
-                    $undone = (int)$tut['belum_dinilai'];
-                    $pct   = $total > 0 ? round(($done / $total) * 100) : 0;
+                    // Cari sesi-sesi yang diampu tutor ini
+                    $tutorSessions = array_filter($allSessions, fn($s) => isPengujiMatch($s['penguji'], $tut['nama_lengkap']));
+                    $sesiCount = count($tutorSessions);
                     $waClean = formatNoHp($tut['no_hp']);
-                    $waText = urlencode("Assalamualaikum Wr. Wb. Bapak/Ibu " . $tut['nama_lengkap'] . ", mengingatkan untuk penginputan nilai pretes LPPAI UNISDA. Saat ini terdapat $undone mahasiswa yang belum dinilai dari total $total mahasiswa. Terima kasih.");
                 ?>
                 <tr style="border-bottom:1px solid #f1f5f9;">
                     <td style="text-align:center; color:#94a3b8;"><?= $rNo++ ?></td>
@@ -1837,26 +1355,31 @@ input:checked + .slider:before { transform: translateX(16px); }
                         <span style="color:#94a3b8;">-</span>
                         <?php endif; ?>
                     </td>
-                    <td style="text-align:center; font-weight:700; font-size:14px; color:#0f172a;"><?= $total ?></td>
-                    <td style="text-align:center; font-weight:700; color:#16a34a;"><?= $done ?></td>
-                    <td style="text-align:center; font-weight:700; color:#dc2626;"><?= $undone ?></td>
+                    <td style="text-align:center;">
+                        <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; font-size:12px; padding:4px 10px; border-radius:12px;">
+                            <?= $sesiCount ?> Sesi
+                        </span>
+                    </td>
                     <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <div style="flex:1; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
-                                <div style="width:<?= $pct ?>%; height:100%; background:<?= $pct === 100 ? '#10b981' : ($pct > 50 ? '#0284c7' : '#f59e0b') ?>; border-radius:4px;"></div>
+                        <?php if ($sesiCount > 0): ?>
+                            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                            <?php foreach ($tutorSessions as $ts): ?>
+                                <span class="badge" style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; font-size:11px; padding:2px 6px; border-radius:4px;">
+                                    <?= sanitize($ts['hari']) ?> · <?= sanitize($ts['ruangan']) ?>
+                                </span>
+                            <?php endforeach; ?>
                             </div>
-                            <span style="font-size:12px; font-weight:700; color:#475569; width:38px; text-align:right;"><?= $pct ?>%</span>
-                        </div>
+                        <?php else: ?>
+                            <span style="color:#94a3b8; font-size:12px;">Belum ditugaskan di sesi manapun</span>
+                        <?php endif; ?>
                     </td>
                     <td style="text-align:center;">
-                        <?php if ($undone > 0 && $waClean): ?>
-                        <a href="https://wa.me/<?= $waClean ?>?text=<?= $waText ?>" target="_blank" class="btn btn-sm" style="background:#25d366; color:#fff; font-weight:600; border-radius:6px; font-size:11px; padding:4px 10px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-                            <span>📲</span> Ingatkan WA
+                        <?php if ($waClean): ?>
+                        <a href="https://wa.me/<?= $waClean ?>" target="_blank" class="btn btn-sm" style="background:#25d366; color:#fff; font-weight:600; border-radius:6px; font-size:11px; padding:4px 10px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                            <span>📲</span> Chat WA
                         </a>
-                        <?php elseif ($total === 0): ?>
-                        <span style="font-size:11px; color:#94a3b8;">Tidak ada mhs</span>
                         <?php else: ?>
-                        <span style="font-size:11px; color:#10b981; font-weight:600;">✅ Tuntas</span>
+                        <span style="color:#94a3b8; font-size:11px;">No WA Kosong</span>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -1867,6 +1390,193 @@ input:checked + .slider:before { transform: translateX(16px); }
     <?php endif; ?>
 
 </div><!-- end content -->
+
+<!-- ===========================================================================
+     MODAL TAMBAH SESI PRETES BARU (PER DOSEN, RUANG, HARI, JAM)
+     =========================================================================== -->
+<div id="modal-add-session" class="custom-modal-backdrop">
+    <div class="custom-modal-content">
+        <h3 style="margin:0 0 16px 0; font-size:18px; color:#1e293b;">➕ Tambah Sesi Pretes Baru</h3>
+        <form method="POST" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="create_session">
+            <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Pelaksanaan *</label>
+                <select name="hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="Senin">Senin (2 Nov 2026)</option>
+                    <option value="Selasa">Selasa (3 Nov 2026)</option>
+                    <option value="Rabu">Rabu (4 Nov 2026)</option>
+                    <option value="Kamis">Kamis (5 Nov 2026)</option>
+                    <option value="Jumat">Jumat (6 Nov 2026)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Sesi Waktu / Jam *</label>
+                <select name="jam" id="add-session-jam" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <?php foreach ($presetSesiJam as $psj): ?>
+                    <option value="<?= sanitize($psj) ?>"><?= sanitize($psj) ?></option>
+                    <?php endforeach; ?>
+                    <option value="__CUSTOM__">✏️ Ketik Jam / Sesi Lainnya...</option>
+                </select>
+                <input type="text" name="custom_jam" id="add-session-custom-jam" placeholder="Contoh: 10.00 WIB (Pagi)" style="display:none; width:100%; margin-top:6px; padding:7px 10px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:12px;">
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Dosen Penguji / Tutor *</label>
+                <select name="penguji" required style="width:100%; padding:8px 12px; border:1.5px solid #0284c7; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="">-- Pilih Dosen Penguji --</option>
+                    <?php foreach ($activeTutors as $t): ?>
+                    <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Ruangan Ujian *</label>
+                <select name="ruangan" id="add-session-ruangan-select" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="">-- Pilih Ruangan --</option>
+                    <?php foreach ($allRoomNames as $rName): ?>
+                    <option value="<?= sanitize($rName) ?>"><?= sanitize($rName) ?></option>
+                    <?php endforeach; ?>
+                    <option value="__NEW_ROOM__">➕ Tambah / Tulis Ruangan Baru...</option>
+                </select>
+                <input type="text" name="new_ruangan_text" id="add-session-new-ruangan" placeholder="Nama ruangan baru (misal: Ruang Lab CBT 3)" style="display:none; width:100%; margin-top:6px; padding:7px 10px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:12px;">
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Kuota Peserta Sesi</label>
+                <input type="number" name="kuota" value="30" min="1" max="500" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600;">
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-session')">Batal</button>
+                <button type="submit" class="btn btn-primary">💾 Simpan Sesi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===========================================================================
+     MODAL EDIT SESI PRETES (PER DOSEN, RUANG, HARI, JAM)
+     =========================================================================== -->
+<div id="modal-edit-session" class="custom-modal-backdrop">
+    <div class="custom-modal-content">
+        <h3 style="margin:0 0 16px 0; font-size:18px; color:#1e293b;">✏️ Edit Sesi Pretes</h3>
+        <form method="POST" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="edit_session">
+            <input type="hidden" name="session_id" id="edit-session-id">
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Pelaksanaan *</label>
+                <select name="hari" id="edit-session-hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="Senin">Senin (2 Nov 2026)</option>
+                    <option value="Selasa">Selasa (3 Nov 2026)</option>
+                    <option value="Rabu">Rabu (4 Nov 2026)</option>
+                    <option value="Kamis">Kamis (5 Nov 2026)</option>
+                    <option value="Jumat">Jumat (6 Nov 2026)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Sesi Waktu / Jam *</label>
+                <select name="jam" id="edit-session-jam" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <?php foreach ($presetSesiJam as $psj): ?>
+                    <option value="<?= sanitize($psj) ?>"><?= sanitize($psj) ?></option>
+                    <?php endforeach; ?>
+                    <option value="__CUSTOM__">✏️ Ketik Jam / Sesi Lainnya...</option>
+                </select>
+                <input type="text" name="custom_jam" id="edit-session-custom-jam" placeholder="Contoh: 10.00 WIB (Pagi)" style="display:none; width:100%; margin-top:6px; padding:7px 10px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:12px;">
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Dosen Penguji / Tutor *</label>
+                <select name="penguji" id="edit-session-penguji" required style="width:100%; padding:8px 12px; border:1.5px solid #0284c7; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <?php foreach ($activeTutors as $t): ?>
+                    <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="margin-bottom:12px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Ruangan Ujian *</label>
+                <select name="ruangan" id="edit-session-ruangan" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <?php foreach ($allRoomNames as $rName): ?>
+                    <option value="<?= sanitize($rName) ?>"><?= sanitize($rName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Kuota Peserta Sesi</label>
+                <input type="number" name="kuota" id="edit-session-kuota" value="30" min="1" max="500" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600;">
+            </div>
+
+            <!-- SMART SYNC REGISTRASI -->
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; margin-bottom:20px;">
+                <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#166534; cursor:pointer;">
+                    <input type="checkbox" name="sync_mhs" value="1" checked style="margin-top:2px;">
+                    <span>
+                        <strong>Sinkronkan Peserta:</strong> Otomatis pindahkan penugasan mahasiswa yang sebelumnya terdaftar pada sesi lama ke dosen, ruangan, hari, dan jam baru ini.
+                    </span>
+                </label>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit-session')">Batal</button>
+                <button type="submit" class="btn btn-primary">💾 Simpan Perubahan Sesi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===========================================================================
+     MODAL SALIN / DUPLIKASI SESI DARI HARI A KE HARI B
+     =========================================================================== -->
+<div id="modal-duplicate-day" class="custom-modal-backdrop">
+    <div class="custom-modal-content">
+        <h3 style="margin:0 0 16px 0; font-size:18px; color:#1e293b;">📑 Salin Sesi ke Hari Lain</h3>
+        <p style="font-size:12.5px; color:#64748b; margin-bottom:16px;">
+            Duplikasi seluruh pengaturan sesi (penguji & ruangan) dari satu hari pelaksanaan ke hari lainnya agar tidak perlu membuat ulang satu per satu.
+        </p>
+
+        <form method="POST" data-no-spa onsubmit="return confirm('Salin seluruh sesi dari hari sumber ke hari tujuan?');">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="duplicate_day_sessions">
+            <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+
+            <div style="margin-bottom:14px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Sumber (Yang Disalin) *</label>
+                <select name="from_hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="Senin">Senin (2 Nov)</option>
+                    <option value="Selasa">Selasa (3 Nov)</option>
+                    <option value="Rabu">Rabu (4 Nov)</option>
+                    <option value="Kamis">Kamis (5 Nov)</option>
+                    <option value="Jumat">Jumat (6 Nov)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Tujuan *</label>
+                <select name="to_hari" required style="width:100%; padding:8px 12px; border:1.5px solid #0284c7; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
+                    <option value="Selasa">Selasa (3 Nov)</option>
+                    <option value="Rabu">Rabu (4 Nov)</option>
+                    <option value="Kamis">Kamis (5 Nov)</option>
+                    <option value="Jumat">Jumat (6 Nov)</option>
+                    <option value="Senin">Senin (2 Nov)</option>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-duplicate-day')">Batal</button>
+                <button type="submit" class="btn btn-primary">⚡ Salin Sesi Sekarang</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- ===========================================================================
      MODAL QR CODE SESI PRESENSI PRETES
@@ -2018,7 +1728,7 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; color:#166534; cursor:pointer;">
                     <input type="checkbox" name="sync_cascade" value="1" checked style="margin-top:2px;">
                     <span>
-                        <strong>Sinkronkan Perubahan Nama:</strong> Otomatis perbarui nama penguji pada seluruh data mahasiswa pretes dan jadwal master yang sudah ada jika nama lengkap diubah.
+                        <strong>Sinkronkan Perubahan Nama:</strong> Otomatis perbarui nama penguji pada seluruh sesi pretes dan master jadwal jika nama diubah.
                     </span>
                 </label>
             </div>
@@ -2064,6 +1774,45 @@ input:checked + .slider:before { transform: translateX(16px); }
 // CSRF Token global
 const CSRF_TOKEN = '<?= csrfToken() ?>';
 
+function openAddSessionModal() {
+    document.getElementById('modal-add-session').style.display = 'flex';
+}
+
+function openEditSessionModal(sess) {
+    document.getElementById('edit-session-id').value = sess.id;
+    document.getElementById('edit-session-hari').value = sess.hari || 'Senin';
+    
+    var jamSelect = document.getElementById('edit-session-jam');
+    var customJamInput = document.getElementById('edit-session-custom-jam');
+    
+    // Check if jam is in preset
+    var foundJam = false;
+    for (var i = 0; i < jamSelect.options.length; i++) {
+        if (jamSelect.options[i].value === sess.jam) {
+            jamSelect.selectedIndex = i;
+            foundJam = true;
+            break;
+        }
+    }
+    if (!foundJam) {
+        jamSelect.value = '__CUSTOM__';
+        customJamInput.value = sess.jam || '';
+        customJamInput.style.display = 'block';
+    } else {
+        customJamInput.style.display = 'none';
+    }
+
+    document.getElementById('edit-session-penguji').value = sess.penguji || '';
+    document.getElementById('edit-session-ruangan').value = sess.ruangan || '';
+    document.getElementById('edit-session-kuota').value = sess.kuota || 30;
+
+    document.getElementById('modal-edit-session').style.display = 'flex';
+}
+
+function openDuplicateDayModal() {
+    document.getElementById('modal-duplicate-day').style.display = 'flex';
+}
+
 function openAddTutorModal() {
     document.getElementById('modal-add-tutor').style.display = 'flex';
 }
@@ -2098,6 +1847,54 @@ document.querySelectorAll('.custom-modal-backdrop').forEach(function(modal) {
     });
 });
 
+// Custom Jam Input Toggle on Add Session Modal
+var addJamSelect = document.getElementById('add-session-jam');
+if (addJamSelect) {
+    addJamSelect.addEventListener('change', function() {
+        var custom = document.getElementById('add-session-custom-jam');
+        if (this.value === '__CUSTOM__') {
+            custom.style.display = 'block';
+            custom.required = true;
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.required = false;
+        }
+    });
+}
+
+// Custom Room Input Toggle on Add Session Modal
+var addRoomSelect = document.getElementById('add-session-ruangan-select');
+if (addRoomSelect) {
+    addRoomSelect.addEventListener('change', function() {
+        var custom = document.getElementById('add-session-new-ruangan');
+        if (this.value === '__NEW_ROOM__') {
+            custom.style.display = 'block';
+            custom.required = true;
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.required = false;
+        }
+    });
+}
+
+// Custom Jam Input Toggle on Edit Session Modal
+var editJamSelect = document.getElementById('edit-session-jam');
+if (editJamSelect) {
+    editJamSelect.addEventListener('change', function() {
+        var custom = document.getElementById('edit-session-custom-jam');
+        if (this.value === '__CUSTOM__') {
+            custom.style.display = 'block';
+            custom.required = true;
+            custom.focus();
+        } else {
+            custom.style.display = 'none';
+            custom.required = false;
+        }
+    });
+}
+
 // ── MODAL QR CODE SESI PRESENSI ───────────────────────────────────────────
 function openSessionQrModal(sessionId, hari, jam, penguji, ruangan, count, isOpen, url, openUntil) {
     document.getElementById('modal-qr-session-id').value = sessionId;
@@ -2105,7 +1902,7 @@ function openSessionQrModal(sessionId, hari, jam, penguji, ruangan, count, isOpe
     document.getElementById('modal-qr-jam').textContent = jam;
     document.getElementById('modal-qr-penguji').textContent = penguji || 'Belum ditentukan';
     document.getElementById('modal-qr-ruangan').textContent = ruangan || 'Belum diplot';
-    document.getElementById('modal-qr-count').textContent = count + ' Mahasiswa';
+    document.getElementById('modal-qr-count').textContent = count + ' Mahasiswa Terdaftar';
     document.getElementById('modal-qr-url').value = url;
     
     var statusBadge = document.getElementById('modal-qr-status-badge');
@@ -2162,22 +1959,6 @@ document.getElementById('modal-qr-btn-toggle').addEventListener('click', functio
     });
 });
 
-// Salin URL via tombol di tabel sesi
-document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.btn-copy-link');
-    if (!btn) return;
-    var url = btn.getAttribute('data-url');
-    if (!url) return;
-
-    navigator.clipboard.writeText(url).then(function() {
-        if (typeof showToast === 'function') {
-            showToast('Link absensi berhasil disalin!', 'success', 2500);
-        } else {
-            alert('Link absensi berhasil disalin!');
-        }
-    });
-});
-
 // ── AJAX: BUKA / TUTUP SESI ABSENSI PRETES DARI TABEL ──────────────────────
 function toggleSessionAjax(sessionId, targetState, callback) {
     var formData = new FormData();
@@ -2200,7 +1981,6 @@ function toggleSessionAjax(sessionId, targetState, callback) {
             }
             if (callback) callback(data);
             else {
-                // Update cell status & tombol di tabel tanpa reload penuh
                 var statusCell = document.getElementById('session-status-cell-' + sessionId);
                 var row = document.getElementById('session-row-' + sessionId);
                 if (statusCell && row) {
@@ -2246,168 +2026,6 @@ document.addEventListener('click', function(e) {
     toggleSessionAjax(sessionId, targetState);
 });
 
-// ── CUSTOM INPUT PADA BULK JAM SELECT ──────────────────────────────────────
-var bulkJamSelect = document.getElementById('bulk-new-jam-select');
-if (bulkJamSelect) {
-    bulkJamSelect.addEventListener('change', function() {
-        var customInput = document.getElementById('bulk-custom-jam-text');
-        if (this.value === '__CUSTOM__') {
-            customInput.style.display = 'block';
-            customInput.required = true;
-            customInput.focus();
-        } else {
-            customInput.style.display = 'none';
-            customInput.required = false;
-        }
-    });
-}
-
-// ── INTERACTIVE AJAX: INLINE DROPDOWN PENGGANTIAN DOSEN PENGUJI ─────────────
-document.addEventListener('change', function(e) {
-    if (!e.target.classList.contains('select-tutor-inline')) return;
-
-    const selectEl = e.target;
-    const regId    = selectEl.getAttribute('data-reg-id');
-    const newVal   = selectEl.value;
-    const oldVal   = selectEl.getAttribute('data-orig-val') || '';
-
-    selectEl.classList.add('updating');
-    selectEl.disabled = true;
-
-    const formData = new FormData();
-    formData.append('action', 'update_tutor_ajax');
-    formData.append('csrf_token', CSRF_TOKEN);
-    formData.append('reg_id', regId);
-    formData.append('dosen_penguji', newVal);
-
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(r => r.json())
-    .then(data => {
-        selectEl.disabled = false;
-        selectEl.classList.remove('updating');
-
-        if (data && data.success) {
-            selectEl.setAttribute('data-orig-val', newVal);
-            selectEl.classList.add('updated-success');
-            setTimeout(() => selectEl.classList.remove('updated-success'), 2000);
-
-            const td = selectEl.closest('td');
-            if (td) {
-                td.setAttribute('data-sort', newVal);
-                td.setAttribute('data-filter', newVal);
-            }
-
-            if (typeof showToast === 'function') {
-                showToast(data.message || 'Dosen penguji telah dirubah', 'success', 3500);
-            } else {
-                alert(data.message || 'Dosen penguji telah dirubah');
-            }
-        } else {
-            selectEl.value = oldVal;
-            const errMsg = (data && data.message) ? data.message : 'Gagal mengubah dosen penguji.';
-            if (typeof showToast === 'function') {
-                showToast(errMsg, 'danger', 4000);
-            } else {
-                alert(errMsg);
-            }
-        }
-    })
-    .catch(err => {
-        selectEl.disabled = false;
-        selectEl.classList.remove('updating');
-        selectEl.value = oldVal;
-        const errMsg = 'Koneksi terputus: ' + (err.message || 'Gagal menyimpan');
-        if (typeof showToast === 'function') {
-            showToast(errMsg, 'danger', 4000);
-        } else {
-            alert(errMsg);
-        }
-    });
-});
-
-// ── INTERACTIVE AJAX: INLINE DROPDOWN PENGGANTIAN SESI / JAM ───────────────
-document.addEventListener('change', function(e) {
-    if (!e.target.classList.contains('select-jam-inline')) return;
-
-    const selectEl = e.target;
-    const regId    = selectEl.getAttribute('data-reg-id');
-    const newVal   = selectEl.value;
-    const oldVal   = selectEl.getAttribute('data-orig-val') || '';
-
-    selectEl.classList.add('updating');
-    selectEl.disabled = true;
-
-    const formData = new FormData();
-    formData.append('action', 'update_jam_ajax');
-    formData.append('csrf_token', CSRF_TOKEN);
-    formData.append('reg_id', regId);
-    formData.append('jam', newVal);
-
-    fetch(window.location.href, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(r => r.json())
-    .then(data => {
-        selectEl.disabled = false;
-        selectEl.classList.remove('updating');
-
-        if (data && data.success) {
-            selectEl.setAttribute('data-orig-val', newVal);
-            selectEl.classList.add('updated-success');
-            setTimeout(() => selectEl.classList.remove('updated-success'), 2000);
-
-            if (typeof showToast === 'function') {
-                showToast(data.message || 'Sesi jam pretes telah dirubah', 'success', 3500);
-            } else {
-                alert(data.message || 'Sesi jam pretes telah dirubah');
-            }
-        } else {
-            selectEl.value = oldVal;
-            const errMsg = (data && data.message) ? data.message : 'Gagal mengubah sesi jam.';
-            if (typeof showToast === 'function') {
-                showToast(errMsg, 'danger', 4000);
-            } else {
-                alert(errMsg);
-            }
-        }
-    })
-    .catch(err => {
-        selectEl.disabled = false;
-        selectEl.classList.remove('updating');
-        selectEl.value = oldVal;
-        const errMsg = 'Koneksi terputus: ' + (err.message || 'Gagal menyimpan');
-        if (typeof showToast === 'function') {
-            showToast(errMsg, 'danger', 4000);
-        } else {
-            alert(errMsg);
-        }
-    });
-});
-
-// ── TOMBOL RESET TUTOR (1-KLIK KOSONGKAN) ──────────────────────────────────
-document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-reset-tutor');
-    if (!btn) return;
-
-    const regId = btn.getAttribute('data-reg-id');
-    const row = document.getElementById('row-reg-' + regId);
-    if (!row) return;
-
-    const selectEl = row.querySelector('.select-tutor-inline');
-    if (!selectEl) return;
-
-    if (!confirm('Kosongkan dosen penguji untuk mahasiswa ini?')) return;
-
-    selectEl.value = '';
-    selectEl.dispatchEvent(new Event('change'));
-});
-
 // ── TOGGLE STATUS AKTIF/NONAKTIF TUTOR VIA AJAX ─────────────────────────────
 document.querySelectorAll('.tutor-status-toggle').forEach(function(toggle) {
     toggle.addEventListener('change', function() {
@@ -2451,35 +2069,22 @@ document.querySelectorAll('.tutor-status-toggle').forEach(function(toggle) {
 // ── INISIALISASI DATATABLES & FILTER HARI ───────────────────────────────────
 $(document).ready(function() {
     if ($.fn.DataTable) {
-        if ($('#table-penugasan').length) {
-            var dtPenugasan = $('#table-penugasan').DataTable({
+        if ($('#table-sesi-pretes').length) {
+            var dtSesi = $('#table-sesi-pretes').DataTable({
                 pageLength: 25,
                 language: {
-                    search: "Cari Mahasiswa/NIM:",
+                    search: "Cari Sesi (Dosen / Ruang / Hari / Jam):",
                     lengthMenu: "Tampilkan _MENU_ data",
-                    info: "Menampilkan _START_ s/d _END_ dari _TOTAL_ mahasiswa",
-                    paginate: { first: "«", last: "»", next: "›", previous: "‹" },
-                    emptyTable: "Belum ada peserta pretes terdaftar"
+                    emptyTable: "Belum ada sesi pretes yang ditambahkan"
                 }
             });
 
-            // Filter Hari Pelaksanaan
+            // Filter Hari Pelaksanaan Sesi
             $('.btn-filter-hari').on('click', function() {
                 var day = $(this).data('day') || '';
-                dtPenugasan.column(4).search(day).draw();
+                dtSesi.column(1).search(day).draw();
                 $('.btn-filter-hari').removeClass('btn-primary').addClass('btn-secondary').css({'background': '', 'color': ''});
                 $(this).removeClass('btn-secondary').addClass('btn-primary').css({'background': '#0284c7', 'color': '#fff'});
-            });
-        }
-
-        if ($('#table-sesi-pretes').length) {
-            $('#table-sesi-pretes').DataTable({
-                pageLength: 20,
-                language: {
-                    search: "Cari Sesi:",
-                    lengthMenu: "Tampilkan _MENU_ data",
-                    emptyTable: "Belum ada sesi pretes yang terbentuk"
-                }
             });
         }
 
