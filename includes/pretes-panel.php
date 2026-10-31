@@ -130,12 +130,24 @@ include __DIR__ . '/header.php';
 </div></div>
 <?php endif; ?>
 <?php if ($participants): ?>
-<div class="card"><div class="card-header">Peserta & Nilai Pretes</div><div class="card-body"><div class="table-responsive"><table>
-    <thead><tr><th>No</th><th>Mahasiswa</th><th>NIM</th><th>Hari / Ruangan</th><th>Kehadiran</th><th>Komponen Terisi</th><th>Rata-rata Sementara</th><th>Aksi</th></tr></thead><tbody>
-    <?php foreach ($participants as $i => $row): $scope = pretesScope($row); $scores = json_decode($row['scores_json'] ?? '{}', true) ?: []; $filled = array_filter($scores, fn($v) => $v !== null); ?>
-    <tr><td><?= $i + 1 ?></td><td><?= sanitize($row['nama_lengkap']) ?></td><td><?= sanitize($row['nim']) ?></td><td><?= sanitize($scope['hari'] . ' / ' . ($scope['ruangan'] ?: 'Belum ditentukan')) ?></td><td><?= $row['status'] === 'hadir' ? 'Hadir' : 'Belum hadir' ?></td><td><?= count($filled) ?>/12</td><td><?= $filled ? number_format(array_sum($filled) / count($filled), 2) : '—' ?></td><td><a class="btn btn-sm btn-primary" href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes">Input / Lihat Nilai</a></td></tr>
+<style>
+    .pretes-participants { width:100%; table-layout:fixed; }
+    .pretes-participants .participant-name { font-weight:600; white-space:normal; overflow-wrap:anywhere; }
+    .pretes-participants .participant-action { width:132px; text-align:right; }
+    .pretes-participants .input-score { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:10px 16px; width:auto; white-space:nowrap; border-radius:10px; }
+    @media (max-width:600px) {
+        .pretes-participants th, .pretes-participants td { padding:12px 8px; }
+        .pretes-participants .participant-action { width:112px; }
+        .pretes-participants .input-score { padding:10px 12px; font-size:13px; }
+        .pretes-participants .participant-name { font-size:14px; line-height:1.5; }
+    }
+</style>
+<div class="card"><div class="card-header">Peserta & Nilai Pretes</div><div class="card-body"><table class="pretes-participants">
+    <thead><tr><th>Nama Mahasiswa</th><th class="participant-action">Input Nilai</th></tr></thead><tbody>
+    <?php foreach ($participants as $row): ?>
+    <tr><td class="participant-name"><?= sanitize($row['nama_lengkap']) ?></td><td class="participant-action"><a class="btn btn-primary input-score" aria-label="Input nilai <?= sanitize($row['nama_lengkap']) ?>" href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes">Input Nilai</a></td></tr>
     <?php endforeach; ?>
-    </tbody></table></div><p>Rata-rata sementara hanya informasi dari komponen yang terisi, bukan nilai akhir atau keputusan kelulusan.</p></div></div>
+    </tbody></table></div></div>
 <?php endif; ?>
 <script src="<?= BASE_URL ?>/assets/js/lib/qrcode.min.js"></script>
 <script>
