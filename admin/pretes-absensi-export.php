@@ -53,7 +53,7 @@ $stmt = $pdo->prepare('SELECT pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruan
 $stmt->execute($params);
 $participants = $stmt->fetchAll();
 
-// Setiap kelompok dan halaman memiliki kop, metadata, dan pengesahan sendiri.
+// Satu sesi (hari, jam, penguji, ruangan) selalu menjadi satu lembar.
 $groups = [];
 foreach ($participants as $participant) {
     $meta = [
@@ -68,9 +68,7 @@ foreach ($participants as $participant) {
 }
 $pages = [];
 foreach ($groups as $group) {
-    foreach (array_chunk($group['peserta'], 18) as $index => $rows) {
-        $pages[] = ['meta' => $group['meta'], 'rows' => $rows, 'offset' => $index * 18, 'total' => count($group['peserta'])];
-    }
+    $pages[] = ['meta' => $group['meta'], 'rows' => $group['peserta'], 'total' => count($group['peserta'])];
 }
 ?>
 <!DOCTYPE html>
@@ -88,7 +86,8 @@ foreach ($groups as $group) {
         .toolbar p { flex: 1; margin: 0; min-width: 200px; }
         .button { padding: 10px 16px; background: #15583c; color: white; border: 0; border-radius: 5px; cursor: pointer; text-decoration: none; font: inherit; }
         .back { background: #475569; }
-        .sheet { width: 210mm; min-height: 273mm; margin: 0 auto 20px; padding: 12mm; background: white; box-shadow: 0 2px 12px #0001; }
+        .sheet { position: relative; overflow: hidden; width: 210mm; height: 296mm; margin: 0 auto 20px; padding: 12mm; background: white; box-shadow: 0 2px 12px #0001; }
+        .sheet-content { position: absolute; top: 12mm; left: 12mm; width: 186mm; transform-origin: top left; display: flow-root; }
         .kop { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 4px double #15583c; }
         .kop img { width: 21mm; height: 21mm; object-fit: contain; }
         .kop-text { flex: 1; text-align: center; padding-right: 21mm; }
@@ -110,12 +109,13 @@ foreach ($groups as $group) {
         .signature-name { margin-top: 48px; text-decoration: underline; font-weight: bold; }
         .footer { display: flex; justify-content: space-between; border-top: 1px solid #a9b9b0; margin-top: 18px; padding-top: 6px; font-size: 8pt; color: #46574f; }
         .empty { text-align: center; padding: 50px 0; }
-        @media screen and (max-width: 820px) { .sheet { width: 100%; padding: 6mm; } .kop-text { padding-right: 0; } .meta { grid-template-columns: 1fr; } }
+        @media screen and (max-width: 820px) { .toolbar { margin: 12px; } }
         @media print {
             body { background: white; color: black; }
             .toolbar { display: none; }
-            .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; break-after: page; }
+            .sheet { width: 186mm; height: 272mm; margin: 0; padding: 0; box-shadow: none; break-inside: avoid; break-after: page; }
             .sheet:last-child { break-after: auto; }
+            .sheet-content { top: 0; left: 0; }
             tr, .kop, .meta, .footer { break-inside: avoid; }
             thead { display: table-header-group; }
             th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -125,7 +125,7 @@ foreach ($groups as $group) {
 <body>
     <div class="toolbar">
         <a href="pretes-jadwal.php" class="button back">Kembali</a>
-        <p><?= count($participants) ?> peserta · <?= count($pages) ?> lembar. Pilih <strong>Simpan sebagai PDF</strong> pada dialog cetak. Nonaktifkan header/footer browser untuk hasil bersih.</p>
+        <p><?= count($participants) ?> peserta · <?= count($pages) ?> sesi / lembar. Setiap sesi otomatis disesuaikan menjadi satu halaman A4. Pilih <strong>Simpan sebagai PDF</strong> dan nonaktifkan header/footer browser.</p>
         <?php if ($pages): ?><button type="button" class="button" onclick="window.print()">Cetak / Simpan PDF</button><?php endif; ?>
     </div>
     <?php if (!$pages): ?>
@@ -133,6 +133,7 @@ foreach ($groups as $group) {
     <?php endif; ?>
     <?php foreach ($pages as $pageIndex => $page): $meta = $page['meta']; ?>
     <section class="sheet">
+        <div class="sheet-content">
         <header class="kop">
             <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI">
             <div class="kop-text">
@@ -157,7 +158,7 @@ foreach ($groups as $group) {
             <tbody>
                 <?php foreach ($page['rows'] as $i => $row): ?>
                 <tr>
-                    <td class="center"><?= $page['offset'] + $i + 1 ?></td>
+                    <td class="center"><?= $i + 1 ?></td>
                     <td><?= sanitize($row['nim']) ?></td>
                     <td><?= sanitize($row['nama_lengkap']) ?></td>
                     <td><?= sanitize($row['program_studi'] ?? '') ?></td>
@@ -172,7 +173,42 @@ foreach ($groups as $group) {
             <div class="signature">Tanggal: ................................<br>Dosen Penguji<div class="signature-name"><?= sanitize($meta['penguji'] === 'Belum ditentukan' ? '(........................................)' : $meta['penguji']) ?></div></div>
         </div>
         <footer class="footer"><span>LPPAI · Administrasi Pretes</span><span>Lembar <?= $pageIndex + 1 ?> dari <?= count($pages) ?></span></footer>
+        </div>
     </section>
     <?php endforeach; ?>
+    <script>
+    // Ukur konten sebenarnya, termasuk nama panjang, agar seluruh sesi muat.
+    // Lebar dibesarkan sebelum skala diterapkan sehingga tabel tetap selebar kertas.
+    function fitAttendanceSheets() {
+        document.querySelectorAll('.sheet-content').forEach(function(content) {
+            const sheet = content.parentElement;
+            const style = getComputedStyle(sheet);
+            const width = sheet.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+            const height = sheet.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - 2;
+            content.style.transform = 'none';
+            content.style.width = width + 'px';
+            const fits = function(scale) {
+                content.style.width = (width / scale) + 'px';
+                return content.scrollHeight * scale <= height;
+            };
+            let scale = 1;
+            if (!fits(scale)) {
+                let low = 0;
+                let high = 1;
+                for (let i = 0; i < 24; i++) {
+                    const middle = (low + high) / 2;
+                    if (fits(middle)) low = middle;
+                    else high = middle;
+                }
+                scale = low;
+            }
+            content.style.width = (width / scale) + 'px';
+            content.style.transform = 'scale(' + scale + ')';
+        });
+    }
+    window.addEventListener('load', fitAttendanceSheets);
+    window.addEventListener('beforeprint', fitAttendanceSheets);
+    if (document.fonts) document.fonts.ready.then(fitAttendanceSheets);
+    </script>
 </body>
 </html>
