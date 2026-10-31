@@ -1,17 +1,18 @@
 <?php
 /**
- * LPPAI Corner - Admin: Pengaturan Tutor Pretes
- * Halaman untuk mengelola tutor/penguji secara bebas pada seluruh kolom terkait
+ * LPPAI Corner - Admin: Pengaturan Tutor & Sesi Pretes
+ * Halaman terpadu untuk mengelola tutor/penguji serta pengaturan sesi pretes secara bebas
  */
-define('PAGE_TITLE', 'Pengaturan Tutor Pretes');
+define('PAGE_TITLE', 'Pengaturan Tutor & Sesi Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/pretes-helper.php';
 
 $pdo = getDBConnection();
 $message = '';
 $msgType = '';
 
-// Auto-migration aman untuk tabel dan kolom terkait tutor/penguji
+// Auto-migration aman untuk tabel dan kolom terkait tutor, penguji, dan sesi
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS master_pretes (
@@ -47,18 +48,7 @@ try {
 } catch (Exception $e) {}
 
 // Pastikan fitur pretes assessments dan absensi terinisialisasi
-if (function_exists('ensurePretesFeatures')) {
-    ensurePretesFeatures($pdo);
-} else {
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_assessments (
-            registration_id INT NOT NULL PRIMARY KEY,
-            scores_json TEXT NOT NULL,
-            assessed_by INT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    } catch (Exception $e) {}
-}
+ensurePretesFeatures($pdo);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parsePengujiList($pengujiStr) {
@@ -98,12 +88,21 @@ function isPengujiMatch($targetName, $optionName) {
     return false;
 }
 
+// Preset daftar sesi waktu pretes yang umum digunakan
+$presetSesiJam = [
+    '13.00 WIB (Jam 1)',
+    '14.30 WIB (Jam 2)',
+    '16.00 WIB (Jam 3)',
+    '08.00 WIB (Pagi 1)',
+    '09.30 WIB (Pagi 2)',
+];
+
 // ── 1. HANDLE AJAX REQUESTS ───────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $token  = $_POST['csrf_token'] ?? '';
 
-    // AJAX: Update Dosen Penguji Peserta secara Instan (1-Klik via Dropdown)
+    // AJAX 1: Update Dosen Penguji Peserta secara Instan (1-Klik via Dropdown)
     if ($action === 'update_tutor_ajax') {
         header('Content-Type: application/json; charset=utf-8');
         if (!verifyCsrf($token)) {
@@ -133,7 +132,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
 
-    // AJAX: Toggle Status Aktif/Nonaktif Tutor Cepat
+    // AJAX 2: Update Sesi / Jam Peserta secara Instan (1-Klik via Dropdown)
+    if ($action === 'update_jam_ajax') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verifyCsrf($token)) {
+            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid atau telah kedaluwarsa.']);
+            exit;
+        }
+        $regId = (int)($_POST['reg_id'] ?? 0);
+        $jam   = trim((string)($_POST['jam'] ?? ''));
+
+        if ($regId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID peserta tidak valid.']);
+            exit;
+        }
+
+        try {
+            $valJam = $jam !== '' ? $jam : '13.00 WIB (Jam 1)';
+            $stmt = $pdo->prepare("UPDATE pretes_registrations SET jam = ? WHERE id = ?");
+            $stmt->execute([$valJam, $regId]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Sesi jam pretes telah dirubah',
+                'reg_id'  => $regId,
+                'jam'     => $valJam
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Gagal mengubah sesi jam: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // AJAX 3: Buka / Tutup Sesi Absensi Pretes (Instant Toggle)
+    if ($action === 'toggle_session_ajax') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verifyCsrf($token)) {
+            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid.']);
+            exit;
+        }
+        $sessionId   = (int)($_POST['session_id'] ?? 0);
+        $targetState = $_POST['target_state'] ?? ''; // 'open' | 'close'
+        $duration    = max(1, min(24, (int)($_POST['duration_hours'] ?? 2)));
+
+        if ($sessionId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID sesi tidak valid.']);
+            exit;
+        }
+
+        try {
+            if ($targetState === 'open') {
+                $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE id = ?")
+                    ->execute([$duration, $sessionId]);
+                $msg = "Sesi absensi berhasil dibuka selama $duration jam.";
+                $isOpen = true;
+            } else {
+                $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = NULL WHERE id = ?")
+                    ->execute([$sessionId]);
+                $msg = "Sesi absensi berhasil ditutup.";
+                $isOpen = false;
+            }
+
+            $stmt = $pdo->prepare("SELECT open_until, (open_until > NOW()) as is_open FROM pretes_attendance_sessions WHERE id = ?");
+            $stmt->execute([$sessionId]);
+            $sessData = $stmt->fetch();
+
+            echo json_encode([
+                'success'    => true,
+                'message'    => $msg,
+                'session_id' => $sessionId,
+                'is_open'    => (bool)($sessData['is_open'] ?? false),
+                'open_until' => $sessData['open_until'] ?? null
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Gagal memperbarui status sesi: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // AJAX 4: Reset Token Sesi Presensi
+    if ($action === 'reset_session_token_ajax') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verifyCsrf($token)) {
+            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid.']);
+            exit;
+        }
+        $sessionId = (int)($_POST['session_id'] ?? 0);
+        if ($sessionId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID sesi tidak valid.']);
+            exit;
+        }
+
+        try {
+            $newToken = bin2hex(random_bytes(24));
+            $pdo->prepare("UPDATE pretes_attendance_sessions SET token = ? WHERE id = ?")->execute([$newToken, $sessionId]);
+            $newUrl = BASE_URL . '/absensi-pretes.php?token=' . rawurlencode($newToken);
+
+            echo json_encode([
+                'success'    => true,
+                'message'    => 'Token sesi QR berhasil diperbarui',
+                'session_id' => $sessionId,
+                'token'      => $newToken,
+                'url'        => $newUrl
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Gagal mereset token sesi: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // AJAX 5: Toggle Status Aktif/Nonaktif Tutor Cepat
     if ($action === 'toggle_tutor_status_ajax') {
         header('Content-Type: application/json; charset=utf-8');
         if (!verifyCsrf($token)) {
@@ -159,8 +266,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $upd->execute([$newStatus, $tutorId]);
 
             echo json_encode([
-                'success' => true,
-                'message' => 'Status tutor berhasil diubah menjadi ' . ($newStatus ? 'Aktif' : 'Nonaktif'),
+                'success'   => true,
+                'message'   => 'Status tutor berhasil diubah menjadi ' . ($newStatus ? 'Aktif' : 'Nonaktif'),
                 'is_active' => $newStatus
             ]);
         } catch (Exception $e) {
@@ -174,8 +281,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $message = 'Sesi tidak valid atau telah kedaluwarsa.';
         $msgType = 'danger';
     } else {
-        // A. TAMBAH TUTOR / PENGUJI BARU
-        if ($action === 'create_tutor') {
+
+        // A. PENGATURAN JAM DEFAULT PERIODE MASTER
+        if ($action === 'update_master_jam') {
+            $masterId  = (int)($_POST['master_id'] ?? 0);
+            $customJam = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+
+            if ($masterId <= 0 || empty($customJam)) {
+                $message = 'Periode dan jam sesi wajib diisi.';
+                $msgType = 'danger';
+            } else {
+                $pdo->prepare("UPDATE master_pretes SET jam = ? WHERE id = ?")->execute([$customJam, $masterId]);
+                $message = "Jam sesi default periode berhasil diatur menjadi <strong>" . htmlspecialchars($customJam) . "</strong>.";
+                $msgType = 'success';
+            }
+
+        // B. ATUR / PINDAHKAN SESI JAM PESERTA SECARA MASSAL
+        } elseif ($action === 'bulk_update_jam') {
+            $periode       = trim($_POST['periode'] ?? '');
+            $targetHari    = trim($_POST['filter_hari'] ?? '');
+            $targetPenguji = trim($_POST['filter_penguji'] ?? '');
+            $newJam        = trim($_POST['new_jam'] ?? '');
+            $customJamText = trim($_POST['custom_jam_text'] ?? '');
+
+            if ($newJam === '__CUSTOM__') {
+                $newJam = $customJamText;
+            }
+
+            if (empty($newJam)) {
+                $message = 'Silakan tentukan jam / sesi pelaksanaan baru.';
+                $msgType = 'danger';
+            } else {
+                $sql = "UPDATE pretes_registrations SET jam = ? WHERE 1=1";
+                $params = [$newJam];
+
+                if (!empty($periode)) {
+                    $sql .= " AND periode = ?";
+                    $params[] = $periode;
+                }
+                if (!empty($targetHari) && $targetHari !== 'Semua') {
+                    $sql .= " AND hari_pilihan = ?";
+                    $params[] = $targetHari;
+                }
+                if (!empty($targetPenguji) && $targetPenguji !== 'Semua') {
+                    if ($targetPenguji === '__EMPTY__') {
+                        $sql .= " AND (dosen_penguji IS NULL OR dosen_penguji = '')";
+                    } else {
+                        $sql .= " AND TRIM(dosen_penguji) = ?";
+                        $params[] = trim($targetPenguji);
+                    }
+                }
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                $affected = $stmt->rowCount();
+
+                $message = "Berhasil memperbarui sesi waktu pretes menjadi <strong>" . htmlspecialchars($newJam) . "</strong> untuk <strong>$affected mahasiswa</strong>.";
+                $msgType = 'success';
+            }
+
+        // C. BUKA SEMUA SESI ABSENSI PRETES (2 JAM)
+        } elseif ($action === 'open_all_sessions') {
+            $periode    = trim($_POST['periode'] ?? '');
+            $targetHari = trim($_POST['filter_hari'] ?? '');
+            $duration   = max(1, min(24, (int)($_POST['duration_hours'] ?? 2)));
+
+            $sql = "UPDATE pretes_attendance_sessions SET open_until = DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE 1=1";
+            $params = [$duration];
+            if (!empty($periode)) {
+                $sql .= " AND periode = ?";
+                $params[] = $periode;
+            }
+            if (!empty($targetHari) && $targetHari !== 'Semua') {
+                $sql .= " AND hari = ?";
+                $params[] = $targetHari;
+            }
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $affected = $stmt->rowCount();
+
+            $message = "Berhasil <strong>membuka $affected sesi absensi</strong> selama $duration jam untuk scan QR mandiri.";
+            $msgType = 'success';
+
+        // D. TUTUP SEMUA SESI ABSENSI PRETES
+        } elseif ($action === 'close_all_sessions') {
+            $periode    = trim($_POST['periode'] ?? '');
+            $targetHari = trim($_POST['filter_hari'] ?? '');
+
+            $sql = "UPDATE pretes_attendance_sessions SET open_until = NULL WHERE 1=1";
+            $params = [];
+            if (!empty($periode)) {
+                $sql .= " AND periode = ?";
+                $params[] = $periode;
+            }
+            if (!empty($targetHari) && $targetHari !== 'Semua') {
+                $sql .= " AND hari = ?";
+                $params[] = $targetHari;
+            }
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $affected = $stmt->rowCount();
+
+            $message = "Seluruh sesi absensi ($affected sesi) berhasil <strong>ditutup</strong>.";
+            $msgType = 'info';
+
+        // E. BUKA / TUTUP SATU SESI (FALLBACK POST)
+        } elseif ($action === 'open_attendance' || $action === 'close_attendance') {
+            $sessionId = (int)($_POST['session_id'] ?? 0);
+            if ($sessionId > 0) {
+                if ($action === 'open_attendance') {
+                    $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = DATE_ADD(NOW(), INTERVAL 2 HOUR) WHERE id = ?")->execute([$sessionId]);
+                    $message = 'Sesi absensi berhasil dibuka selama 2 jam.';
+                    $msgType = 'success';
+                } else {
+                    $pdo->prepare("UPDATE pretes_attendance_sessions SET open_until = NULL WHERE id = ?")->execute([$sessionId]);
+                    $message = 'Sesi absensi berhasil ditutup.';
+                    $msgType = 'info';
+                }
+            }
+
+        // F. TAMBAH TUTOR / PENGUJI BARU
+        } elseif ($action === 'create_tutor') {
             $nama     = trim($_POST['nama_lengkap'] ?? '');
             $nim      = trim($_POST['nim'] ?? ''); // NIDN / NIP
             $username = trim($_POST['username'] ?? '');
@@ -209,7 +437,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
 
-        // B. EDIT DATA TUTOR / PENGUJI (DENGAN OPSI SINKRONISASI OTOMATIS)
+        // G. EDIT DATA TUTOR / PENGUJI (DENGAN OPSI SINKRONISASI OTOMATIS)
         } elseif ($action === 'update_tutor') {
             $id          = (int)($_POST['id'] ?? 0);
             $nama        = trim($_POST['nama_lengkap'] ?? '');
@@ -230,7 +458,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $message = 'Username sudah digunakan oleh akun lain.';
                     $msgType = 'danger';
                 } else {
-                    // Ambil nama lama untuk cascade jika ada perubahan
                     $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
                     $stmtOld->execute([$id]);
                     $oldName = $stmtOld->fetchColumn();
@@ -244,12 +471,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                     $syncInfo = '';
                     if ($syncCascade && $oldName && trim($oldName) !== $nama) {
-                        // 1. Update kolom dosen_penguji di pretes_registrations
                         $stmtReg = $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE TRIM(dosen_penguji) = ?");
                         $stmtReg->execute([$nama, trim($oldName)]);
                         $affectedReg = $stmtReg->rowCount();
 
-                        // 2. Update di master_pretes penguji harian (penguji_senin s/d penguji_jumat)
                         $masters = $pdo->query("SELECT id, penguji_senin, penguji_selasa, penguji_rabu, penguji_kamis, penguji_jumat FROM master_pretes")->fetchAll();
                         foreach ($masters as $m) {
                             $mUpdates = [];
@@ -275,7 +500,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             }
                         }
 
-                        // 3. Update tabel sesi absensi jika ada
                         try {
                             $stmtSes = $pdo->prepare("UPDATE pretes_attendance_sessions SET penguji = ? WHERE TRIM(penguji) = ?");
                             $stmtSes->execute([$nama, trim($oldName)]);
@@ -289,7 +513,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
 
-        // C. RESET PASSWORD TUTOR
+        // H. RESET PASSWORD TUTOR
         } elseif ($action === 'reset_password_tutor') {
             $id          = (int)($_POST['id'] ?? 0);
             $newPassword = trim($_POST['new_password'] ?? '');
@@ -304,7 +528,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
 
-        // D. HAPUS ATAU NONAKTIFKAN TUTOR
+        // I. HAPUS ATAU NONAKTIFKAN TUTOR
         } elseif ($action === 'delete_tutor') {
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
@@ -318,7 +542,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $cnt = (int)$assignedCount->fetchColumn();
 
                     if ($cnt > 0) {
-                        // Jangan hapus langsung jika sudah memiliki peserta, jadikan nonaktif agar data aman
                         $pdo->prepare("UPDATE users SET is_active = 0 WHERE id = ?")->execute([$id]);
                         $message = 'Tutor <strong>' . htmlspecialchars($tName) . '</strong> telah dinonaktifkan (karena memiliki ' . $cnt . ' riwayat bimbingan peserta).';
                         $msgType = 'warning';
@@ -330,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
 
-        // E. BULK REASSIGN / TRANSFER TUTOR MASSAL
+        // J. BULK REASSIGN / TRANSFER TUTOR MASSAL
         } elseif ($action === 'bulk_reassign_tutor') {
             $fromTutor   = trim($_POST['from_tutor'] ?? '');
             $toTutor     = trim($_POST['to_tutor'] ?? '');
@@ -370,7 +593,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
 
-        // F. DISTRIBUSI / BAGI RATA TUTOR OTOMATIS (AUTO DISTRIBUTE)
+        // K. DISTRIBUSI / BAGI RATA TUTOR OTOMATIS (AUTO DISTRIBUTE)
         } elseif ($action === 'auto_distribute_tutors') {
             $targetHari    = trim($_POST['distribute_hari'] ?? '');
             $periode       = trim($_POST['periode'] ?? '');
@@ -415,7 +638,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
 
-        // G. SIMPAN PLOTTING JADWAL HARIAN TUTOR MASTER PRETES
+        // L. SIMPAN PLOTTING JADWAL HARIAN TUTOR MASTER PRETES
         } elseif ($action === 'update_master_jadwal_tutor') {
             $masterId = (int)($_POST['master_id'] ?? 0);
             if ($masterId <= 0) {
@@ -449,7 +672,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'success';
             }
 
-        // H. KOSONGKAN PENUGASAN TUTOR MASSAL
+        // M. KOSONGKAN PENUGASAN TUTOR MASSAL
         } elseif ($action === 'clear_tutor_massal') {
             $periode    = trim($_POST['periode'] ?? '');
             $targetHari = trim($_POST['clear_hari'] ?? '');
@@ -476,7 +699,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // ── 3. QUERY DATA PERIODE & MASTER PRETES ──────────────────────────────────────
-$periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status FROM master_pretes ORDER BY id DESC")->fetchAll();
+$periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes ORDER BY id DESC")->fetchAll();
 
 $selectedPeriodName = trim($_GET['periode'] ?? '');
 $currentMaster = null;
@@ -505,6 +728,7 @@ if (!$currentMaster) {
 }
 
 $periodeName = $currentMaster['periode'] ?? 'Pretes';
+$defaultPeriodeJam = $currentMaster['jam'] ?? '13.00 WIB (Jam 1)';
 
 // ── 4. QUERY MASTER TUTOR (ROLE DOSEN) DENGAN STATISTIK BEBAN ──────────────────
 $tutorsQuery = "
@@ -526,16 +750,18 @@ $tutors = $stmtTut->fetchAll();
 // List tutor aktif saja untuk dropdown
 $activeTutors = array_filter($tutors, fn($t) => (int)$t['is_active'] === 1);
 
-// ── 5. QUERY PESERTA PRETES PERIODE AKTIF ──────────────────────────────────────
+// ── 5. QUERY PESERTA PRETES PERIODE AKTIF BESERTA PRESENSI ────────────────────
 $stmtPart = $pdo->prepare("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.status, pr.tanggal_daftar,
            u.nim, u.nama_lengkap, u.program_studi, u.no_hp,
-           CASE WHEN pa.scores_json IS NOT NULL THEN 1 ELSE 0 END as is_assessed
+           CASE WHEN pa.scores_json IS NOT NULL THEN 1 ELSE 0 END as is_assessed,
+           ar.attended_at
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
+    LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id
     WHERE pr.periode = ?
-    ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), pr.dosen_penguji ASC, u.nama_lengkap ASC
+    ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), pr.jam ASC, pr.dosen_penguji ASC, u.nama_lengkap ASC
 ");
 $stmtPart->execute([$periodeName]);
 $participants = $stmtPart->fetchAll();
@@ -545,8 +771,61 @@ $totalParticipants = count($participants);
 $totalWithTutor    = count(array_filter($participants, fn($p) => !empty(trim($p['dosen_penguji'] ?? ''))));
 $totalUnassigned   = $totalParticipants - $totalWithTutor;
 $totalAssessed     = count(array_filter($participants, fn($p) => (int)$p['is_assessed'] === 1));
+$totalHadirGlobal  = count(array_filter($participants, fn($p) => !empty($p['attended_at'])));
 
-// Parsing jadwal penguji master
+// ── 6. PENGELOMPOKAN & QUERY SESI PRETES (SESI ABSENSI & PELAKSANAAN) ──────────
+$sessionGroups = [];
+foreach ($participants as $p) {
+    $scope = pretesScope($p);
+    $hash  = pretesScopeHash($scope);
+    if (!isset($sessionGroups[$hash])) {
+        $sessionGroups[$hash] = [
+            'scope'        => $scope,
+            'jam'          => $p['jam'] ?: $defaultPeriodeJam,
+            'count'        => 0,
+            'hadir'        => 0,
+            'participants' => []
+        ];
+    }
+    $sessionGroups[$hash]['count']++;
+    if (!empty($p['attended_at'])) {
+        $sessionGroups[$hash]['hadir']++;
+    }
+    $sessionGroups[$hash]['participants'][] = $p;
+}
+
+// Inisialisasi dan sinkronisasi sesi ke database pretes_attendance_sessions
+$allSessionsList = [];
+foreach ($sessionGroups as $hash => $grp) {
+    $sessData = pretesSession($pdo, $grp['scope']);
+    $allSessionsList[] = [
+        'session_id' => (int)$sessData['id'],
+        'scope'      => $grp['scope'],
+        'jam'        => $grp['jam'],
+        'count'      => $grp['count'],
+        'hadir'      => $grp['hadir'],
+        'is_open'    => (bool)($sessData['is_open'] ?? false),
+        'open_until' => $sessData['open_until'] ?? null,
+        'token'      => $sessData['token'] ?? '',
+        'url'        => pretesAttendanceUrl($sessData)
+    ];
+}
+
+// Urutkan sesi berdasarkan Hari (Senin-Jumat), Jam, dan Penguji
+usort($allSessionsList, function($a, $b) {
+    $order = ['Senin' => 1, 'Selasa' => 2, 'Rabu' => 3, 'Kamis' => 4, 'Jumat' => 5];
+    $dayA = $order[$a['scope']['hari']] ?? 99;
+    $dayB = $order[$b['scope']['hari']] ?? 99;
+    if ($dayA !== $dayB) return $dayA - $dayB;
+    if ($a['jam'] !== $b['jam']) return strcmp($a['jam'], $b['jam']);
+    return strcmp($a['scope']['penguji'], $b['scope']['penguji']);
+});
+
+$totalSessionsCount = count($allSessionsList);
+$openSessionsCount  = count(array_filter($allSessionsList, fn($s) => $s['is_open']));
+$closedSessionsCount= $totalSessionsCount - $openSessionsCount;
+
+// Parsing jadwal penguji master harian
 $masterSenin  = parsePengujiList($currentMaster['penguji_senin'] ?? '');
 $masterSelasa = parsePengujiList($currentMaster['penguji_selasa'] ?? '');
 $masterRabu   = parsePengujiList($currentMaster['penguji_rabu'] ?? '');
@@ -567,7 +846,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
-/* Styling Elegan & Modern LPPAI Pengaturan Tutor */
+/* Styling Elegan & Modern LPPAI Pengaturan Tutor & Sesi */
 .tutor-hero-card {
     background: linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%);
     color: #fff;
@@ -668,31 +947,30 @@ include __DIR__ . '/../includes/header.php';
     border-radius: 8px 8px 0 0;
 }
 
-/* Inline Tutor Dropdown Interactive */
-.select-tutor-inline {
+/* Inline Tutor & Jam Dropdowns Interactive */
+.select-tutor-inline, .select-jam-inline {
     width: 100%;
-    min-width: 190px;
-    padding: 7px 10px;
+    padding: 6px 9px;
     border: 1.5px solid #cbd5e1;
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
     color: #1e293b;
     background-color: #fff;
     cursor: pointer;
     transition: border-color 0.2s, box-shadow 0.2s, background-color 0.3s;
 }
-.select-tutor-inline:focus {
+.select-tutor-inline:focus, .select-jam-inline:focus {
     border-color: #0284c7;
     outline: none;
     box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
-.select-tutor-inline.updating {
+.select-tutor-inline.updating, .select-jam-inline.updating {
     opacity: 0.6;
     pointer-events: none;
     background-color: #f1f5f9;
 }
-.select-tutor-inline.updated-success {
+.select-tutor-inline.updated-success, .select-jam-inline.updated-success {
     border-color: #10b981 !important;
     background-color: #ecfdf5 !important;
 }
@@ -703,7 +981,7 @@ include __DIR__ . '/../includes/header.php';
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(3px);
     z-index: 99999;
     align-items: center;
     justify-content: center;
@@ -765,6 +1043,12 @@ input:checked + .slider:before { transform: translateX(16px); }
 .day-pill-Rabu   { background: #e0e7ff; color: #3730a3; }
 .day-pill-Kamis  { background: #dcfce7; color: #166534; }
 .day-pill-Jumat  { background: #f3e8ff; color: #6b21a8; }
+
+@keyframes pulseGlow {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}
 </style>
 
 <div class="content">
@@ -779,9 +1063,9 @@ input:checked + .slider:before { transform: translateX(16px); }
     <div class="tutor-hero-card">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
             <div>
-                <h1 style="font-size:24px; font-weight:800; margin-bottom:6px; color:#fff;">🧑‍🏫 Pengaturan Tutor & Dosen Penguji Pretes</h1>
-                <p style="font-size:14px; opacity:0.9; margin:0; max-width:650px;">
-                    Pusat kendali pengaturan tutor/penguji LPPAI. Kelola akun tutor, plotting peserta, tukar tutor massal, pembagian otomatis, serta jadwal penguji harian.
+                <h1 style="font-size:24px; font-weight:800; margin-bottom:6px; color:#fff;">🧑‍🏫 Pengaturan Tutor & Sesi Pretes LPPAI</h1>
+                <p style="font-size:14px; opacity:0.9; margin:0; max-width:680px;">
+                    Pusat kendali pengaturan tutor/penguji serta sesi pelaksanaan pretes. Kelola akun tutor, sesi waktu ujian, QR absensi mandiri, transfer tutor massal, dan plotting harian.
                 </p>
             </div>
             <!-- Period Selector Switcher -->
@@ -799,7 +1083,7 @@ input:checked + .slider:before { transform: translateX(16px); }
         </div>
     </div>
 
-    <!-- STATS COUNTER -->
+    <!-- STATS COUNTER GLOBAL -->
     <div class="tutor-stats-grid">
         <div class="tutor-stat-item">
             <div class="tutor-stat-icon" style="background:#e0f2fe; color:#0284c7;">👨‍🏫</div>
@@ -834,10 +1118,13 @@ input:checked + .slider:before { transform: translateX(16px); }
     <!-- TAB NAVIGATION -->
     <div class="custom-tabs">
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=penugasan" class="custom-tab-btn <?= $activeTab === 'penugasan' ? 'active' : '' ?>">
-            <span>📋</span> Penugasan Peserta per Tutor
+            <span>📋</span> Penugasan Peserta per Tutor & Sesi
+        </a>
+        <a href="?periode=<?= urlencode($periodeName) ?>&tab=sesi" class="custom-tab-btn <?= $activeTab === 'sesi' ? 'active' : '' ?>">
+            <span>⏱️</span> Pengaturan Sesi Pretes
         </a>
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=master" class="custom-tab-btn <?= $activeTab === 'master' ? 'active' : '' ?>">
-            <span>🧑‍🏫</span> Manajemen Data Tutor (Dosen)
+            <span>🧑‍🏫</span> Manajemen Data Master Tutor (Dosen)
         </a>
         <a href="?periode=<?= urlencode($periodeName) ?>&tab=jadwal" class="custom-tab-btn <?= $activeTab === 'jadwal' ? 'active' : '' ?>">
             <span>📅</span> Plotting Jadwal Harian (Master Pretes)
@@ -848,7 +1135,7 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 1: PENUGASAN PESERTA PER TUTOR (LIVE DROPDOWN AJAX + BULK TOOLS)
+         TAB 1: PENUGASAN PESERTA PER TUTOR & SESI JAM (INLINE AJAX + BULK TOOLS)
          ======================================================================= -->
     <?php if ($activeTab === 'penugasan'): ?>
     
@@ -963,12 +1250,12 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Jumat" style="border-radius:20px; font-size:12px; padding:4px 12px;">Jumat (6 Nov)</button>
             </div>
             <div style="font-size:12px; color:#64748b;">
-                💡 <em>Ubah tutor langsung pada kolom dropdown di tabel untuk update instan tanpa reload!</em>
+                💡 <em>Ubah tutor & sesi jam langsung pada kolom dropdown tabel untuk update seketika tanpa reload!</em>
             </div>
         </div>
     </div>
 
-    <!-- TABEL DATA PESERTA PRETES DENGAN INLINE DROPDOWN TUTOR -->
+    <!-- TABEL DATA PESERTA PRETES DENGAN INLINE DROPDOWN TUTOR & SESI JAM -->
     <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
         <table id="table-penugasan" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
@@ -977,17 +1264,18 @@ input:checked + .slider:before { transform: translateX(16px); }
                     <th style="width:100px;">NIM</th>
                     <th>Nama Mahasiswa</th>
                     <th>Program Studi</th>
-                    <th style="width:120px;">Hari & Jam</th>
+                    <th style="min-width:180px;">Hari & Sesi Jam (Edit Bebas)</th>
                     <th style="width:110px;">Ruangan</th>
-                    <th style="min-width:220px; background:#eff6ff;">🧑‍🏫 Dosen Penguji (Bisa Diedit Bebas)</th>
-                    <th style="width:100px; text-align:center;">Penilaian</th>
+                    <th style="min-width:220px; background:#eff6ff;">🧑‍🏫 Dosen Penguji (Edit Bebas)</th>
+                    <th style="width:100px; text-align:center;">Presensi & Penilaian</th>
                     <th style="width:60px; text-align:center;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 <?php $no = 1; foreach ($participants as $p): 
                     $currentTutor = trim($p['dosen_penguji'] ?? '');
-                    $dayPill = $p['hari_pilihan'] ? 'day-pill-' . $p['hari_pilihan'] : '';
+                    $currentJam   = trim($p['jam'] ?? $defaultPeriodeJam);
+                    $dayPill      = $p['hari_pilihan'] ? 'day-pill-' . $p['hari_pilihan'] : '';
                 ?>
                 <tr id="row-reg-<?= $p['reg_id'] ?>" style="border-bottom:1px solid #f1f5f9;">
                     <td style="text-align:center; color:#94a3b8; font-weight:600;"><?= $no++ ?></td>
@@ -999,14 +1287,40 @@ input:checked + .slider:before { transform: translateX(16px); }
                         <?php endif; ?>
                     </td>
                     <td style="color:#475569; font-size:12px;"><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                    
+                    <!-- KOLOM HARI & SESI JAM (INLINE AJAX SELECT) -->
                     <td>
                         <?php if ($p['hari_pilihan']): ?>
                         <span class="day-pill-badge <?= $dayPill ?>"><?= sanitize($p['hari_pilihan']) ?></span>
-                        <div style="font-size:11px; color:#64748b; margin-top:2px;"><?= sanitize($p['jam'] ?: '13.00 WIB') ?></div>
                         <?php else: ?>
-                        <span style="color:#94a3b8; font-size:12px;">-</span>
+                        <span style="color:#94a3b8; font-size:11px;">Belum pilih hari</span>
                         <?php endif; ?>
+
+                        <!-- Interactive Sesi Jam Dropdown -->
+                        <select class="select-jam-inline" 
+                                data-reg-id="<?= $p['reg_id'] ?>" 
+                                data-orig-val="<?= htmlspecialchars($currentJam, ENT_QUOTES, 'UTF-8') ?>"
+                                title="Klik untuk mengubah sesi jam pretes peserta ini"
+                                style="margin-top:4px;">
+                            <?php 
+                            $matchedJamInList = false;
+                            foreach ($presetSesiJam as $psj): 
+                                $isJamMatch = ($currentJam === $psj);
+                                if ($isJamMatch) $matchedJamInList = true;
+                            ?>
+                            <option value="<?= sanitize($psj) ?>" <?= $isJamMatch ? 'selected' : '' ?>>
+                                <?= sanitize($psj) ?>
+                            </option>
+                            <?php endforeach; ?>
+                            
+                            <?php if (!empty($currentJam) && !$matchedJamInList): ?>
+                            <option value="<?= sanitize($currentJam) ?>" selected>
+                                ⏱️ <?= sanitize($currentJam) ?>
+                            </option>
+                            <?php endif; ?>
+                        </select>
                     </td>
+
                     <td>
                         <span style="font-size:12px; font-weight:500; color:#334155;"><?= sanitize($p['ruangan'] ?: 'Belum diplot') ?></span>
                     </td>
@@ -1030,7 +1344,6 @@ input:checked + .slider:before { transform: translateX(16px); }
                             <?php endforeach; ?>
                             
                             <?php if (!empty($currentTutor) && !$matchedInOptions): ?>
-                            <!-- Pertahankan penguji lama jika tidak cocok di daftar tutor aktif -->
                             <option value="<?= sanitize($currentTutor) ?>" selected>
                                 📌 <?= sanitize($currentTutor) ?> (Tersimpan)
                             </option>
@@ -1039,17 +1352,31 @@ input:checked + .slider:before { transform: translateX(16px); }
                     </td>
 
                     <td style="text-align:center;">
-                        <?php if ((int)$p['is_assessed'] === 1): ?>
-                        <span class="badge" style="background:#dcfce7; color:#15803d; font-size:11px; padding:3px 8px; border-radius:6px; font-weight:600;">Sudah Dinilai</span>
+                        <?php if (!empty($p['attended_at'])): ?>
+                            <span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700; display:block; margin-bottom:3px;">
+                                📱 Hadir Presensi
+                            </span>
                         <?php else: ?>
-                        <span class="badge" style="background:#f1f5f9; color:#64748b; font-size:11px; padding:3px 8px; border-radius:6px;">Belum Dinilai</span>
+                            <span class="badge" style="background:#f1f5f9; color:#94a3b8; font-size:10px; padding:2px 6px; border-radius:4px; display:block; margin-bottom:3px;">
+                                Belum Absen
+                            </span>
+                        <?php endif; ?>
+
+                        <?php if ((int)$p['is_assessed'] === 1): ?>
+                            <span class="badge" style="background:#e0e7ff; color:#3730a3; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700; display:block;">
+                                Sudah Dinilai
+                            </span>
+                        <?php else: ?>
+                            <span class="badge" style="background:#f8fafc; color:#64748b; font-size:10px; padding:2px 6px; border-radius:4px; display:block;">
+                                Belum Dinilai
+                            </span>
                         <?php endif; ?>
                     </td>
 
                     <td style="text-align:center;">
                         <button type="button" class="btn btn-sm btn-outline-danger btn-reset-tutor" 
                                 data-reg-id="<?= $p['reg_id'] ?>" 
-                                title="Kosongkan Tutor" 
+                                title="Kosongkan Dosen Penguji" 
                                 style="padding:3px 7px; font-size:12px; border-radius:6px; border:1px solid #fca5a5; color:#dc2626; background:#fff; cursor:pointer;">
                             ✕
                         </button>
@@ -1061,7 +1388,248 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 2: MANAJEMEN DATA MASTER TUTOR (ROLE DOSEN)
+         TAB 2: PENGATURAN SESI PRETES (SESI WAKTU & KONTROL ABSENSI QR)
+         ======================================================================= -->
+    <?php elseif ($activeTab === 'sesi'): ?>
+    
+    <!-- STATS COUNTER KHUSUS SESI PRETES -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
+        <div class="tutor-stat-item">
+            <div class="tutor-stat-icon" style="background:#f3e8ff; color:#7e22ce;">⏱️</div>
+            <div>
+                <div class="tutor-stat-val"><?= $totalSessionsCount ?></div>
+                <div class="tutor-stat-lbl">Total Sesi Terbentuk</div>
+            </div>
+        </div>
+        <div class="tutor-stat-item">
+            <div class="tutor-stat-icon" style="background:#dcfce7; color:#15803d;">🟢</div>
+            <div>
+                <div class="tutor-stat-val"><?= $openSessionsCount ?></div>
+                <div class="tutor-stat-lbl">Sesi Absensi Aktif / Buka</div>
+            </div>
+        </div>
+        <div class="tutor-stat-item">
+            <div class="tutor-stat-icon" style="background:#f1f5f9; color:#64748b;">🔒</div>
+            <div>
+                <div class="tutor-stat-val"><?= $closedSessionsCount ?></div>
+                <div class="tutor-stat-lbl">Sesi Absensi Ditutup</div>
+            </div>
+        </div>
+        <div class="tutor-stat-item">
+            <div class="tutor-stat-icon" style="background:#e0f2fe; color:#0369a1;">📱</div>
+            <div>
+                <div class="tutor-stat-val"><?= $totalHadirGlobal ?></div>
+                <div class="tutor-stat-lbl">Mahasiswa Hadir Presensi</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACTION CARDS: SETTING JAM DEFAULT & BULK UPDATE SESI -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:24px;">
+        
+        <!-- CARD 1: PENGATURAN JAM DEFAULT PERIODE MASTER -->
+        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                <span>⚙️</span> Jam Default Periode Pretes
+            </div>
+            <p style="font-size:12px; color:#64748b; margin-bottom:14px;">
+                Jam default yang digunakan saat pendaftaran mahasiswa baru dan pada kartu ujian pretes.
+            </p>
+            <form method="POST" data-no-spa>
+                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                <input type="hidden" name="action" value="update_master_jam">
+                <input type="hidden" name="master_id" value="<?= $currentMaster['id'] ?>">
+
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px; text-transform:uppercase;">Jam Default Periode</label>
+                    <input type="text" name="jam" value="<?= htmlspecialchars($defaultPeriodeJam, ENT_QUOTES, 'UTF-8') ?>" required placeholder="Contoh: 13.00 WIB (Jam 1)" style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600;">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 14px; font-size:13px; font-weight:600;">
+                    💾 Simpan Jam Default Periode
+                </button>
+            </form>
+        </div>
+
+        <!-- CARD 2: ATUR SESI JAM MAHASISWA SECARA MASSAL -->
+        <div class="card" style="margin:0; border-radius:12px; border:1px solid #e2e8f0; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight:700; font-size:15px; color:#1e293b; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                <span>⚡</span> Atur Sesi / Jam Mahasiswa Massal
+            </div>
+            <p style="font-size:12px; color:#64748b; margin-bottom:14px;">
+                Ubah sesi jam sekaligus untuk seluruh peserta pada hari atau tutor penguji tertentu.
+            </p>
+            <form method="POST" data-no-spa onsubmit="return confirm('Terapkan perubahan sesi jam ini ke seluruh mahasiswa yang sesuai filter?');">
+                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                <input type="hidden" name="action" value="bulk_update_jam">
+                <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">FILTER HARI</label>
+                        <select name="filter_hari" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
+                            <option value="Semua">Semua Hari</option>
+                            <option value="Senin">Senin (2 Nov)</option>
+                            <option value="Selasa">Selasa (3 Nov)</option>
+                            <option value="Rabu">Rabu (4 Nov)</option>
+                            <option value="Kamis">Kamis (5 Nov)</option>
+                            <option value="Jumat">Jumat (6 Nov)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">FILTER TUTOR</label>
+                        <select name="filter_penguji" style="width:100%; padding:7px 9px; border-radius:6px; border:1px solid #cbd5e1; font-size:12px; background:#fff;">
+                            <option value="Semua">Semua Penguji</option>
+                            <option value="__EMPTY__">[Belum Ditentukan]</option>
+                            <?php foreach ($activeTutors as $t): ?>
+                            <option value="<?= sanitize($t['nama_lengkap']) ?>"><?= sanitize($t['nama_lengkap']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px; font-weight:700; color:#64748b; display:block; margin-bottom:4px;">PILIH SESI WAKTU BARU</label>
+                    <select name="new_jam" id="bulk-new-jam-select" required style="width:100%; padding:7px 9px; border-radius:6px; border:1.5px solid #0284c7; font-size:12px; font-weight:600; background:#fff;">
+                        <?php foreach ($presetSesiJam as $psj): ?>
+                        <option value="<?= sanitize($psj) ?>"><?= sanitize($psj) ?></option>
+                        <?php endforeach; ?>
+                        <option value="__CUSTOM__">✏️ Ketik Jam / Sesi Manual...</option>
+                    </select>
+                    <input type="text" name="custom_jam_text" id="bulk-custom-jam-text" placeholder="Masukkan jam kustom (misal: 10.00 WIB)" style="display:none; width:100%; margin-top:6px; padding:7px 10px; border:1.5px solid #cbd5e1; border-radius:6px; font-size:12px;">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; padding:8px 14px; font-size:13px; font-weight:600; background:#0284c7;">
+                    🚀 Terapkan Perubahan Sesi Jam
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- SESI BATCH CONTROLS: BUKA SEMUA / TUTUP SEMUA -->
+    <div class="card" style="margin-bottom:18px; border-radius:12px; padding:16px 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <div>
+                <h4 style="margin:0 0 2px 0; font-size:15px; font-weight:700; color:#1e293b;">Kontrol Cepat Sesi Absensi Mandiri</h4>
+                <p style="margin:0; font-size:12px; color:#64748b;">Buka atau tutup seluruh sesi absensi secara serentak untuk memudahkan mahasiswa melakukan presensi di lokasi ujian.</p>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Buka seluruh sesi absensi selama 2 jam sekarang?');">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="action" value="open_all_sessions">
+                    <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit" class="btn btn-success" style="font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                        <span>🟢</span> Buka Semua Sesi (2 Jam)
+                    </button>
+                </form>
+
+                <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Tutup seluruh sesi absensi sekarang?');">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="action" value="close_all_sessions">
+                    <input type="hidden" name="periode" value="<?= htmlspecialchars($periodeName, ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit" class="btn btn-danger" style="font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                        <span>🔒</span> Tutup Semua Sesi
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABEL SELURUH SESI PRETES & KONTROL ABSENSI -->
+    <div class="card" style="border-radius:12px; padding:20px; overflow-x:auto;">
+        <table id="table-sesi-pretes" class="table" style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+                <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                    <th style="width:40px; text-align:center;">No</th>
+                    <th style="width:110px;">Hari</th>
+                    <th style="min-width:140px;">Sesi Waktu</th>
+                    <th>Dosen Penguji</th>
+                    <th style="width:120px;">Ruangan</th>
+                    <th style="width:130px; text-align:center;">Peserta & Presensi</th>
+                    <th style="width:130px; text-align:center;">Status Sesi</th>
+                    <th style="width:200px; text-align:center;">Aksi Kontrol Sesi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                $sNo = 1; 
+                foreach ($allSessionsList as $sess): 
+                    $dayPill = 'day-pill-' . $sess['scope']['hari'];
+                    $isOpen  = $sess['is_open'];
+                ?>
+                <tr id="session-row-<?= $sess['session_id'] ?>" style="border-bottom:1px solid #f1f5f9;">
+                    <td style="text-align:center; color:#94a3b8; font-weight:600;"><?= $sNo++ ?></td>
+                    <td>
+                        <span class="day-pill-badge <?= $dayPill ?>"><?= sanitize($sess['scope']['hari']) ?></span>
+                    </td>
+                    <td>
+                        <strong style="color:#0f172a;"><?= sanitize($sess['jam']) ?></strong>
+                    </td>
+                    <td>
+                        <strong style="color:#1e293b;"><?= sanitize($sess['scope']['penguji'] ?: 'Belum ditentukan') ?></strong>
+                    </td>
+                    <td>
+                        <span style="font-weight:500; color:#475569;"><?= sanitize($sess['scope']['ruangan'] ?: 'Belum diplot') ?></span>
+                    </td>
+                    <td style="text-align:center;">
+                        <span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; padding:3px 8px; border-radius:6px; font-size:11px;">
+                            <?= $sess['count'] ?> Mhs
+                        </span>
+                        <div style="font-size:11px; color:#16a34a; font-weight:600; margin-top:2px;">
+                            📱 <?= $sess['hadir'] ?> Hadir
+                        </div>
+                    </td>
+                    <td style="text-align:center;" id="session-status-cell-<?= $sess['session_id'] ?>">
+                        <?php if ($isOpen): ?>
+                        <span class="badge" style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;">
+                            <span style="width:6px; height:6px; border-radius:50%; background:#16a34a; animation:pulseGlow 1.5s infinite;"></span> BUKA
+                        </span>
+                        <?php else: ?>
+                        <span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px;">
+                            🔒 TERTUTUP
+                        </span>
+                        <?php endif; ?>
+                    </td>
+                    <td style="text-align:center;">
+                        <div style="display:inline-flex; gap:6px; align-items:center;">
+                            <!-- Tombol Buka/Tutup Sesi (AJAX 1-Klik) -->
+                            <button type="button" 
+                                    class="btn btn-sm btn-toggle-session-ajax <?= $isOpen ? 'btn-danger' : 'btn-success' ?>"
+                                    data-session-id="<?= $sess['session_id'] ?>"
+                                    data-target-state="<?= $isOpen ? 'close' : 'open' ?>"
+                                    title="<?= $isOpen ? 'Tutup Sesi Absensi' : 'Buka Sesi Absensi Selama 2 Jam' ?>"
+                                    style="padding:4px 9px; font-size:11.5px; border-radius:6px; font-weight:600;">
+                                <?= $isOpen ? '🔒 Tutup' : '🟢 Buka' ?>
+                            </button>
+
+                            <!-- Tombol Buka Modal QR Code -->
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary"
+                                    onclick="openSessionQrModal(<?= $sess['session_id'] ?>, '<?= htmlspecialchars($sess['scope']['hari'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['jam'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['scope']['penguji'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['scope']['ruangan'], ENT_QUOTES, 'UTF-8') ?>', <?= $sess['count'] ?>, <?= $isOpen ? 'true' : 'false' ?>, '<?= htmlspecialchars($sess['url'], ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($sess['open_until'] ?? '', ENT_QUOTES, 'UTF-8') ?>')"
+                                    title="Tampilkan QR Code Absensi"
+                                    style="padding:4px 9px; font-size:11.5px; border-radius:6px;">
+                                📱 QR
+                            </button>
+
+                            <!-- Tombol Salin URL Langsung -->
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary btn-copy-link"
+                                    data-url="<?= htmlspecialchars($sess['url'], ENT_QUOTES, 'UTF-8') ?>"
+                                    title="Salin Link Presensi Mahasiswa"
+                                    style="padding:4px 8px; font-size:11.5px; border-radius:6px;">
+                                📋
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- =======================================================================
+         TAB 3: MANAJEMEN DATA MASTER TUTOR (ROLE DOSEN)
          ======================================================================= -->
     <?php elseif ($activeTab === 'master'): ?>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
@@ -1148,7 +1716,7 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 3: PLOTTING JADWAL HARIAN TUTOR PRETES (MASTER_PRETES)
+         TAB 4: PLOTTING JADWAL HARIAN TUTOR PRETES (MASTER_PRETES)
          ======================================================================= -->
     <?php elseif ($activeTab === 'jadwal'): ?>
     <div class="card" style="border-radius:12px; padding:24px; margin-bottom:24px;">
@@ -1219,7 +1787,7 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 
     <!-- =======================================================================
-         TAB 4: REKAP BEBAN & PROGRESS PENILAIAN TUTOR
+         TAB 5: REKAP BEBAN & PROGRESS PENILAIAN TUTOR
          ======================================================================= -->
     <?php elseif ($activeTab === 'rekap'): ?>
     <div style="margin-bottom:16px;">
@@ -1299,6 +1867,48 @@ input:checked + .slider:before { transform: translateX(16px); }
     <?php endif; ?>
 
 </div><!-- end content -->
+
+<!-- ===========================================================================
+     MODAL QR CODE SESI PRESENSI PRETES
+     =========================================================================== -->
+<div id="modal-qr-sesi" class="custom-modal-backdrop">
+    <div class="custom-modal-content" style="max-width:480px; text-align:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <h3 style="margin:0; font-size:17px; color:#1e293b;">📱 QR Code Sesi Presensi Mahasiswa</h3>
+            <button type="button" onclick="closeModal('modal-qr-sesi')" style="border:none; background:none; font-size:20px; color:#94a3b8; cursor:pointer;">✕</button>
+        </div>
+
+        <div style="background:#f8fafc; border-radius:10px; padding:12px; margin-bottom:16px; font-size:12.5px; text-align:left; color:#334155; line-height:1.6;">
+            <div>📅 Hari: <strong id="modal-qr-hari">-</strong> · Jam: <strong id="modal-qr-jam">-</strong></div>
+            <div>👨‍🏫 Penguji: <strong id="modal-qr-penguji">-</strong></div>
+            <div>🏢 Ruangan: <strong id="modal-qr-ruangan">-</strong> · Peserta: <strong id="modal-qr-count">0 Mhs</strong></div>
+            <div style="margin-top:4px;">Status: <span id="modal-qr-status-badge"></span></div>
+        </div>
+
+        <!-- Wadah QR Code -->
+        <div style="display:inline-block; padding:14px; background:#ffffff; border:2px dashed #cbd5e1; border-radius:16px; margin-bottom:16px;">
+            <div id="modal-qr-container" style="display:inline-block; min-width:220px; min-height:220px;"></div>
+            <p style="font-size:11px; color:#64748b; margin:8px 0 0 0;">Scan dengan kamera HP untuk presensi langsung</p>
+        </div>
+
+        <!-- Input Link URL Absensi -->
+        <div style="display:flex; gap:8px; margin-bottom:18px;">
+            <input type="text" id="modal-qr-url" readonly style="flex:1; padding:7px 10px; font-size:11px; font-family:monospace; border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; color:#475569;">
+            <button type="button" id="btn-copy-modal-url" class="btn btn-secondary" style="font-size:12px; padding:7px 12px; white-space:nowrap;">📋 Salin</button>
+        </div>
+
+        <input type="hidden" id="modal-qr-session-id">
+
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <button type="button" id="modal-qr-btn-toggle" class="btn btn-success" style="font-weight:700; padding:8px 16px; font-size:13px;">
+                🟢 Buka Sesi (2 Jam)
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="window.print()" style="font-weight:600; padding:8px 16px; font-size:13px;">
+                🖨️ Cetak QR
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- ===========================================================================
      MODAL TAMBAH TUTOR BARU
@@ -1447,6 +2057,9 @@ input:checked + .slider:before { transform: translateX(16px); }
     </div>
 </div>
 
+<!-- Load QRCode Library -->
+<script src="<?= BASE_URL ?>/assets/js/lib/qrcode.min.js"></script>
+
 <script>
 // CSRF Token global
 const CSRF_TOKEN = '<?= csrfToken() ?>';
@@ -1485,6 +2098,170 @@ document.querySelectorAll('.custom-modal-backdrop').forEach(function(modal) {
     });
 });
 
+// ── MODAL QR CODE SESI PRESENSI ───────────────────────────────────────────
+function openSessionQrModal(sessionId, hari, jam, penguji, ruangan, count, isOpen, url, openUntil) {
+    document.getElementById('modal-qr-session-id').value = sessionId;
+    document.getElementById('modal-qr-hari').textContent = hari;
+    document.getElementById('modal-qr-jam').textContent = jam;
+    document.getElementById('modal-qr-penguji').textContent = penguji || 'Belum ditentukan';
+    document.getElementById('modal-qr-ruangan').textContent = ruangan || 'Belum diplot';
+    document.getElementById('modal-qr-count').textContent = count + ' Mahasiswa';
+    document.getElementById('modal-qr-url').value = url;
+    
+    var statusBadge = document.getElementById('modal-qr-status-badge');
+    var btnToggle = document.getElementById('modal-qr-btn-toggle');
+    if (isOpen) {
+        statusBadge.innerHTML = '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;">🟢 BUKA' + (openUntil ? ' (s.d ' + openUntil + ')' : '') + '</span>';
+        btnToggle.textContent = '🔒 Tutup Sesi Absensi';
+        btnToggle.className = 'btn btn-danger';
+        btnToggle.setAttribute('data-target-state', 'close');
+    } else {
+        statusBadge.innerHTML = '<span style="background:#f1f5f9;color:#64748b;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;">🔒 TERTUTUP</span>';
+        btnToggle.textContent = '🟢 Buka Sesi Absensi (2 Jam)';
+        btnToggle.className = 'btn btn-success';
+        btnToggle.setAttribute('data-target-state', 'open');
+    }
+
+    var qrContainer = document.getElementById('modal-qr-container');
+    qrContainer.innerHTML = '';
+    if (typeof QRCode !== 'undefined') {
+        new QRCode(qrContainer, {
+            text: url,
+            width: 220,
+            height: 220,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+
+    document.getElementById('modal-qr-sesi').style.display = 'flex';
+}
+
+// Salin link di modal QR
+document.getElementById('btn-copy-modal-url').addEventListener('click', function() {
+    var urlInput = document.getElementById('modal-qr-url');
+    urlInput.select();
+    navigator.clipboard.writeText(urlInput.value).then(function() {
+        if (typeof showToast === 'function') {
+            showToast('Link absensi mahasiswa berhasil disalin!', 'success', 2500);
+        } else {
+            alert('Link absensi berhasil disalin!');
+        }
+    });
+});
+
+// Toggle Sesi Buka/Tutup dari dalam Modal QR
+document.getElementById('modal-qr-btn-toggle').addEventListener('click', function() {
+    var sessionId = document.getElementById('modal-qr-session-id').value;
+    var targetState = this.getAttribute('data-target-state');
+
+    toggleSessionAjax(sessionId, targetState, function(data) {
+        if (data && data.success) {
+            closeModal('modal-qr-sesi');
+            location.reload();
+        }
+    });
+});
+
+// Salin URL via tombol di tabel sesi
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn-copy-link');
+    if (!btn) return;
+    var url = btn.getAttribute('data-url');
+    if (!url) return;
+
+    navigator.clipboard.writeText(url).then(function() {
+        if (typeof showToast === 'function') {
+            showToast('Link absensi berhasil disalin!', 'success', 2500);
+        } else {
+            alert('Link absensi berhasil disalin!');
+        }
+    });
+});
+
+// ── AJAX: BUKA / TUTUP SESI ABSENSI PRETES DARI TABEL ──────────────────────
+function toggleSessionAjax(sessionId, targetState, callback) {
+    var formData = new FormData();
+    formData.append('action', 'toggle_session_ajax');
+    formData.append('csrf_token', CSRF_TOKEN);
+    formData.append('session_id', sessionId);
+    formData.append('target_state', targetState);
+    formData.append('duration_hours', 2);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.success) {
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'success', 3000);
+            }
+            if (callback) callback(data);
+            else {
+                // Update cell status & tombol di tabel tanpa reload penuh
+                var statusCell = document.getElementById('session-status-cell-' + sessionId);
+                var row = document.getElementById('session-row-' + sessionId);
+                if (statusCell && row) {
+                    var btn = row.querySelector('.btn-toggle-session-ajax');
+                    if (data.is_open) {
+                        statusCell.innerHTML = '<span class="badge" style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;"><span style="width:6px; height:6px; border-radius:50%; background:#16a34a; animation:pulseGlow 1.5s infinite;"></span> BUKA</span>';
+                        if (btn) {
+                            btn.textContent = '🔒 Tutup';
+                            btn.className = 'btn btn-sm btn-toggle-session-ajax btn-danger';
+                            btn.setAttribute('data-target-state', 'close');
+                        }
+                    } else {
+                        statusCell.innerHTML = '<span class="badge" style="background:#f1f5f9; color:#64748b; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px;">🔒 TERTUTUP</span>';
+                        if (btn) {
+                            btn.textContent = '🟢 Buka';
+                            btn.className = 'btn btn-sm btn-toggle-session-ajax btn-success';
+                            btn.setAttribute('data-target-state', 'open');
+                        }
+                    }
+                }
+            }
+        } else {
+            var errMsg = (data && data.message) ? data.message : 'Gagal memperbarui status sesi.';
+            if (typeof showToast === 'function') {
+                showToast(errMsg, 'danger', 4000);
+            } else {
+                alert(errMsg);
+            }
+        }
+    })
+    .catch(err => {
+        if (typeof showToast === 'function') {
+            showToast('Koneksi terputus: ' + (err.message || 'Gagal menyimpan'), 'danger', 4000);
+        }
+    });
+}
+
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.btn-toggle-session-ajax');
+    if (!btn) return;
+    var sessionId = btn.getAttribute('data-session-id');
+    var targetState = btn.getAttribute('data-target-state');
+    toggleSessionAjax(sessionId, targetState);
+});
+
+// ── CUSTOM INPUT PADA BULK JAM SELECT ──────────────────────────────────────
+var bulkJamSelect = document.getElementById('bulk-new-jam-select');
+if (bulkJamSelect) {
+    bulkJamSelect.addEventListener('change', function() {
+        var customInput = document.getElementById('bulk-custom-jam-text');
+        if (this.value === '__CUSTOM__') {
+            customInput.style.display = 'block';
+            customInput.required = true;
+            customInput.focus();
+        } else {
+            customInput.style.display = 'none';
+            customInput.required = false;
+        }
+    });
+}
+
 // ── INTERACTIVE AJAX: INLINE DROPDOWN PENGGANTIAN DOSEN PENGUJI ─────────────
 document.addEventListener('change', function(e) {
     if (!e.target.classList.contains('select-tutor-inline')) return;
@@ -1518,7 +2295,6 @@ document.addEventListener('change', function(e) {
             selectEl.classList.add('updated-success');
             setTimeout(() => selectEl.classList.remove('updated-success'), 2000);
 
-            // Update data-sort dan data-filter di cell TD agar DataTables tetap konsisten
             const td = selectEl.closest('td');
             if (td) {
                 td.setAttribute('data-sort', newVal);
@@ -1533,6 +2309,67 @@ document.addEventListener('change', function(e) {
         } else {
             selectEl.value = oldVal;
             const errMsg = (data && data.message) ? data.message : 'Gagal mengubah dosen penguji.';
+            if (typeof showToast === 'function') {
+                showToast(errMsg, 'danger', 4000);
+            } else {
+                alert(errMsg);
+            }
+        }
+    })
+    .catch(err => {
+        selectEl.disabled = false;
+        selectEl.classList.remove('updating');
+        selectEl.value = oldVal;
+        const errMsg = 'Koneksi terputus: ' + (err.message || 'Gagal menyimpan');
+        if (typeof showToast === 'function') {
+            showToast(errMsg, 'danger', 4000);
+        } else {
+            alert(errMsg);
+        }
+    });
+});
+
+// ── INTERACTIVE AJAX: INLINE DROPDOWN PENGGANTIAN SESI / JAM ───────────────
+document.addEventListener('change', function(e) {
+    if (!e.target.classList.contains('select-jam-inline')) return;
+
+    const selectEl = e.target;
+    const regId    = selectEl.getAttribute('data-reg-id');
+    const newVal   = selectEl.value;
+    const oldVal   = selectEl.getAttribute('data-orig-val') || '';
+
+    selectEl.classList.add('updating');
+    selectEl.disabled = true;
+
+    const formData = new FormData();
+    formData.append('action', 'update_jam_ajax');
+    formData.append('csrf_token', CSRF_TOKEN);
+    formData.append('reg_id', regId);
+    formData.append('jam', newVal);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        selectEl.disabled = false;
+        selectEl.classList.remove('updating');
+
+        if (data && data.success) {
+            selectEl.setAttribute('data-orig-val', newVal);
+            selectEl.classList.add('updated-success');
+            setTimeout(() => selectEl.classList.remove('updated-success'), 2000);
+
+            if (typeof showToast === 'function') {
+                showToast(data.message || 'Sesi jam pretes telah dirubah', 'success', 3500);
+            } else {
+                alert(data.message || 'Sesi jam pretes telah dirubah');
+            }
+        } else {
+            selectEl.value = oldVal;
+            const errMsg = (data && data.message) ? data.message : 'Gagal mengubah sesi jam.';
             if (typeof showToast === 'function') {
                 showToast(errMsg, 'danger', 4000);
             } else {
@@ -1632,6 +2469,17 @@ $(document).ready(function() {
                 dtPenugasan.column(4).search(day).draw();
                 $('.btn-filter-hari').removeClass('btn-primary').addClass('btn-secondary').css({'background': '', 'color': ''});
                 $(this).removeClass('btn-secondary').addClass('btn-primary').css({'background': '#0284c7', 'color': '#fff'});
+            });
+        }
+
+        if ($('#table-sesi-pretes').length) {
+            $('#table-sesi-pretes').DataTable({
+                pageLength: 20,
+                language: {
+                    search: "Cari Sesi:",
+                    lengthMenu: "Tampilkan _MENU_ data",
+                    emptyTable: "Belum ada sesi pretes yang terbentuk"
+                }
             });
         }
 

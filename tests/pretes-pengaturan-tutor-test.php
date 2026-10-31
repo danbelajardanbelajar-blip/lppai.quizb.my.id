@@ -1,6 +1,6 @@
 <?php
 /**
- * Test Suite: Pengaturan Tutor Pretes & Sidebar Integration
+ * Test Suite: Pengaturan Tutor & Sesi Pretes
  */
 
 function runTutorSettingTests() {
@@ -32,18 +32,30 @@ function runTutorSettingTests() {
             $failures[] = "Pengamanan requireAdmin() tidak ditemukan di admin/pretes-pengaturan-tutor.php";
         }
 
-        // Cek AJAX endpoints
+        // Cek AJAX endpoints untuk Tutor & Sesi
         if (strpos($content, 'update_tutor_ajax') === false) {
             $failures[] = "Endpoint update_tutor_ajax tidak ditemukan di file.";
         }
         if (strpos($content, 'Dosen penguji telah dirubah') === false) {
             $failures[] = "Pesan toast 'Dosen penguji telah dirubah' tidak ditemukan di file.";
         }
+        if (strpos($content, 'update_jam_ajax') === false) {
+            $failures[] = "Endpoint update_jam_ajax tidak ditemukan di file.";
+        }
+        if (strpos($content, 'Sesi jam pretes telah dirubah') === false) {
+            $failures[] = "Pesan toast 'Sesi jam pretes telah dirubah' tidak ditemukan di file.";
+        }
+        if (strpos($content, 'toggle_session_ajax') === false) {
+            $failures[] = "Endpoint toggle_session_ajax tidak ditemukan di file.";
+        }
+        if (strpos($content, 'reset_session_token_ajax') === false) {
+            $failures[] = "Endpoint reset_session_token_ajax tidak ditemukan di file.";
+        }
         if (strpos($content, 'toggle_tutor_status_ajax') === false) {
             $failures[] = "Endpoint toggle_tutor_status_ajax tidak ditemukan di file.";
         }
 
-        // Cek Form Actions
+        // Cek Form Actions Pengaturan Tutor & Sesi
         if (strpos($content, 'create_tutor') === false) {
             $failures[] = "Aksi create_tutor tidak ditemukan.";
         }
@@ -59,9 +71,29 @@ function runTutorSettingTests() {
         if (strpos($content, 'update_master_jadwal_tutor') === false) {
             $failures[] = "Aksi update_master_jadwal_tutor tidak ditemukan.";
         }
+        if (strpos($content, 'update_master_jam') === false) {
+            $failures[] = "Aksi update_master_jam tidak ditemukan.";
+        }
+        if (strpos($content, 'bulk_update_jam') === false) {
+            $failures[] = "Aksi bulk_update_jam tidak ditemukan.";
+        }
+        if (strpos($content, 'open_all_sessions') === false) {
+            $failures[] = "Aksi open_all_sessions tidak ditemukan.";
+        }
+        if (strpos($content, 'close_all_sessions') === false) {
+            $failures[] = "Aksi close_all_sessions tidak ditemukan.";
+        }
 
-        // Cek kolom tabel penguji terkait
-        foreach (['dosen_penguji', 'penguji_senin', 'penguji_selasa', 'penguji_rabu', 'penguji_kamis', 'penguji_jumat'] as $col) {
+        // Cek tab pengaturan sesi
+        if (strpos($content, 'tab=sesi') === false) {
+            $failures[] = "Tab 'tab=sesi' tidak ditemukan di navigasi tab.";
+        }
+        if (strpos($content, 'Pengaturan Sesi Pretes') === false) {
+            $failures[] = "Teks 'Pengaturan Sesi Pretes' tidak ditemukan di file.";
+        }
+
+        // Cek kolom tabel penguji dan sesi terkait
+        foreach (['dosen_penguji', 'jam', 'penguji_senin', 'penguji_selasa', 'penguji_rabu', 'penguji_kamis', 'penguji_jumat'] as $col) {
             if (strpos($content, $col) === false) {
                 $failures[] = "Kolom $col tidak ditemukan di file.";
             }
@@ -80,7 +112,7 @@ function runTutorSettingTests() {
         exit(1);
     }
 
-    echo "PASS: Sidebar terintegrasi, file halaman pengaturan tutor lengkap dan valid.\n";
+    echo "PASS: Pengaturan Tutor & Sesi Pretes terverifikasi lengkap dan valid.\n";
     exit(0);
 }
 
