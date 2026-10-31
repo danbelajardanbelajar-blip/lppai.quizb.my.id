@@ -610,6 +610,45 @@ function addQETutorRow(day) {
     </div>
 </div>
 
+<div class="card">
+    <div class="card-header">Export Absensi Pretes</div>
+    <div class="card-body">
+        <p style="margin-top:0;color:#475569;">Lembar absensi resmi dengan kop dan logo LPPAI, dipisahkan per hari, jam, penguji, dan ruangan. Buka pratinjau untuk mencetak atau menyimpan sebagai PDF.</p>
+        <form action="pretes-absensi-export.php" method="GET" target="_blank" rel="noopener" data-no-spa style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <input type="hidden" name="pretes_id" value="<?= (int)$active_pretes['id'] ?>">
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
+                <label>Periode</label>
+                <div style="padding:10px 0;"><?= sanitize($active_pretes['periode']) ?></div>
+            </div>
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
+                <label for="absensi-hari">Hari</label>
+                <select id="absensi-hari" name="hari">
+                    <option value="">Semua hari</option>
+                    <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                    <option value="<?= $day ?>"><?= $day ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php foreach (['dosen_penguji' => 'Dosen Penguji', 'ruangan' => 'Ruangan'] as $field => $label):
+                $options = array_values(array_unique(array_filter(array_map(fn($value) => trim($value ?? ''), array_column($participants, $field)))));
+                sort($options, SORT_NATURAL | SORT_FLAG_CASE);
+            ?>
+            <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
+                <label for="absensi-<?= $field ?>"><?= $label ?></label>
+                <select id="absensi-<?= $field ?>" name="<?= $field ?>">
+                    <option value="">Semua</option>
+                    <?php foreach ($options as $option): ?>
+                    <option value="<?= sanitize($option) ?>"><?= sanitize($option) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endforeach; ?>
+            <button type="submit" class="btn btn-primary" style="width:auto;">Export Absensi / PDF</button>
+        </form>
+        <p style="font-size:12px;color:#64748b;margin-bottom:0;">Export hanya memuat peserta pada periode yang tercantum. Tanggal pelaksanaan dapat diisi pada lembar cetak.</p>
+    </div>
+</div>
+
 <!-- ===================================================
      CARD 3: TABEL HASIL PLOTTING & JADWAL PRETES
      =================================================== -->
