@@ -81,7 +81,11 @@ try {
         assertCard($exit === 0 && $errors === '', "$case: PHP error: $errors");
         assertCard(strpos($output, 'HTTP_STATUS=' . $status) !== false, "$case: status HTTP salah.");
         assertCard(strpos($output, '<script>alert') === false, "$case: data HTML harus di-escape.");
-        assertCard(strpos($output, 'SECRET_') === false, "$case: kredensial CBT tidak boleh tercetak.");
+        if ($case === 'full') {
+            assertCard(strpos($output, 'SECRET_USERNAME') !== false && strpos($output, 'SECRET_PASSWORD') !== false, "$case: username dan password CBT harus tercetak.");
+            assertCard(strpos($output, 'Tutorial Ubudiyah Unisda') !== false, 'Nama program harus Tutorial Ubudiyah Unisda.');
+            assertCard(strpos($output, "UNIVERSITAS ISLAM DARUL") !== false, 'Header institusi UNISDA harus tercetak.');
+        }
         if ($status === 200) {
             assertCard(strpos($output, 'PRE-000123') !== false, "$case: nomor peserta hilang.");
             assertCard(strpos($output, '&lt;script&gt;') !== false, "$case: identitas harus aman.");

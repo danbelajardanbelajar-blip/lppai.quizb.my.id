@@ -262,7 +262,8 @@ include __DIR__ . '/../includes/header.php';
             <div style="font-size:14px; color:#334155; line-height:1.6;">
                 <?= nl2br(sanitize($annPretes['konten'])) ?>
             </div>
-            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #bae6fd; font-size:13px; color:#0369a1;">
+            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #bae6fd; font-size:13px; color:#0369a1; line-height:1.6;">
+                📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong>2 sampai 6 November 2026</strong> (Senin s.d. Jumat).<br>
                 🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong>Pukul 13.00 WIB (Jam 1 Siang)</strong>.
             </div>
         </div>
@@ -270,9 +271,12 @@ include __DIR__ . '/../includes/header.php';
         <!-- Info Pengumuman Pelaksanaan & Jam (Jam 1 / 13.00) -->
         <div class="announcement-card" style="margin-bottom:24px; background:#f0f9ff; border-left:4px solid #0ea5e9; padding:18px 20px; border-radius:10px;">
             <div class="ann-title" style="color:#0284c7; font-weight:700; font-size:16px; margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-                <span>📢</span> Informasi Pelaksanaan Pre-tes Mahasiswa
+                <span>📢</span> Informasi Pelaksanaan Pre-tes Mahasiswa (Tutorial Ubudiyah Unisda)
             </div>
             <div style="font-size:14px; color:#334155; line-height:1.6;">
+                <p style="margin:0 0 8px;">
+                    📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong>2 sampai 6 November 2026</strong> (Senin s.d. Jumat).
+                </p>
                 <p style="margin:0 0 8px;">
                     🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong>Pukul 13.00 WIB (Jam 1 Siang)</strong>.
                 </p>
@@ -289,23 +293,31 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="action" value="daftar_pretes">
 
             <label style="font-weight:600; margin-bottom:10px; display:block; font-size:15px; color:#1e293b;">
-                Pilih Hari Pelaksanaan Pretes (Jam: 13.00 WIB / Jam 1) <span style="color:red">*</span>
+                Pilih Hari &amp; Tanggal Pelaksanaan Pretes (2 – 6 November 2026, Pukul 13.00 WIB) <span style="color:red">*</span>
             </label>
 
             <div class="form-group" style="margin-bottom:24px;">
                 <select name="hari_pilihan" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
-                    <option value="">-- Pilih Hari --</option>
+                    <option value="">-- Pilih Hari &amp; Tanggal Ujian --</option>
                     <?php 
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    $dayLabels = [
+                        'Senin' => 'Senin, 2 November 2026',
+                        'Selasa' => 'Selasa, 3 November 2026',
+                        'Rabu' => 'Rabu, 4 November 2026',
+                        'Kamis' => 'Kamis, 5 November 2026',
+                        'Jumat' => 'Jumat, 6 November 2026',
+                    ];
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
                         $kuota  = (int)($active_pretes["kuota_$dayLower"] ?? 0);
                         $terisi = $registeredCounts[$day] ?? 0;
                         $sisa   = $kuota - $terisi;
                         $isFull = ($kuota <= 0) || ($sisa <= 0);
+                        $labelDay = $dayLabels[$day] ?? $day;
                     ?>
                     <option value="<?= $day ?>" <?= $isFull ? 'disabled style="color:#94a3b8;"' : '' ?>>
-                        <?= $day ?> <?= $isFull ? ($kuota <= 0 ? '(Belum ada dosen penguji/kuota)' : '(Penuh)') : "(Sisa $sisa kursi dari total kuota $kuota)" ?>
+                        <?= $labelDay ?> <?= $isFull ? ($kuota <= 0 ? '(Belum ada dosen penguji/kuota)' : '(Penuh)') : "(Sisa $sisa kursi dari total kuota $kuota)" ?>
                     </option>
                     <?php endforeach; ?>
                 </select>

@@ -403,7 +403,8 @@ include __DIR__ . '/../includes/header.php';
             </h4>
             <p style="margin:0; font-size:14px; color:#1d4ed8;">
                 Tahun Ajaran: <strong><?= sanitize($active_pretes['tahun_ajaran']) ?></strong> | 
-                Jam Pelaksanaan: <strong><?= sanitize($active_pretes['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
+                Pelaksanaan: <strong>2 – 6 November 2026</strong> | 
+                Jam: <strong><?= sanitize($active_pretes['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
             </p>
         </div>
         <a href="<?= BASE_URL ?>/admin/pretes-dosen.php" class="btn btn-outline-primary" style="white-space:nowrap; padding:8px 16px; font-weight:600; text-decoration:none; background:#fff;">
@@ -438,7 +439,7 @@ include __DIR__ . '/../includes/header.php';
                 ?>
                 <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="font-weight:bold; font-size:14px; text-transform:capitalize; margin:0;"><?= $day ?></label>
+                        <label style="font-weight:bold; font-size:14px; text-transform:capitalize; margin:0;"><?= $day ?> <span style="font-size:12px;color:#0284c7;font-weight:600;">(<?= ['Senin'=>'2 Nov','Selasa'=>'3 Nov','Rabu'=>'4 Nov','Kamis'=>'5 Nov','Jumat'=>'6 Nov'][$day] ?? '' ?>)</span></label>
                         <span style="font-size:11px; background:#e2e8f0; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">13.00 WIB</span>
                     </div>
                     

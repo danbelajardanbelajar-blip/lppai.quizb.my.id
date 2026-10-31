@@ -23,29 +23,29 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            padding: 28px 18px;
+            padding: 24px 16px;
             background: #eef3f8;
             color: #0f172a;
             font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            font-size: 13px;
-            line-height: 1.55;
+            font-size: 12.5px;
+            line-height: 1.5;
             -webkit-font-smoothing: antialiased;
         }
 
         .toolbar, .card {
             width: 100%;
-            max-width: 820px;
+            max-width: 860px;
             margin: 0 auto;
         }
 
-        /* ── Toolbar Aksi Atas (Hanya Layar) ── */
+        /* ── Toolbar Aksi Layar ── */
         .toolbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 12px;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             padding: 12px 18px;
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -55,13 +55,9 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
         .toolbar-info {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             color: #475569;
-            font-size: 12.5px;
-        }
-        .toolbar-info svg {
-            color: #0284c7;
-            flex-shrink: 0;
+            font-size: 12px;
         }
         .actions {
             display: flex;
@@ -76,7 +72,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             min-height: 40px;
             padding: 8px 16px;
             border: 1px solid #cbd5e1;
-            border-radius: 9px;
+            border-radius: 8px;
             background: #ffffff;
             color: #334155;
             font-family: inherit;
@@ -102,30 +98,26 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
             color: #ffffff;
         }
-        .button:focus-visible {
-            outline: 3px solid #38bdf8;
-            outline-offset: 2px;
-        }
 
         /* ── Kartu Utama ── */
         .card {
             position: relative;
             background: #ffffff;
             border: 1px solid #cbd5e1;
-            border-top: 6px solid #0369a1;
-            border-radius: 16px;
-            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+            border-top: 5px solid #0369a1;
+            border-radius: 14px;
+            box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
             overflow: hidden;
         }
 
-        /* Watermark lambang di latar belakang kartu */
+        /* Watermark lambang di latar belakang */
         .card-watermark {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 380px;
-            height: 380px;
+            width: 360px;
+            height: 360px;
             background-image: url('<?= BASE_URL ?>/assets/logo.svg');
             background-repeat: no-repeat;
             background-position: center;
@@ -135,40 +127,67 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             z-index: 0;
         }
 
-        /* ── Kop Surat / Header Resmi Institusi ── */
+        /* ── Kop Surat Resmi UNISDA LPPAI ── */
         .brand {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 24px 14px;
+            background: #ffffff;
+        }
+        .brand-logo {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+        .brand-text {
+            flex: 1;
+            text-align: center;
+            min-width: 0;
+        }
+        .inst-uni {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+        .inst-lppai {
+            margin: 2px 0;
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #0369a1;
+            letter-spacing: 0.3px;
+        }
+        .inst-address {
+            margin: 0;
+            font-size: 11px;
+            color: #475569;
+            line-height: 1.35;
+        }
+        .kop-rule {
+            height: 3px;
+            border-top: 2.5px solid #0f172a;
+            border-bottom: 1px solid #0f172a;
+            margin: 0 24px;
+        }
+
+        /* ── Banner Judul Kartu ── */
+        .card-header-bar {
             position: relative;
             z-index: 1;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 18px;
-            padding: 22px 28px 18px;
-            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .brand-institution {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            min-width: 0;
-        }
-        .brand-logo {
-            width: 60px;
-            height: 60px;
-            object-fit: contain;
-            flex-shrink: 0;
-        }
-        .brand-titles {
-            min-width: 0;
-        }
-        .inst-eyebrow {
-            margin: 0;
-            color: #0369a1;
-            font-size: 10.5px;
-            font-weight: 800;
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-bottom: 1px solid #bae6fd;
         }
         .eyebrow {
             margin: 0;
@@ -179,38 +198,35 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             text-transform: uppercase;
         }
         h1 {
-            margin: 2px 0 0;
-            color: #0f172a;
-            font-size: 21px;
+            margin: 0;
+            font-size: 17px;
             font-weight: 800;
-            line-height: 1.25;
-            letter-spacing: -0.2px;
+            color: #0369a1;
+            letter-spacing: 0.2px;
+            text-transform: uppercase;
         }
-        .inst-sub {
-            margin: 2px 0 0;
-            color: #64748b;
+        .program-tag {
             font-size: 12px;
-            font-weight: 500;
+            font-weight: 700;
+            color: #0284c7;
+            margin-top: 2px;
         }
-        .brand-badge-col {
+        .badge-group {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
-            flex-shrink: 0;
+            align-items: center;
+            gap: 8px;
         }
         .badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
+            gap: 5px;
+            padding: 4px 10px;
             border: 1px solid #bae6fd;
             border-radius: 20px;
-            background: #f0f9ff;
+            background: #ffffff;
             color: #0369a1;
-            font-size: 11.5px;
+            font-size: 11px;
             font-weight: 700;
-            letter-spacing: 0.3px;
             text-transform: uppercase;
         }
         .badge::before {
@@ -220,258 +236,262 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             border-radius: 50%;
             background: #0284c7;
         }
-        .card-number-badge {
-            font-family: 'JetBrains Mono', monospace, Consolas, sans-serif;
-            font-size: 12px;
+        .card-id-pill {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11.5px;
             font-weight: 700;
-            color: #475569;
-            background: #f1f5f9;
-            padding: 3px 8px;
+            color: #0f172a;
+            background: #ffffff;
+            padding: 4px 10px;
             border-radius: 6px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid #cbd5e1;
         }
 
-        /* ── Garis Ganda Kop Surat Resmi ── */
-        .kop-rule {
-            height: 3px;
-            border-top: 2px solid #0369a1;
-            border-bottom: 1px solid #0284c7;
-            margin: 0;
-            opacity: 0.85;
-        }
-
-        /* ── Isi Kartu ── */
+        /* ── Konten Utama ── */
         .content {
             position: relative;
             z-index: 1;
-            padding: 22px 28px;
+            padding: 18px 24px;
         }
 
-        /* Banner Periode */
-        .period-banner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-            padding: 10px 16px;
-            margin-bottom: 18px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-left: 4px solid #0369a1;
-            border-radius: 8px;
-        }
-        .period-banner-left {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .period-banner-label {
-            color: #64748b;
-            font-size: 11.5px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .period-banner-val {
-            margin: 0;
-            color: #0f172a;
-            font-size: 13.5px;
-            font-weight: 800;
-        }
-        .period-type {
-            font-size: 11.5px;
-            color: #0369a1;
-            font-weight: 700;
-            background: #e0f2fe;
-            padding: 3px 10px;
-            border-radius: 6px;
-        }
-
-        /* ── Grid Dua Kolom: Identitas & Jadwal (Kiri) + Pas Foto & QR Code (Kanan) ── */
+        /* ── Grid Identitas & Jadwal (Kiri) + Pas Foto (Kanan) ── */
         .main-grid {
             display: grid;
-            grid-template-columns: 1fr 180px;
-            gap: 18px;
+            grid-template-columns: 1fr 140px;
+            gap: 16px;
             align-items: start;
+            margin-bottom: 16px;
         }
-
         .data-column {
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
             min-width: 0;
         }
-
         .section-box {
             background: #ffffff;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 16px 18px;
-        }
-        .section-box-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px dashed #e2e8f0;
-        }
-        .section-box-header svg {
-            color: #0369a1;
-            flex-shrink: 0;
+            border-radius: 10px;
+            padding: 12px 14px;
         }
         h2 {
-            margin: 0;
-            font-size: 11.5px;
-            letter-spacing: 1px;
+            margin: 0 0 8px;
+            font-size: 11px;
+            letter-spacing: 0.8px;
             text-transform: uppercase;
             color: #0369a1;
             font-weight: 800;
+            border-bottom: 1px dashed #e2e8f0;
+            padding-bottom: 4px;
         }
-
         dl {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px 18px;
+            gap: 8px 16px;
             margin: 0;
         }
         dl > div { min-width: 0; }
         dt {
-            margin-bottom: 2px;
+            margin-bottom: 1px;
             color: #64748b;
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
         }
         dd {
             margin: 0;
             color: #0f172a;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 700;
             overflow-wrap: anywhere;
         }
         .full { grid-column: 1 / -1; }
         .student-name {
-            font-size: 16.5px;
+            font-size: 15px;
             font-weight: 800;
             color: #0369a1;
             line-height: 1.3;
         }
-        .nim-val {
-            font-family: 'JetBrains Mono', monospace, Consolas, sans-serif;
-            letter-spacing: 0.5px;
-            font-size: 13.5px;
-            color: #0f172a;
+        .mono-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
         }
 
-        /* ── Kolom Pas Foto & QR Code ── */
-        .side-column {
+        /* Pas Foto Box */
+        .photo-column {
             display: flex;
             flex-direction: column;
-            gap: 14px;
             align-items: center;
         }
-
-        /* Kotak Pas Foto 3x4 */
         .photo-box {
             width: 130px;
             height: 165px;
             border: 1.5px dashed #94a3b8;
-            border-radius: 10px;
+            border-radius: 8px;
             background: #f8fafc;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 8px;
+            padding: 6px;
             text-align: center;
             box-sizing: border-box;
-            box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
         }
         .photo-box svg {
             color: #94a3b8;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
         .photo-title {
             font-size: 10px;
             font-weight: 800;
             color: #64748b;
-            letter-spacing: 0.8px;
             text-transform: uppercase;
         }
         .photo-dim {
             font-size: 13px;
-            font-weight: 900;
+            font-weight: 800;
             color: #334155;
-            margin: 2px 0 4px;
+            margin: 2px 0;
         }
         .photo-hint {
-            font-size: 9.5px;
+            font-size: 9px;
             color: #94a3b8;
             line-height: 1.25;
         }
 
-        /* Kotak QR Code Verifikasi */
-        .qr-card {
-            width: 130px;
-            border: 1px solid #cbd5e1;
+        /* ── Kotak Akun CBT E-Ujian ── */
+        .cbt-account-box {
+            background: #fffbeb;
+            border: 1.5px solid #fde68a;
             border-radius: 10px;
-            background: #ffffff;
-            padding: 10px 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+            padding: 12px 16px;
+            margin-bottom: 16px;
         }
-        .qr-target {
-            width: 90px;
-            height: 90px;
+        .cbt-account-title {
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 6px;
-        }
-        .qr-target img, .qr-target canvas {
-            max-width: 100% !important;
-            height: auto !important;
-            border-radius: 4px;
-        }
-        .qr-fallback-svg {
-            width: 86px;
-            height: 86px;
-            border-radius: 4px;
-        }
-        .qr-caption {
-            font-size: 9.5px;
+            gap: 6px;
+            font-size: 11.5px;
             font-weight: 800;
-            color: #0369a1;
+            color: #92400e;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            line-height: 1.2;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
-        .qr-subcaption {
-            font-size: 8.5px;
-            color: #64748b;
-            margin-top: 2px;
+        .cbt-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .cbt-item {
+            background: #ffffff;
+            border: 1px solid #fef3c7;
+            border-radius: 8px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .cbt-lbl {
+            font-size: 10px;
+            font-weight: 700;
+            color: #78350f;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .cbt-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 800;
+            color: #b45309;
+            word-break: break-all;
         }
 
-        /* ── Materi Uji & Tata Tertib ── */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-            margin-top: 16px;
+        /* ── Tabel Kisi-Kisi Soal & Kriteria Penilaian (Sesuai Gambar) ── */
+        .syllabus-section {
+            margin-bottom: 16px;
         }
-        .info-card {
+        .syllabus-title {
+            text-align: center;
+            margin: 0 0 8px;
+            font-size: 12px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+        .syllabus-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            border: 1.5px solid #0f172a;
+        }
+        .syllabus-table th, .syllabus-table td {
+            border: 1px solid #0f172a;
+            padding: 6px 8px;
+            vertical-align: top;
+            line-height: 1.35;
+        }
+        .syllabus-table th {
+            background: #f1f5f9;
+            color: #0f172a;
+            font-weight: 800;
+            text-align: center;
+            text-transform: uppercase;
+            font-size: 10.5px;
+        }
+        .syllabus-table td.col-no {
+            text-align: center;
+            font-weight: 700;
+            width: 32px;
+        }
+        .syllabus-table td.col-materi {
+            width: 52%;
+        }
+        .syllabus-table td.col-kriteria {
+            width: 44%;
+        }
+        .syllabus-heading {
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+        .syllabus-sub {
+            margin: 2px 0 0;
+            color: #334155;
+        }
+        .syllabus-list {
+            margin: 2px 0 0;
+            padding-left: 14px;
+            color: #334155;
+        }
+        .syllabus-list li {
+            margin-bottom: 2px;
+        }
+        .syllabus-footer-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            font-weight: 800;
+            font-size: 11.5px;
+        }
+        .passing-grade {
+            color: #0f172a;
+        }
+        .lppai-unisda-brand {
+            color: #16a34a;
+            letter-spacing: 0.6px;
+        }
+
+        /* ── Peraturan & Tata Tertib (Dari Halaman Panduan Mahasiswa) ── */
+        .rules-section {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
+            border-left: 4px solid #0369a1;
+            border-radius: 8px;
             padding: 12px 14px;
+            margin-bottom: 16px;
         }
-        .info-card-title {
+        .rules-title {
             display: flex;
             align-items: center;
             gap: 6px;
@@ -479,65 +499,47 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             font-weight: 800;
             color: #0369a1;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            letter-spacing: 0.4px;
+            margin-bottom: 6px;
         }
-        .info-card-title svg {
-            flex-shrink: 0;
-            color: #0284c7;
-        }
-        .info-list {
+        .rules-list {
             margin: 0;
             padding-left: 16px;
+            font-size: 11px;
             color: #334155;
-            font-size: 11.5px;
             line-height: 1.45;
         }
-        .info-list li {
+        .rules-list li {
             margin-bottom: 4px;
         }
-        .info-list li:last-child {
+        .rules-list li:last-child {
             margin-bottom: 0;
         }
-
-        /* ── Catatan Resmi (Notice) ── */
-        .notice {
-            margin-top: 14px;
-            padding: 11px 14px;
-            border-left: 3.5px solid #0284c7;
-            background: #f0f9ff;
-            color: #334155;
-            font-size: 11.5px;
-            border-radius: 0 8px 8px 0;
-        }
-        .notice p { margin: 0; }
-        .notice p + p { margin-top: 4px; }
 
         /* ── Lembar Pengesahan Tanda Tangan ── */
         .signature-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 18px;
-            padding-top: 14px;
+            gap: 24px;
+            margin-top: 14px;
+            padding-top: 12px;
             border-top: 1px dashed #cbd5e1;
         }
         .sig-box {
             text-align: center;
-            font-size: 11.5px;
+            font-size: 11px;
             color: #334155;
         }
         .sig-role {
             font-weight: 700;
             color: #0f172a;
-            margin-bottom: 2px;
         }
         .sig-sub {
-            font-size: 10.5px;
+            font-size: 10px;
             color: #64748b;
         }
         .sig-space {
-            height: 48px;
+            height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -546,20 +548,19 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 3px 10px;
+            padding: 3px 8px;
             border: 1px dashed #0284c7;
-            border-radius: 6px;
+            border-radius: 4px;
             color: #0369a1;
-            font-size: 9.5px;
+            font-size: 9px;
             font-weight: 700;
             background: #f0f9ff;
-            letter-spacing: 0.3px;
         }
         .sig-name {
             font-weight: 700;
             color: #0f172a;
             border-top: 1px solid #94a3b8;
-            padding-top: 4px;
+            padding-top: 3px;
             display: inline-block;
             min-width: 170px;
         }
@@ -571,70 +572,43 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             align-items: center;
             flex-wrap: wrap;
             gap: 8px;
-            padding: 12px 28px;
+            padding: 10px 24px;
             border-top: 1px solid #e2e8f0;
             background: #f8fafc;
             color: #64748b;
-            font-size: 11px;
-        }
-        .footer-left {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .footer-dot {
-            color: #94a3b8;
+            font-size: 10.5px;
         }
 
-        /* ── Halaman Kosong (Belum Terdaftar) ── */
+        /* ── Empty State ── */
         .empty {
             text-align: center;
-            padding: 56px 28px;
-        }
-        .empty-icon {
-            font-size: 48px;
-            margin-bottom: 12px;
+            padding: 50px 24px;
         }
         .empty h2 {
-            font-size: 18px;
+            font-size: 16px;
             color: #0f172a;
-            margin-bottom: 8px;
+            border: none;
         }
         .empty p {
             color: #64748b;
-            max-width: 440px;
             margin: 0 auto 20px;
-            font-size: 13.5px;
+            max-width: 440px;
         }
 
-        /* ── Responsif Tampilan Layar ── */
-        @media (max-width: 768px) {
-            body { padding: 16px 10px; }
-            .brand, .content { padding: 18px 16px; }
-            .brand { flex-direction: column; align-items: flex-start; gap: 12px; }
-            .brand-badge-col { align-items: flex-start; }
+        /* ── Responsive Screen ── */
+        @media (max-width: 680px) {
+            body { padding: 14px 10px; }
+            .brand { flex-direction: column; text-align: center; }
             .main-grid { grid-template-columns: 1fr; }
-            .side-column {
-                flex-direction: row;
-                justify-content: center;
-                gap: 16px;
-                width: 100%;
-            }
-            .info-grid { grid-template-columns: 1fr; }
-            .footer { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+            .photo-column { align-items: center; }
+            .cbt-grid { grid-template-columns: 1fr; }
+            .syllabus-table { font-size: 10px; }
         }
 
-        @media (max-width: 520px) {
-            dl { grid-template-columns: 1fr; gap: 10px; }
-            .signature-grid { grid-template-columns: 1fr; gap: 16px; }
-            .side-column { flex-direction: column; }
-            .actions, .actions .button { width: 100%; }
-        }
-
-        /* ── Spesifikasi Cetak Presisi A4 (Print Stylesheet) ── */
+        /* ── Print Stylesheet Presisi ── */
         @page {
             size: A4 portrait;
-            margin: 10mm 12mm;
+            margin: 8mm 10mm;
         }
         @media print {
             * {
@@ -645,7 +619,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                 padding: 0;
                 background: #ffffff !important;
                 color: #000000 !important;
-                font-size: 11.5px;
+                font-size: 11px;
             }
             .no-print {
                 display: none !important;
@@ -653,90 +627,68 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             .card {
                 max-width: 100% !important;
                 box-shadow: none !important;
-                border: 1.5px solid #0369a1 !important;
-                border-top: 5px solid #0369a1 !important;
-                border-radius: 6px !important;
+                border: 1.5px solid #0f172a !important;
+                border-top: 4px solid #0369a1 !important;
+                border-radius: 0 !important;
                 overflow: visible !important;
-                page-break-inside: avoid !important;
             }
             .card-watermark {
                 opacity: 0.04 !important;
             }
             .brand {
-                padding: 14px 20px 12px !important;
-                background: #f8fafc !important;
-                break-inside: avoid;
+                padding: 10px 16px 8px !important;
             }
             .brand-logo {
-                width: 50px !important;
-                height: 50px !important;
+                width: 60px !important;
+                height: 60px !important;
             }
-            h1 { font-size: 18px !important; }
+            .inst-uni { font-size: 13.5px !important; }
+            .inst-lppai { font-size: 12px !important; }
+            .kop-rule { margin: 0 16px !important; }
+            .card-header-bar {
+                padding: 8px 16px !important;
+                background: #f1f5f9 !important;
+            }
             .content {
-                padding: 14px 20px !important;
-                break-inside: avoid;
+                padding: 10px 16px !important;
             }
             .main-grid {
-                grid-template-columns: 1fr 140px !important;
-                gap: 14px !important;
-            }
-            .photo-box {
-                width: 115px !important;
-                height: 145px !important;
-                background: #fafafa !important;
-            }
-            .qr-card {
-                width: 115px !important;
-                padding: 6px !important;
-            }
-            .qr-target {
-                width: 76px !important;
-                height: 76px !important;
-            }
-            .qr-fallback-svg {
-                width: 74px !important;
-                height: 74px !important;
+                grid-template-columns: 1fr 115px !important;
+                gap: 12px !important;
+                margin-bottom: 10px !important;
             }
             .section-box {
-                padding: 12px 14px !important;
-                border: 1px solid #cbd5e1 !important;
-            }
-            dl {
-                grid-template-columns: 1fr 1fr !important;
-                gap: 8px 14px !important;
-            }
-            dt { color: #475569 !important; font-size: 10px !important; }
-            dd { font-size: 12px !important; }
-            .student-name { font-size: 15px !important; }
-            .info-grid {
-                margin-top: 12px !important;
-                gap: 10px !important;
-            }
-            .info-card {
                 padding: 8px 10px !important;
-                background: #ffffff !important;
                 border: 1px solid #cbd5e1 !important;
             }
-            .info-list { font-size: 10.5px !important; }
-            .notice {
-                margin-top: 10px !important;
+            .photo-box {
+                width: 105px !important;
+                height: 135px !important;
+                background: #ffffff !important;
+            }
+            .cbt-account-box {
                 padding: 8px 12px !important;
-                background: #f8fafc !important;
-                font-size: 10.5px !important;
+                margin-bottom: 10px !important;
+                background: #fffbeb !important;
+            }
+            .syllabus-section {
+                margin-bottom: 10px !important;
+            }
+            .syllabus-table th, .syllabus-table td {
+                padding: 4px 6px !important;
+            }
+            .rules-section {
+                padding: 8px 10px !important;
+                margin-bottom: 10px !important;
             }
             .signature-grid {
-                margin-top: 14px !important;
-                padding-top: 10px !important;
-                break-inside: avoid;
+                margin-top: 10px !important;
+                padding-top: 8px !important;
             }
-            .sig-space { height: 38px !important; }
-            .sig-name { min-width: 140px !important; }
+            .sig-space { height: 34px !important; }
             .footer {
-                padding: 8px 20px !important;
-                font-size: 10px !important;
-                background: #ffffff !important;
-                border-top: 1px solid #cbd5e1 !important;
-                break-inside: avoid;
+                padding: 6px 16px !important;
+                font-size: 9.5px !important;
             }
         }
     </style>
@@ -757,8 +709,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             <?php endif; ?>
         </div>
         <div class="toolbar-info">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-            <span>Pilih <strong>“Simpan sebagai PDF”</strong> atau printer A4 untuk mencetak kartu fisik.</span>
+            <span>Pilih <strong>“Simpan sebagai PDF”</strong> untuk mengunduh berkas kartu peserta Anda.</span>
         </div>
     </nav>
 
@@ -766,39 +717,59 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
     <main class="card">
         <div class="card-watermark" aria-hidden="true"></div>
 
-        <!-- ── Kop Institusi Resmi ── -->
+        <!-- ── Kop Institusi Resmi Sesuai Dokumen LPPAI UNISDA ── -->
         <header class="brand">
-            <div class="brand-institution">
-                <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI" class="brand-logo">
-                <div class="brand-titles">
-                    <p class="inst-eyebrow">LPPAI Corner</p>
-                    <h1>Kartu Peserta Pretes</h1>
-                    <p class="inst-sub">Lembaga Pengkajian &amp; Pengembangan Al-Islam Kemuhammadiyahan</p>
-                </div>
-            </div>
-            <div class="brand-badge-col">
-                <span class="badge"><?= sanitize(ucfirst(str_replace('_', ' ', $cardValue($registration['status'] ?? null, 'terdaftar')))) ?></span>
-                <?php if ($registration): 
-                    $cardNumber = 'PRE-' . str_pad((string)$registration['id'], 6, '0', STR_PAD_LEFT);
-                ?>
-                    <span class="card-number-badge"><?= sanitize($cardNumber) ?></span>
-                <?php endif; ?>
+            <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo UNISDA LPPAI" class="brand-logo">
+            <div class="brand-text">
+                <p class="inst-uni">UNIVERSITAS ISLAM DARUL 'ULUM LAMONGAN</p>
+                <h2 class="inst-lppai" style="border:none;margin:2px 0;padding:0;">LEMBAGA PEMBINAAN DAN PENGEMBANGAN AGAMA ISLAM ( LPPAI )</h2>
+                <p class="inst-address">Kantor: Gedung FAI Lt. 1, Jl. Airlangga 3 Sukodadi, Lamongan, Jawa Timur 62253</p>
             </div>
         </header>
 
         <div class="kop-rule" aria-hidden="true"></div>
 
+        <!-- ── Bar Judul Kartu ── -->
+        <div class="card-header-bar">
+            <div>
+                <p class="eyebrow" style="margin:0 0 2px;">LPPAI Corner</p>
+                <h1>Kartu Peserta Pretes</h1>
+                <div class="program-tag">Tutorial Ubudiyah Unisda · Periode <?= sanitize($cardValue($registration['periode'] ?? null)) ?></div>
+            </div>
+            <div class="badge-group">
+                <span class="badge"><?= sanitize(ucfirst(str_replace('_', ' ', $cardValue($registration['status'] ?? null, 'terdaftar')))) ?></span>
+                <?php if ($registration): 
+                    $cardNumber = 'PRE-' . str_pad((string)$registration['id'], 6, '0', STR_PAD_LEFT);
+                ?>
+                    <span class="card-id-pill"><?= sanitize($cardNumber) ?></span>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <?php if (!$registration): ?>
-            <!-- Tampilan jika mahasiswa belum mendaftar -->
+            <!-- Mahasiswa Belum Mendaftar -->
             <div class="empty">
-                <div class="empty-icon">📋</div>
                 <h2>Belum terdaftar pretes</h2>
-                <p>Silakan lakukan pendaftaran pretes terlebih dahulu melalui portal mahasiswa untuk mencetak kartu tanda peserta resmi Anda.</p>
+                <p>Silakan lakukan pendaftaran pretes terlebih dahulu melalui portal mahasiswa untuk mencetak kartu peserta resmi Anda.</p>
                 <a class="button button-primary no-print" href="<?= BASE_URL ?>/pretes-daftar.php">Daftar Pretes Sekarang</a>
             </div>
         <?php else:
             $cardNumber = 'PRE-' . str_pad((string)$registration['id'], 6, '0', STR_PAD_LEFT);
+            
+            // Tanggal ujian: tanggal 2 sampai 6 November 2026
+            $dayDates = [
+                'senin' => '2026-11-02',
+                'selasa' => '2026-11-03',
+                'rabu'   => '2026-11-04',
+                'kamis'  => '2026-11-05',
+                'jumat'  => '2026-11-06',
+            ];
+            $hariLower = strtolower(trim((string)($registration['hari_pilihan'] ?? '')));
             $tanggal = !empty($registration['tanggal']) ? strtotime($registration['tanggal']) : false;
+            if ($tanggal === false && isset($dayDates[$hariLower])) {
+                $tanggal = strtotime($dayDates[$hariLower]);
+            }
+            
             $time = $cardValue($registration['jam'] ?? null, '');
             if ($time === '' && !empty($registration['waktu_mulai'])) {
                 $time = substr($registration['waktu_mulai'], 0, 5);
@@ -810,33 +781,14 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             if ($angkatan === '' && strlen($nimRaw) >= 2 && ctype_digit(substr($nimRaw, 0, 2))) {
                 $angkatan = '20' . substr($nimRaw, 0, 2);
             }
-            $qrUrl = BASE_URL . '/pretes-peserta.php?verify=' . rawurlencode($cardNumber);
-            $qrPayload = 'LPPAI CORNER | KARTU PRETES' . "\n"
-                . 'NO: ' . $cardNumber . "\n"
-                . 'NIM: ' . $nimRaw . "\n"
-                . 'NAMA: ' . trim((string)($user['nama_lengkap'] ?? '')) . "\n"
-                . 'PERIODE: ' . trim((string)($registration['periode'] ?? '')) . "\n"
-                . 'VERIFIKASI: ' . $qrUrl;
         ?>
             <div class="content">
-                <!-- ── Banner Periode & Skema Pretes ── -->
-                <div class="period-banner">
-                    <div class="period-banner-left">
-                        <span class="period-banner-label">Periode Pretes:</span>
-                        <p class="period-banner-val"><?= sanitize($cardValue($registration['periode'] ?? null)) ?></p>
-                    </div>
-                    <span class="period-type">Standardisasi BTQ &amp; Al-Islam</span>
-                </div>
-
-                <!-- ── Grid Utama: Identitas & Jadwal (Kiri) + Pas Foto & QR Code (Kanan) ── -->
+                <!-- ── Grid Identitas & Jadwal (Kiri) + Pas Foto 3x4 (Kanan) ── -->
                 <div class="main-grid">
                     <div class="data-column">
                         <!-- Identitas Peserta -->
                         <section class="section-box identity" aria-labelledby="identitas">
-                            <div class="section-box-header">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                                <h2 id="identitas">Identitas Peserta</h2>
-                            </div>
+                            <h2 id="identitas">Identitas Peserta</h2>
                             <dl>
                                 <div class="full">
                                     <dt>Nama lengkap</dt>
@@ -844,11 +796,11 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                                 </div>
                                 <div>
                                     <dt>NIM</dt>
-                                    <dd class="nim-val"><?= sanitize($cardValue($user['nim'] ?? null)) ?></dd>
+                                    <dd class="mono-val"><?= sanitize($cardValue($user['nim'] ?? null)) ?></dd>
                                 </div>
                                 <div>
                                     <dt>Nomor peserta</dt>
-                                    <dd class="nim-val" style="color:#0369a1;"><?= sanitize($cardNumber) ?></dd>
+                                    <dd class="mono-val" style="color:#0369a1;"><?= sanitize($cardNumber) ?></dd>
                                 </div>
                                 <div>
                                     <dt>Program studi</dt>
@@ -864,8 +816,8 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                                     <dd><?= sanitize($angkatan) ?></dd>
                                 </div>
                                 <div>
-                                    <dt>Status Registrasi</dt>
-                                    <dd style="color:#0284c7;font-weight:800;">Terverifikasi Sistem</dd>
+                                    <dt>Program</dt>
+                                    <dd>Tutorial Ubudiyah Unisda</dd>
                                 </div>
                                 <?php endif; ?>
                             </dl>
@@ -873,10 +825,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
 
                         <!-- Jadwal Pelaksanaan -->
                         <section class="section-box schedule" aria-labelledby="jadwal">
-                            <div class="section-box-header">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                                <h2 id="jadwal">Jadwal Pelaksanaan</h2>
-                            </div>
+                            <h2 id="jadwal">Jadwal Pelaksanaan</h2>
                             <dl>
                                 <div>
                                     <dt>Hari pilihan</dt>
@@ -902,9 +851,8 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                         </section>
                     </div>
 
-                    <!-- Kolom Samping: Pas Foto & QR Code -->
-                    <aside class="side-column" aria-label="Validasi & Pas Foto">
-                        <!-- Kotak Pas Foto 3x4 -->
+                    <!-- Kolom Samping: Pas Foto 3x4 (Barcode Dihilangkan) -->
+                    <aside class="photo-column" aria-label="Pas Foto">
                         <div class="photo-box">
                             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
@@ -914,96 +862,179 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                             <span class="photo-dim">3 × 4 CM</span>
                             <span class="photo-hint">Jas Almamater / Busana Muslim Rapi</span>
                         </div>
-
-                        <!-- Kotak QR Code Verifikasi -->
-                        <div class="qr-card">
-                            <div id="qrcode-box" class="qr-target" data-payload="<?= sanitize($qrPayload) ?>" title="QR Code Verifikasi Resmi LPPAI">
-                                <!-- Fallback SVG Berpresisi Tinggi Jika Skrip Belum Selesai Muat -->
-                                <svg class="qr-fallback-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                    <rect width="100" height="100" fill="#ffffff" rx="4"/>
-                                    <!-- Finder Top-Left -->
-                                    <rect x="8" y="8" width="24" height="24" rx="2" fill="#0f172a"/>
-                                    <rect x="12" y="12" width="16" height="16" fill="#ffffff"/>
-                                    <rect x="16" y="16" width="8" height="8" fill="#0f172a"/>
-                                    <!-- Finder Top-Right -->
-                                    <rect x="68" y="8" width="24" height="24" rx="2" fill="#0f172a"/>
-                                    <rect x="72" y="12" width="16" height="16" fill="#ffffff"/>
-                                    <rect x="76" y="16" width="8" height="8" fill="#0f172a"/>
-                                    <!-- Finder Bottom-Left -->
-                                    <rect x="8" y="68" width="24" height="24" rx="2" fill="#0f172a"/>
-                                    <rect x="12" y="72" width="16" height="16" fill="#ffffff"/>
-                                    <rect x="16" y="76" width="8" height="8" fill="#0f172a"/>
-                                    <!-- Decorative Matrix Pattern -->
-                                    <rect x="38" y="10" width="6" height="6" fill="#0369a1"/>
-                                    <rect x="50" y="14" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="42" y="24" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="54" y="26" width="6" height="6" fill="#0369a1"/>
-                                    <rect x="12" y="42" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="22" y="48" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="38" y="42" width="16" height="6" fill="#0369a1"/>
-                                    <rect x="44" y="52" width="12" height="12" fill="#0f172a"/>
-                                    <rect x="64" y="40" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="76" y="44" width="6" height="6" fill="#0369a1"/>
-                                    <rect x="82" y="52" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="38" y="72" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="48" y="78" width="8" height="6" fill="#0369a1"/>
-                                    <rect x="40" y="86" width="6" height="6" fill="#0f172a"/>
-                                    <rect x="68" y="70" width="8" height="8" fill="#0f172a"/>
-                                    <rect x="80" y="74" width="6" height="6" fill="#0369a1"/>
-                                    <rect x="72" y="84" width="14" height="6" fill="#0f172a"/>
-                                </svg>
-                            </div>
-                            <span class="qr-caption">Verifikasi QR</span>
-                            <span class="qr-subcaption">Scan Validasi Dokumen</span>
-                        </div>
                     </aside>
                 </div>
 
-                <!-- ── Materi Evaluasi & Tata Tertib Peserta ── -->
-                <div class="info-grid">
-                    <div class="info-card">
-                        <div class="info-card-title">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                            Materi Evaluasi Pretes
-                        </div>
-                        <ul class="info-list">
-                            <li><strong>Tes Tulis CBT:</strong> Aqidah, Akhlak, Ibadah, &amp; Kemuhammadiyahan.</li>
-                            <li><strong>Tes Praktik &amp; Lisan:</strong> Tartil Baca Al-Qur'an (Tajwid &amp; Makhraj), Hafalan Surat Pilihan, Praktik Wudhu &amp; Shalat.</li>
-                        </ul>
+                <!-- ── Kredensial Akun CBT E-Ujian Mahasiswa (Wajib Dituliskan) ── -->
+                <section class="cbt-account-box" aria-label="Akun CBT E-Ujian">
+                    <div class="cbt-account-title">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Akun Login CBT E-Ujian Mahasiswa</span>
                     </div>
-                    <div class="info-card">
-                        <div class="info-card-title">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                            Tata Tertib &amp; Petunjuk Ujian
+                    <div class="cbt-grid">
+                        <div class="cbt-item">
+                            <div class="cbt-lbl">Kode Sekolah / ID Lembaga</div>
+                            <div class="cbt-val">22205</div>
                         </div>
-                        <ul class="info-list">
-                            <li>Wajib membawa kartu fisik ini dan kartu identitas mahasiswa (KTM / KTP).</li>
-                            <li>Hadir di lokasi ujian paling lambat 15 menit sebelum sesi dimulai.</li>
-                            <li>Berpakaian rapi, sopan, dan berbusana muslim/muslimah standar universitas.</li>
-                            <li>Membawa smartphone baterai penuh untuk pelaksanaan tes CBT.</li>
-                        </ul>
+                        <div class="cbt-item">
+                            <div class="cbt-lbl">Username CBT</div>
+                            <div class="cbt-val"><?= sanitize($cardValue($registration['username_tes'] ?? null, 'Menunggu TU')) ?></div>
+                        </div>
+                        <div class="cbt-item">
+                            <div class="cbt-lbl">Password / Kode Akses</div>
+                            <div class="cbt-val"><?= sanitize($cardValue($registration['password_tes'] ?? null, 'Menunggu TU')) ?></div>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- ── Catatan Resmi ── -->
-                <aside class="notice">
-                    <p><strong>Simpan dan bawa kartu ini saat mengikuti pretes.</strong></p>
-                    <p>Periksa kembali jadwal, ruangan, dan penguji di akun LPPAI Anda sebelum pelaksanaan. Data yang belum ditetapkan akan diperbarui setelah pembagian oleh admin.</p>
-                </aside>
+                <!-- ── KISI-KISI SOAL DAN KRITERIA PENILAIAN PRE TES LPPAI (Sesuai Gambar Dokumen Resmi) ── -->
+                <section class="syllabus-section" aria-label="Kisi-Kisi Soal dan Kriteria Penilaian">
+                    <div class="syllabus-title">KISI-KISI SOAL DAN KRITERIA PENILAIAN PRE TES LPPAI</div>
+                    <table class="syllabus-table">
+                        <thead>
+                            <tr>
+                                <th class="col-no">NO</th>
+                                <th class="col-materi">MATERI TES</th>
+                                <th class="col-kriteria">KRITERIA PENILAIAN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="col-no">1</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">1. Ujian CBT (Wajib Instal E-ujian)</div>
+                                    <div class="syllabus-sub">Materi : Najis, alat Thaharah, Wudhu, Tayamum, Mandi, Sholat Fardhu, Sholat Jenazah, Memandikan Jenazah, Amaliyah Masyarakat</div>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Jawaban benar</li>
+                                        <li>Jawaban bukan hasil browsing</li>
+                                        <li>50 Soal waktu 30 menit</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="col-no">2</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">THAHARAH</div>
+                                    <ol class="syllabus-list" style="padding-left:16px;">
+                                        <li>Praktek Wudhu</li>
+                                        <li>Do'a Setelah Wudhu</li>
+                                        <li>Praktek Tayamum</li>
+                                        <li>Niat Mandi Besar</li>
+                                    </ol>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Kelancaran bacaan</li>
+                                        <li>Niat dan kebenaran praktek (Tes Praktek)</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="col-no">3</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">SHALAT</div>
+                                    <ol class="syllabus-list" style="padding-left:16px;">
+                                        <li>Niat Shalat Jama' dan Qashar</li>
+                                        <li>Bacaan Shalat (Subuh)</li>
+                                    </ol>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Kebenaran Jawaban (Tes Lisan)</li>
+                                        <li>Kelancaran bacaan</li>
+                                        <li>Tidak ada kesalahan fatal pada do'a dan gerakan shalat</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="col-no">4</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">SURAT-SURAT PENDEK</div>
+                                    <ol class="syllabus-list" style="padding-left:16px;">
+                                        <li>Al-Bayyinah</li>
+                                        <li>Al-'Alaq</li>
+                                        <li>Ad-Dhuha</li>
+                                    </ol>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Kelancaran bacaan</li>
+                                        <li>Kefasihan bacaan</li>
+                                        <li>Mahasiswa tau nama surat (bukan hanya bisa menghafal tapi tidak tau surat apa yang dia baca)</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="col-no">5</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">AMALIYAH DI MASYARAKAT</div>
+                                    <ol class="syllabus-list" style="padding-left:16px;">
+                                        <li>Istighotsah</li>
+                                    </ol>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Kelancaran bacaan</li>
+                                        <li>Runtutnya (urut) susunan bacaan</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="col-no">6</td>
+                                <td class="col-materi">
+                                    <div class="syllabus-heading">KIFAYAH JENAZAH</div>
+                                    <ol class="syllabus-list" style="padding-left:16px;">
+                                        <li>Shalat Jenazah</li>
+                                    </ol>
+                                </td>
+                                <td class="col-kriteria">
+                                    <ul class="syllabus-list">
+                                        <li>Tidak ada kesalahan fatal pada do'a dan gerakan shalat</li>
+                                    </ul>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="syllabus-footer-bar">
+                        <span class="passing-grade">NILAI MINIMAL KELULUSAN ( 80 )</span>
+                        <span class="lppai-unisda-brand">LPPAI UNISDA</span>
+                    </div>
+                </section>
+
+                <!-- ── Semua Peraturan Halaman Panduan Pretes Mahasiswa ── -->
+                <section class="rules-section" aria-label="Tata Tertib & Petunjuk Ujian">
+                    <div class="rules-title">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Tata Tertib &amp; Petunjuk Pelaksanaan Pretes Mahasiswa</span>
+                    </div>
+                    <ol class="rules-list">
+                        <li><strong>Try Out Mandiri dari Rumah:</strong> Manfaatkan waktu sebelum hari pelaksanaan (rentang tanggal 2 s.d. 6 November 2026) untuk mencoba login simulasi dari rumah menggunakan Kode Sekolah <strong>22205</strong> beserta username &amp; password Anda, agar terbiasa dengan aplikasi CBT.</li>
+                        <li><strong>Dilarang 2 HP di Meja Ujian:</strong> Saat ujian resmi di kampus, dilarang meletakkan 2 HP di atas meja. Pelanggaran berakibat akun dinonaktifkan otomatis oleh Pengawas (gugur). HP cadangan wajib dimatikan dan ditaruh di dalam tas di depan kelas.</li>
+                        <li><strong>Hadir 15 Menit Lebih Awal:</strong> Hadir di ruangan ujian paling lambat 15 menit sebelum waktu tes dimulai. Jika koneksi terputus atau baterai habis saat ujian, jawaban tersimpan aman di server; segera hidupkan HP atau lapor pengawas di ruangan.</li>
+                        <li><strong>Catat di Kertas Sebelum Masuk Aplikasi:</strong> Aplikasi ujian mengunci layar HP secara penuh (<em>Kiosk Mode</em>), sehingga Anda tidak dapat membuka catatan di HP saat ujian berlangsung. Catat Kode Sekolah (<strong>22205</strong>), Username, dan Password di secarik kertas sebelum membuka aplikasi.</li>
+                        <li><strong>Aplikasi Resmi Ujian:</strong>
+                            Pengguna HP Android wajib memasang aplikasi resmi <strong>E-Ujian Browser</strong> dari Google Play Store (masukkan Kode Sekolah: <strong>22205</strong>).
+                            Pengguna iPhone / iPad wajib menggunakan <strong>Safe Exam Browser (SEB)</strong> dengan file konfigurasi resmi (<code>seb-config-lppai.seb</code>).
+                        </li>
+                        <li><strong>Ketertiban &amp; Kejujuran:</strong> Menjaga ketenangan, ketertiban, berpakaian rapi dan sopan (busana muslim/muslimah), serta menjunjung tinggi kejujuran akademik.</li>
+                    </ol>
+                </section>
 
                 <!-- ── Lembar Pengesahan Tanda Tangan ── -->
                 <div class="signature-grid">
                     <div class="sig-box">
-                        <div class="sig-role">Mahasiswa / Peserta Ujian</div>
-                        <div class="sig-sub">Menyatakan siap mengikuti tata tertib</div>
+                        <div class="sig-role">Mahasiswa / Peserta Pretes</div>
+                        <div class="sig-sub">Menyatakan siap mengikuti seluruh tata tertib</div>
                         <div class="sig-space"></div>
                         <span class="sig-name">( <?= sanitize($cardValue($user['nama_lengkap'] ?? null)) ?> )</span>
                     </div>
                     <div class="sig-box">
-                        <div class="sig-role">Dosen Penguji / Panitia LPPAI</div>
-                        <div class="sig-sub">Verifikasi kehadiran &amp; asesmen nilai</div>
+                        <div class="sig-role">Dosen Penguji / LPPAI UNISDA</div>
+                        <div class="sig-sub">Verifikasi kehadiran &amp; asesmen ujian</div>
                         <div class="sig-space">
-                            <span class="sig-stamp">✓ LPPAI Corner Verified</span>
+                            <span class="sig-stamp">✓ LPPAI UNISDA Verified</span>
                         </div>
                         <span class="sig-name">( <?= sanitize($cardValue($registration['dosen_penguji'] ?? null, 'Dosen Penguji')) ?> )</span>
                     </div>
@@ -1012,12 +1043,12 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
 
             <!-- ── Footer Kartu ── -->
             <footer class="footer">
-                <div class="footer-left">
+                <div>
                     <span><?= sanitize($cardNumber) ?></span>
-                    <span class="footer-dot">·</span>
-                    <span>LPPAI Corner</span>
-                    <span class="footer-dot">·</span>
-                    <span>Sistem Informasi Akademik Keislaman</span>
+                    <span> · </span>
+                    <span>LPPAI UNISDA</span>
+                    <span> · </span>
+                    <span>Universitas Islam Darul 'Ulum Lamongan</span>
                 </div>
                 <div>
                     <span>Dicetak pada <?= (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('d/m/Y H:i') ?> WIB</span>
@@ -1025,27 +1056,5 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             </footer>
         <?php endif; ?>
     </main>
-
-    <!-- Skrip Pembangkit QR Code Resmi -->
-    <script src="<?= BASE_URL ?>/assets/js/lib/qrcode.min.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var box = document.getElementById('qrcode-box');
-        if (box && typeof QRCode !== 'undefined') {
-            var payload = box.getAttribute('data-payload');
-            if (payload) {
-                box.innerHTML = '';
-                new QRCode(box, {
-                    text: payload,
-                    width: 86,
-                    height: 86,
-                    colorDark: '#0f172a',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.M
-                });
-            }
-        }
-    });
-    </script>
 </body>
 </html>

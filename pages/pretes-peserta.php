@@ -153,7 +153,7 @@ include __DIR__ . '/../includes/header.php';
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
         <div>
             <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
-            <p style="margin:4px 0 0;color:#64748b;font-size:13px;">Simpan kartu peserta dan periksa jadwal pretes Anda.</p>
+            <p style="margin:4px 0 0;color:#64748b;font-size:13px;">Tutorial Ubudiyah Unisda (Pelaksanaan: 2 – 6 November 2026). Simpan kartu peserta dan periksa jadwal Anda.</p>
         </div>
         <a href="<?= BASE_URL ?>/cetak-kartu-pretes.php" target="_blank" rel="noopener" data-no-spa class="btn btn-primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 18px;border-radius:10px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(2,132,199,0.16);" aria-label="Cetak kartu pretes (buka tab baru)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6z"/><path d="M17 12h1"/></svg>
@@ -172,7 +172,7 @@ include __DIR__ . '/../includes/header.php';
                         Jadwal & Akun Tes Pretes Anda
                     </h3>
                     <div style="font-size:12px;color:#e0f2fe;word-break:break-word;margin-top:2px;">
-                        Periode: <strong><?= sanitize($myReg['periode']) ?></strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
+                        Periode: <strong><?= sanitize($myReg['periode']) ?> (2 – 6 Nov 2026)</strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
                     </div>
                 </div>
             </div>
@@ -189,7 +189,11 @@ include __DIR__ . '/../includes/header.php';
                 <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">📅 Hari Ujian</div>
                     <div style="font-size:15px;font-weight:800;color:#0f172a;word-break:break-word;">
-                        <?= sanitize($myReg['hari_pilihan'] ?: 'Belum ditentukan') ?>
+                        <?php 
+                        $dMap = ['senin' => 'Senin, 2 Nov 2026', 'selasa' => 'Selasa, 3 Nov 2026', 'rabu' => 'Rabu, 4 Nov 2026', 'kamis' => 'Kamis, 5 Nov 2026', 'jumat' => 'Jumat, 6 Nov 2026'];
+                        $hClean = strtolower(trim((string)($myReg['hari_pilihan'] ?? '')));
+                        echo sanitize($dMap[$hClean] ?? ($myReg['hari_pilihan'] ?: 'Belum ditentukan'));
+                        ?>
                     </div>
                 </div>
 
@@ -494,7 +498,7 @@ include __DIR__ . '/../includes/header.php';
                         <strong style="font-size:13px;color:#854d0e;">1. Try Out Mandiri dari Rumah</strong>
                     </div>
                     <div style="font-size:12px;color:#713f12;line-height:1.55;word-break:break-word;">
-                        Manfaatkan waktu <strong>malam ini s.d. malam Senin</strong> untuk mencoba login simulasi dari rumah dengan Kode Sekolah <code>22205</code> dan akun Anda, agar terbiasa dengan aplikasi.
+                        Manfaatkan waktu <strong>malam ini s.d. sebelum ujian (2 s.d. 6 November 2026)</strong> untuk mencoba login simulasi dari rumah dengan Kode Sekolah <code>22205</code> dan akun Anda, agar terbiasa dengan aplikasi.
                     </div>
                 </div>
 
