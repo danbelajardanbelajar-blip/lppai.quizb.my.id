@@ -12,7 +12,7 @@ if (!$pretesId) {
     http_response_code(400);
     exit('Periode pretes tidak valid. Silakan buka export dari halaman jadwal pretes.');
 }
-$stmt = $pdo->prepare('SELECT id, periode, tahun_ajaran, jam FROM master_pretes WHERE id = ?');
+$stmt = $pdo->prepare('SELECT id, periode, tahun_ajaran FROM master_pretes WHERE id = ?');
 $stmt->execute([$pretesId]);
 $pretes = $stmt->fetch();
 if (!$pretes) {
@@ -44,25 +44,26 @@ foreach (['dosen_penguji', 'ruangan'] as $field) {
         $params[] = $filters[$field];
     }
 }
-$stmt = $pdo->prepare('SELECT pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan,
+$stmt = $pdo->prepare('SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan,
     u.nama_lengkap, u.nim, u.program_studi
     FROM pretes_registrations pr JOIN users u ON u.id = pr.user_id
     WHERE ' . implode(' AND ', $where) . "
     ORDER BY FIELD(COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin'), 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'),
-    pr.jam, pr.dosen_penguji, pr.ruangan, u.nama_lengkap, u.nim, pr.id");
+    pr.dosen_penguji, pr.ruangan, u.nama_lengkap, u.nim, pr.id");
 $stmt->execute($params);
 $participants = $stmt->fetchAll();
 
-// Satu sesi (hari, jam, penguji, ruangan) selalu menjadi satu lembar.
+// Semua sesi pukul 13.00 WIB; variasi jam tersimpan tidak memisahkan absensi.
+// Satu kelompok hari, penguji, dan ruangan selalu menjadi satu lembar.
 $groups = [];
 foreach ($participants as $participant) {
     $meta = [
         'hari' => ucfirst(strtolower(trim($participant['hari_pilihan'] ?? ''))) ?: 'Senin',
-        'jam' => trim($participant['jam'] ?? '') ?: ($pretes['jam'] ?: 'Belum ditentukan'),
+        'jam' => '13.00 WIB',
         'penguji' => trim($participant['dosen_penguji'] ?? '') ?: 'Belum ditentukan',
         'ruangan' => trim($participant['ruangan'] ?? '') ?: 'Belum ditentukan',
     ];
-    $key = json_encode(array_values($meta));
+    $key = json_encode([$meta['hari'], $meta['penguji'], $meta['ruangan']]);
     if (!isset($groups[$key])) $groups[$key] = ['meta' => $meta, 'peserta' => []];
     $groups[$key]['peserta'][] = $participant;
 }
