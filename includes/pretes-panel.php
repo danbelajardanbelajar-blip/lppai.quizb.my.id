@@ -224,6 +224,67 @@ include __DIR__ . '/header.php';
     flex-shrink: 0;
 }
 
+/* Accordion QR Sessions */
+.pretes-qr-sessions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pretes-qr-session {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pretes-qr-session[open] {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 16px rgba(59,130,246,0.08);
+}
+
+.pretes-qr-session summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    cursor: pointer;
+    list-style: none;
+    background: #f8fafc;
+    user-select: none;
+    transition: background 0.15s;
+    outline: none;
+}
+
+.pretes-qr-session summary::-webkit-details-marker {
+    display: none;
+}
+
+.pretes-qr-session summary:hover {
+    background: #f1f5f9;
+}
+
+.pretes-qr-session[open] summary {
+    background: #f0f9ff;
+    border-bottom: 1.5px solid #bae6fd;
+}
+
+.pretes-qr-session .summary-chevron {
+    font-size: 13px;
+    color: #64748b;
+    transition: transform 0.25s ease;
+    margin-left: 12px;
+    display: inline-block;
+}
+
+.pretes-qr-session[open] .summary-chevron {
+    transform: rotate(180deg);
+    color: #0284c7;
+}
+
+/* Score Input Components */
 .pretes-score-box {
     background: #f8fafc;
     border: 1.5px solid #e2e8f0;
@@ -285,12 +346,6 @@ include __DIR__ . '/header.php';
     box-shadow: 0 2px 6px rgba(22,163,74,0.3) !important;
 }
 
-.filter-tab-btn.active {
-    background: #0284c7 !important;
-    color: #ffffff !important;
-    border-color: #0284c7 !important;
-}
-
 @keyframes pulseGlow {
     0% { transform: scale(0.92); opacity: 0.7; }
     50% { transform: scale(1.15); opacity: 1; }
@@ -306,21 +361,6 @@ include __DIR__ . '/header.php';
 @media (max-width: 768px) {
     .pretes-hero {
         padding: 18px 16px;
-    }
-    .desktop-student-table {
-        display: none !important;
-    }
-    .mobile-student-list {
-        display: flex !important;
-    }
-}
-
-@media (min-width: 769px) {
-    .desktop-student-table {
-        display: block !important;
-    }
-    .mobile-student-list {
-        display: none !important;
     }
 }
 
@@ -433,7 +473,7 @@ include __DIR__ . '/header.php';
     </div>
 <?php endif; ?>
 
-<!-- ── 1. SESI QR CODE ABSENSI PRETES ── -->
+<!-- ── 1. SESI QR CODE ABSENSI PRETES (ACCORDION) ── -->
 <?php if (!empty($groups)): ?>
 <div class="card" id="absensi-pretes" style="border-radius:16px;border:1px solid #e2e8f0;margin-bottom:24px;overflow:hidden;">
     <div class="card-header" style="background:#f8fafc;padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -443,82 +483,94 @@ include __DIR__ . '/header.php';
             </div>
             <div>
                 <h3 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Sesi QR Code Absensi Mahasiswa</h3>
-                <span style="font-size:12px;color:#64748b;">Buka absensi untuk mengizinkan mahasiswa scan kehadiran mandiri lewat kamera HP</span>
+                <span style="font-size:12px;color:#64748b;">Klik baris sesi untuk membuka accordion dan menampilkan QR code presensi</span>
             </div>
         </div>
     </div>
-    <div class="card-body" style="padding:20px;">
-        <div class="pretes-qr-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 320px), 1fr));gap:16px;">
+    <div class="card-body" style="padding:18px 20px;">
+        <div class="pretes-qr-sessions">
         <?php foreach ($groups as $group): 
             $scope = $group['scope'];
             $session = pretesSession($pdo, $scope);
             $url = pretesAttendanceUrl($session);
             $isOpen = (bool)$session['is_open'];
+            $isTarget = ((int)($_GET['session_id'] ?? 0) === (int)$session['id']) || (count($groups) === 1);
         ?>
-            <div class="pretes-qr-session-card" id="qr-session-<?= (int)$session['id'] ?>" 
-                style="background:#ffffff;border:1.5px solid <?= $isOpen ? '#86efac' : '#e2e8f0' ?>;border-radius:14px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.03);position:relative;">
-                
-                <div>
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;">
-                        <div>
-                            <span style="font-size:11px;font-weight:700;color:#0284c7;text-transform:uppercase;letter-spacing:0.5px;">Sesi Ujian Pretes</span>
-                            <h4 style="margin:2px 0 0;font-size:16px;font-weight:800;color:#0f172a;">
-                                📅 <?= sanitize($scope['hari']) ?> · 13.00 WIB
-                            </h4>
+            <details class="pretes-qr-session" id="qr-session-<?= (int)$session['id'] ?>" <?= $isTarget ? 'open' : '' ?>>
+                <summary>
+                    <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                        <span style="font-size:20px;flex-shrink:0;">📅</span>
+                        <div style="min-width:0;">
+                            <strong style="font-size:14.5px;color:#0f172a;display:block;">
+                                Sesi <?= sanitize($scope['hari']) ?> · 13.00 WIB
+                            </strong>
+                            <small style="color:#64748b;font-size:12px;display:block;margin-top:2px;">
+                                🏢 <?= sanitize($scope['ruangan'] ?: 'Ruangan belum ditentukan') ?> · 👥 <?= $group['count'] ?> Mahasiswa
+                            </small>
                         </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
                         <?php if ($isOpen): ?>
-                            <span style="background:#dcfce7;color:#15803d;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;gap:6px;box-shadow:0 0 0 3px rgba(34,197,94,0.15);">
+                            <span style="background:#dcfce7;color:#15803d;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:800;display:inline-flex;align-items:center;gap:6px;box-shadow:0 0 0 3px rgba(34,197,94,0.15);">
                                 <span style="width:7px;height:7px;border-radius:50%;background:#16a34a;animation:pulseGlow 1.5s infinite;"></span> ABSENSI BUKA
                             </span>
                         <?php else: ?>
-                            <span style="background:#f1f5f9;color:#64748b;padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;">
+                            <span style="background:#f1f5f9;color:#64748b;padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:700;">
                                 ○ TERTUTUP
                             </span>
                         <?php endif; ?>
+                        <span class="summary-chevron">▼</span>
                     </div>
+                </summary>
 
-                    <div style="font-size:12.5px;color:#475569;background:#f8fafc;padding:10px 12px;border-radius:10px;margin-bottom:14px;line-height:1.5;">
-                        <div>🏢 Ruangan: <strong><?= sanitize($scope['ruangan'] ?: 'Ruangan belum ditentukan') ?></strong></div>
-                        <div>👥 Peserta Terdaftar: <strong><?= $group['count'] ?> Mahasiswa</strong></div>
-                        <div>👨‍🏫 Penguji: <strong><?= sanitize($scope['penguji'] ?: 'Belum ditentukan') ?></strong></div>
-                    </div>
-
-                    <!-- QR Box Area -->
-                    <div style="text-align:center;padding:12px;background:#f8fafc;border:1px dashed <?= $isOpen ? '#86efac' : '#cbd5e1' ?>;border-radius:12px;margin-bottom:14px;">
-                        <div class="pretes-qr" data-url="<?= sanitize($url) ?>" style="display:inline-block;padding:10px;background:#ffffff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);min-width:180px;min-height:180px;"></div>
-                        
-                        <div style="margin-top:10px;">
-                            <?php if ($isOpen): ?>
-                                <p style="margin:0 0 8px;font-size:12px;color:#15803d;font-weight:700;">
-                                    🟢 Mahasiswa dapat langsung scan QR di atas
-                                </p>
-                            <?php else: ?>
-                                <p style="margin:0 0 8px;font-size:12px;color:#64748b;font-weight:600;">
-                                    🔒 Absensi ditutup. Buka sesi agar mahasiswa dapat scan.
-                                </p>
-                            <?php endif; ?>
-                            <button type="button" onclick="copyAttendanceLink('<?= sanitize($url) ?>', this)" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:5px 12px;">
-                                📋 Salin Link Absensi
-                            </button>
+                <div style="padding:22px 20px;text-align:center;border-top:1px solid #e2e8f0;background:#ffffff;">
+                    <div style="max-width:440px;margin:0 auto;">
+                        <div style="font-size:13px;color:#475569;margin-bottom:14px;line-height:1.5;">
+                            Penguji: <strong><?= sanitize($scope['penguji'] ?: 'Belum ditentukan') ?></strong><br>
+                            Ruangan: <strong><?= sanitize($scope['ruangan'] ?: 'Ruangan belum ditentukan') ?></strong> · Peserta: <strong><?= $group['count'] ?> Mahasiswa</strong>
                         </div>
+
+                        <!-- QR Code Container -->
+                        <div style="display:inline-block;padding:14px;background:#f8fafc;border:1.5px dashed <?= $isOpen ? '#86efac' : '#cbd5e1' ?>;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:16px;">
+                            <div class="pretes-qr" data-url="<?= sanitize($url) ?>" style="display:inline-block;padding:10px;background:#ffffff;border-radius:10px;min-width:180px;min-height:180px;"></div>
+                            
+                            <div style="margin-top:12px;">
+                                <?php if ($isOpen): ?>
+                                    <p style="margin:0 0 6px;font-size:12.5px;color:#15803d;font-weight:700;">
+                                        🟢 Absensi dibuka (otomatis ditutup 2 jam setelah dibuka)
+                                    </p>
+                                    <p style="margin:0 0 10px;font-size:11.5px;color:#64748b;">
+                                        Mahasiswa scan dengan kamera HP, login, lalu konfirmasi kehadiran.
+                                    </p>
+                                <?php else: ?>
+                                    <p style="margin:0 0 10px;font-size:12.5px;color:#64748b;font-weight:700;">
+                                        🔒 Absensi ditutup. Klik tombol di bawah untuk membuka sesi absensi.
+                                    </p>
+                                <?php endif; ?>
+
+                                <button type="button" onclick="copyAttendanceLink('<?= sanitize($url) ?>', this)" class="btn btn-sm btn-secondary" style="font-size:12px;padding:6px 14px;border-radius:8px;">
+                                    📋 Salin Link Absensi
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Form Buka/Tutup Absensi -->
+                        <form method="POST" data-no-spa style="margin:0;">
+                            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                            <input type="hidden" name="session_id" value="<?= (int)$session['id'] ?>">
+                            <?php if ($isOpen): ?>
+                                <button name="action" value="close_attendance" class="btn btn-danger" style="width:100%;font-weight:700;padding:10px 16px;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;">
+                                    🔒 Tutup Sesi Absensi
+                                </button>
+                            <?php else: ?>
+                                <button name="action" value="open_attendance" class="btn btn-success" style="width:100%;font-weight:700;padding:10px 16px;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;">
+                                    🟢 Buka Sesi Absensi (2 Jam)
+                                </button>
+                            <?php endif; ?>
+                        </form>
                     </div>
                 </div>
-
-                <!-- Form Buka/Tutup Absensi -->
-                <form method="POST" data-no-spa style="margin:0;">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="session_id" value="<?= (int)$session['id'] ?>">
-                    <?php if ($isOpen): ?>
-                        <button name="action" value="close_attendance" class="btn btn-danger" style="width:100%;font-weight:700;padding:10px 14px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;">
-                            🔒 Tutup Sesi Absensi
-                        </button>
-                    <?php else: ?>
-                        <button name="action" value="open_attendance" class="btn btn-success" style="width:100%;font-weight:700;padding:10px 14px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;">
-                            🟢 Buka Sesi Absensi (2 Jam)
-                        </button>
-                    <?php endif; ?>
-                </form>
-            </div>
+            </details>
         <?php endforeach; ?>
         </div>
     </div>
@@ -651,46 +703,25 @@ include __DIR__ . '/header.php';
 </div>
 <?php endif; ?>
 
-<!-- ── 3. DAFTAR MAHASISWA & REKAP PENILAIAN ── -->
+<!-- ── 3. DAFTAR MAHASISWA & REKAP PENILAIAN (DATATABLES) ── -->
 <div class="card" id="peserta-pretes" style="border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(0,0,0,0.04);margin-bottom:24px;overflow:hidden;">
     <div class="card-header" style="background:#f8fafc;padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div>
-            <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">
-                👥 Daftar Mahasiswa Pretes (<?= count($participants) ?> Peserta)
-            </h3>
-            <span style="font-size:12px;color:#64748b;">
-                Klik tombol "Input Nilai" pada mahasiswa untuk mengisi atau memperbarui penilaian
-            </span>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:18px;">
+                👥
+            </div>
+            <div>
+                <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;">
+                    Daftar Mahasiswa & Rekap Penilaian (<?= count($participants) ?> Peserta)
+                </h3>
+                <span style="font-size:12px;color:#64748b;">
+                    Kelola penilaian 12 komponen pretes untuk setiap mahasiswa bimbingan Anda
+                </span>
+            </div>
         </div>
     </div>
 
-    <div class="card-body" style="padding:18px 20px;">
-        <!-- Search and Filter Bar -->
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
-            <!-- Search Box -->
-            <div style="flex:1;min-width:240px;position:relative;">
-                <input type="text" id="search-student" oninput="filterStudents()" placeholder="🔍 Cari nama mahasiswa atau NIM..."
-                    style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:13px;outline:none;box-sizing:border-box;">
-                <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;color:#94a3b8;pointer-events:none;">🔍</span>
-            </div>
-
-            <!-- Filter Buttons -->
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                <button type="button" class="btn btn-sm filter-tab-btn active" data-filter="all" onclick="setStudentFilter('all', this)" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;">
-                    Semua (<?= count($participants) ?>)
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary filter-tab-btn" data-filter="unscored" onclick="setStudentFilter('unscored', this)" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;">
-                    Belum Lengkap (<?= $progress['sebagian'] + $progress['kosong'] ?>)
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary filter-tab-btn" data-filter="complete" onclick="setStudentFilter('complete', this)" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;">
-                    Nilai Lengkap (<?= $progress['lengkap'] ?>)
-                </button>
-                <button type="button" class="btn btn-sm btn-secondary filter-tab-btn" data-filter="attended" onclick="setStudentFilter('attended', this)" style="padding:6px 12px;font-size:12px;font-weight:700;border-radius:8px;">
-                    Hadir (<?= $progress['hadir'] ?>)
-                </button>
-            </div>
-        </div>
-
+    <div class="card-body" style="padding:20px;">
         <?php if (empty($participants)): ?>
             <div style="text-align:center;padding:40px 10px;color:#64748b;">
                 <div style="font-size:40px;margin-bottom:8px;">👥</div>
@@ -698,21 +729,19 @@ include __DIR__ . '/header.php';
                 <p style="font-size:13px;margin:4px 0 0;">Belum ada mahasiswa yang ditugaskan pada periode ini.</p>
             </div>
         <?php else: ?>
-
-            <!-- Desktop View Table -->
-            <div class="desktop-student-table" style="overflow-x:auto;">
-                <table class="no-datatable" style="width:100%;border-collapse:collapse;font-size:13px;">
+            <div class="table-responsive" style="width:100%;overflow-x:auto;">
+                <table id="table-peserta-pretes" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
                     <thead>
                         <tr style="border-bottom:2px solid #e2e8f0;background:#f8fafc;">
-                            <th style="padding:12px 14px;text-align:center;width:48px;color:#64748b;font-weight:700;">No</th>
+                            <th style="padding:12px 14px;text-align:center;width:40px;color:#64748b;font-weight:700;">No</th>
                             <th style="padding:12px 14px;text-align:left;color:#64748b;font-weight:700;">Mahasiswa</th>
                             <th style="padding:12px 14px;text-align:left;color:#64748b;font-weight:700;">Jadwal & Ruangan</th>
                             <th style="padding:12px 14px;text-align:center;color:#64748b;font-weight:700;width:120px;">Kehadiran</th>
-                            <th style="padding:12px 14px;text-align:center;color:#64748b;font-weight:700;width:160px;">Nilai Rata-rata</th>
+                            <th style="padding:12px 14px;text-align:center;color:#64748b;font-weight:700;width:150px;">Nilai Pretes</th>
                             <th style="padding:12px 14px;text-align:right;color:#64748b;font-weight:700;width:130px;">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody id="student-table-body">
+                    <tbody>
                     <?php $no = 0; foreach ($participants as $row): $no++;
                         $scores = json_decode($row['scores_json'] ?? '{}', true) ?: [];
                         $filled = 0;
@@ -725,17 +754,9 @@ include __DIR__ . '/header.php';
                         }
                         $avg = $filled > 0 ? round($sum / $filled, 2) : null;
                         $isAttended = !empty($row['attended_at']) || ($row['status'] ?? '') === 'hadir';
-                        $statusCat = ($filled === count($components)) ? 'complete' : ($filled > 0 ? 'partial' : 'unscored');
                         $isSelected = ($selectedId === (int)$row['id']);
                     ?>
-                        <tr class="student-item student-row" 
-                            data-name="<?= strtolower(sanitize($row['nama_lengkap'])) ?>"
-                            data-nim="<?= strtolower(sanitize($row['nim'])) ?>"
-                            data-prodi="<?= strtolower(sanitize($row['program_studi'])) ?>"
-                            data-status="<?= $statusCat ?>"
-                            data-attended="<?= $isAttended ? '1' : '0' ?>"
-                            style="border-bottom:1px solid #f1f5f9;transition:background 0.15s;<?= $isSelected ? 'background:#f0f9ff;outline:2px solid #0284c7;outline-offset:-2px;' : '' ?>">
-                            
+                        <tr <?= $isSelected ? 'style="background:#f0f9ff;font-weight:600;"' : '' ?>>
                             <td style="padding:12px 14px;text-align:center;color:#94a3b8;font-weight:600;">
                                 <?= $no ?>
                             </td>
@@ -744,7 +765,7 @@ include __DIR__ . '/header.php';
                                 <div style="font-weight:800;color:#0f172a;font-size:13.5px;">
                                     <?= sanitize($row['nama_lengkap']) ?>
                                     <?php if ($isSelected): ?>
-                                        <span style="background:#0284c7;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-left:4px;">Sedang Dinilai</span>
+                                        <span class="badge badge-primary" style="font-size:10px;margin-left:4px;">Sedang Dinilai</span>
                                     <?php endif; ?>
                                 </div>
                                 <div style="font-size:12px;color:#64748b;margin-top:2px;">
@@ -754,7 +775,7 @@ include __DIR__ . '/header.php';
 
                             <td style="padding:12px 14px;font-size:12.5px;color:#475569;">
                                 <div>📅 <?= sanitize($row['hari_pilihan'] ?: 'Senin') ?> (13.00 WIB)</div>
-                                <div style="color:#64748b;font-size:11.5px;">🏢 <?= sanitize($row['ruangan'] ?: 'Ruangan belum ditentukan') ?></div>
+                                <small style="color:#64748b;">🏢 <?= sanitize($row['ruangan'] ?: 'Ruangan belum ditentukan') ?></small>
                             </td>
 
                             <td style="padding:12px 14px;text-align:center;">
@@ -777,14 +798,14 @@ include __DIR__ . '/header.php';
                                     <div style="font-size:14px;font-weight:900;color:#b45309;"><?= number_format($avg, 2) ?></div>
                                     <div style="font-size:11px;color:#d97706;font-weight:700;">Sebagian (<?= $filled ?>/12)</div>
                                 <?php else: ?>
-                                    <span style="font-size:12px;color:#94a3b8;font-weight:600;">Belum Dinilai</span>
+                                    <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:11.5px;">Belum Dinilai</span>
                                 <?php endif; ?>
                             </td>
 
                             <td style="padding:12px 14px;text-align:right;">
                                 <a href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes"
                                     class="btn <?= ($filled === count($components)) ? 'btn-secondary' : 'btn-primary' ?>"
-                                    style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">
+                                    style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">
                                     <?= ($filled === count($components)) ? '✏️ Edit Nilai' : '📝 Input Nilai' ?>
                                 </a>
                             </td>
@@ -793,76 +814,6 @@ include __DIR__ . '/header.php';
                     </tbody>
                 </table>
             </div>
-
-            <!-- Mobile Card View (<= 768px) -->
-            <div class="mobile-student-list" style="display:none;flex-direction:column;gap:12px;">
-            <?php foreach ($participants as $row): 
-                $scores = json_decode($row['scores_json'] ?? '{}', true) ?: [];
-                $filled = 0;
-                $sum = 0;
-                foreach ($components as $k => $l) {
-                    if (isset($scores[$k]) && $scores[$k] !== '' && $scores[$k] !== null && is_numeric($scores[$k])) {
-                        $filled++;
-                        $sum += (float)$scores[$k];
-                    }
-                }
-                $avg = $filled > 0 ? round($sum / $filled, 2) : null;
-                $isAttended = !empty($row['attended_at']) || ($row['status'] ?? '') === 'hadir';
-                $statusCat = ($filled === count($components)) ? 'complete' : ($filled > 0 ? 'partial' : 'unscored');
-                $isSelected = ($selectedId === (int)$row['id']);
-            ?>
-                <div class="student-item student-mobile-card"
-                    data-name="<?= strtolower(sanitize($row['nama_lengkap'])) ?>"
-                    data-nim="<?= strtolower(sanitize($row['nim'])) ?>"
-                    data-prodi="<?= strtolower(sanitize($row['program_studi'])) ?>"
-                    data-status="<?= $statusCat ?>"
-                    data-attended="<?= $isAttended ? '1' : '0' ?>"
-                    style="background:#ffffff;border:1.5px solid <?= $isSelected ? '#0284c7' : '#e2e8f0' ?>;border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.03);position:relative;<?= $isSelected ? 'background:#f0f9ff;' : '' ?>">
-                    
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;">
-                        <div>
-                            <div style="font-weight:800;font-size:14.5px;color:#0f172a;">
-                                <?= sanitize($row['nama_lengkap']) ?>
-                            </div>
-                            <div style="font-size:12px;color:#64748b;margin-top:2px;">
-                                NIM: <strong style="color:#1e293b;"><?= sanitize($row['nim']) ?></strong> · <?= sanitize($row['program_studi']) ?>
-                            </div>
-                        </div>
-                        <?php if ($isAttended): ?>
-                            <span class="badge badge-success" style="font-size:10.5px;padding:3px 8px;">✓ Hadir</span>
-                        <?php else: ?>
-                            <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:10.5px;padding:3px 8px;">Belum Absen</span>
-                        <?php endif; ?>
-                    </div>
-
-                    <div style="font-size:12px;color:#475569;background:#f8fafc;padding:8px 10px;border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-                        <span>🏢 <?= sanitize($row['ruangan'] ?: 'Ruangan -') ?> (<?= sanitize($row['hari_pilihan'] ?: 'Senin') ?>)</span>
-                        <span>
-                            <?php if ($filled === count($components)): ?>
-                                <strong style="color:#15803d;font-size:13px;"><?= number_format($avg, 2) ?></strong> (12/12)
-                            <?php elseif ($filled > 0): ?>
-                                <strong style="color:#b45309;font-size:13px;"><?= number_format($avg, 2) ?></strong> (<?= $filled ?>/12)
-                            <?php else: ?>
-                                <span style="color:#94a3b8;">Belum Dinilai</span>
-                            <?php endif; ?>
-                        </span>
-                    </div>
-
-                    <a href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes"
-                        class="btn <?= ($filled === count($components)) ? 'btn-secondary' : 'btn-primary' ?>"
-                        style="width:100%;padding:9px 12px;font-size:12.5px;font-weight:700;border-radius:8px;text-align:center;text-decoration:none;display:block;">
-                        <?= ($filled === count($components)) ? '✏️ Edit Nilai Mahasiswa' : '📝 Input Nilai Mahasiswa ➔' ?>
-                    </a>
-                </div>
-            <?php endforeach; ?>
-            </div>
-
-            <div id="no-students-found" style="display:none;text-align:center;padding:30px 10px;color:#64748b;">
-                <div style="font-size:36px;margin-bottom:8px;">🔍</div>
-                <strong style="font-size:14px;color:#0f172a;display:block;">Mahasiswa tidak ditemukan</strong>
-                <p style="font-size:12.5px;margin:4px 0 0;">Coba ganti kata kunci pencarian atau ubah filter di atas.</p>
-            </div>
-
         <?php endif; ?>
     </div>
 </div>
@@ -964,17 +915,27 @@ document.querySelector('.reset-all-scores')?.addEventListener('click', function(
     }
 });
 
-// ── 3. Render QR Codes Otomatis ─────────────────────────────────────────────
-document.querySelectorAll('.pretes-qr').forEach(function(el) {
-    if (!el.dataset.rendered && el.dataset.url) {
-        new QRCode(el, {
-            text: el.dataset.url,
-            width: 180,
-            height: 180,
-            correctLevel: QRCode.CorrectLevel.M
+// ── 3. Accordion Sesi QR Code ───────────────────────────────────────────────
+document.querySelectorAll('.pretes-qr-session').forEach(function(details) {
+    function renderSessionQr() {
+        if (!details.open) return;
+        // Tutup details lain jika terbuka (accordion behavior)
+        document.querySelectorAll('.pretes-qr-session').forEach(function(other) {
+            if (other !== details) other.open = false;
         });
-        el.dataset.rendered = 'true';
+        var el = details.querySelector('.pretes-qr');
+        if (el && !el.dataset.rendered && el.dataset.url) {
+            new QRCode(el, {
+                text: el.dataset.url,
+                width: 180,
+                height: 180,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+            el.dataset.rendered = 'true';
+        }
     }
+    details.addEventListener('toggle', renderSessionQr);
+    renderSessionQr();
 });
 
 function copyAttendanceLink(url, btn) {
@@ -994,54 +955,39 @@ function copyAttendanceLink(url, btn) {
     });
 }
 
-// ── 4. Instant Student Search & Filter Tabs ─────────────────────────────────
-var currentStudentFilter = 'all';
-
-function setStudentFilter(filter, btn) {
-    currentStudentFilter = filter;
-    document.querySelectorAll('.filter-tab-btn').forEach(function(b) {
-        b.classList.remove('active');
-        b.classList.add('btn-secondary');
-    });
-    btn.classList.add('active');
-    btn.classList.remove('btn-secondary');
-    filterStudents();
+// ── 4. Inisialisasi DataTables pada Tabel Peserta ───────────────────────────
+function initPretesDataTable() {
+    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable) {
+        var table = document.getElementById('table-peserta-pretes');
+        if (table && !window.jQuery.fn.DataTable.isDataTable(table)) {
+            window.jQuery(table).DataTable({
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
+                order: [],
+                columnDefs: [{ orderable: false, targets: [5] }],
+                language: {
+                    search: 'Cari Mahasiswa:',
+                    lengthMenu: 'Tampilkan _MENU_ data',
+                    info: 'Menampilkan _START_ - _END_ dari _TOTAL_ mahasiswa',
+                    infoEmpty: 'Tidak ada data',
+                    infoFiltered: '(difilter dari _MAX_ total data)',
+                    zeroRecords: 'Mahasiswa tidak ditemukan',
+                    paginate: {
+                        first: 'Pertama',
+                        last: 'Terakhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya'
+                    }
+                }
+            });
+        }
+    }
 }
 
-function filterStudents() {
-    var query = (document.getElementById('search-student')?.value || '').toLowerCase().trim();
-    var visibleCount = 0;
-
-    document.querySelectorAll('.student-item').forEach(function(item) {
-        var name = item.dataset.name || '';
-        var nim = item.dataset.nim || '';
-        var prodi = item.dataset.prodi || '';
-        var status = item.dataset.status;
-        var attended = item.dataset.attended;
-
-        var matchesQuery = !query || name.indexOf(query) !== -1 || nim.indexOf(query) !== -1 || prodi.indexOf(query) !== -1;
-        var matchesFilter = true;
-
-        if (currentStudentFilter === 'unscored') {
-            matchesFilter = (status === 'unscored' || status === 'partial');
-        } else if (currentStudentFilter === 'complete') {
-            matchesFilter = (status === 'complete');
-        } else if (currentStudentFilter === 'attended') {
-            matchesFilter = (attended === '1');
-        }
-
-        if (matchesQuery && matchesFilter) {
-            item.style.display = '';
-            visibleCount++;
-        } else {
-            item.style.display = 'none';
-        }
-    });
-
-    var noFound = document.getElementById('no-students-found');
-    if (noFound) {
-        noFound.style.display = (visibleCount === 0) ? 'block' : 'none';
-    }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPretesDataTable);
+} else {
+    initPretesDataTable();
 }
 </script>
 
