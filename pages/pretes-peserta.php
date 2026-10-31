@@ -269,7 +269,7 @@ include __DIR__ . '/../includes/header.php';
                         <span style="font-size:24px;line-height:1;flex-shrink:0;">✍️</span>
                         <div style="font-size:13px;color:#92400e;line-height:1.55;min-width:0;word-break:break-word;">
                             <strong style="color:#b45309;display:block;margin-bottom:4px;">
-                                Wajib Catat di Secarik Kertas Sekarang Sebelum Membuka Aplikasi!
+                                Wajib Catat di Secarik Kertas atau Cetak Kartu Pretes Sekarang Sebelum Membuka Aplikasi!
                             </strong>
                             Aplikasi ujian mengunci layar HP secara penuh (<em>Kiosk Mode</em>), sehingga Anda <strong>tidak dapat membuka catatan di HP</strong> saat ujian berlangsung.
                             Ambil secarik kertas dan pulpen, lalu catat:
@@ -361,14 +361,14 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                                 <span style="background:#0284c7;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">3</span>
-                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
+                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas / Kartu Pretes</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                                Masuk sebagai Siswa/Peserta. Ketikkan Username & Password sesuai catatan kertas Anda.
+                                Masuk sebagai Siswa/Peserta. Ketikkan Username & Password sesuai catatan kertas atau cetak kartu pretes Anda.
                             </p>
                         </div>
                         <div style="background:#fef3c7;color:#92400e;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;text-align:center;">
-                            📝 Ketik dari catatan kertas
+                            📝 Ketik dari catatan kertas / kartu pretes
                         </div>
                     </div>
 
@@ -450,14 +450,14 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                                 <span style="background:#0f766e;color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0;">3</span>
-                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas</strong>
+                                <strong style="font-size:13px;color:#0f172a;">Login dari Catatan Kertas / Kartu Pretes</strong>
                             </div>
                             <p style="font-size:12px;color:#64748b;line-height:1.5;margin:0 0 10px;">
-                                SEB otomatis mengunci layar. Ketik Username & Password dari catatan kertas Anda.
+                                SEB otomatis mengunci layar. Ketik Username & Password dari catatan kertas atau cetak kartu pretes Anda.
                             </p>
                         </div>
                         <div style="background:#fef3c7;color:#92400e;padding:7px 10px;border-radius:6px;font-size:11.5px;font-weight:600;text-align:center;">
-                            📝 Ketik dari catatan kertas
+                            📝 Ketik dari catatan kertas / kartu pretes
                         </div>
                     </div>
 
