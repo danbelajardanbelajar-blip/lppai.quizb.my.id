@@ -67,6 +67,12 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Recent Classes -->
+<div class="card"><div class="card-header">Pretes</div><div class="card-body">
+    <p>Lihat peserta yang ditugaskan kepada Anda, isi 12 komponen nilai, dan buka QR absensi pretes.</p>
+    <a href="<?= BASE_URL ?>/dosen/pretes.php" class="btn btn-primary" data-no-spa style="width:auto;">Penilaian & Absensi Pretes</a>
+</div></div>
+
+<!-- Recent Classes -->
 <div class="card">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
         <span>📋 Kelas Anda (Terbaru)</span>

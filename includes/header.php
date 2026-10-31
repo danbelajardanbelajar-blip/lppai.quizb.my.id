@@ -40,7 +40,7 @@ $currentUser = getCurrentUser();
             <div class="user-info">
                 <div>
                     <div class="name"><?= sanitize($currentUser['nama_lengkap']) ?></div>
-                    <span class="role-badge"><?= $currentUser['role'] === 'admin' ? 'Admin' : 'Mahasiswa' ?></span>
+                    <span class="role-badge"><?= $currentUser['role'] === 'admin' ? 'Admin' : ($currentUser['role'] === 'dosen' ? 'Dosen / Tutor' : 'Mahasiswa') ?></span>
                 </div>
                 <div class="avatar"><?= strtoupper(substr($currentUser['nama_lengkap'], 0, 1)) ?></div>
             </div>

@@ -2,10 +2,12 @@
 /** Lembar absensi pretes A4, khusus administrator. */
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/pretes-helper.php';
 header('Cache-Control: private, no-store');
 header('Content-Type: text/html; charset=UTF-8');
 
 $pdo = getDBConnection();
+ensurePretesFeatures($pdo);
 $rawId = $_GET['pretes_id'] ?? null;
 $pretesId = filter_var($rawId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 if (!$pretesId) {
@@ -69,7 +71,9 @@ foreach ($participants as $participant) {
 }
 $pages = [];
 foreach ($groups as $group) {
-    $pages[] = ['meta' => $group['meta'], 'rows' => $group['peserta'], 'total' => count($group['peserta'])];
+    $scope = pretesScope(array_merge($group['peserta'][0], ['periode' => $pretes['periode']]));
+    $session = pretesSession($pdo, $scope);
+    $pages[] = ['meta' => $group['meta'], 'rows' => $group['peserta'], 'total' => count($group['peserta']), 'qr_url' => pretesAttendanceUrl($session)];
 }
 ?>
 <!DOCTYPE html>
@@ -88,7 +92,8 @@ foreach ($groups as $group) {
         .button { padding: 10px 16px; background: #15583c; color: white; border: 0; border-radius: 5px; cursor: pointer; text-decoration: none; font: inherit; }
         .back { background: #475569; }
         .sheet { position: relative; overflow: hidden; width: 210mm; height: 296mm; margin: 0 auto 20px; padding: 12mm; background: white; box-shadow: 0 2px 12px #0001; }
-        .sheet-content { position: absolute; top: 12mm; left: 12mm; width: 186mm; transform-origin: top left; display: flow-root; }
+        .sheet-content { position: absolute; top: 12mm; left: 12mm; width: 186mm; }
+        .sheet-fit { display: flow-root; }
         .kop { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 4px double #15583c; }
         .kop img { width: 12mm; height: 12mm; object-fit: contain; }
         .kop-text { flex: 1; text-align: center; }
@@ -109,6 +114,9 @@ foreach ($groups as $group) {
         .signature-name { margin-top: 48px; text-decoration: underline; font-weight: bold; }
         .footer { display: flex; justify-content: space-between; border-top: 1px solid #a9b9b0; margin-top: 18px; padding-top: 6px; font-size: 8pt; color: #46574f; }
         .empty { text-align: center; padding: 50px 0; }
+        .qr-footer { position: absolute; bottom: 12mm; left: 12mm; right: 12mm; display: flex; align-items: center; gap: 14px; border-top: 1px solid #a9b9b0; padding-top: 8px; font-size: 9pt; }
+        .attendance-qr { padding: 14px; background: white; flex: 0 0 auto; }
+        .attendance-qr canvas, .attendance-qr img { display: block; width: 144px; height: 144px; }
         @media screen and (max-width: 820px) { .toolbar { margin: 12px; } }
         @media print {
             body { background: white; color: black; }
@@ -116,6 +124,7 @@ foreach ($groups as $group) {
             .sheet { width: 186mm; height: 272mm; margin: 0; padding: 0; box-shadow: none; break-inside: avoid; break-after: page; }
             .sheet:last-child { break-after: auto; }
             .sheet-content { top: 0; left: 0; }
+            .qr-footer { bottom: 0; left: 0; right: 0; }
             tr, .kop, .meta, .footer { break-inside: avoid; }
             thead { display: table-header-group; }
             th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -134,6 +143,7 @@ foreach ($groups as $group) {
     <?php foreach ($pages as $pageIndex => $page): $meta = $page['meta']; ?>
     <section class="sheet">
         <div class="sheet-content">
+        <div class="sheet-fit">
         <header class="kop">
             <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI">
             <div class="kop-text">
@@ -173,22 +183,34 @@ foreach ($groups as $group) {
         </div>
         <footer class="footer"><span>LPPAI · Administrasi Pretes</span><span>Lembar <?= $pageIndex + 1 ?> dari <?= count($pages) ?></span></footer>
         </div>
+        </div>
+        <aside class="qr-footer">
+            <div class="attendance-qr" data-url="<?= sanitize($page['qr_url']) ?>"></div>
+            <div><strong>QR Absensi Pretes</strong><br>Scan dengan kamera ponsel, login sebagai mahasiswa, lalu konfirmasi kehadiran.<br>Absensi dapat dilakukan setelah dosen membuka sesi.<br>QR khusus hari, penguji, dan ruangan pada lembar ini.</div>
+        </aside>
     </section>
     <?php endforeach; ?>
+    <script src="<?= BASE_URL ?>/assets/js/lib/qrcode.min.js"></script>
     <script>
+    document.querySelectorAll('.attendance-qr').forEach(function(el) {
+        new QRCode(el, {text:el.dataset.url,width:288,height:288,correctLevel:QRCode.CorrectLevel.M});
+    });
     // Ukur konten sebenarnya, termasuk nama panjang, agar seluruh sesi muat.
     // Lebar dibesarkan sebelum skala diterapkan sehingga tabel tetap selebar kertas.
     function fitAttendanceSheets() {
         document.querySelectorAll('.sheet-content').forEach(function(content) {
             const sheet = content.parentElement;
+            const fitted = content.querySelector('.sheet-fit');
             const style = getComputedStyle(sheet);
             const width = sheet.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-            const height = sheet.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - 2;
-            content.style.transform = 'none';
+            const qrFooter = sheet.querySelector('.qr-footer');
+            const height = sheet.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - (qrFooter ? qrFooter.offsetHeight + 12 : 0) - 2;
             content.style.width = width + 'px';
+            fitted.style.zoom = '1';
             const fits = function(scale) {
-                content.style.width = (width / scale) + 'px';
-                return content.scrollHeight * scale <= height;
+                fitted.style.width = (width / scale) + 'px';
+                fitted.style.zoom = scale;
+                return fitted.getBoundingClientRect().height <= height;
             };
             let scale = 1;
             if (!fits(scale)) {
@@ -201,8 +223,8 @@ foreach ($groups as $group) {
                 }
                 scale = low;
             }
-            content.style.width = (width / scale) + 'px';
-            content.style.transform = 'scale(' + scale + ')';
+            fitted.style.width = (width / scale) + 'px';
+            fitted.style.zoom = scale;
         });
     }
     window.addEventListener('load', fitAttendanceSheets);

@@ -43,6 +43,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/pretes-hasil.php" class="page-nav <?= menuActive('pretes-hasil.php') ?>">
                 <span class="icon">📝</span> Kelola Hasil Pretes
             </a>
+            <a href="<?= BASE_URL ?>/admin/pretes-nilai.php" class="<?= menuActive('pretes-nilai.php') ?>" data-no-spa>
+                <span class="icon">📚</span> Nilai Rinci & Absensi Pretes
+            </a>
 
             <div class="menu-label">Manajemen Tutorial</div>
             <a href="<?= BASE_URL ?>/admin/tutorial-kelas.php" class="page-nav <?= menuActive('tutorial-kelas.php') ?>">
@@ -138,6 +141,9 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Akademik</div>
+            <a href="<?= BASE_URL ?>/dosen/pretes.php" class="<?= menuActive('pretes.php') ?>" data-no-spa>
+                <span class="icon">📝</span> Penilaian & Absensi Pretes
+            </a>
             <a href="<?= BASE_URL ?>/dosen/kelas.php" class="page-nav <?= menuActive('kelas.php') ?>">
                 <span class="icon">🏫</span> Kelas Anda
             </a>
