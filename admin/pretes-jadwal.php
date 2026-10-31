@@ -160,12 +160,43 @@ function isPengujiMatch($targetName, $optionName) {
 
 // ── Handle POST Actions ───────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    $token = $_POST['csrf_token'] ?? '';
+    $action = $_POST['action'];
+    $token  = $_POST['csrf_token'] ?? '';
+
+    // 0. UPDATE RUANGAN INLINE DROPDOWN (AJAX OLEH ADMIN)
+    if ($action === 'update_ruangan_ajax') {
+        header('Content-Type: application/json; charset=utf-8');
+        if (!verifyCsrf($token)) {
+            echo json_encode(['success' => false, 'message' => 'Sesi tidak valid atau telah kedaluwarsa. Silakan refresh halaman.']);
+            exit;
+        }
+        $regId = (int)($_POST['reg_id'] ?? 0);
+        $ruang = trim((string)($_POST['ruangan'] ?? ''));
+
+        if ($regId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID peserta tidak valid.']);
+            exit;
+        }
+
+        try {
+            $stmt = $pdo->prepare("UPDATE pretes_registrations SET ruangan = ? WHERE id = ?");
+            $stmt->execute([$ruang !== '' ? $ruang : null, $regId]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Ruang telah dirubah',
+                'reg_id'  => $regId,
+                'ruangan' => $ruang
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Gagal mengubah ruangan: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     if (!verifyCsrf($token)) {
         $message = 'Sesi tidak valid.';
         $msgType = 'danger';
     } else {
-        $action = $_POST['action'];
 
         // 1. UPDATE PENGATURAN DOSEN PENGUJI & KUOTA
         if ($action === 'update_penguji_kuota') {
@@ -723,14 +754,31 @@ function addQETutorRow(day) {
                                 <span style="color:#94a3b8; font-size:12px; font-style:italic;">— Belum diplot —</span>
                             <?php endif; ?>
                         </td>
-                        <td>
-                            <?php if (!empty($p['ruangan'])): ?>
-                                <span style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; display:inline-block;">
-                                    🏛️ <?= sanitize($p['ruangan']) ?>
-                                </span>
-                            <?php else: ?>
-                                <span style="color:#94a3b8; font-size:12px; font-style:italic;">— Belum ada —</span>
-                            <?php endif; ?>
+                        <td data-sort="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-filter="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                            <select class="form-select form-select-sm select-ruangan-inline" 
+                                    data-reg-id="<?= $p['reg_id'] ?>" 
+                                    data-original="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                    title="Pilih ruangan ujian"
+                                    style="min-width:130px;max-width:160px;padding:5px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:12px;font-weight:600;background:#ffffff;color:#1e293b;cursor:pointer;outline:none;transition:border-color 0.2s, background-color 0.2s;">
+                                <option value="" <?= empty($p['ruangan']) ? 'selected' : '' ?>>— Belum ada —</option>
+                                <?php 
+                                $curRuangan = trim((string)($p['ruangan'] ?? ''));
+                                $found = false;
+                                foreach ($roomsList as $rm): 
+                                    $rmName = trim((string)($rm['ruang'] ?? ''));
+                                    $isSel = ($curRuangan !== '' && strcasecmp($curRuangan, $rmName) === 0);
+                                    if ($isSel) $found = true;
+                                ?>
+                                    <option value="<?= sanitize($rmName) ?>" <?= $isSel ? 'selected' : '' ?>>
+                                        🏛️ <?= sanitize($rmName) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                                <?php if ($curRuangan !== '' && !$found): ?>
+                                    <option value="<?= sanitize($curRuangan) ?>" selected>
+                                        🏛️ <?= sanitize($curRuangan) ?> (Khusus)
+                                    </option>
+                                <?php endif; ?>
+                            </select>
                         </td>
                         <td>
                             <?php
@@ -882,6 +930,95 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closePenugasanModal();
     }
+});
+
+// Handler Ubah Ruangan Langsung dari Dropdown Kolom Ruangan
+document.addEventListener('change', function(e) {
+    if (!e.target || !e.target.classList.contains('select-ruangan-inline')) return;
+
+    var selectEl = e.target;
+    var regId = selectEl.getAttribute('data-reg-id');
+    var oldVal = selectEl.getAttribute('data-original') || '';
+    var newVal = selectEl.value;
+
+    if (newVal === oldVal) return;
+
+    // Tampilkan indikator visual sedang menyimpan
+    selectEl.disabled = true;
+    selectEl.style.opacity = '0.6';
+
+    var formData = new FormData();
+    formData.append('csrf_token', '<?= csrfToken() ?>');
+    formData.append('action', 'update_ruangan_ajax');
+    formData.append('reg_id', regId);
+    formData.append('ruangan', newVal);
+
+    fetch('<?= BASE_URL ?>/admin/pretes-jadwal.php', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(function(res) {
+        return res.json();
+    })
+    .then(function(data) {
+        selectEl.disabled = false;
+        selectEl.style.opacity = '1';
+
+        if (data && data.success) {
+            selectEl.setAttribute('data-original', newVal);
+
+            // Efek highlight hijau sukses
+            selectEl.style.borderColor = '#16a34a';
+            selectEl.style.backgroundColor = '#f0fdf4';
+            setTimeout(function() {
+                selectEl.style.borderColor = '#cbd5e1';
+                selectEl.style.backgroundColor = '#ffffff';
+            }, 1800);
+
+            // Sinkronkan data-ruangan pada tombol modal edit dan atribut tabel
+            var row = selectEl.closest('tr');
+            if (row) {
+                var btnEdit = row.querySelector('.btn-edit-penugasan');
+                if (btnEdit) {
+                    btnEdit.setAttribute('data-ruangan', newVal);
+                }
+                var td = selectEl.closest('td');
+                if (td) {
+                    td.setAttribute('data-sort', newVal);
+                    td.setAttribute('data-filter', newVal);
+                }
+            }
+
+            // Tampilkan notifikasi "Ruang telah dirubah"
+            if (typeof showToast === 'function') {
+                showToast('Ruang telah dirubah', 'success', 3500);
+            } else {
+                alert('Ruang telah dirubah');
+            }
+        } else {
+            selectEl.value = oldVal;
+            selectEl.style.borderColor = '#ef4444';
+            var errMsg = (data && data.message) ? data.message : 'Gagal mengubah ruangan.';
+            if (typeof showToast === 'function') {
+                showToast(errMsg, 'danger', 4000);
+            } else {
+                alert(errMsg);
+            }
+        }
+    })
+    .catch(function(err) {
+        selectEl.disabled = false;
+        selectEl.style.opacity = '1';
+        selectEl.value = oldVal;
+        selectEl.style.borderColor = '#ef4444';
+        var errMsg = 'Gagal menyimpan perubahan: ' + (err.message || 'Koneksi terputus');
+        if (typeof showToast === 'function') {
+            showToast(errMsg, 'danger', 4000);
+        } else {
+            alert(errMsg);
+        }
+    });
 });
 
 // Filter DataTables berdasarkan Hari Pelaksanaan
