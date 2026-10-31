@@ -704,6 +704,21 @@ include __DIR__ . '/header.php';
 <?php endif; ?>
 
 <!-- ── 3. DAFTAR MAHASISWA & REKAP PENILAIAN (DATATABLES) ── -->
+<style>
+    #peserta-pretes .pretes-roster-body { padding:20px; }
+    #table-peserta-pretes { table-layout:fixed; }
+    #table-peserta-pretes th, #table-peserta-pretes td { padding:12px 10px; white-space:normal; overflow-wrap:anywhere; }
+    #table-peserta-pretes .student-action { width:120px; text-align:right; }
+    #table-peserta-pretes .student-name { font-weight:800; color:#0f172a; font-size:14px; line-height:1.5; }
+    #table-peserta-pretes .student-meta { margin-top:4px; font-size:12px; line-height:1.5; color:#64748b; }
+    #table-peserta-pretes .student-meta span { display:block; }
+    #table-peserta-pretes .input-score { min-height:44px; padding:10px 12px; font-size:12px; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; white-space:nowrap; width:auto; }
+    @media (max-width:600px) {
+        #peserta-pretes .pretes-roster-body { padding:12px; }
+        #table-peserta-pretes th, #table-peserta-pretes td { padding:12px 8px; }
+        #table-peserta-pretes .student-action { width:104px; }
+    }
+</style>
 <div class="card" id="peserta-pretes" style="border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(0,0,0,0.04);margin-bottom:24px;overflow:hidden;">
     <div class="card-header" style="background:#f8fafc;padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -721,7 +736,7 @@ include __DIR__ . '/header.php';
         </div>
     </div>
 
-    <div class="card-body" style="padding:20px;">
+    <div class="card-body pretes-roster-body">
         <?php if (empty($participants)): ?>
             <div style="text-align:center;padding:40px 10px;color:#64748b;">
                 <div style="font-size:40px;margin-bottom:8px;">👥</div>
@@ -733,80 +748,28 @@ include __DIR__ . '/header.php';
                 <table id="table-peserta-pretes" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
                     <thead>
                         <tr style="border-bottom:2px solid #e2e8f0;background:#f8fafc;">
-                            <th style="padding:12px 14px;text-align:center;width:40px;color:#64748b;font-weight:700;">No</th>
-                            <th style="padding:12px 14px;text-align:left;color:#64748b;font-weight:700;">Mahasiswa</th>
-                            <th style="padding:12px 14px;text-align:left;color:#64748b;font-weight:700;">Jadwal & Ruangan</th>
-                            <th style="padding:12px 14px;text-align:center;color:#64748b;font-weight:700;width:120px;">Kehadiran</th>
-                            <th style="padding:12px 14px;text-align:center;color:#64748b;font-weight:700;width:150px;">Nilai Pretes</th>
-                            <th style="padding:12px 14px;text-align:right;color:#64748b;font-weight:700;width:130px;">Aksi</th>
+                            <th>Nama Mahasiswa</th>
+                            <th class="student-action">Input Nilai</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php $no = 0; foreach ($participants as $row): $no++;
-                        $scores = json_decode($row['scores_json'] ?? '{}', true) ?: [];
-                        $filled = 0;
-                        $sum = 0;
-                        foreach ($components as $k => $l) {
-                            if (isset($scores[$k]) && $scores[$k] !== '' && $scores[$k] !== null && is_numeric($scores[$k])) {
-                                $filled++;
-                                $sum += (float)$scores[$k];
-                            }
-                        }
-                        $avg = $filled > 0 ? round($sum / $filled, 2) : null;
-                        $isAttended = !empty($row['attended_at']) || ($row['status'] ?? '') === 'hadir';
+                    <?php foreach ($participants as $row):
                         $isSelected = ($selectedId === (int)$row['id']);
                     ?>
                         <tr <?= $isSelected ? 'style="background:#f0f9ff;font-weight:600;"' : '' ?>>
-                            <td style="padding:12px 14px;text-align:center;color:#94a3b8;font-weight:600;">
-                                <?= $no ?>
-                            </td>
-
-                            <td style="padding:12px 14px;">
-                                <div style="font-weight:800;color:#0f172a;font-size:13.5px;">
+                            <td>
+                                <div class="student-name">
                                     <?= sanitize($row['nama_lengkap']) ?>
-                                    <?php if ($isSelected): ?>
-                                        <span class="badge badge-primary" style="font-size:10px;margin-left:4px;">Sedang Dinilai</span>
-                                    <?php endif; ?>
                                 </div>
-                                <div style="font-size:12px;color:#64748b;margin-top:2px;">
-                                    NIM: <span style="font-family:monospace;font-weight:700;color:#334155;"><?= sanitize($row['nim']) ?></span> · <?= sanitize($row['program_studi']) ?>
+                                <div class="student-meta">
+                                    <span>NIM: <?= sanitize($row['nim']) ?></span>
+                                    <span><?= sanitize($row['program_studi'] ?: 'Jurusan belum tersedia') ?></span>
                                 </div>
                             </td>
-
-                            <td style="padding:12px 14px;font-size:12.5px;color:#475569;">
-                                <div>📅 <?= sanitize($row['hari_pilihan'] ?: 'Senin') ?> (13.00 WIB)</div>
-                                <small style="color:#64748b;">🏢 <?= sanitize($row['ruangan'] ?: 'Ruangan belum ditentukan') ?></small>
-                            </td>
-
-                            <td style="padding:12px 14px;text-align:center;">
-                                <?php if ($isAttended): ?>
-                                    <span class="badge badge-success" style="font-size:11.5px;padding:4px 10px;font-weight:700;">
-                                        ✓ Hadir
-                                    </span>
-                                <?php else: ?>
-                                    <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:11.5px;padding:4px 10px;font-weight:600;">
-                                        Belum Absen
-                                    </span>
-                                <?php endif; ?>
-                            </td>
-
-                            <td style="padding:12px 14px;text-align:center;">
-                                <?php if ($filled === count($components)): ?>
-                                    <div style="font-size:14px;font-weight:900;color:#15803d;"><?= number_format($avg, 2) ?></div>
-                                    <div style="font-size:11px;color:#16a34a;font-weight:700;">Lengkap (12/12)</div>
-                                <?php elseif ($filled > 0): ?>
-                                    <div style="font-size:14px;font-weight:900;color:#b45309;"><?= number_format($avg, 2) ?></div>
-                                    <div style="font-size:11px;color:#d97706;font-weight:700;">Sebagian (<?= $filled ?>/12)</div>
-                                <?php else: ?>
-                                    <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:11.5px;">Belum Dinilai</span>
-                                <?php endif; ?>
-                            </td>
-
-                            <td style="padding:12px 14px;text-align:right;">
+                            <td class="student-action">
                                 <a href="?<?= sanitize(http_build_query(['pretes_id' => $periodId, 'registration_id' => $row['id']])) ?>#nilai-pretes"
-                                    class="btn <?= ($filled === count($components)) ? 'btn-secondary' : 'btn-primary' ?>"
-                                    style="padding:7px 14px;font-size:12px;font-weight:700;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;">
-                                    <?= ($filled === count($components)) ? '✏️ Edit Nilai' : '📝 Input Nilai' ?>
+                                    class="btn btn-primary input-score" aria-label="Input nilai <?= sanitize($row['nama_lengkap']) ?>">
+                                    Input Nilai
                                 </a>
                             </td>
                         </tr>
@@ -964,7 +927,8 @@ function initPretesDataTable() {
                 pageLength: 10,
                 lengthMenu: [10, 25, 50, 100],
                 order: [],
-                columnDefs: [{ orderable: false, targets: [5] }],
+                autoWidth: false,
+                columnDefs: [{ orderable: false, searchable: false, targets: [1] }],
                 language: {
                     search: 'Cari Mahasiswa:',
                     lengthMenu: 'Tampilkan _MENU_ data',
