@@ -225,9 +225,15 @@ include __DIR__ . '/../includes/header.php';
                     <p style="margin:0 0 14px; color:#15803d; font-size:14px; line-height:1.5;">
                         <em>Anda telah memilih hari pelaksanaan pretes. Silakan tunggu admin membagikan dosen penguji dan ruangan ujian Anda. Pastikan untuk mengecek akun tes tulis Anda sebelum hari pelaksanaan.</em>
                     </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:10px;">
+                    <a href="<?= BASE_URL ?>/cetak-kartu-pretes.php" target="_blank" rel="noopener" data-no-spa class="btn btn-primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 20px;border-radius:10px;font-weight:700;text-decoration:none;" aria-label="Cetak kartu pretes (buka tab baru)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6z"/><path d="M17 12h1"/></svg>
+                        Cetak Kartu Pretes
+                    </a>
                     <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:10px 20px; font-weight:600; text-decoration:none;">
                         🔑 Lihat Jadwal & Credentials Tes Tulis CBT
                     </a>
+                    </div>
                 </div>
             </div>
         </div>

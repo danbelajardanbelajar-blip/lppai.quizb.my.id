@@ -150,6 +150,17 @@ include __DIR__ . '/../includes/header.php';
 ═══════════════════════════════════════════════════════════════════ -->
 <?php if ($myReg): ?>
 
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
+        <div>
+            <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
+            <p style="margin:4px 0 0;color:#64748b;font-size:13px;">Simpan kartu peserta dan periksa jadwal pretes Anda.</p>
+        </div>
+        <a href="<?= BASE_URL ?>/cetak-kartu-pretes.php" target="_blank" rel="noopener" data-no-spa class="btn btn-primary" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 18px;border-radius:10px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(2,132,199,0.16);" aria-label="Cetak kartu pretes (buka tab baru)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6z"/><path d="M17 12h1"/></svg>
+            Cetak Kartu Pretes
+        </a>
+    </div>
+
     <!-- ── 1. KARTU UTAMA: JADWAL PRETES & KREDENSIAL AKUN CBT ── -->
     <div class="card" style="border:2px solid #0284c7;background:#ffffff;margin-bottom:20px;border-radius:16px;box-shadow:0 4px 18px rgba(2,132,199,0.08);overflow:hidden;box-sizing:border-box;max-width:100%;">
         <!-- Header Kartu -->
