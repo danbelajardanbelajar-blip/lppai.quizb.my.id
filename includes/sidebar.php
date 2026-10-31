@@ -31,6 +31,9 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Manajemen Pretes</div>
+            <a href="<?= BASE_URL ?>/admin/pretes-pengaturan-tutor.php" class="page-nav <?= menuActive('pretes-pengaturan-tutor.php') ?>">
+                <span class="icon">🧑‍🏫</span> Pengaturan Tutor
+            </a>
             <a href="<?= BASE_URL ?>/admin/pretes-dosen.php" class="page-nav <?= menuActive('pretes-dosen.php') ?>">
                 <span class="icon">👨‍🏫</span> Penguji & Kuota Pretes
             </a>
