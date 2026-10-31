@@ -119,11 +119,28 @@ include __DIR__ . '/header.php';
 ?>
 <div class="card" id="nilai-pretes"><div class="card-header">Input Nilai · <?= sanitize($selected['nama_lengkap']) ?> (<?= sanitize($selected['nim']) ?>)</div><div class="card-body">
     <p>Rentang 0–100, maksimal dua angka desimal. Kosongkan komponen yang belum dinilai. Nilai 0 tetap dihitung sebagai nilai yang sudah diisi.</p>
-    <form method="POST" data-no-spa>
+    <style>
+        .pretes-score-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr)); gap:16px 24px; }
+        .pretes-score-row { display:flex; align-items:center; gap:5px; }
+        .pretes-score-row input { flex:0 0 62px; width:62px; min-width:0; height:44px; padding:8px 4px; text-align:center; }
+        .pretes-score-row .score-preset { flex:1; min-width:0; height:44px; padding:0 2px; border:1px solid #c5dfcf; border-radius:8px; background:#edf6f0; color:#215d3b; font-size:13px; font-weight:700; cursor:pointer; }
+        .pretes-score-row .score-preset:hover { background:#d8ecdf; }
+        .pretes-score-row .score-preset[aria-pressed="true"] { background:#246b43; color:white; border-color:#246b43; }
+        .pretes-score-row .score-preset:focus-visible { outline:2px solid #246b43; outline-offset:2px; }
+        @media (max-width:360px) { .pretes-score-row { gap:4px; } .pretes-score-row input { flex-basis:54px; width:54px; } .pretes-score-row .score-preset { font-size:12px; } }
+    </style>
+    <form method="POST" id="pretes-score-form" data-no-spa>
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>"><input type="hidden" name="action" value="save_scores"><input type="hidden" name="registration_id" value="<?= (int)$selected['id'] ?>">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+        <div class="pretes-score-grid">
         <?php $no = 0; foreach ($components as $key => $label): ?>
-            <div class="form-group"><label for="nilai-<?= $key ?>"><?= ++$no ?>. <?= sanitize($label) ?></label><input id="nilai-<?= $key ?>" name="scores[<?= $key ?>]" type="number" min="0" max="100" step="0.01" value="<?= sanitize((string)($scores[$key] ?? '')) ?>" placeholder="Belum dinilai"></div>
+            <div class="form-group"><label for="nilai-<?= $key ?>"><?= ++$no ?>. <?= sanitize($label) ?></label>
+                <div class="pretes-score-row">
+                    <input id="nilai-<?= $key ?>" name="scores[<?= $key ?>]" type="number" min="0" max="100" step="0.01" value="<?= sanitize((string)($scores[$key] ?? '')) ?>" placeholder="—">
+                    <?php foreach ([60, 70, 80, 90, 100] as $preset): ?>
+                    <button type="button" class="score-preset" data-score="<?= $preset ?>" aria-pressed="false" aria-label="Beri nilai <?= $preset ?> untuk <?= sanitize($label) ?>"><?= $preset ?></button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         <?php endforeach; ?></div>
         <button class="btn btn-primary" style="width:auto;">Simpan 12 Komponen Nilai</button>
     </form>
@@ -151,6 +168,22 @@ include __DIR__ . '/header.php';
 <?php endif; ?>
 <script src="<?= BASE_URL ?>/assets/js/lib/qrcode.min.js"></script>
 <script>
+document.querySelectorAll('.pretes-score-row').forEach(function(row) {
+    var input = row.querySelector('input');
+    function updatePresets() {
+        row.querySelectorAll('.score-preset').forEach(function(button) {
+            button.setAttribute('aria-pressed', input.value !== '' && Number(input.value) === Number(button.dataset.score) ? 'true' : 'false');
+        });
+    }
+    row.querySelectorAll('.score-preset').forEach(function(button) {
+        button.addEventListener('click', function() {
+            input.value = button.dataset.score;
+            input.dispatchEvent(new Event('input', {bubbles:true}));
+        });
+    });
+    input.addEventListener('input', updatePresets);
+    updatePresets();
+});
 document.querySelectorAll('.pretes-qr').forEach(function(el) {
     new QRCode(el, {text:el.dataset.url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});
 });
