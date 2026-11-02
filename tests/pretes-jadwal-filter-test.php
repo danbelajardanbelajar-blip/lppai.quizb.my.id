@@ -53,12 +53,33 @@ function runPretesJadwalFilterTests() {
             $failures[] = "ID tabel 'table-pretes-peserta' tidak ditemukan.";
         }
 
-        // 6. Cek Script DataTables Search Extension
+        // 6. Cek Script DataTables Search Extension & Vanilla JS Resilience
         if (strpos($content, '$.fn.dataTable.ext.search.push') === false) {
             $failures[] = "DataTables ext.search.push tidak ditemukan di script.";
         }
         if (strpos($content, 'applyPretesFilters') === false) {
             $failures[] = "Fungsi applyPretesFilters tidak ditemukan di script.";
+        }
+        if (strpos($content, 'rowMatchesPretesFilters') === false) {
+            $failures[] = "Fungsi rowMatchesPretesFilters tidak ditemukan di script.";
+        }
+        if (strpos($content, 'syncDayPills') === false) {
+            $failures[] = "Fungsi syncDayPills tidak ditemukan di script.";
+        }
+        if (strpos($content, 'watchForPretesDataTables') === false) {
+            $failures[] = "Fungsi watchForPretesDataTables tidak ditemukan di script.";
+        }
+
+        // 7. Cek Pencegahan Error ReferenceError: $ is not defined
+        // Pastikan tidak ada $(document).ready() di file pretes-jadwal.php karena jQuery di-load di footer.php
+        if (strpos($content, '$(document).ready') !== false) {
+            $failures[] = "Terdeteksi $(document).ready() yang dapat memicu ReferenceError: $ is not defined sebelum footer.php di-load.";
+        }
+        if (strpos($content, "document.addEventListener('change'") === false) {
+            $failures[] = "Event listener change vanilla JS tidak ditemukan di script.";
+        }
+        if (strpos($content, "document.addEventListener('click'") === false) {
+            $failures[] = "Event listener click vanilla JS tidak ditemukan di script.";
         }
     }
 

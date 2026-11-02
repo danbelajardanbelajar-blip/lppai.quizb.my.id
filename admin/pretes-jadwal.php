@@ -861,7 +861,7 @@ function addQETutorRow(day) {
                                 <?= sanitize($p['jam'] ?? '13.00 WIB') ?>
                             </div>
                         </td>
-                        <td>
+                        <td data-order="<?= sanitize($curDosen) ?>" data-search="<?= sanitize($curDosen ?: '__BELUM__') ?>" data-filter="<?= sanitize($curDosen ?: '__BELUM__') ?>">
                             <?php if (!empty($p['dosen_penguji'])): ?>
                                 <span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:6px; font-size:13px; font-weight:600; display:inline-block;">
                                     👨‍🏫 <?= sanitize($p['dosen_penguji']) ?>
@@ -870,7 +870,7 @@ function addQETutorRow(day) {
                                 <span style="color:#94a3b8; font-size:12px; font-style:italic;">— Belum diplot —</span>
                             <?php endif; ?>
                         </td>
-                        <td data-sort="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-filter="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                        <td data-sort="<?= htmlspecialchars($curRuangan, ENT_QUOTES, 'UTF-8') ?>" data-search="<?= htmlspecialchars($curRuangan ?: '__BELUM__', ENT_QUOTES, 'UTF-8') ?>" data-filter="<?= htmlspecialchars($curRuangan ?: '__BELUM__', ENT_QUOTES, 'UTF-8') ?>">
                             <select class="form-select form-select-sm select-ruangan-inline" 
                                     data-reg-id="<?= $p['reg_id'] ?>" 
                                     data-original="<?= htmlspecialchars($p['ruangan'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
@@ -1104,6 +1104,13 @@ document.addEventListener('change', function(e) {
                 if (td) {
                     td.setAttribute('data-sort', newVal);
                     td.setAttribute('data-filter', newVal);
+                    td.setAttribute('data-search', newVal || '__BELUM__');
+                }
+                var dt = typeof getPretesDataTable === 'function' ? getPretesDataTable() : null;
+                if (dt) {
+                    try {
+                        dt.row(row).invalidate('dom');
+                    } catch(e) {}
                 }
                 if (typeof applyPretesFilters === 'function') {
                     applyPretesFilters();
@@ -1142,129 +1149,300 @@ document.addEventListener('change', function(e) {
 });
 
 // ── CUSTOM MULTI-FILTER DATATABLES: HARI, DOSEN, RUANGAN, STATUS PENJADWALAN ──
-function getPretesTable() {
+function getPretesDataTable() {
     var el = document.getElementById('table-pretes-peserta');
-    if (el && window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(el)) {
-        return $(el).DataTable();
+    if (el && window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable && window.jQuery.fn.DataTable.isDataTable(el)) {
+        return window.jQuery(el).DataTable();
     }
     return null;
 }
 
-function updateFilterSummary(dt) {
-    if (!dt) return;
-    var info = dt.page.info();
-    var indicator = document.getElementById('filter-active-indicator');
-    if (indicator) {
-        if (info.recordsDisplay < info.recordsTotal) {
-            indicator.innerHTML = '<span style="color:#0284c7;font-weight:700;">Filter aktif:</span> Menampilkan <strong>' + info.recordsDisplay + '</strong> dari ' + info.recordsTotal + ' peserta';
-        } else {
-            indicator.textContent = 'Menampilkan semua peserta (' + info.recordsTotal + ')';
+// Alias untuk kompatibilitas
+function getPretesTable() {
+    return getPretesDataTable();
+}
+
+function getPretesFilterValues() {
+    var elHari   = document.getElementById('filter-table-hari');
+    var elDosen  = document.getElementById('filter-table-dosen');
+    var elRuang  = document.getElementById('filter-table-ruangan');
+    var elJadwal = document.getElementById('filter-table-status-jadwal');
+
+    return {
+        hari:   elHari   ? (elHari.value   || '').trim().toLowerCase() : '',
+        dosen:  elDosen  ? (elDosen.value  || '').trim() : '',
+        ruang:  elRuang  ? (elRuang.value  || '').trim() : '',
+        jadwal: elJadwal ? (elJadwal.value || '').trim() : ''
+    };
+}
+
+function normalizeFilterText(str) {
+    return (str || '').toLowerCase().replace(/[`'’‘]/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+function rowMatchesPretesFilters(row, filters) {
+    if (!row) return true;
+
+    // 1. Filter Hari
+    var rowHari = (row.getAttribute('data-hari') || '').trim().toLowerCase();
+    if (!rowHari && row.cells && row.cells[4]) {
+        rowHari = (row.cells[4].textContent || '').trim().toLowerCase();
+    }
+    if (filters.hari !== '' && rowHari.indexOf(filters.hari) === -1) {
+        return false;
+    }
+
+    // 2. Filter Dosen Penguji
+    var rowDosen = (row.getAttribute('data-dosen') || '').trim();
+    if (!rowDosen && row.cells && row.cells[5]) {
+        var cellText = (row.cells[5].textContent || '').trim();
+        if (cellText.indexOf('— Belum diplot —') === -1) {
+            rowDosen = cellText.replace(/^👨‍🏫\s*/, '').trim();
         }
     }
+    if (filters.dosen !== '') {
+        if (filters.dosen === '__BELUM__') {
+            if (rowDosen !== '') return false;
+        } else {
+            var nRowDosen = normalizeFilterText(rowDosen);
+            var nSelDosen = normalizeFilterText(filters.dosen);
+            if (nRowDosen !== nSelDosen && nRowDosen.indexOf(nSelDosen) === -1 && nSelDosen.indexOf(nRowDosen) === -1) {
+                return false;
+            }
+        }
+    }
+
+    // 3. Filter Ruangan Ujian
+    var rowRuang = (row.getAttribute('data-ruangan') || '').trim();
+    var selectInline = row.querySelector('.select-ruangan-inline');
+    if (selectInline && selectInline.value !== undefined) {
+        rowRuang = (selectInline.value || '').trim();
+    }
+    if (filters.ruang !== '') {
+        if (filters.ruang === '__BELUM__') {
+            if (rowRuang !== '') return false;
+        } else {
+            var nRowRuang = normalizeFilterText(rowRuang);
+            var nSelRuang = normalizeFilterText(filters.ruang);
+            if (nRowRuang !== nSelRuang && nRowRuang.indexOf(nSelRuang) === -1 && nSelRuang.indexOf(nRowRuang) === -1) {
+                return false;
+            }
+        }
+    }
+
+    // 4. Filter Status Penjadwalan: Terjadwal vs Tidak Terjadwal
+    var rowJadwal = (row.getAttribute('data-status-jadwal') || '').trim();
+    if (!rowJadwal) {
+        rowJadwal = (rowDosen !== '') ? 'terjadwal' : 'tidak_terjadwal';
+    }
+    if (filters.jadwal !== '') {
+        if (rowJadwal !== filters.jadwal) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
-function applyPretesFilters() {
-    var dt = getPretesTable();
-    if (dt) {
-        dt.draw();
-        updateFilterSummary(dt);
+function updateFilterActiveIndicator(isFiltered, visibleCount, totalCount) {
+    var indicator = document.getElementById('filter-active-indicator');
+    if (!indicator) return;
+    if (isFiltered) {
+        indicator.innerHTML = '<span style="color:#0284c7;font-weight:700;">Filter aktif:</span> Menampilkan <strong>' + visibleCount + '</strong> dari ' + totalCount + ' peserta';
+    } else {
+        indicator.textContent = 'Menampilkan semua peserta (' + totalCount + ')';
     }
 }
 
-// Daftarkan Custom Filter ke DataTables Search Extension
-if (window.jQuery && $.fn.dataTable && $.fn.dataTable.ext) {
+// Alias untuk kompatibilitas
+function updateFilterSummary(dt) {
+    if (!dt) return;
+    var info = dt.page.info ? dt.page.info() : null;
+    if (info) {
+        var filters = getPretesFilterValues();
+        var isFiltered = !!(filters.hari || filters.dosen || filters.ruang || filters.jadwal);
+        updateFilterActiveIndicator(isFiltered, info.recordsDisplay, info.recordsTotal);
+    }
+}
+
+function syncDayPills(selectedDay) {
+    var selLower = (selectedDay || '').trim().toLowerCase();
+    var pills = document.querySelectorAll('.btn-filter-day');
+    pills.forEach(function(pill) {
+        var pDay = (pill.getAttribute('data-day') || '').trim().toLowerCase();
+        if (pDay === selLower) {
+            pill.style.background = '#0284c7';
+            pill.style.color = '#fff';
+            pill.style.borderColor = '#0284c7';
+            pill.style.fontWeight = '700';
+        } else {
+            pill.style.background = '#fff';
+            pill.style.color = '#334155';
+            pill.style.borderColor = '#cbd5e1';
+            pill.style.fontWeight = '600';
+        }
+    });
+}
+
+function registerDataTablesPretesSearch() {
+    var $ = window.jQuery;
+    if (!$ || !$.fn || !$.fn.dataTable || !$.fn.dataTable.ext) {
+        return false;
+    }
+    if (window._pretesFilterSearchRegistered) {
+        return true;
+    }
+
+    // Daftarkan Custom Filter ke DataTables Search Extension
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
         var tableEl = settings.nTable;
         if (!tableEl || tableEl.id !== 'table-pretes-peserta') {
             return true;
         }
 
-        var row = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
-        if (!row) return true;
-
-        var selHari   = ($('#filter-table-hari').val() || '').trim().toLowerCase();
-        var selDosen  = ($('#filter-table-dosen').val() || '').trim();
-        var selRuang  = ($('#filter-table-ruangan').val() || '').trim();
-        var selJadwal = ($('#filter-table-status-jadwal').val() || '').trim();
-
-        var rowHari   = (row.getAttribute('data-hari') || '').trim().toLowerCase();
-        var rowDosen  = (row.getAttribute('data-dosen') || '').trim();
-        var rowRuang  = (row.getAttribute('data-ruangan') || '').trim();
-        var rowJadwal = (row.getAttribute('data-status-jadwal') || '').trim();
-
-        // 1. Filter Hari
-        if (selHari !== '' && rowHari !== selHari) {
-            return false;
+        var filters = getPretesFilterValues();
+        if (!filters.hari && !filters.dosen && !filters.ruang && !filters.jadwal) {
+            return true;
         }
 
-        // 2. Filter Dosen Penguji
-        if (selDosen !== '') {
-            if (selDosen === '__BELUM__') {
-                if (rowDosen !== '') return false;
-            } else {
-                if (rowDosen.toLowerCase() !== selDosen.toLowerCase()) return false;
-            }
+        var row = settings.aoData && settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+        if (row) {
+            return rowMatchesPretesFilters(row, filters);
         }
 
-        // 3. Filter Ruangan Ujian
-        if (selRuang !== '') {
-            if (selRuang === '__BELUM__') {
-                if (rowRuang !== '') return false;
-            } else {
-                if (rowRuang.toLowerCase() !== selRuang.toLowerCase()) return false;
-            }
-        }
+        // Fallback jika nTr belum di-render oleh DataTables
+        var dHari   = (data[4] || '').toLowerCase();
+        var dDosen  = (data[5] || '').trim();
+        var dRuang  = (data[6] || '').trim();
+        var isPlot  = (dDosen !== '' && dDosen.indexOf('Belum') === -1);
+        var dJadwal = isPlot ? 'terjadwal' : 'tidak_terjadwal';
 
-        // 4. Filter Status Penjadwalan: Terjadwal vs Tidak Terjadwal
-        if (selJadwal !== '') {
-            if (rowJadwal !== selJadwal) {
+        if (filters.hari && dHari.indexOf(filters.hari) === -1) return false;
+        if (filters.dosen) {
+            if (filters.dosen === '__BELUM__') {
+                if (isPlot) return false;
+            } else if (dDosen.toLowerCase().indexOf(filters.dosen.toLowerCase()) === -1) {
                 return false;
             }
         }
+        if (filters.ruang) {
+            if (filters.ruang === '__BELUM__') {
+                if (dRuang !== '' && dRuang.indexOf('Belum') === -1) return false;
+            } else if (dRuang.toLowerCase().indexOf(filters.ruang.toLowerCase()) === -1) {
+                return false;
+            }
+        }
+        if (filters.jadwal && dJadwal !== filters.jadwal) return false;
 
         return true;
     });
+
+    window._pretesFilterSearchRegistered = true;
+    return true;
 }
 
-// Inisialisasi event listener setelah DOM siap
-$(document).ready(function() {
-    // Event perubahan dropdown filter
-    $('#filter-table-hari, #filter-table-dosen, #filter-table-ruangan, #filter-table-status-jadwal').on('change', function() {
-        var currentDay = $('#filter-table-hari').val();
-        $('.btn-filter-day').each(function() {
-            var bDay = $(this).data('day') || '';
-            if (bDay === currentDay) {
-                $(this).css({'background': '#0284c7', 'color': '#fff', 'border-color': '#0284c7', 'font-weight': '700'});
+function applyPretesFilters() {
+    registerDataTablesPretesSearch();
+    var dt = getPretesDataTable();
+    var filters = getPretesFilterValues();
+    var isFiltered = !!(filters.hari || filters.dosen || filters.ruang || filters.jadwal);
+
+    if (dt) {
+        dt.draw();
+        var info = dt.page.info ? dt.page.info() : null;
+        var visibleCount = info ? info.recordsDisplay : dt.rows({ filter: 'applied' }).count();
+        var totalCount = info ? info.recordsTotal : dt.rows().count();
+        updateFilterActiveIndicator(isFiltered, visibleCount, totalCount);
+    } else {
+        // Fallback DOM filtering murni jika DataTables belum aktif
+        var table = document.getElementById('table-pretes-peserta');
+        if (!table) return;
+        var tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        var rows = tbody.querySelectorAll('tr');
+        var visibleCount = 0;
+        var totalCount = rows.length;
+
+        for (var i = 0; i < rows.length; i++) {
+            var r = rows[i];
+            if (rowMatchesPretesFilters(r, filters)) {
+                r.style.display = '';
+                visibleCount++;
             } else {
-                $(this).css({'background': '#fff', 'color': '#334155', 'border-color': '#cbd5e1', 'font-weight': '600'});
+                r.style.display = 'none';
             }
-        });
+        }
+        updateFilterActiveIndicator(isFiltered, visibleCount, totalCount);
+    }
+}
+
+// Event Delegation Murni Vanilla JS (Bekerja Seketika Tanpa Ketergantungan jQuery)
+document.addEventListener('change', function(e) {
+    var target = e.target;
+    if (!target) return;
+    var id = target.id;
+    if (id === 'filter-table-hari' || id === 'filter-table-dosen' || id === 'filter-table-ruangan' || id === 'filter-table-status-jadwal') {
+        if (id === 'filter-table-hari') {
+            syncDayPills(target.value);
+        }
         applyPretesFilters();
-    });
-
-    // Event klik shortcut tombol hari (pills)
-    $('.btn-filter-day').on('click', function() {
-        var day = $(this).data('day') || '';
-        $('#filter-table-hari').val(day).trigger('change');
-    });
-
-    // Event tombol Reset Filter
-    $('#btn-reset-pretes-filter').on('click', function() {
-        $('#filter-table-hari').val('');
-        $('#filter-table-dosen').val('');
-        $('#filter-table-ruangan').val('');
-        $('#filter-table-status-jadwal').val('');
-        $('.btn-filter-day').css({'background': '#fff', 'color': '#334155', 'border-color': '#cbd5e1', 'font-weight': '600'});
-        $('.btn-filter-day[data-day=""]').css({'background': '#0284c7', 'color': '#fff', 'border-color': '#0284c7', 'font-weight': '700'});
-        applyPretesFilters();
-    });
-
-    // Update summary count saat DataTables selesai dimuat
-    setTimeout(function() {
-        var dt = getPretesTable();
-        if (dt) updateFilterSummary(dt);
-    }, 500);
+    }
 });
+
+document.addEventListener('click', function(e) {
+    var pill = e.target.closest('.btn-filter-day');
+    if (pill) {
+        e.preventDefault();
+        var day = pill.getAttribute('data-day') || '';
+        var selectHari = document.getElementById('filter-table-hari');
+        if (selectHari) {
+            selectHari.value = day;
+        }
+        syncDayPills(day);
+        applyPretesFilters();
+        return;
+    }
+
+    var btnReset = e.target.closest('#btn-reset-pretes-filter');
+    if (btnReset) {
+        e.preventDefault();
+        var elHari   = document.getElementById('filter-table-hari');
+        var elDosen  = document.getElementById('filter-table-dosen');
+        var elRuang  = document.getElementById('filter-table-ruangan');
+        var elJadwal = document.getElementById('filter-table-status-jadwal');
+
+        if (elHari)   elHari.value = '';
+        if (elDosen)  elDosen.value = '';
+        if (elRuang)  elRuang.value = '';
+        if (elJadwal) elJadwal.value = '';
+
+        syncDayPills('');
+        applyPretesFilters();
+        return;
+    }
+});
+
+// Polling sinkronisasi jika DataTables diinisialisasi secara asinkron oleh app.js
+function watchForPretesDataTables(retries) {
+    retries = typeof retries === 'number' ? retries : 25;
+    if (registerDataTablesPretesSearch() && getPretesDataTable()) {
+        applyPretesFilters();
+        return;
+    }
+    if (retries > 0) {
+        setTimeout(function() {
+            watchForPretesDataTables(retries - 1);
+        }, 150);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        watchForPretesDataTables();
+    });
+} else {
+    watchForPretesDataTables();
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
