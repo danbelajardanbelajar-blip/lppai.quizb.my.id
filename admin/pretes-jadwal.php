@@ -416,6 +416,38 @@ foreach ($participants as $p) {
     if (isset($dayCounts[$dh])) $dayCounts[$dh]++;
 }
 
+// Ambil daftar unik Dosen Penguji untuk opsi filter
+$filterDosenList = [];
+foreach ($participants as $p) {
+    $d = trim($p['dosen_penguji'] ?? '');
+    if (!empty($d) && !in_array($d, $filterDosenList)) {
+        $filterDosenList[] = $d;
+    }
+}
+foreach ($tutorsList as $t) {
+    $tName = trim($t['nama'] ?? '');
+    if (!empty($tName) && !in_array($tName, $filterDosenList)) {
+        $filterDosenList[] = $tName;
+    }
+}
+sort($filterDosenList, SORT_NATURAL | SORT_FLAG_CASE);
+
+// Ambil daftar unik Ruangan untuk opsi filter
+$filterRuangList = [];
+foreach ($roomsList as $rm) {
+    $r = trim($rm['ruang'] ?? '');
+    if (!empty($r) && !in_array($r, $filterRuangList)) {
+        $filterRuangList[] = $r;
+    }
+}
+foreach ($participants as $p) {
+    $r = trim($p['ruangan'] ?? '');
+    if (!empty($r) && !in_array($r, $filterRuangList)) {
+        $filterRuangList[] = $r;
+    }
+}
+sort($filterRuangList, SORT_NATURAL | SORT_FLAG_CASE);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -700,21 +732,98 @@ function addQETutorRow(day) {
                 <p>Belum ada mahasiswa yang mendaftar pretes pada periode ini.</p>
             </div>
         <?php else: ?>
-        <!-- Filter Hari Peserta Pretes -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;background:#f8fafc;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;">
-            <span style="font-size:13px;font-weight:600;color:#475569;">📅 Filter Hari:</span>
-            <button type="button" class="btn-filter-day" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#e2e8f0;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
-                Semua (<?= $totalPeserta ?>)
-            </button>
-            <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
-                <button type="button" class="btn-filter-day" data-day="<?= $day ?>" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
-                    <?= $day ?>: <span style="color:#2563eb;font-weight:bold;"><?= $dayCounts[$day] ?? 0 ?></span>
-                </button>
-            <?php endforeach; ?>
+        <!-- ===================================================
+             PANEL FILTER DATA PRETES (HARI, DOSEN, RUANGAN, STATUS JADWAL)
+             =================================================== -->
+        <div class="pretes-filter-panel" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:18px;">
+            
+            <!-- Baris 1: Shortcut Filter Cepat Hari & Ringkasan -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #e2e8f0;">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-size:13px;font-weight:700;color:#334155;">📅 Filter Cepat Hari:</span>
+                    <button type="button" class="btn-filter-day btn-filter-day-active" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #0284c7;background:#0284c7;color:#fff;font-size:12px;cursor:pointer;font-weight:700;transition:all 0.2s;">
+                        Semua (<?= $totalPeserta ?>)
+                    </button>
+                    <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                        <button type="button" class="btn-filter-day" data-day="<?= $day ?>" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12px;cursor:pointer;font-weight:600;transition:all 0.2s;">
+                            <?= $day ?>: <span style="color:#0284c7;font-weight:bold;"><?= $dayCounts[$day] ?? 0 ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="filter-active-indicator" style="font-size:12px;color:#64748b;font-weight:600;">
+                        Menampilkan semua peserta (<?= $totalPeserta ?>)
+                    </span>
+                    <button type="button" id="btn-reset-pretes-filter" class="btn btn-sm btn-secondary" style="padding:4px 12px;font-size:12px;border-radius:6px;font-weight:600;display:inline-flex;align-items:center;gap:4px;">
+                        <span>🔄</span> Reset Filter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Baris 2: Dropdown Filter Utama (Hari, Dosen, Ruangan, Status Penjadwalan) -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;align-items:flex-end;">
+                
+                <!-- 1. Filter Hari -->
+                <div>
+                    <label for="filter-table-hari" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:block;">
+                        📅 Hari Pretes:
+                    </label>
+                    <select id="filter-table-hari" class="form-select" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;">
+                        <option value="">-- Semua Hari --</option>
+                        <option value="Senin">Senin (2 Nov)</option>
+                        <option value="Selasa">Selasa (3 Nov)</option>
+                        <option value="Rabu">Rabu (4 Nov)</option>
+                        <option value="Kamis">Kamis (5 Nov)</option>
+                        <option value="Jumat">Jumat (6 Nov)</option>
+                    </select>
+                </div>
+
+                <!-- 2. Filter Dosen Penguji -->
+                <div>
+                    <label for="filter-table-dosen" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:block;">
+                        🧑‍🏫 Dosen Penguji:
+                    </label>
+                    <select id="filter-table-dosen" class="form-select" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;">
+                        <option value="">-- Semua Dosen Penguji --</option>
+                        <option value="__BELUM__">⏳ — Belum Diplot Dosen —</option>
+                        <?php foreach ($filterDosenList as $dName): ?>
+                        <option value="<?= sanitize($dName) ?>"><?= sanitize($dName) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- 3. Filter Ruangan -->
+                <div>
+                    <label for="filter-table-ruangan" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:block;">
+                        🏢 Ruangan Ujian:
+                    </label>
+                    <select id="filter-table-ruangan" class="form-select" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;">
+                        <option value="">-- Semua Ruangan --</option>
+                        <option value="__BELUM__">⏳ — Belum Ada Ruangan —</option>
+                        <?php foreach ($filterRuangList as $rName): ?>
+                        <option value="<?= sanitize($rName) ?>"><?= sanitize($rName) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <!-- 4. Filter Status Penjadwalan: Terjadwal & Tidak Terjadwal -->
+                <div>
+                    <label for="filter-table-status-jadwal" style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;display:block;">
+                        ⚡ Status Penjadwalan:
+                    </label>
+                    <select id="filter-table-status-jadwal" class="form-select" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;">
+                        <option value="">-- Semua Status Plotting --</option>
+                        <option value="terjadwal">✅ Terjadwal (Sudah Terplot)</option>
+                        <option value="tidak_terjadwal">⏳ Tidak Terjadwal (Belum Terplot)</option>
+                    </select>
+                </div>
+
+            </div>
         </div>
 
         <div class="table-responsive">
-            <table>
+            <table id="table-pretes-peserta" class="table">
                 <thead>
                     <tr>
                         <th>No</th>
@@ -730,9 +839,16 @@ function addQETutorRow(day) {
                 </thead>
                 <tbody>
                     <?php foreach ($participants as $i => $p): 
-                        $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
+                        $curHari      = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
+                        $curDosen     = trim($p['dosen_penguji'] ?? '');
+                        $curRuangan   = trim($p['ruangan'] ?? '');
+                        $isTerjadwal  = !empty($curDosen);
+                        $statusJadwal = $isTerjadwal ? 'terjadwal' : 'tidak_terjadwal';
                     ?>
-                    <tr>
+                    <tr data-hari="<?= sanitize($curHari ?: 'Senin') ?>"
+                        data-dosen="<?= htmlspecialchars($curDosen, ENT_QUOTES, 'UTF-8') ?>"
+                        data-ruangan="<?= htmlspecialchars($curRuangan, ENT_QUOTES, 'UTF-8') ?>"
+                        data-status-jadwal="<?= $statusJadwal ?>">
                         <td><?= $i + 1 ?></td>
                         <td><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($p['nim']) ?></td>
@@ -979,6 +1095,7 @@ document.addEventListener('change', function(e) {
             // Sinkronkan data-ruangan pada tombol modal edit dan atribut tabel
             var row = selectEl.closest('tr');
             if (row) {
+                row.setAttribute('data-ruangan', newVal);
                 var btnEdit = row.querySelector('.btn-edit-penugasan');
                 if (btnEdit) {
                     btnEdit.setAttribute('data-ruangan', newVal);
@@ -987,6 +1104,9 @@ document.addEventListener('change', function(e) {
                 if (td) {
                     td.setAttribute('data-sort', newVal);
                     td.setAttribute('data-filter', newVal);
+                }
+                if (typeof applyPretesFilters === 'function') {
+                    applyPretesFilters();
                 }
             }
 
@@ -1021,19 +1141,129 @@ document.addEventListener('change', function(e) {
     });
 });
 
-// Filter DataTables berdasarkan Hari Pelaksanaan
-document.querySelectorAll('.btn-filter-day').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        var day = this.dataset.day || '';
-        if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('table')) {
-            $('table').DataTable().column(4).search(day).draw();
+// ── CUSTOM MULTI-FILTER DATATABLES: HARI, DOSEN, RUANGAN, STATUS PENJADWALAN ──
+function getPretesTable() {
+    var el = document.getElementById('table-pretes-peserta');
+    if (el && window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(el)) {
+        return $(el).DataTable();
+    }
+    return null;
+}
+
+function updateFilterSummary(dt) {
+    if (!dt) return;
+    var info = dt.page.info();
+    var indicator = document.getElementById('filter-active-indicator');
+    if (indicator) {
+        if (info.recordsDisplay < info.recordsTotal) {
+            indicator.innerHTML = '<span style="color:#0284c7;font-weight:700;">Filter aktif:</span> Menampilkan <strong>' + info.recordsDisplay + '</strong> dari ' + info.recordsTotal + ' peserta';
+        } else {
+            indicator.textContent = 'Menampilkan semua peserta (' + info.recordsTotal + ')';
         }
-        document.querySelectorAll('.btn-filter-day').forEach(function(b) {
-            b.style.background = '#fff';
-            b.style.color = '#334155';
-        });
-        this.style.background = '#e2e8f0';
+    }
+}
+
+function applyPretesFilters() {
+    var dt = getPretesTable();
+    if (dt) {
+        dt.draw();
+        updateFilterSummary(dt);
+    }
+}
+
+// Daftarkan Custom Filter ke DataTables Search Extension
+if (window.jQuery && $.fn.dataTable && $.fn.dataTable.ext) {
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        var tableEl = settings.nTable;
+        if (!tableEl || tableEl.id !== 'table-pretes-peserta') {
+            return true;
+        }
+
+        var row = settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+        if (!row) return true;
+
+        var selHari   = ($('#filter-table-hari').val() || '').trim().toLowerCase();
+        var selDosen  = ($('#filter-table-dosen').val() || '').trim();
+        var selRuang  = ($('#filter-table-ruangan').val() || '').trim();
+        var selJadwal = ($('#filter-table-status-jadwal').val() || '').trim();
+
+        var rowHari   = (row.getAttribute('data-hari') || '').trim().toLowerCase();
+        var rowDosen  = (row.getAttribute('data-dosen') || '').trim();
+        var rowRuang  = (row.getAttribute('data-ruangan') || '').trim();
+        var rowJadwal = (row.getAttribute('data-status-jadwal') || '').trim();
+
+        // 1. Filter Hari
+        if (selHari !== '' && rowHari !== selHari) {
+            return false;
+        }
+
+        // 2. Filter Dosen Penguji
+        if (selDosen !== '') {
+            if (selDosen === '__BELUM__') {
+                if (rowDosen !== '') return false;
+            } else {
+                if (rowDosen.toLowerCase() !== selDosen.toLowerCase()) return false;
+            }
+        }
+
+        // 3. Filter Ruangan Ujian
+        if (selRuang !== '') {
+            if (selRuang === '__BELUM__') {
+                if (rowRuang !== '') return false;
+            } else {
+                if (rowRuang.toLowerCase() !== selRuang.toLowerCase()) return false;
+            }
+        }
+
+        // 4. Filter Status Penjadwalan: Terjadwal vs Tidak Terjadwal
+        if (selJadwal !== '') {
+            if (rowJadwal !== selJadwal) {
+                return false;
+            }
+        }
+
+        return true;
     });
+}
+
+// Inisialisasi event listener setelah DOM siap
+$(document).ready(function() {
+    // Event perubahan dropdown filter
+    $('#filter-table-hari, #filter-table-dosen, #filter-table-ruangan, #filter-table-status-jadwal').on('change', function() {
+        var currentDay = $('#filter-table-hari').val();
+        $('.btn-filter-day').each(function() {
+            var bDay = $(this).data('day') || '';
+            if (bDay === currentDay) {
+                $(this).css({'background': '#0284c7', 'color': '#fff', 'border-color': '#0284c7', 'font-weight': '700'});
+            } else {
+                $(this).css({'background': '#fff', 'color': '#334155', 'border-color': '#cbd5e1', 'font-weight': '600'});
+            }
+        });
+        applyPretesFilters();
+    });
+
+    // Event klik shortcut tombol hari (pills)
+    $('.btn-filter-day').on('click', function() {
+        var day = $(this).data('day') || '';
+        $('#filter-table-hari').val(day).trigger('change');
+    });
+
+    // Event tombol Reset Filter
+    $('#btn-reset-pretes-filter').on('click', function() {
+        $('#filter-table-hari').val('');
+        $('#filter-table-dosen').val('');
+        $('#filter-table-ruangan').val('');
+        $('#filter-table-status-jadwal').val('');
+        $('.btn-filter-day').css({'background': '#fff', 'color': '#334155', 'border-color': '#cbd5e1', 'font-weight': '600'});
+        $('.btn-filter-day[data-day=""]').css({'background': '#0284c7', 'color': '#fff', 'border-color': '#0284c7', 'font-weight': '700'});
+        applyPretesFilters();
+    });
+
+    // Update summary count saat DataTables selesai dimuat
+    setTimeout(function() {
+        var dt = getPretesTable();
+        if (dt) updateFilterSummary(dt);
+    }, 500);
 });
 </script>
 
