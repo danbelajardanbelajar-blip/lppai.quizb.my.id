@@ -363,8 +363,13 @@ function ajaxDelete(table, id, csrfToken, rowEl, successMsg) {
 }
 
 /* =============================================
-   SPA ENGINE
+   SPA ENGINE & CONFIGURATION
    ============================================= */
+// Set ENABLE_SPA = false agar seluruh navigasi halaman berjalan native di browser
+// (mencegah bug harus reload/F5 pada form, filter, scanner, dan script halaman).
+// Cadangan konfigurasi lengkap tersimpan di: assets/js/app.spa.bak.js
+var ENABLE_SPA = false;
+
 var SPA = {
     loading: false,
 
@@ -529,7 +534,7 @@ var SPA = {
 };
 
 window.addEventListener('popstate', function(e) {
-    if (e.state && e.state.url) {
+    if (ENABLE_SPA && e.state && e.state.url) {
         SPA.navigate(e.state.url, false);
     }
 });
@@ -538,7 +543,9 @@ window.addEventListener('popstate', function(e) {
    DOM READY
    ============================================= */
 document.addEventListener('DOMContentLoaded', function() {
-    SPA.init();
+    if (ENABLE_SPA) {
+        SPA.init();
+    }
 
     var hamburger = document.querySelector('.hamburger');
     var sidebar = document.querySelector('.sidebar');
@@ -572,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /* =============================================
-   EVENT DELEGATION — SPA NAVIGATION
+   EVENT DELEGATION — NAVIGATION
    ============================================= */
 document.addEventListener('click', function(e) {
     var link = e.target.closest('a.page-nav');
@@ -581,14 +588,21 @@ document.addEventListener('click', function(e) {
     var href = link.getAttribute('href');
     if (!href || href === '#' || href.indexOf('logout') !== -1) return;
 
-    e.preventDefault();
-    if (typeof window.trackUserClick === 'function') { window.trackUserClick(link, 'menu'); }
-    e.stopPropagation();
-    SPA.navigate(href, true);
+    // Catat log aktivitas klik menu jika tracker aktif
+    if (typeof window.trackUserClick === 'function') {
+        window.trackUserClick(link, 'menu');
+    }
+
+    if (ENABLE_SPA) {
+        e.preventDefault();
+        e.stopPropagation();
+        SPA.navigate(href, true);
+    }
+    // Jika ENABLE_SPA = false, biarkan browser berpindah halaman secara native
 }, true);
 
 /* =============================================
-   EVENT DELEGATION — SPA FORM SUBMIT
+   EVENT DELEGATION — FORM SUBMIT
    ============================================= */
 document.addEventListener('submit', function(e) {
     var form = e.target;
@@ -606,6 +620,7 @@ document.addEventListener('submit', function(e) {
         }, 10);
     });
 
+    if (!ENABLE_SPA) return;
 
     if (!form.closest('.content-area')) return;
     if (form.getAttribute('enctype') === 'multipart/form-data') return;
@@ -650,9 +665,17 @@ document.addEventListener('click', function(e) {
         }
 
         if (form) {
-            SPA.submitForm(form);
-        } else if (el.tagName === 'A') {
-            SPA.navigate(el.href, true);
+            if (ENABLE_SPA && !form.hasAttribute('data-no-spa')) {
+                SPA.submitForm(form);
+            } else {
+                form.submit();
+            }
+        } else if (el.tagName === 'A' && el.href) {
+            if (ENABLE_SPA && el.classList.contains('page-nav')) {
+                SPA.navigate(el.href, true);
+            } else {
+                window.location.href = el.href;
+            }
         }
     }, type);
 }, true);
