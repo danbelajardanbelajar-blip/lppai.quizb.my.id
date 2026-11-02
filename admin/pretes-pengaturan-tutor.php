@@ -736,6 +736,108 @@ $daysInfo = [
     'Jumat'  => ['date' => '6 Nov 2026', 'penguji' => $masterJumat,  'kuota' => (int)($currentMaster['kuota_jumat'] ?? 30)],
 ];
 
+// Ambil jumlah peserta terisi per hari dari pretes_registrations
+$stmtDayCounts = $pdo->prepare("
+    SELECT hari_pilihan, COUNT(*) as jml 
+    FROM pretes_registrations 
+    WHERE periode = ? AND hari_pilihan IS NOT NULL AND hari_pilihan != ''
+    GROUP BY hari_pilihan
+");
+$stmtDayCounts->execute([$periodeName]);
+$registeredCounts = [];
+foreach ($stmtDayCounts->fetchAll() as $row) {
+    $registeredCounts[ucfirst(strtolower(trim($row['hari_pilihan'])))] = (int)$row['jml'];
+}
+
+// Map ruangan per tutor per hari dari pretes_attendance_sessions
+$sessionRooms = [];
+foreach ($allSessions as $s) {
+    $h = ucfirst(strtolower(trim($s['hari'])));
+    $p = trim($s['penguji']);
+    if (!empty($s['ruangan'])) {
+        $sessionRooms[$h][$p] = trim($s['ruangan']);
+    }
+}
+
+$days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+$datesShort = [
+    'Senin'  => '2 Nov',
+    'Selasa' => '3 Nov',
+    'Rabu'   => '4 Nov',
+    'Kamis'  => '5 Nov',
+    'Jumat'  => '6 Nov'
+];
+$datesFull = [
+    'Senin'  => '2 November 2026',
+    'Selasa' => '3 November 2026',
+    'Rabu'   => '4 November 2026',
+    'Kamis'  => '5 November 2026',
+    'Jumat'  => '6 November 2026'
+];
+
+$scheduleCardData = [];
+$totalAllKuota = 0;
+$totalAllTerisi = 0;
+
+foreach ($days as $day) {
+    $dayLower = strtolower($day);
+    $pengujiStr = $currentMaster["penguji_$dayLower"] ?? '';
+    $pengujiArr = parsePengujiList($pengujiStr);
+    
+    // Sinkronkan juga penguji dari tabel sesi yang belum masuk master
+    if (isset($sessionRooms[$day])) {
+        foreach (array_keys($sessionRooms[$day]) as $sessPenguji) {
+            if (!in_array($sessPenguji, $pengujiArr)) {
+                $pengujiArr[] = $sessPenguji;
+            }
+        }
+    }
+
+    $kuota = (int)($currentMaster["kuota_$dayLower"] ?? 0);
+    $terisi = $registeredCounts[$day] ?? 0;
+    $sisaKuota = $kuota - $terisi;
+
+    $totalAllKuota += $kuota;
+    $totalAllTerisi += $terisi;
+
+    $scheduleCardData[$day] = [
+        'day'        => $day,
+        'date'       => $datesShort[$day],
+        'date_full'  => $datesFull[$day],
+        'penguji'    => $pengujiArr,
+        'kuota'      => $kuota,
+        'terisi'     => $terisi,
+        'sisa'       => $sisaKuota,
+        'rooms'      => $sessionRooms[$day] ?? []
+    ];
+}
+
+// Teks format WhatsApp untuk di-share ke para tutor
+$waTextSchedule = "🌟 *JADWAL DOSEN PENGUJI & KUOTA PRETES LPPAI UNISDA*\n";
+$waTextSchedule .= "*Periode:* " . $periodeName . "\n";
+$waTextSchedule .= "*Tahun Ajaran:* " . ($currentMaster['tahun_ajaran'] ?? '-') . "\n";
+$waTextSchedule .= "*Pelaksanaan:* 2 – 6 November 2026\n";
+$waTextSchedule .= "*Waktu Ujian:* " . $defaultPeriodeJam . "\n";
+$waTextSchedule .= "--------------------------------------------------\n\n";
+
+foreach ($scheduleCardData as $d) {
+    $waTextSchedule .= "📅 *" . strtoupper($d['day']) . " (" . $d['date_full'] . ")* - " . $defaultPeriodeJam . "\n";
+    $waTextSchedule .= "• *Dosen Penguji:*\n";
+    if (empty($d['penguji'])) {
+        $waTextSchedule .= "  _(Belum ada penguji yang diplot)_\n";
+    } else {
+        $n = 1;
+        foreach ($d['penguji'] as $pName) {
+            $rm = isset($d['rooms'][$pName]) ? " (" . $d['rooms'][$pName] . ")" : "";
+            $waTextSchedule .= "  " . $n++ . ". " . $pName . $rm . "\n";
+        }
+    }
+    $waTextSchedule .= "• *Kuota Peserta:* " . $d['kuota'] . " (Terisi: " . $d['terisi'] . " | Sisa: " . $d['sisa'] . ")\n\n";
+}
+$waTextSchedule .= "--------------------------------------------------\n";
+$waTextSchedule .= "⚠️ *Catatan:* Diharapkan Bapak/Ibu Dosen Penguji hadir 15 menit sebelum pelaksanaan ujian. Terima kasih.\n\n";
+$waTextSchedule .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Islam Darul 'Ulum Lamongan_";
+
 $activeTab = $_GET['tab'] ?? 'sesi';
 
 include __DIR__ . '/../includes/header.php';
@@ -1003,6 +1105,112 @@ input:checked + .slider:before { transform: translateX(16px); }
          TAB 1: PENGATURAN SESI PRETES (PER DOSEN, PER RUANG, PER HARI)
          ======================================================================= -->
     <?php if ($activeTab === 'sesi'): ?>
+    
+    <!-- =======================================================================
+         KARTU JADWAL DOSEN PENGUJI & KUOTA (FORMAT CETAK & BAGIKAN KE TUTOR)
+         Sesuai Tampilan Jadwal LPPAI (Persis Screenshot)
+         ======================================================================= -->
+    <div class="card" style="margin-bottom: 24px; border-radius: 14px; border: 1.5px solid #bfdbfe; overflow: hidden; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.06);">
+        
+        <!-- CALLOUT BANNER PERIODE (PERSIS GAMBAR USER) -->
+        <div style="background: #eff6ff; border-left: 5px solid #3b82f6; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+            <div>
+                <div style="font-size: 16px; font-weight: 800; color: #1e40af; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <span>🌟</span> Periode Pretes Aktif: <strong><?= sanitize($periodeName) ?></strong>
+                </div>
+                <div style="font-size: 13.5px; color: #1d4ed8; font-weight: 600;">
+                    Tahun Ajaran: <strong><?= sanitize($currentMaster['tahun_ajaran'] ?? '-') ?></strong> | 
+                    Pelaksanaan: <strong>2 – 6 November 2026</strong> | 
+                    Jam: <strong><?= sanitize($defaultPeriodeJam) ?></strong>
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS: CETAK, SALIN WA, SHARE WA -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button type="button" onclick="copyScheduleWaText()" id="btn-copy-wa-top" class="btn btn-sm" style="background: #10b981; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 14px; display: inline-flex; align-items: center; gap: 5px; border: none; cursor: pointer;">
+                    <span>📋</span> Salin Teks WhatsApp
+                </button>
+                <a href="https://api.whatsapp.com/send?text=<?= rawurlencode($waTextSchedule) ?>" target="_blank" class="btn btn-sm" style="background: #25d366; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;">
+                    <span>📲</span> Bagikan ke WA
+                </a>
+                <a href="<?= BASE_URL ?>/admin/pretes-jadwal-cetak.php?periode=<?= urlencode($periodeName) ?>" target="_blank" class="btn btn-sm" style="background: #0284c7; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;">
+                    <span>🖨️</span> Cetak / Simpan PDF
+                </a>
+                <a href="?periode=<?= urlencode($periodeName) ?>&tab=jadwal" class="btn btn-sm btn-outline-primary" style="background: #fff; font-weight: 600; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="Edit Susunan Dosen Penguji">
+                    <span>⚙️</span> Edit Plotting
+                </a>
+            </div>
+        </div>
+
+        <!-- CARD HEADER -->
+        <div style="padding: 14px 20px 8px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #dbeafe;">
+            <div style="font-size: 15px; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                <span>👨‍🏫</span> Pengaturan Dosen & Kuota (Jadwal Siap Dishare ke Para Tutor)
+            </div>
+            <div style="font-size: 12px; color: #64748b; font-weight: 600;">
+                Total Kuota: <strong style="color: #0f172a;"><?= $totalAllKuota ?></strong> · Terisi: <strong style="color: #0284c7;"><?= $totalAllTerisi ?></strong>
+            </div>
+        </div>
+
+        <!-- 5-COLUMN DAY GRID (PERSIS GAMBAR USER) -->
+        <div style="padding: 16px 20px 20px 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1.5px solid #e2e8f0;">
+                <?php foreach ($scheduleCardData as $d): ?>
+                <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <div>
+                        <!-- Header Hari & Jam -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1.5px solid #f1f5f9;">
+                            <div style="font-size: 14px; font-weight: 800; color: #0f172a;">
+                                <?= $d['day'] ?> <span style="font-size: 12px; color: #0284c7; font-weight: 700;">(<?= $d['date'] ?>)</span>
+                            </div>
+                            <span style="font-size: 11px; background: #e2e8f0; color: #334155; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
+                                13.00 WIB
+                            </span>
+                        </div>
+
+                        <!-- Daftar Tutor Penguji (Clean Card View) -->
+                        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+                            <?php if (empty($d['penguji'])): ?>
+                                <div style="font-size: 12px; color: #94a3b8; font-style: italic; padding: 8px 6px;">
+                                    Belum ada penguji diplot
+                                </div>
+                            <?php else: ?>
+                                <?php foreach ($d['penguji'] as $pName): 
+                                    $rName = $d['rooms'][$pName] ?? '';
+                                ?>
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-weight: 600; color: #1e293b; line-height: 1.35;">
+                                    <div><?= sanitize($pName) ?></div>
+                                    <?php if (!empty($rName)): ?>
+                                    <div style="font-size: 11px; color: #0284c7; font-weight: 700; margin-top: 2px;">
+                                        🏢 <?= sanitize($rName) ?>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Kuota Peserta (Mirip Input/View Box di Screenshot) -->
+                    <div style="border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
+                        <div style="font-size: 11.5px; color: #64748b; font-weight: 600; margin-bottom: 3px;">
+                            Kuota Peserta:
+                        </div>
+                        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
+                            <?= $d['kuota'] ?>
+                        </div>
+                        <div style="font-size: 12px; font-weight: 700; color: <?= $d['sisa'] < 0 ? '#ef4444' : '#10b981' ?>;">
+                            Terisi: <?= $d['terisi'] ?> | Sisa Kuota: <?= $d['sisa'] ?>
+                        </div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Textarea for WhatsApp Message -->
+    <textarea id="raw-schedule-wa-text" style="position: absolute; left: -9999px; top: -9999px;"><?= htmlspecialchars($waTextSchedule, ENT_QUOTES, 'UTF-8') ?></textarea>
     
     <!-- ACTION TOOLBAR: TAMBAH SESI, DUPLIKASI, BUKA/TUTUP SEMUA -->
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -2104,6 +2312,27 @@ $(document).ready(function() {
         }
     }
 });
+
+// ── SALIN TEKS JADWAL TUTOR UNTUK WHATSAPP ──────────────────────────────────
+function copyScheduleWaText() {
+    var textEl = document.getElementById('raw-schedule-wa-text');
+    if (!textEl) return;
+    var text = textEl.value;
+    var btn = document.getElementById('btn-copy-wa-top');
+    navigator.clipboard.writeText(text).then(function() {
+        if (btn) {
+            var oldHtml = btn.innerHTML;
+            btn.innerHTML = '<span>✅</span> Berhasil Disalin!';
+            btn.style.background = '#059669';
+            setTimeout(function() {
+                btn.innerHTML = oldHtml;
+                btn.style.background = '#10b981';
+            }, 2500);
+        }
+    }).catch(function(err) {
+        prompt('Salin teks jadwal berikut untuk WhatsApp:', text);
+    });
+}
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

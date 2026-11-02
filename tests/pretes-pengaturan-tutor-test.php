@@ -82,9 +82,40 @@ function runTutorSettingTests() {
                 $failures[] = "Kolom $col tidak ditemukan di file.";
             }
         }
+
+        // Cek Fitur Menu Cetak & Bagikan Jadwal Tutor
+        if (strpos($content, 'pretes-jadwal-cetak.php') === false) {
+            $failures[] = "Link menu cetak jadwal pretes-jadwal-cetak.php tidak ditemukan di admin/pretes-pengaturan-tutor.php";
+        }
+        if (strpos($content, 'copyScheduleWaText') === false) {
+            $failures[] = "Fungsi copyScheduleWaText tidak ditemukan di admin/pretes-pengaturan-tutor.php";
+        }
+        if (strpos($content, 'api.whatsapp.com/send') === false) {
+            $failures[] = "Tombol share WhatsApp tidak ditemukan di admin/pretes-pengaturan-tutor.php";
+        }
     }
 
-    // 3. Test Logika Parser Penguji
+    // 3. Verifikasi File admin/pretes-jadwal-cetak.php
+    $printFile = __DIR__ . '/../admin/pretes-jadwal-cetak.php';
+    if (!file_exists($printFile)) {
+        $failures[] = "File admin/pretes-jadwal-cetak.php tidak ditemukan.";
+    } else {
+        $pContent = file_get_contents($printFile);
+        if (strpos($pContent, 'requireAdmin();') === false) {
+            $failures[] = "Pengamanan requireAdmin() tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'kop-surat') === false) {
+            $failures[] = "Kop surat LPPAI UNISDA tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'window.print()') === false) {
+            $failures[] = "Fungsi window.print() tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'copyWaText') === false) {
+            $failures[] = "Fungsi salin WhatsApp tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+    }
+
+    // 4. Test Logika Parser Penguji
     $testStr = "Dr. Fauzi, M.Pd.I|||Ustadz Ahmad, M.E.I|||K.H. Zainal";
     $parts = array_values(array_filter(array_map('trim', explode('|||', $testStr))));
     if (count($parts) !== 3 || $parts[1] !== 'Ustadz Ahmad, M.E.I') {
