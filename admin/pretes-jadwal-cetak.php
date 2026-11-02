@@ -47,29 +47,35 @@ function parsePengujiListLocal($pengujiStr, $tutorsList = []) {
     return [$pengujiStr];
 }
 
-// Ambil jumlah peserta terisi per hari dari pretes_registrations
-$stmtDayCounts = $pdo->prepare("
-    SELECT hari_pilihan, COUNT(*) as jml 
-    FROM pretes_registrations 
-    WHERE periode = ? AND hari_pilihan IS NOT NULL AND hari_pilihan != ''
-    GROUP BY hari_pilihan
-");
-$stmtDayCounts->execute([$periodeName]);
-$registeredCounts = [];
-foreach ($stmtDayCounts->fetchAll() as $row) {
-    $registeredCounts[ucfirst(strtolower(trim($row['hari_pilihan'])))] = (int)$row['jml'];
-}
-
-// Ambil juga data ruangan per hari & per penguji dari pretes_attendance_sessions
-$stmtSess = $pdo->prepare("SELECT hari, penguji, ruangan, jam FROM pretes_attendance_sessions WHERE periode = ?");
+// Ambil data ruangan dan kuota per hari & per penguji dari pretes_attendance_sessions
+$stmtSess = $pdo->prepare("SELECT hari, penguji, ruangan, jam, kuota FROM pretes_attendance_sessions WHERE periode = ?");
 $stmtSess->execute([$periodeName]);
 $sessionRooms = [];
+$sessionKuotas = [];
 foreach ($stmtSess->fetchAll() as $sr) {
     $h = ucfirst(strtolower(trim($sr['hari'])));
     $p = trim($sr['penguji']);
     if (!empty($sr['ruangan'])) {
         $sessionRooms[$h][$p] = trim($sr['ruangan']);
     }
+    if (!empty($sr['kuota'])) {
+        $sessionKuotas[$h][$p] = (int)$sr['kuota'];
+    }
+}
+
+// Ambil jumlah peserta terplot per dosen dari pretes_registrations
+$stmtTutorMhs = $pdo->prepare("
+    SELECT hari_pilihan, dosen_penguji, COUNT(*) as jml
+    FROM pretes_registrations
+    WHERE periode = ? AND dosen_penguji IS NOT NULL AND dosen_penguji != ''
+    GROUP BY hari_pilihan, dosen_penguji
+");
+$stmtTutorMhs->execute([$periodeName]);
+$tutorTerplot = [];
+foreach ($stmtTutorMhs->fetchAll() as $row) {
+    $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
+    $p = trim($row['dosen_penguji']);
+    $tutorTerplot[$h][$p] = (int)$row['jml'];
 }
 
 $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
@@ -88,11 +94,52 @@ $datesFull = [
     'Jumat'  => '6 November 2026'
 ];
 
+// Helper untuk cari kuota & terplot tutor
+function getTutorDetailLocal($day, $pName, $sessionRooms, $sessionKuotas, $tutorTerplot) {
+    $rName = $sessionRooms[$day][$pName] ?? '';
+    if (empty($rName)) {
+        foreach (($sessionRooms[$day] ?? []) as $k => $v) {
+            if (strcasecmp($k, $pName) === 0 || stripos($k, $pName) !== false || stripos($pName, $k) !== false) {
+                $rName = $v;
+                break;
+            }
+        }
+    }
+
+    $kuota = $sessionKuotas[$day][$pName] ?? null;
+    if ($kuota === null) {
+        foreach (($sessionKuotas[$day] ?? []) as $k => $v) {
+            if (strcasecmp($k, $pName) === 0 || stripos($k, $pName) !== false || stripos($pName, $k) !== false) {
+                $kuota = (int)$v;
+                break;
+            }
+        }
+    }
+
+    $terplot = $tutorTerplot[$day][$pName] ?? 0;
+    if ($terplot === 0) {
+        foreach (($tutorTerplot[$day] ?? []) as $k => $v) {
+            if (strcasecmp($k, $pName) === 0 || stripos($k, $pName) !== false || stripos($pName, $k) !== false) {
+                $terplot = (int)$v;
+                break;
+            }
+        }
+    }
+
+    if (!$kuota) {
+        $kuota = $terplot > 0 ? $terplot : 30;
+    }
+
+    return [
+        'name'    => $pName,
+        'room'    => $rName,
+        'kuota'   => $kuota,
+        'terplot' => $terplot,
+    ];
+}
+
 // Siapkan data per hari
 $scheduleData = [];
-$totalAllKuota = 0;
-$totalAllTerisi = 0;
-
 foreach ($days as $day) {
     $dayLower = strtolower($day);
     $pengujiStr = $currentMaster["penguji_$dayLower"] ?? '';
@@ -107,27 +154,22 @@ foreach ($days as $day) {
         }
     }
 
-    $kuota = (int)($currentMaster["kuota_$dayLower"] ?? 0);
-    $terisi = $registeredCounts[$day] ?? 0;
-    $sisaKuota = $kuota - $terisi;
-
-    $totalAllKuota += $kuota;
-    $totalAllTerisi += $terisi;
+    $tutorsDetail = [];
+    foreach ($pengujiArr as $pName) {
+        $tutorsDetail[] = getTutorDetailLocal($day, $pName, $sessionRooms, $sessionKuotas, $tutorTerplot);
+    }
 
     $scheduleData[$day] = [
-        'day'        => $day,
-        'date'       => $dates[$day],
-        'date_full'  => $datesFull[$day],
-        'penguji'    => $pengujiArr,
-        'kuota'      => $kuota,
-        'terisi'     => $terisi,
-        'sisa'       => $sisaKuota,
-        'rooms'      => $sessionRooms[$day] ?? []
+        'day'           => $day,
+        'date'          => $dates[$day],
+        'date_full'     => $datesFull[$day],
+        'penguji'       => $pengujiArr,
+        'tutors_detail' => $tutorsDetail,
     ];
 }
 
-// Buat teks WhatsApp otomatis siap salin
-$waText = "🌟 *JADWAL DOSEN PENGUJI & KUOTA PRETES LPPAI UNISDA*\n";
+// Buat teks WhatsApp otomatis siap salin (menampilkan kuota terplot per dosen, tanpa kuota di bagian bawah)
+$waText = "🌟 *JADWAL DOSEN PENGUJI PRETES LPPAI UNISDA*\n";
 $waText .= "*Periode:* " . $periodeName . "\n";
 $waText .= "*Tahun Ajaran:* " . $tahunAjaran . "\n";
 $waText .= "*Pelaksanaan:* 2 – 6 November 2026\n";
@@ -136,21 +178,27 @@ $waText .= "--------------------------------------------------\n\n";
 
 foreach ($scheduleData as $d) {
     $waText .= "📅 *" . strtoupper($d['day']) . " (" . $d['date_full'] . ")* - " . $jamPelaksanaan . "\n";
-    $waText .= "• *Dosen Penguji:*\n";
-    if (empty($d['penguji'])) {
+    $waText .= "• *Dosen Penguji & Kuota Terplot:*\n";
+    if (empty($d['tutors_detail'])) {
         $waText .= "  _(Belum ada penguji yang diplot)_\n";
     } else {
         $n = 1;
-        foreach ($d['penguji'] as $pName) {
-            $rm = isset($d['rooms'][$pName]) ? " (" . $d['rooms'][$pName] . ")" : "";
-            $waText .= "  " . $n++ . ". " . $pName . $rm . "\n";
+        foreach ($d['tutors_detail'] as $td) {
+            $rm = !empty($td['room']) ? " (" . $td['room'] . ")" : "";
+            $waText .= "  " . $n++ . ". " . $td['name'] . $rm . " - Kuota Terplot: " . $td['kuota'] . " Peserta";
+            if ($td['terplot'] > 0 && $td['terplot'] != $td['kuota']) {
+                $waText .= " (" . $td['terplot'] . " terisi)";
+            }
+            $waText .= "\n";
         }
     }
-    $waText .= "• *Kuota Peserta:* " . $d['kuota'] . " (Terisi: " . $d['terisi'] . " | Sisa: " . $d['sisa'] . ")\n\n";
+    $waText .= "\n";
 }
 
 $waText .= "--------------------------------------------------\n";
 $waText .= "⚠️ *Catatan:* Diharapkan Bapak/Ibu Dosen Penguji hadir 15 menit sebelum pelaksanaan ujian. Terima kasih.\n\n";
+$waText .= "Kepala LPPAI UNISDA,\n";
+$waText .= "*Dr. Zainul Hakim. M.H.I.*\n\n";
 $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Islam Darul 'Ulum Lamongan_";
 ?>
 <!DOCTYPE html>
@@ -314,7 +362,7 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
             color: #1e293b;
         }
 
-        /* ── 5-COLUMN DAY GRID (PERSIS GAMBAR USER) ── */
+        /* ── 5-COLUMN DAY GRID ── */
         .schedule-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -331,7 +379,6 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
             padding: 12px;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
         .day-header {
@@ -365,72 +412,63 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
         .tutor-list {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            margin-bottom: 14px;
+            gap: 8px;
             flex: 1;
         }
         .tutor-item {
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 7px 9px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 9px 10px;
             font-size: 12px;
-            font-weight: 600;
             color: #1e293b;
+            line-height: 1.35;
+        }
+        .tutor-name {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 12.5px;
             line-height: 1.35;
         }
         .tutor-room {
             display: block;
-            font-size: 10.5px;
+            font-size: 11px;
             color: #0284c7;
             font-weight: 700;
-            margin-top: 2px;
+            margin-top: 3px;
         }
-
-        /* Kuota Footer inside day column */
-        .day-kuota-box {
-            border-top: 1.5px solid #f1f5f9;
-            padding-top: 8px;
-        }
-        .kuota-lbl {
+        .tutor-kuota-badge {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+            margin-top: 6px;
             font-size: 11px;
-            color: #64748b;
+            color: #1e3a8a;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 3px 8px;
+            border-radius: 5px;
             font-weight: 600;
-            margin-bottom: 2px;
+            box-sizing: border-box;
         }
-        .kuota-input-view {
-            width: 100%;
-            background: #ffffff;
-            border: 1.5px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 5px 8px;
-            font-size: 13.5px;
-            font-weight: 800;
-            color: #0f172a;
-            margin-bottom: 4px;
-        }
-        .kuota-status {
-            font-size: 11.5px;
-            font-weight: 700;
-        }
-        .status-ok { color: #10b981; }
-        .status-danger { color: #ef4444; }
 
         /* Signature block for formal print */
         .print-signature {
-            display: none;
+            display: flex;
             margin-top: 30px;
             justify-content: flex-end;
         }
         .signature-box {
             text-align: center;
-            width: 250px;
+            width: 260px;
             font-size: 13px;
         }
         .signature-name {
-            margin-top: 60px;
             font-weight: 800;
             text-decoration: underline;
+            color: #0f172a;
+            font-size: 14px;
         }
 
         /* ── MEDIA PRINT OPTIMIZATION (A4 LANDSCAPE) ── */
@@ -462,7 +500,15 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
             }
             .tutor-item {
                 font-size: 10.5px !important;
-                padding: 5px 6px !important;
+                padding: 6px 7px !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+            .tutor-name {
+                font-size: 11px !important;
+            }
+            .tutor-kuota-badge {
+                font-size: 9.5px !important;
+                padding: 2px 5px !important;
             }
             .print-signature {
                 display: flex !important;
@@ -532,17 +578,14 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
                     Jam: <strong><?= sanitize($jamPelaksanaan) ?></strong>
                 </p>
             </div>
-            <div style="font-size:12px; background:#fff; color:#1e40af; padding:6px 14px; border-radius:20px; font-weight:700; border:1px solid #bfdbfe;">
-                Total Kuota: <?= $totalAllKuota ?> · Terisi: <?= $totalAllTerisi ?>
-            </div>
         </div>
 
         <!-- SECTION HEADER -->
         <div class="section-header-box">
-            <span>👨‍🏫</span> Pengaturan Dosen & Kuota (Jadwal Penguji Pretes)
+            <span>👨‍🏫</span> Pengaturan Dosen & Kuota Terplot (Jadwal Penguji Pretes)
         </div>
 
-        <!-- 5-COLUMN DAY GRID (PERSIS GAMBAR USER) -->
+        <!-- 5-COLUMN DAY GRID -->
         <div class="schedule-grid">
             <?php foreach ($scheduleData as $d): ?>
             <div class="day-column">
@@ -555,33 +598,28 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
                         <span class="time-badge">13.00 WIB</span>
                     </div>
 
-                    <!-- Daftar Dosen Penguji -->
+                    <!-- Daftar Dosen Penguji & Kuota Terplot Masing-Masing -->
                     <div class="tutor-list">
-                        <?php if (empty($d['penguji'])): ?>
+                        <?php if (empty($d['tutors_detail'])): ?>
                             <div style="font-size:11.5px; color:#94a3b8; font-style:italic; padding:6px;">
                                 Belum ada penguji diplot
                             </div>
                         <?php else: ?>
-                            <?php foreach ($d['penguji'] as $pName): 
-                                $rName = $d['rooms'][$pName] ?? '';
-                            ?>
+                            <?php foreach ($d['tutors_detail'] as $td): ?>
                             <div class="tutor-item">
-                                <div><?= sanitize($pName) ?></div>
-                                <?php if (!empty($rName)): ?>
-                                <span class="tutor-room">🏢 <?= sanitize($rName) ?></span>
+                                <div class="tutor-name"><?= sanitize($td['name']) ?></div>
+                                <?php if (!empty($td['room'])): ?>
+                                <span class="tutor-room">🏢 <?= sanitize($td['room']) ?></span>
                                 <?php endif; ?>
+                                <div class="tutor-kuota-badge">
+                                    <span>👥 Kuota Terplot: <strong><?= $td['kuota'] ?> Peserta</strong></span>
+                                    <?php if ($td['terplot'] > 0 && $td['terplot'] != $td['kuota']): ?>
+                                    <span style="color:#0369a1; font-weight:700;">(<?= $td['terplot'] ?> terisi)</span>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- Footer Kuota Peserta -->
-                <div class="day-kuota-box">
-                    <div class="kuota-lbl">Kuota Peserta:</div>
-                    <div class="kuota-input-view"><?= $d['kuota'] ?></div>
-                    <div class="kuota-status <?= $d['sisa'] < 0 ? 'status-danger' : 'status-ok' ?>">
-                        Terisi: <?= $d['terisi'] ?> | Sisa Kuota: <?= $d['sisa'] ?>
                     </div>
                 </div>
             </div>
@@ -593,7 +631,10 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
             <div class="signature-box">
                 <p>Lamongan, <?= date('d F Y') ?></p>
                 <p style="margin-top:4px;">Kepala LPPAI UNISDA,</p>
-                <div class="signature-name">( Dr. H. Ahmad Fauzi, M.Pd.I )</div>
+                <div style="position: relative; height: 75px; margin: 4px 0; display: flex; justify-content: center; align-items: center;">
+                    <img src="<?= BASE_URL ?>/assets/img/ttd_zainul_hakim.png" alt="Tanda Tangan" style="height: 75px; object-fit: contain; mix-blend-mode: multiply;">
+                </div>
+                <div class="signature-name">Dr. Zainul Hakim. M.H.I.</div>
             </div>
         </div>
 

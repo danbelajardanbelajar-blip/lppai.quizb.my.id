@@ -736,27 +736,33 @@ $daysInfo = [
     'Jumat'  => ['date' => '6 Nov 2026', 'penguji' => $masterJumat,  'kuota' => (int)($currentMaster['kuota_jumat'] ?? 30)],
 ];
 
-// Ambil jumlah peserta terisi per hari dari pretes_registrations
-$stmtDayCounts = $pdo->prepare("
-    SELECT hari_pilihan, COUNT(*) as jml 
-    FROM pretes_registrations 
-    WHERE periode = ? AND hari_pilihan IS NOT NULL AND hari_pilihan != ''
-    GROUP BY hari_pilihan
-");
-$stmtDayCounts->execute([$periodeName]);
-$registeredCounts = [];
-foreach ($stmtDayCounts->fetchAll() as $row) {
-    $registeredCounts[ucfirst(strtolower(trim($row['hari_pilihan'])))] = (int)$row['jml'];
-}
-
-// Map ruangan per tutor per hari dari pretes_attendance_sessions
+// Map ruangan dan kuota per tutor per hari dari pretes_attendance_sessions
 $sessionRooms = [];
+$sessionKuotas = [];
 foreach ($allSessions as $s) {
     $h = ucfirst(strtolower(trim($s['hari'])));
     $p = trim($s['penguji']);
     if (!empty($s['ruangan'])) {
         $sessionRooms[$h][$p] = trim($s['ruangan']);
     }
+    if (!empty($s['kuota'])) {
+        $sessionKuotas[$h][$p] = (int)$s['kuota'];
+    }
+}
+
+// Ambil jumlah peserta terplot per dosen dari pretes_registrations
+$stmtTutorMhs = $pdo->prepare("
+    SELECT hari_pilihan, dosen_penguji, COUNT(*) as jml
+    FROM pretes_registrations
+    WHERE periode = ? AND dosen_penguji IS NOT NULL AND dosen_penguji != ''
+    GROUP BY hari_pilihan, dosen_penguji
+");
+$stmtTutorMhs->execute([$periodeName]);
+$tutorTerplot = [];
+foreach ($stmtTutorMhs->fetchAll() as $row) {
+    $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
+    $p = trim($row['dosen_penguji']);
+    $tutorTerplot[$h][$p] = (int)$row['jml'];
 }
 
 $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
@@ -775,9 +781,50 @@ $datesFull = [
     'Jumat'  => '6 November 2026'
 ];
 
+$getTutorCardDetail = function($day, $pName) use ($sessionRooms, $sessionKuotas, $tutorTerplot) {
+    $rName = $sessionRooms[$day][$pName] ?? '';
+    if (empty($rName)) {
+        foreach (($sessionRooms[$day] ?? []) as $k => $v) {
+            if (isPengujiMatch($k, $pName) || isPengujiMatch($pName, $k)) {
+                $rName = $v;
+                break;
+            }
+        }
+    }
+
+    $kuota = $sessionKuotas[$day][$pName] ?? null;
+    if ($kuota === null) {
+        foreach (($sessionKuotas[$day] ?? []) as $k => $v) {
+            if (isPengujiMatch($k, $pName) || isPengujiMatch($pName, $k)) {
+                $kuota = (int)$v;
+                break;
+            }
+        }
+    }
+
+    $terplot = $tutorTerplot[$day][$pName] ?? 0;
+    if ($terplot === 0) {
+        foreach (($tutorTerplot[$day] ?? []) as $k => $v) {
+            if (isPengujiMatch($k, $pName) || isPengujiMatch($pName, $k)) {
+                $terplot = (int)$v;
+                break;
+            }
+        }
+    }
+
+    if (!$kuota) {
+        $kuota = $terplot > 0 ? $terplot : 30;
+    }
+
+    return [
+        'name'    => $pName,
+        'room'    => $rName,
+        'kuota'   => $kuota,
+        'terplot' => $terplot,
+    ];
+};
+
 $scheduleCardData = [];
-$totalAllKuota = 0;
-$totalAllTerisi = 0;
 
 foreach ($days as $day) {
     $dayLower = strtolower($day);
@@ -793,27 +840,22 @@ foreach ($days as $day) {
         }
     }
 
-    $kuota = (int)($currentMaster["kuota_$dayLower"] ?? 0);
-    $terisi = $registeredCounts[$day] ?? 0;
-    $sisaKuota = $kuota - $terisi;
-
-    $totalAllKuota += $kuota;
-    $totalAllTerisi += $terisi;
+    $tutorsDetail = [];
+    foreach ($pengujiArr as $pName) {
+        $tutorsDetail[] = $getTutorCardDetail($day, $pName);
+    }
 
     $scheduleCardData[$day] = [
-        'day'        => $day,
-        'date'       => $datesShort[$day],
-        'date_full'  => $datesFull[$day],
-        'penguji'    => $pengujiArr,
-        'kuota'      => $kuota,
-        'terisi'     => $terisi,
-        'sisa'       => $sisaKuota,
-        'rooms'      => $sessionRooms[$day] ?? []
+        'day'           => $day,
+        'date'          => $datesShort[$day],
+        'date_full'     => $datesFull[$day],
+        'penguji'       => $pengujiArr,
+        'tutors_detail' => $tutorsDetail,
     ];
 }
 
-// Teks format WhatsApp untuk di-share ke para tutor
-$waTextSchedule = "🌟 *JADWAL DOSEN PENGUJI & KUOTA PRETES LPPAI UNISDA*\n";
+// Teks format WhatsApp untuk di-share ke para tutor (kuota terplot pada masing-masing dosen, tanpa kuota di bagian bawah)
+$waTextSchedule = "🌟 *JADWAL DOSEN PENGUJI PRETES LPPAI UNISDA*\n";
 $waTextSchedule .= "*Periode:* " . $periodeName . "\n";
 $waTextSchedule .= "*Tahun Ajaran:* " . ($currentMaster['tahun_ajaran'] ?? '-') . "\n";
 $waTextSchedule .= "*Pelaksanaan:* 2 – 6 November 2026\n";
@@ -822,20 +864,26 @@ $waTextSchedule .= "--------------------------------------------------\n\n";
 
 foreach ($scheduleCardData as $d) {
     $waTextSchedule .= "📅 *" . strtoupper($d['day']) . " (" . $d['date_full'] . ")* - " . $defaultPeriodeJam . "\n";
-    $waTextSchedule .= "• *Dosen Penguji:*\n";
-    if (empty($d['penguji'])) {
+    $waTextSchedule .= "• *Dosen Penguji & Kuota Terplot:*\n";
+    if (empty($d['tutors_detail'])) {
         $waTextSchedule .= "  _(Belum ada penguji yang diplot)_\n";
     } else {
         $n = 1;
-        foreach ($d['penguji'] as $pName) {
-            $rm = isset($d['rooms'][$pName]) ? " (" . $d['rooms'][$pName] . ")" : "";
-            $waTextSchedule .= "  " . $n++ . ". " . $pName . $rm . "\n";
+        foreach ($d['tutors_detail'] as $td) {
+            $rm = !empty($td['room']) ? " (" . $td['room'] . ")" : "";
+            $waTextSchedule .= "  " . $n++ . ". " . $td['name'] . $rm . " - Kuota Terplot: " . $td['kuota'] . " Peserta";
+            if ($td['terplot'] > 0 && $td['terplot'] != $td['kuota']) {
+                $waTextSchedule .= " (" . $td['terplot'] . " terisi)";
+            }
+            $waTextSchedule .= "\n";
         }
     }
-    $waTextSchedule .= "• *Kuota Peserta:* " . $d['kuota'] . " (Terisi: " . $d['terisi'] . " | Sisa: " . $d['sisa'] . ")\n\n";
+    $waTextSchedule .= "\n";
 }
 $waTextSchedule .= "--------------------------------------------------\n";
 $waTextSchedule .= "⚠️ *Catatan:* Diharapkan Bapak/Ibu Dosen Penguji hadir 15 menit sebelum pelaksanaan ujian. Terima kasih.\n\n";
+$waTextSchedule .= "Kepala LPPAI UNISDA,\n";
+$waTextSchedule .= "*Dr. Zainul Hakim. M.H.I.*\n\n";
 $waTextSchedule .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Islam Darul 'Ulum Lamongan_";
 
 $activeTab = $_GET['tab'] ?? 'sesi';
@@ -1145,18 +1193,15 @@ input:checked + .slider:before { transform: translateX(16px); }
         <!-- CARD HEADER -->
         <div style="padding: 14px 20px 8px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #dbeafe;">
             <div style="font-size: 15px; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 8px;">
-                <span>👨‍🏫</span> Pengaturan Dosen & Kuota (Jadwal Siap Dishare ke Para Tutor)
-            </div>
-            <div style="font-size: 12px; color: #64748b; font-weight: 600;">
-                Total Kuota: <strong style="color: #0f172a;"><?= $totalAllKuota ?></strong> · Terisi: <strong style="color: #0284c7;"><?= $totalAllTerisi ?></strong>
+                <span>👨‍🏫</span> Pengaturan Dosen & Kuota Terplot (Jadwal Siap Dishare ke Para Tutor)
             </div>
         </div>
 
-        <!-- 5-COLUMN DAY GRID (PERSIS GAMBAR USER) -->
+        <!-- 5-COLUMN DAY GRID -->
         <div style="padding: 16px 20px 20px 20px;">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1.5px solid #e2e8f0;">
                 <?php foreach ($scheduleCardData as $d): ?>
-                <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                     <div>
                         <!-- Header Hari & Jam -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1.5px solid #f1f5f9;">
@@ -1168,39 +1213,30 @@ input:checked + .slider:before { transform: translateX(16px); }
                             </span>
                         </div>
 
-                        <!-- Daftar Tutor Penguji (Clean Card View) -->
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
-                            <?php if (empty($d['penguji'])): ?>
+                        <!-- Daftar Tutor Penguji (Clean Card View dengan Kuota Terplot Masing-Masing) -->
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <?php if (empty($d['tutors_detail'])): ?>
                                 <div style="font-size: 12px; color: #94a3b8; font-style: italic; padding: 8px 6px;">
                                     Belum ada penguji diplot
                                 </div>
                             <?php else: ?>
-                                <?php foreach ($d['penguji'] as $pName): 
-                                    $rName = $d['rooms'][$pName] ?? '';
-                                ?>
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 9px; font-size: 12.5px; font-weight: 600; color: #1e293b; line-height: 1.35;">
-                                    <div><?= sanitize($pName) ?></div>
-                                    <?php if (!empty($rName)): ?>
+                                <?php foreach ($d['tutors_detail'] as $td): ?>
+                                <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 12.5px; line-height: 1.35;">
+                                    <div style="font-weight: 700; color: #0f172a;"><?= sanitize($td['name']) ?></div>
+                                    <?php if (!empty($td['room'])): ?>
                                     <div style="font-size: 11px; color: #0284c7; font-weight: 700; margin-top: 2px;">
-                                        🏢 <?= sanitize($rName) ?>
+                                        🏢 <?= sanitize($td['room']) ?>
                                     </div>
                                     <?php endif; ?>
+                                    <div style="font-size: 11px; margin-top: 5px; display: flex; align-items: center; justify-content: space-between; gap: 4px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; padding: 3px 8px; border-radius: 5px; font-weight: 600;">
+                                        <span>👥 Kuota Terplot: <strong><?= $td['kuota'] ?> Peserta</strong></span>
+                                        <?php if ($td['terplot'] > 0 && $td['terplot'] != $td['kuota']): ?>
+                                        <span style="color: #0369a1; font-weight: 700;">(<?= $td['terplot'] ?> terisi)</span>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- Kuota Peserta (Mirip Input/View Box di Screenshot) -->
-                    <div style="border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
-                        <div style="font-size: 11.5px; color: #64748b; font-weight: 600; margin-bottom: 3px;">
-                            Kuota Peserta:
-                        </div>
-                        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 5px 8px; font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 4px;">
-                            <?= $d['kuota'] ?>
-                        </div>
-                        <div style="font-size: 12px; font-weight: 700; color: <?= $d['sisa'] < 0 ? '#ef4444' : '#10b981' ?>;">
-                            Terisi: <?= $d['terisi'] ?> | Sisa Kuota: <?= $d['sisa'] ?>
                         </div>
                     </div>
                 </div>

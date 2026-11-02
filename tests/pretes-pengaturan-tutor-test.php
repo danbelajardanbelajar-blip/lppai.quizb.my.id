@@ -93,6 +93,9 @@ function runTutorSettingTests() {
         if (strpos($content, 'api.whatsapp.com/send') === false) {
             $failures[] = "Tombol share WhatsApp tidak ditemukan di admin/pretes-pengaturan-tutor.php";
         }
+        if (strpos($content, 'Kuota Terplot') === false) {
+            $failures[] = "Teks 'Kuota Terplot' per dosen tidak ditemukan di admin/pretes-pengaturan-tutor.php";
+        }
     }
 
     // 3. Verifikasi File admin/pretes-jadwal-cetak.php
@@ -112,6 +115,15 @@ function runTutorSettingTests() {
         }
         if (strpos($pContent, 'copyWaText') === false) {
             $failures[] = "Fungsi salin WhatsApp tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'Dr. Zainul Hakim. M.H.I.') === false) {
+            $failures[] = "Nama Kepala LPPAI 'Dr. Zainul Hakim. M.H.I.' tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'Kuota Terplot') === false) {
+            $failures[] = "Teks 'Kuota Terplot' per dosen tidak ditemukan di admin/pretes-jadwal-cetak.php";
+        }
+        if (strpos($pContent, 'day-kuota-box') !== false) {
+            $failures[] = "Box kuota di bawah tabel masih ditemukan di admin/pretes-jadwal-cetak.php";
         }
     }
 
