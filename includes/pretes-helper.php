@@ -45,6 +45,21 @@ function pretesComponents() {
     ];
 }
 
+/** Lulus hanya jika setiap komponen wajib bernilai minimal 80. */
+function getPretesStatusLulus($scores) {
+    $complete = true;
+    foreach (pretesComponents() as $key => $label) {
+        $value = is_array($scores) ? ($scores[$key] ?? null) : null;
+        if ($value === null || $value === '' || !is_numeric($value)
+            || !is_finite((float)$value) || (float)$value < 0 || (float)$value > 100) {
+            $complete = false;
+            continue;
+        }
+        if ((float)$value < 80) return 'tidak_lulus';
+    }
+    return $complete ? 'lulus' : 'menunggu';
+}
+
 function pretesValidateScores($input) {
     if (!is_array($input)) throw new InvalidArgumentException('Data nilai tidak valid.');
     $scores = [];

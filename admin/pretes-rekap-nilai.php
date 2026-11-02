@@ -60,11 +60,6 @@ function getPretesPredikat($score) {
     return 'E';
 }
 
-function getPretesStatusLulus($score, $filledCount, $totalCount) {
-    if ($filledCount < $totalCount) return 'menunggu';
-    return ((float)$score >= 65) ? 'lulus' : 'tidak_lulus';
-}
-
 $message = '';
 $msgType = 'info';
 
@@ -100,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $filled = 0;
                 foreach ($componentKeys as $ck) {
                     $val = is_array($scores) ? ($scores[$ck] ?? null) : null;
-                    if ($val !== null && $val !== '' && is_numeric($val)) {
+                    if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
                         $sum += (float)$val;
                         $filled++;
                     }
@@ -112,10 +107,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 $avg = round($sum / $filled, 2);
-                $statusLulus = ($filled === $totalComponents && $avg >= 65) ? 'lulus' : (($filled === $totalComponents) ? 'tidak_lulus' : 'belum_diumumkan');
+                $statusLulus = getPretesStatusLulus($scores);
+                if ($statusLulus === 'menunggu') $statusLulus = 'belum_diumumkan';
                 
                 $predikat = getPretesPredikat($avg);
-                $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$totalComponents} komponen dinilai.";
+                $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$totalComponents} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
 
                 // Check pretes_results
                 $check = $pdo->prepare("SELECT id FROM pretes_results WHERE user_id = ?");
@@ -234,7 +230,7 @@ foreach ($rawRows as $row) {
 
     foreach ($components as $key => $label) {
         $val = is_array($scores) ? ($scores[$key] ?? null) : null;
-        if ($val !== null && $val !== '' && is_numeric($val)) {
+        if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
             $fVal = (float)$val;
             $filledScores[$key] = $fVal;
             $sum += $fVal;
@@ -246,12 +242,13 @@ foreach ($rawRows as $row) {
 
     $avg = ($filled > 0) ? round($sum / $filled, 2) : null;
     $predikat = getPretesPredikat($avg);
-    $statusLulus = getPretesStatusLulus($avg, $filled, $totalComponents);
+    $statusLulus = getPretesStatusLulus($scores);
+
+    if ($statusLulus === 'lulus') $lulusCount++;
+    elseif ($statusLulus === 'tidak_lulus') $tidakLulusCount++;
 
     if ($filled === $totalComponents) {
         $lengkapCount++;
-        if ($avg >= 65) $lulusCount++;
-        else $tidakLulusCount++;
     } elseif ($filled > 0) {
         $sebagianCount++;
     } else {
@@ -588,7 +585,7 @@ if ($isPrint) {
                     <?php foreach ($componentKeys as $ck): 
                         $val = $r['scores'][$ck];
                     ?>
-                        <td><?= $val !== null ? number_format($val, 0) : '-' ?></td>
+                        <td><?= $val !== null ? rtrim(rtrim(number_format($val, 2, '.', ''), '0'), '.') : '-' ?></td>
                     <?php endforeach; ?>
 
                     <td style="font-weight:bold;"><?= $r['average'] !== null ? number_format($r['average'], 1) : '-' ?></td>
@@ -612,7 +609,7 @@ if ($isPrint) {
             <strong>Keterangan Singkatan Komponen:</strong><br>
             UT: Ujian Tulis | PW: Praktik Wudlu | DW: Doa Setelah Wudlu | PT: Praktik Tayammum | MB: Niat Mandi Besar | JQ: Niat Jamak Qashar<br>
             SS: Bacaan Shalat Subuh | BY: Al Bayyinah | AL: Al 'Alaq | DL: Al Dluha | IS: Istighasah | SJ: Shalat Jenazah<br>
-            * Batas minimal kelulusan pretes PAI adalah rata-rata nilai <strong>65.00</strong> dengan 12 komponen lengkap dinilai.
+            * Lulus jika seluruh 12 komponen bernilai <strong>minimal 80</strong>. Satu komponen di bawah 80 berarti <strong>tidak lulus</strong>. Nilai belum lengkap tanpa komponen di bawah 80 berstatus menunggu.
         </div>
 
         <div class="signature-container">
@@ -857,6 +854,11 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ── SUMMARY KPI CARDS ───────────────────────────────────────────────────── -->
+<div class="alert alert-info" style="margin-bottom:18px;">
+    <strong>Syarat kelulusan:</strong> seluruh 12 komponen harus bernilai minimal <strong>80</strong>.
+    Satu nilai di bawah 80 berarti <strong>tidak lulus</strong>, meskipun rata-ratanya tinggi.
+    Jika nilai belum lengkap dan belum ada nilai di bawah 80, statusnya <strong>menunggu</strong>.
+</div>
 <div class="rekap-kpi-grid">
     <div class="rekap-kpi-card">
         <div class="rekap-kpi-val" style="color:#0f172a;"><?= $totalPeserta ?></div>
@@ -876,11 +878,11 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="rekap-kpi-card">
         <div class="rekap-kpi-val" style="color:#16a34a;"><?= $lulusCount ?></div>
-        <div class="rekap-kpi-label">🎉 Lulus Pretes (≥65)</div>
+        <div class="rekap-kpi-label">🎉 Lulus (semua komponen ≥80)</div>
     </div>
     <div class="rekap-kpi-card">
         <div class="rekap-kpi-val" style="color:#dc2626;"><?= $tidakLulusCount ?></div>
-        <div class="rekap-kpi-label">❌ Tidak Lulus (&lt;65)</div>
+        <div class="rekap-kpi-label">❌ Tidak Lulus (ada nilai &lt;80)</div>
     </div>
     <div class="rekap-kpi-card">
         <div class="rekap-kpi-val" style="color:#7c3aed;"><?= number_format($rataRataAngkatan, 1) ?></div>
@@ -946,8 +948,8 @@ include __DIR__ . '/../includes/header.php';
                 <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Status Kelulusan</label>
                 <select name="status_lulus" class="form-control" style="width:100%; padding:8px; border-radius:8px; font-size:13px;" onchange="this.form.submit()">
                     <option value="">-- Semua Kelulusan --</option>
-                    <option value="lulus" <?= ($filterStatus === 'lulus') ? 'selected' : '' ?>>🎉 Lulus (≥65)</option>
-                    <option value="tidak_lulus" <?= ($filterStatus === 'tidak_lulus') ? 'selected' : '' ?>>❌ Tidak Lulus (&lt;65)</option>
+                    <option value="lulus" <?= ($filterStatus === 'lulus') ? 'selected' : '' ?>>🎉 Lulus (semua komponen ≥80)</option>
+                    <option value="tidak_lulus" <?= ($filterStatus === 'tidak_lulus') ? 'selected' : '' ?>>❌ Tidak Lulus (ada nilai &lt;80)</option>
                     <option value="menunggu" <?= ($filterStatus === 'menunggu') ? 'selected' : '' ?>>⏳ Belum Lengkap</option>
                 </select>
             </div>
@@ -976,7 +978,7 @@ include __DIR__ . '/../includes/header.php';
             📋 Tabel Nilai Rinci 12 Komponen Pretes (<?= count($roster) ?> Mahasiswa)
         </div>
         <div style="font-size:12.5px; color:#64748b;">
-            💡 Skor berwarna: <span class="score-pill good">≥75</span> <span class="score-pill mid">65–74</span> <span class="score-pill low">&lt;65</span>
+            💡 Skor berwarna: <span class="score-pill good">≥80</span> <span class="score-pill low">&lt;80</span>
         </div>
     </div>
 
@@ -1049,15 +1051,14 @@ include __DIR__ . '/../includes/header.php';
                         $val = $r['scores'][$ck];
                         $pillClass = '';
                         if ($val !== null) {
-                            if ($val >= 75) $pillClass = 'good';
-                            elseif ($val >= 65) $pillClass = 'mid';
+                            if ($val >= 80) $pillClass = 'good';
                             else $pillClass = 'low';
                         }
                     ?>
                         <td>
                             <?php if ($val !== null): ?>
                                 <span class="score-pill <?= $pillClass ?>" title="<?= sanitize($components[$ck]) ?>: <?= $val ?>">
-                                    <?= number_format($val, 0) ?>
+                                    <?= rtrim(rtrim(number_format($val, 2, '.', ''), '0'), '.') ?>
                                 </span>
                             <?php else: ?>
                                 <span style="color:#cbd5e1;">-</span>

@@ -5,6 +5,36 @@
 
 function runPretesRekapNilaiTests() {
     $failures = [];
+    require_once __DIR__ . '/../includes/pretes-helper.php';
+    $all80 = array_fill_keys(array_keys(pretesComponents()), 80);
+    $cases = [
+        'semua tepat 80' => [$all80, 'lulus'],
+        'semua 100' => [array_fill_keys(array_keys($all80), 100), 'lulus'],
+        'nilai string dari database' => [array_fill_keys(array_keys($all80), '80.00'), 'lulus'],
+        'tanpa nilai' => [[], 'menunggu'],
+        'JSON tidak valid' => [null, 'menunggu'],
+        'belum lengkap dan sudah di bawah 80' => [['ujian_tulis' => 79], 'tidak_lulus'],
+        'komponen tambahan tidak mengganti komponen wajib' => [['tambahan' => 100], 'menunggu'],
+    ];
+    foreach (array_keys($all80) as $key) {
+        foreach ([0, 65, 79, 79.99] as $value) {
+            $scores = array_fill_keys(array_keys($all80), 100);
+            $scores[$key] = $value;
+            $cases["$key = $value walaupun rata-rata tinggi"] = [$scores, 'tidak_lulus'];
+        }
+        foreach ([null, '', 'abc', 101, -1, INF, ['80']] as $value) {
+            $scores = $all80;
+            $scores[$key] = $value;
+            $cases[$key . ' tidak valid ' . count($cases)] = [$scores, 'menunggu'];
+        }
+        $scores = $all80;
+        unset($scores[$key]);
+        $cases["$key belum diisi"] = [$scores, 'menunggu'];
+    }
+    foreach ($cases as $name => [$scores, $expected]) {
+        $actual = getPretesStatusLulus($scores);
+        if ($actual !== $expected) $failures[] = "$name: harapan $expected, hasil $actual.";
+    }
     $adminFile = __DIR__ . '/../admin/pretes-rekap-nilai.php';
     $dosenFile = __DIR__ . '/../dosen/pretes-rekap-nilai.php';
     $sidebarFile = __DIR__ . '/../includes/sidebar.php';
@@ -111,7 +141,7 @@ function runPretesRekapNilaiTests() {
     }
 
     if (empty($failures)) {
-        echo "PASS: Halaman Rekapitulasi Nilai Pretes terverifikasi lengkap & valid.\n";
+        echo 'PASS: ' . count($cases) . " skenario kelulusan per komponen dan pemeriksaan halaman rekapitulasi nilai pretes.\n";
         return 0;
     } else {
         echo "FAIL: Ditemukan kegagalan pada pengujian rekapitulasi nilai pretes:\n";
