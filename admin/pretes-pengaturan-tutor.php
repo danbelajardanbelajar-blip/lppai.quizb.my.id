@@ -36,28 +36,62 @@ try {
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
-} catch (Exception $e) {}
+} catch (Throwable $e) {}
 
+// Pastikan setiap kolom di master_pretes selalu ada meskipun tabel dibuat oleh migrasi versi lama
+$masterPretesColumns = [
+    'tahun_ajaran'   => "VARCHAR(50) NOT NULL DEFAULT ''",
+    'status'         => "ENUM('aktif','selesai','nonaktif') NOT NULL DEFAULT 'aktif'",
+    'jam'            => "VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'",
+    'kuota_senin'    => "INT DEFAULT 0",
+    'kuota_selasa'   => "INT DEFAULT 0",
+    'kuota_rabu'     => "INT DEFAULT 0",
+    'kuota_kamis'    => "INT DEFAULT 0",
+    'kuota_jumat'    => "INT DEFAULT 0",
+    'penguji_senin'  => "VARCHAR(1000) DEFAULT NULL",
+    'penguji_selasa' => "VARCHAR(1000) DEFAULT NULL",
+    'penguji_rabu'   => "VARCHAR(1000) DEFAULT NULL",
+    'penguji_kamis'  => "VARCHAR(1000) DEFAULT NULL",
+    'penguji_jumat'  => "VARCHAR(1000) DEFAULT NULL",
+];
+foreach ($masterPretesColumns as $col => $def) {
+    try {
+        $pdo->exec("ALTER TABLE master_pretes ADD COLUMN $col $def");
+    } catch (Throwable $e) {}
+}
+
+// Pastikan kolom pendukung di pretes_registrations selalu ada
+$pretesRegColumns = [
+    'hari_pilihan'  => "VARCHAR(20) DEFAULT NULL",
+    'jam'           => "VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'",
+    'dosen_penguji' => "VARCHAR(150) DEFAULT NULL",
+    'ruangan'       => "VARCHAR(100) DEFAULT NULL",
+];
 try {
     $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
     $pdo->exec("ALTER TABLE pretes_registrations MODIFY pretes_schedule_id INT NULL");
-    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN hari_pilihan VARCHAR(20) DEFAULT NULL");
-    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'");
-    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN dosen_penguji VARCHAR(150) DEFAULT NULL");
-    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN ruangan VARCHAR(100) DEFAULT NULL");
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
-} catch (Exception $e) {}
+} catch (Throwable $e) {}
+
+foreach ($pretesRegColumns as $col => $def) {
+    try {
+        $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN $col $def");
+    } catch (Throwable $e) {}
+}
 
 // Pastikan fitur pretes assessments dan absensi terinisialisasi
 ensurePretesFeatures($pdo);
 
 // Kolom pendukung pada pretes_attendance_sessions
-try {
-    $pdo->exec("ALTER TABLE pretes_attendance_sessions ADD COLUMN jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'");
-} catch (Exception $e) {}
-try {
-    $pdo->exec("ALTER TABLE pretes_attendance_sessions ADD COLUMN kuota INT DEFAULT 30");
-} catch (Exception $e) {}
+$pretesSessColumns = [
+    'jam'   => "VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'",
+    'kuota' => "INT DEFAULT 30",
+];
+foreach ($pretesSessColumns as $col => $def) {
+    try {
+        $pdo->exec("ALTER TABLE pretes_attendance_sessions ADD COLUMN $col $def");
+    } catch (Throwable $e) {}
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parsePengujiList($pengujiStr) {
@@ -222,117 +256,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // ── STANDARD POST ACTIONS ─────────────────────────────────────────────────
     if (!verifyCsrf($token)) {
-        $message = 'Sesi tidak valid atau telah kedaluwarsa.';
+        $message = 'Sesi tidak valid atau telah kedaluwarsa. Silakan muat ulang halaman.';
         $msgType = 'danger';
     } else {
+        try {
+            // A. TAMBAH SESI PRETES BARU (PER DOSEN, RUANG, HARI, JAM)
+            if ($action === 'create_session') {
+                $periode = trim($_POST['periode'] ?? '');
+                $hari    = trim($_POST['hari'] ?? 'Senin');
+                $jam     = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+                $penguji = trim($_POST['penguji'] ?? '');
+                $ruangan = trim($_POST['ruangan'] ?? '');
+                $kuota   = max(1, (int)($_POST['kuota'] ?? 30));
 
-        // A. TAMBAH SESI PRETES BARU (PER DOSEN, RUANG, HARI, JAM)
-        if ($action === 'create_session') {
-            $periode = trim($_POST['periode'] ?? '');
-            $hari    = trim($_POST['hari'] ?? 'Senin');
-            $jam     = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
-            $penguji = trim($_POST['penguji'] ?? '');
-            $ruangan = trim($_POST['ruangan'] ?? '');
-            $kuota   = max(1, (int)($_POST['kuota'] ?? 30));
-
-            if ($jam === '__CUSTOM__') {
-                $jam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
-            }
-
-            if (empty($periode) || empty($hari) || empty($penguji) || empty($ruangan)) {
-                $message = 'Hari, Jam, Dosen Penguji, dan Ruangan wajib diisi.';
-                $msgType = 'danger';
-            } else {
-                $scope = ['periode' => $periode, 'hari' => $hari, 'penguji' => $penguji, 'ruangan' => $ruangan];
-                $hash  = pretesScopeHash($scope);
-
-                // Cek apakah kombinasi sesi ini sudah ada
-                $check = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ?");
-                $check->execute([$hash]);
-                if ($check->fetch()) {
-                    $message = 'Sesi untuk dosen <strong>' . htmlspecialchars($penguji) . '</strong> di ruangan <strong>' . htmlspecialchars($ruangan) . '</strong> pada hari ' . htmlspecialchars($hari) . ' sudah terdaftar.';
-                    $msgType = 'warning';
-                } else {
-                    $tokenStr = bin2hex(random_bytes(24));
-                    $ins = $pdo->prepare("
-                        INSERT INTO pretes_attendance_sessions 
-                        (scope_hash, periode, hari, penguji, ruangan, jam, kuota, token)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    ");
-                    $ins->execute([$hash, $periode, $hari, $penguji, $ruangan, $jam, $kuota, $tokenStr]);
-                    $message = "Sesi pretes berhasil ditambahkan untuk <strong>" . htmlspecialchars($penguji) . "</strong> di <strong>" . htmlspecialchars($ruangan) . "</strong> ($hari · $jam).";
-                    $msgType = 'success';
+                if ($jam === '__CUSTOM__') {
+                    $jam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
                 }
-            }
 
-        // B. EDIT SESI PRETES LENGKAP (PER DOSEN, RUANG, HARI & JAM)
-        } elseif ($action === 'edit_session') {
-            $sessionId = (int)($_POST['session_id'] ?? 0);
-            $newHari   = trim($_POST['hari'] ?? 'Senin');
-            $newJam    = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
-            $newPenguji= trim($_POST['penguji'] ?? '');
-            $newRuangan= trim($_POST['ruangan'] ?? '');
-            $newKuota  = max(1, (int)($_POST['kuota'] ?? 30));
-            $syncMhs   = isset($_POST['sync_mhs']) ? 1 : 0;
-
-            if ($newJam === '__CUSTOM__') {
-                $newJam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
-            }
-
-            if ($sessionId <= 0 || empty($newPenguji) || empty($newRuangan)) {
-                $message = 'Data sesi, dosen penguji, dan ruangan tidak boleh kosong.';
-                $msgType = 'danger';
-            } else {
-                $stmtOld = $pdo->prepare("SELECT * FROM pretes_attendance_sessions WHERE id = ?");
-                $stmtOld->execute([$sessionId]);
-                $oldSess = $stmtOld->fetch();
-
-                if (!$oldSess) {
-                    $message = 'Sesi pretes tidak ditemukan.';
+                if (empty($periode) || empty($hari) || empty($penguji) || empty($ruangan)) {
+                    $message = 'Hari, Jam, Dosen Penguji, dan Ruangan wajib diisi.';
                     $msgType = 'danger';
                 } else {
-                    $newScope = [
-                        'periode' => $oldSess['periode'],
-                        'hari'    => $newHari,
-                        'penguji' => $newPenguji,
-                        'ruangan' => $newRuangan
-                    ];
-                    $newHash = pretesScopeHash($newScope);
+                    $scope = ['periode' => $periode, 'hari' => $hari, 'penguji' => $penguji, 'ruangan' => $ruangan];
+                    $hash  = pretesScopeHash($scope);
 
-                    $pdo->prepare("
-                        UPDATE pretes_attendance_sessions 
-                        SET hari = ?, jam = ?, penguji = ?, ruangan = ?, kuota = ?, scope_hash = ?
-                        WHERE id = ?
-                    ")->execute([$newHari, $newJam, $newPenguji, $newRuangan, $newKuota, $newHash, $sessionId]);
-
-                    $mhsNotice = '';
-                    if ($syncMhs) {
-                        // Perbarui data mahasiswa yang sebelumnya diplot ke sesi ini
-                        $updMhs = $pdo->prepare("
-                            UPDATE pretes_registrations 
-                            SET hari_pilihan = ?, dosen_penguji = ?, ruangan = ?, jam = ?
-                            WHERE periode = ?
-                              AND (hari_pilihan = ? OR (? = '' AND hari_pilihan IS NULL))
-                              AND (TRIM(dosen_penguji) = ? OR (? = '' AND (dosen_penguji IS NULL OR dosen_penguji = '')))
-                              AND (TRIM(ruangan) = ? OR (? = '' AND (ruangan IS NULL OR ruangan = '')))
+                    // Cek apakah kombinasi sesi ini sudah ada
+                    $check = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ?");
+                    $check->execute([$hash]);
+                    if ($check->fetch()) {
+                        $message = 'Sesi untuk dosen <strong>' . htmlspecialchars($penguji) . '</strong> di ruangan <strong>' . htmlspecialchars($ruangan) . '</strong> pada hari ' . htmlspecialchars($hari) . ' sudah terdaftar.';
+                        $msgType = 'warning';
+                    } else {
+                        $tokenStr = bin2hex(random_bytes(24));
+                        $ins = $pdo->prepare("
+                            INSERT INTO pretes_attendance_sessions 
+                            (scope_hash, periode, hari, penguji, ruangan, jam, kuota, token)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ");
-                        $updMhs->execute([
-                            $newHari, $newPenguji, $newRuangan, $newJam,
-                            $oldSess['periode'],
-                            $oldSess['hari'], $oldSess['hari'],
-                            trim($oldSess['penguji']), trim($oldSess['penguji']),
-                            trim($oldSess['ruangan']), trim($oldSess['ruangan'])
-                        ]);
-                        $affected = $updMhs->rowCount();
-                        if ($affected > 0) {
-                            $mhsNotice = " (Penugasan $affected mahasiswa pada sesi ini otomatis diperbarui).";
+                        $ins->execute([$hash, $periode, $hari, $penguji, $ruangan, $jam, $kuota, $tokenStr]);
+                        $message = "Sesi pretes berhasil ditambahkan untuk <strong>" . htmlspecialchars($penguji) . "</strong> di <strong>" . htmlspecialchars($ruangan) . "</strong> ($hari · $jam).";
+                        $msgType = 'success';
+                    }
+                }
+
+            // B. EDIT SESI PRETES LENGKAP (PER DOSEN, RUANG, HARI & JAM)
+            } elseif ($action === 'edit_session') {
+                $sessionId = (int)($_POST['session_id'] ?? 0);
+                $newHari   = trim($_POST['hari'] ?? 'Senin');
+                $newJam    = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+                $newPenguji= trim($_POST['penguji'] ?? '');
+                $newRuangan= trim($_POST['ruangan'] ?? '');
+                $newKuota  = max(1, (int)($_POST['kuota'] ?? 30));
+                $syncMhs   = isset($_POST['sync_mhs']) ? 1 : 0;
+
+                if ($newJam === '__CUSTOM__') {
+                    $newJam = trim($_POST['custom_jam'] ?? '13.00 WIB (Jam 1)');
+                }
+
+                if ($sessionId <= 0 || empty($newPenguji) || empty($newRuangan)) {
+                    $message = 'Data sesi, dosen penguji, dan ruangan tidak boleh kosong.';
+                    $msgType = 'danger';
+                } else {
+                    $stmtOld = $pdo->prepare("SELECT * FROM pretes_attendance_sessions WHERE id = ?");
+                    $stmtOld->execute([$sessionId]);
+                    $oldSess = $stmtOld->fetch();
+
+                    if (!$oldSess) {
+                        $message = 'Sesi pretes tidak ditemukan.';
+                        $msgType = 'danger';
+                    } else {
+                        $newScope = [
+                            'periode' => $oldSess['periode'],
+                            'hari'    => $newHari,
+                            'penguji' => $newPenguji,
+                            'ruangan' => $newRuangan
+                        ];
+                        $newHash = pretesScopeHash($newScope);
+
+                        // Cek apakah kombinasi sesi baru sudah dipakai oleh sesi LAIN (mencegah error Duplicate entry for key 'scope_hash')
+                        $checkDup = $pdo->prepare("SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ? AND id != ?");
+                        $checkDup->execute([$newHash, $sessionId]);
+                        if ($checkDup->fetch()) {
+                            $message = "Kombinasi sesi untuk dosen <strong>" . htmlspecialchars($newPenguji) . "</strong> di ruangan <strong>" . htmlspecialchars($newRuangan) . "</strong> pada hari " . htmlspecialchars($newHari) . " sudah terdaftar di sesi lain. Silakan pilih kombinasi yang berbeda.";
+                            $msgType = 'warning';
+                        } else {
+                            $pdo->prepare("
+                                UPDATE pretes_attendance_sessions 
+                                SET hari = ?, jam = ?, penguji = ?, ruangan = ?, kuota = ?, scope_hash = ?
+                                WHERE id = ?
+                            ")->execute([$newHari, $newJam, $newPenguji, $newRuangan, $newKuota, $newHash, $sessionId]);
+
+                            $mhsNotice = '';
+                            if ($syncMhs) {
+                                try {
+                                    // Perbarui data mahasiswa yang sebelumnya diplot ke sesi ini
+                                    $updMhs = $pdo->prepare("
+                                        UPDATE pretes_registrations 
+                                        SET hari_pilihan = ?, dosen_penguji = ?, ruangan = ?, jam = ?
+                                        WHERE periode = ?
+                                          AND (hari_pilihan = ? OR (? = '' AND hari_pilihan IS NULL))
+                                          AND (TRIM(dosen_penguji) = ? OR (? = '' AND (dosen_penguji IS NULL OR dosen_penguji = '')))
+                                          AND (TRIM(ruangan) = ? OR (? = '' AND (ruangan IS NULL OR ruangan = '')))
+                                    ");
+                                    $updMhs->execute([
+                                        $newHari, $newPenguji, $newRuangan, $newJam,
+                                        $oldSess['periode'],
+                                        $oldSess['hari'], $oldSess['hari'],
+                                        trim($oldSess['penguji']), trim($oldSess['penguji']),
+                                        trim($oldSess['ruangan']), trim($oldSess['ruangan'])
+                                    ]);
+                                    $affected = $updMhs->rowCount();
+                                    if ($affected > 0) {
+                                        $mhsNotice = " (Penugasan $affected mahasiswa pada sesi ini otomatis diperbarui).";
+                                    }
+                                } catch (Throwable $eSync) {
+                                    error_log("Gagal sync penugasan mhs pada edit_session: " . $eSync->getMessage());
+                                }
+                            }
+
+                            $message = "Sesi pretes berhasil diperbarui menjadi <strong>" . htmlspecialchars($newPenguji) . "</strong> di <strong>" . htmlspecialchars($newRuangan) . "</strong> ($newHari · $newJam)." . $mhsNotice;
+                            $msgType = 'success';
                         }
                     }
-
-                    $message = "Sesi pretes berhasil diperbarui menjadi <strong>" . htmlspecialchars($newPenguji) . "</strong> di <strong>" . htmlspecialchars($newRuangan) . "</strong> ($newHari · $newJam)." . $mhsNotice;
-                    $msgType = 'success';
                 }
-            }
 
         // C. HAPUS SESI PRETES
         } elseif ($action === 'delete_session') {
@@ -530,23 +576,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'ID, Nama lengkap, dan Username wajib diisi.';
                 $msgType = 'danger';
             } else {
-                $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
-                $stmtOld->execute([$id]);
-                $oldName = $stmtOld->fetchColumn();
+                // Cek apakah username baru sudah dipakai oleh user lain
+                $chkU = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+                $chkU->execute([$username, $id]);
+                if ($chkU->fetch()) {
+                    $message = 'Username/NIDN <strong>' . htmlspecialchars($username) . '</strong> sudah digunakan oleh pengguna lain.';
+                    $msgType = 'danger';
+                } else {
+                    $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
+                    $stmtOld->execute([$id]);
+                    $oldName = $stmtOld->fetchColumn();
 
-                $pdo->prepare("
-                    UPDATE users 
-                    SET nama_lengkap = ?, nim = ?, username = ?, email = ?, no_hp = ?, is_active = ?
-                    WHERE id = ? AND role = 'dosen'
-                ")->execute([$nama, $nim, $username, $email, $noHp, $isActive, $id]);
+                    $pdo->prepare("
+                        UPDATE users 
+                        SET nama_lengkap = ?, nim = ?, username = ?, email = ?, no_hp = ?, is_active = ?
+                        WHERE id = ? AND role = 'dosen'
+                    ")->execute([$nama, $nim, $username, $email, $noHp, $isActive, $id]);
 
-                if ($syncCascade && $oldName && trim($oldName) !== $nama) {
-                    $pdo->prepare("UPDATE pretes_attendance_sessions SET penguji = ? WHERE TRIM(penguji) = ?")->execute([$nama, trim($oldName)]);
-                    $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE TRIM(dosen_penguji) = ?")->execute([$nama, trim($oldName)]);
+                    if ($syncCascade && $oldName && trim($oldName) !== $nama) {
+                        try {
+                            $pdo->prepare("UPDATE pretes_attendance_sessions SET penguji = ? WHERE TRIM(penguji) = ?")->execute([$nama, trim($oldName)]);
+                            $pdo->prepare("UPDATE pretes_registrations SET dosen_penguji = ? WHERE TRIM(dosen_penguji) = ?")->execute([$nama, trim($oldName)]);
+                        } catch (Throwable $eCascade) {
+                            error_log("Gagal cascade update nama tutor: " . $eCascade->getMessage());
+                        }
+                    }
+
+                    $message = 'Data tutor <strong>' . htmlspecialchars($nama) . '</strong> berhasil diperbarui!';
+                    $msgType = 'success';
                 }
-
-                $message = 'Data tutor <strong>' . htmlspecialchars($nama) . '</strong> berhasil diperbarui!';
-                $msgType = 'success';
             }
 
         } elseif ($action === 'reset_password_tutor') {
@@ -576,61 +634,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
         }
+        } catch (Throwable $e) {
+            error_log("Error pada pretes-pengaturan-tutor action {$action}: " . $e->getMessage());
+            $message = 'Terjadi kesalahan sistem saat memproses tindakan: ' . htmlspecialchars($e->getMessage());
+            $msgType = 'danger';
+        }
     }
 }
 
 // ── 2. QUERY DATA PERIODE & MASTER PRETES ──────────────────────────────────────
-$periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes ORDER BY id DESC")->fetchAll();
+$periodsList = [];
+try {
+    $periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes ORDER BY id DESC")->fetchAll() ?: [];
+} catch (Throwable $e) {}
 
 $selectedPeriodName = trim($_GET['periode'] ?? '');
 $currentMaster = null;
 
 if (!empty($selectedPeriodName)) {
-    $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? LIMIT 1");
-    $stmtM->execute([$selectedPeriodName]);
-    $currentMaster = $stmtM->fetch();
+    try {
+        $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? LIMIT 1");
+        $stmtM->execute([$selectedPeriodName]);
+        $currentMaster = $stmtM->fetch() ?: null;
+    } catch (Throwable $e) {}
 }
 
 if (!$currentMaster) {
-    $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch()
-                  ?: $pdo->query("SELECT * FROM master_pretes ORDER BY id DESC LIMIT 1")->fetch();
+    try {
+        $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch()
+                      ?: $pdo->query("SELECT * FROM master_pretes ORDER BY id DESC LIMIT 1")->fetch() ?: null;
+    } catch (Throwable $e) {}
 }
 
 if (!$currentMaster) {
     $curYear = (int)date('Y');
     $ta  = $curYear . ' - ' . ($curYear + 1);
     $per = 'Pretes ' . $curYear . '/' . ($curYear + 1);
-    $pdo->prepare("
-        INSERT INTO master_pretes 
-        (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) 
-        VALUES (?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
-    ")->execute([$per, $ta]);
-    $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE id = " . $pdo->lastInsertId())->fetch();
+    try {
+        $pdo->prepare("
+            INSERT INTO master_pretes 
+            (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) 
+            VALUES (?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
+        ")->execute([$per, $ta]);
+        $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE id = " . $pdo->lastInsertId())->fetch() ?: [];
+    } catch (Throwable $e) {}
+}
+
+if (!is_array($currentMaster)) {
+    $currentMaster = [
+        'id'             => 0,
+        'periode'        => 'Pretes',
+        'tahun_ajaran'   => date('Y') . ' - ' . (date('Y') + 1),
+        'status'         => 'aktif',
+        'jam'            => '13.00 WIB (Jam 1)',
+        'kuota_senin'    => 30,
+        'kuota_selasa'   => 30,
+        'kuota_rabu'     => 30,
+        'kuota_kamis'    => 30,
+        'kuota_jumat'    => 30,
+        'penguji_senin'  => '',
+        'penguji_selasa' => '',
+        'penguji_rabu'   => '',
+        'penguji_kamis'  => '',
+        'penguji_jumat'  => '',
+    ];
 }
 
 $periodeName = $currentMaster['periode'] ?? 'Pretes';
 $defaultPeriodeJam = $currentMaster['jam'] ?? '13.00 WIB (Jam 1)';
 
 // ── 3. QUERY MASTER TUTOR (ROLE DOSEN) ─────────────────────────────────────────
-$tutors = $pdo->query("SELECT id, username, nama_lengkap, nim, email, no_hp, is_active FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
-$activeTutors = array_filter($tutors, fn($t) => (int)$t['is_active'] === 1);
+$tutors = [];
+try {
+    $tutors = $pdo->query("SELECT id, username, nama_lengkap, nim, email, no_hp, is_active FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll() ?: [];
+} catch (Throwable $e) {}
+$activeTutors = array_filter($tutors, fn($t) => (int)($t['is_active'] ?? 1) === 1);
 
 // ── 4. QUERY DAFTAR RUANGAN ───────────────────────────────────────────────────
-$roomsDb = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
-$allRoomNames = array_column($roomsDb, 'ruang');
+$roomsDb = [];
+try {
+    $roomsDb = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll() ?: [];
+} catch (Throwable $e) {}
+$allRoomNames = !empty($roomsDb) ? array_filter(array_column($roomsDb, 'ruang')) : [];
 
 // Ambil juga nama ruangan unik yang pernah tersimpan di sesi atau pendaftaran
-$extraRooms = $pdo->query("
-    SELECT DISTINCT ruangan FROM pretes_attendance_sessions WHERE ruangan IS NOT NULL AND ruangan != ''
-    UNION 
-    SELECT DISTINCT ruangan FROM pretes_registrations WHERE ruangan IS NOT NULL AND ruangan != ''
-")->fetchAll(PDO::FETCH_COLUMN);
+try {
+    $extraRooms = $pdo->query("
+        SELECT DISTINCT ruangan FROM pretes_attendance_sessions WHERE ruangan IS NOT NULL AND ruangan != ''
+        UNION 
+        SELECT DISTINCT ruangan FROM pretes_registrations WHERE ruangan IS NOT NULL AND ruangan != ''
+    ")->fetchAll(PDO::FETCH_COLUMN) ?: [];
 
-foreach ($extraRooms as $er) {
-    if (!empty($er) && !in_array($er, $allRoomNames)) {
-        $allRoomNames[] = $er;
+    foreach ($extraRooms as $er) {
+        if (!empty($er) && !in_array($er, $allRoomNames)) {
+            $allRoomNames[] = $er;
+        }
     }
-}
+} catch (Throwable $e) {}
 sort($allRoomNames);
 
 // ── 5. AUTO-SINKRONISASI SESI DARI DATA PENDAFTARAN YANG SUDAH ADA ────────────
@@ -666,28 +766,34 @@ try {
 } catch (Exception $e) {}
 
 // ── 6. QUERY STATISTIK MAHASISWA SECARA AGREGAT (TANPA MENAMPILKAN NAMA) ──────
-$stmtAgg = $pdo->prepare("
-    SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam,
-           COUNT(pr.id) as total_mhs,
-           COUNT(ar.registration_id) as total_hadir
-    FROM pretes_registrations pr
-    LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id
-    WHERE pr.periode = ?
-    GROUP BY pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam
-");
-$stmtAgg->execute([$periodeName]);
-$aggregates = $stmtAgg->fetchAll();
+$aggregates = [];
+try {
+    $stmtAgg = $pdo->prepare("
+        SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam,
+               COUNT(pr.id) as total_mhs,
+               COUNT(ar.registration_id) as total_hadir
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id
+        WHERE pr.periode = ?
+        GROUP BY pr.hari_pilihan, pr.dosen_penguji, pr.ruangan, pr.jam
+    ");
+    $stmtAgg->execute([$periodeName]);
+    $aggregates = $stmtAgg->fetchAll() ?: [];
+} catch (Throwable $e) {}
 
 // ── 7. QUERY DAFTAR SESI LENGKAP PADA PERIODE INI ─────────────────────────────
-$stmtSess = $pdo->prepare("
-    SELECT id, scope_hash, periode, hari, penguji, ruangan, jam, kuota, token, open_until,
-           (open_until > NOW()) as is_open, created_at
-    FROM pretes_attendance_sessions
-    WHERE periode = ?
-    ORDER BY FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), jam ASC, ruangan ASC, penguji ASC
-");
-$stmtSess->execute([$periodeName]);
-$rawSessions = $stmtSess->fetchAll();
+$rawSessions = [];
+try {
+    $stmtSess = $pdo->prepare("
+        SELECT id, scope_hash, periode, hari, penguji, ruangan, jam, kuota, token, open_until,
+               (open_until > NOW()) as is_open, created_at
+        FROM pretes_attendance_sessions
+        WHERE periode = ?
+        ORDER BY FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), jam ASC, ruangan ASC, penguji ASC
+    ");
+    $stmtSess->execute([$periodeName]);
+    $rawSessions = $stmtSess->fetchAll() ?: [];
+} catch (Throwable $e) {}
 
 // Pasangkan data agregat mhs ke masing-masing sesi
 $allSessions = [];
@@ -751,19 +857,21 @@ foreach ($allSessions as $s) {
 }
 
 // Ambil jumlah peserta terplot per dosen dari pretes_registrations
-$stmtTutorMhs = $pdo->prepare("
-    SELECT hari_pilihan, dosen_penguji, COUNT(*) as jml
-    FROM pretes_registrations
-    WHERE periode = ? AND dosen_penguji IS NOT NULL AND dosen_penguji != ''
-    GROUP BY hari_pilihan, dosen_penguji
-");
-$stmtTutorMhs->execute([$periodeName]);
 $tutorTerplot = [];
-foreach ($stmtTutorMhs->fetchAll() as $row) {
-    $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
-    $p = trim($row['dosen_penguji']);
-    $tutorTerplot[$h][$p] = (int)$row['jml'];
-}
+try {
+    $stmtTutorMhs = $pdo->prepare("
+        SELECT hari_pilihan, dosen_penguji, COUNT(*) as jml
+        FROM pretes_registrations
+        WHERE periode = ? AND dosen_penguji IS NOT NULL AND dosen_penguji != ''
+        GROUP BY hari_pilihan, dosen_penguji
+    ");
+    $stmtTutorMhs->execute([$periodeName]);
+    foreach ($stmtTutorMhs->fetchAll() as $row) {
+        $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
+        $p = trim($row['dosen_penguji']);
+        $tutorTerplot[$h][$p] = (int)$row['jml'];
+    }
+} catch (Throwable $e) {}
 
 $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 $datesShort = [

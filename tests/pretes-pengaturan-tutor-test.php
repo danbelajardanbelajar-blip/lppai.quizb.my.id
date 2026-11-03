@@ -51,6 +51,17 @@ function runTutorSettingTests() {
             $failures[] = "Aksi duplicate_day_sessions tidak ditemukan.";
         }
 
+        // Cek penanganan pencegahan HTTP 500 pada edit menu & database
+        if (strpos($content, 'SELECT id FROM pretes_attendance_sessions WHERE scope_hash = ? AND id != ?') === false) {
+            $failures[] = "Pencegahan duplikasi scope_hash saat edit sesi tidak ditemukan.";
+        }
+        if (strpos($content, 'catch (Throwable $e)') === false) {
+            $failures[] = "Penanganan global catch (Throwable \$e) tidak ditemukan.";
+        }
+        if (strpos($content, 'SELECT id FROM users WHERE username = ? AND id != ?') === false) {
+            $failures[] = "Pencegahan duplikasi username saat edit tutor tidak ditemukan.";
+        }
+
         // Cek AJAX endpoints untuk Sesi & QR
         if (strpos($content, 'toggle_session_ajax') === false) {
             $failures[] = "Endpoint toggle_session_ajax tidak ditemukan di file.";
