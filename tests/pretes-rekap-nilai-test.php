@@ -114,9 +114,21 @@ function runPretesRekapNilaiTests() {
             $failures[] = "File tanda tangan ttd_zainul_hakim.png tidak ditemukan pada lembar cetak";
         }
 
-        // 8. Cek Tabel Data & DataTables ID
+        // 8. Cek Tabel Data & DataTables ID & Pencegahan DataTables Incorrect Column Count Warning
         if (strpos($adminContent, 'table-rekap-pretes') === false) {
             $failures[] = "Elemen tabel id #table-rekap-pretes tidak ditemukan";
+        }
+        if (strpos($adminContent, 'colspan="22"') === false) {
+            $failures[] = "Baris data kosong harus memiliki colspan=\"22\" sesuai jumlah kolom header 22 komponen";
+        }
+        if (strpos($adminContent, 'colspan="23"') !== false) {
+            $failures[] = "Ditemukan colspan=\"23\" yang melebihi jumlah kolom header (22), menyebabkan Tech Note 18 DataTables warning";
+        }
+        if (strpos($adminContent, "no-datatable") === false) {
+            $failures[] = "Kelas no-datatable saat roster kosong tidak ditemukan";
+        }
+        if (strpos($adminContent, "dataTable.ext.errMode = 'none'") === false) {
+            $failures[] = "Pengamanan dataTable.ext.errMode = 'none' tidak ditemukan";
         }
     }
 

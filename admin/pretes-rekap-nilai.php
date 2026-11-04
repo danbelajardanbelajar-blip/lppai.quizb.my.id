@@ -983,7 +983,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="table-responsive">
-        <table class="rekap-table" id="table-rekap-pretes">
+        <table class="rekap-table <?= empty($roster) ? 'no-datatable' : '' ?>" id="table-rekap-pretes">
             <thead>
                 <tr>
                     <th rowspan="2" class="col-sticky-left" style="width:40px;">No</th>
@@ -1018,7 +1018,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
                 <?php if (empty($roster)): ?>
                 <tr>
-                    <td colspan="23" style="padding:32px; text-align:center; color:#64748b;">
+                    <td colspan="22" style="padding:32px; text-align:center; color:#64748b;">
                         Tidak ada data mahasiswa yang ditemukan untuk filter yang dipilih.
                     </td>
                 </tr>
@@ -1117,8 +1117,17 @@ include __DIR__ . '/../includes/header.php';
 // DataTables & Vanilla JS Auto-Enhancement
 document.addEventListener('DOMContentLoaded', function() {
     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable) {
+        // Matikan browser alert popup bawaan DataTables
+        window.jQuery.fn.dataTable.ext.errMode = 'none';
+
         var table = document.getElementById('table-rekap-pretes');
-        if (table && !window.jQuery.fn.DataTable.isDataTable(table)) {
+        if (!table) return;
+
+        // Hanya inisialisasi DataTables jika tabel memiliki baris data (bukan baris colspan kosong)
+        var hasEmptyRow = table.querySelector('tbody td[colspan]') !== null;
+        var hasDataRows = table.querySelectorAll('tbody tr').length > 0 && !hasEmptyRow;
+
+        if (hasDataRows && !window.jQuery.fn.DataTable.isDataTable(table)) {
             window.jQuery(table).DataTable({
                 pageLength: 25,
                 lengthMenu: [10, 25, 50, 100, 250],
