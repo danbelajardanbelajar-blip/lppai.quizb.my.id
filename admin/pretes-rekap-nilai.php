@@ -50,14 +50,16 @@ $componentKeys = array_keys($components);
 $totalComponents = count($components);
 
 // ── Helper Predikat & Status Kelulusan ────────────────────────────────────────
-function getPretesPredikat($score) {
-    if ($score === null || $score === '') return '-';
-    $num = (float)$score;
-    if ($num >= 85) return 'A';
-    if ($num >= 75) return 'B';
-    if ($num >= 65) return 'C';
-    if ($num >= 55) return 'D';
-    return 'E';
+if (!function_exists('getPretesPredikat')) {
+    function getPretesPredikat($score) {
+        if ($score === null || $score === '') return '-';
+        $num = (float)$score;
+        if ($num >= 85) return 'A';
+        if ($num >= 75) return 'B';
+        if ($num >= 65) return 'C';
+        if ($num >= 55) return 'D';
+        return 'E';
+    }
 }
 
 $message = '';

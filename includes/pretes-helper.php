@@ -60,6 +60,18 @@ function getPretesStatusLulus($scores) {
     return $complete ? 'lulus' : 'menunggu';
 }
 
+if (!function_exists('getPretesPredikat')) {
+    function getPretesPredikat($score) {
+        if ($score === null || $score === '') return '-';
+        $num = (float)$score;
+        if ($num >= 85) return 'A';
+        if ($num >= 75) return 'B';
+        if ($num >= 65) return 'C';
+        if ($num >= 55) return 'D';
+        return 'E';
+    }
+}
+
 function pretesValidateScores($input) {
     if (!is_array($input)) throw new InvalidArgumentException('Data nilai tidak valid.');
     $scores = [];
