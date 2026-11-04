@@ -224,6 +224,43 @@ include __DIR__ . '/header.php';
     flex-shrink: 0;
 }
 
+/* Outer Card Accordion QR Code Absensi */
+.pretes-qr-card-accordion {
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.pretes-qr-card-accordion:hover {
+    border-color: #cbd5e1 !important;
+}
+.pretes-qr-card-accordion[open] {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+.pretes-qr-card-accordion summary::-webkit-details-marker {
+    display: none;
+}
+.pretes-qr-card-accordion summary {
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+.pretes-qr-card-accordion summary:hover {
+    background: #f1f5f9 !important;
+}
+.pretes-qr-card-accordion[open] > summary {
+    border-bottom: 1.5px solid #e2e8f0;
+}
+.pretes-qr-card-accordion:not([open]) > summary {
+    border-bottom: none !important;
+}
+.pretes-qr-card-accordion .summary-chevron {
+    transition: transform 0.25s ease;
+    display: inline-block;
+}
+.pretes-qr-card-accordion[open] > summary .summary-chevron {
+    transform: rotate(180deg);
+}
+
 /* Accordion QR Sessions */
 .pretes-qr-sessions {
     display: flex;
@@ -474,19 +511,48 @@ include __DIR__ . '/header.php';
 <?php endif; ?>
 
 <!-- ── 1. SESI QR CODE ABSENSI PRETES (ACCORDION) ── -->
-<?php if (!empty($groups)): ?>
-<div class="card" id="absensi-pretes" style="border-radius:16px;border:1px solid #e2e8f0;margin-bottom:24px;overflow:hidden;">
-    <div class="card-header" style="background:#f8fafc;padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div style="display:flex;align-items:center;gap:12px;">
+<?php if (!empty($groups)): 
+    $anySessionOpen = false;
+    foreach ($groups as $g) {
+        $checkSess = pretesSession($pdo, $g['scope']);
+        if (!empty($checkSess['is_open'])) {
+            $anySessionOpen = true;
+            break;
+        }
+    }
+    // Terbuka otomatis hanya jika ada parameter session_id dari redirect atau open_qr
+    $isCardOpen = isset($_GET['session_id']) || (isset($_GET['open_qr']) && $_GET['open_qr'] == '1');
+?>
+<details class="card pretes-qr-card-accordion" id="absensi-pretes" <?= $isCardOpen ? 'open' : '' ?> style="border-radius:16px;border:1px solid #e2e8f0;margin-bottom:24px;overflow:hidden;background:#ffffff;">
+    <summary class="card-header pretes-qr-card-header" style="background:#f8fafc;padding:14px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;cursor:pointer;list-style:none;user-select:none;">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
             <div style="width:38px;height:38px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
                 📱
             </div>
-            <div>
-                <h3 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Sesi QR Code Absensi Mahasiswa</h3>
-                <span style="font-size:12px;color:#64748b;">Klik baris sesi untuk membuka accordion dan menampilkan QR code presensi</span>
+            <div style="min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <h3 style="margin:0;font-size:15px;font-weight:800;color:#0f172a;">Sesi QR Code Absensi Mahasiswa</h3>
+                    <span class="badge" style="background:#e2e8f0;color:#475569;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">
+                        <?= count($groups) ?> Sesi
+                    </span>
+                    <?php if ($anySessionOpen): ?>
+                        <span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:800;display:inline-flex;align-items:center;gap:5px;box-shadow:0 0 0 2px rgba(34,197,94,0.15);">
+                            <span style="width:6px;height:6px;border-radius:50%;background:#16a34a;animation:pulseGlow 1.5s infinite;"></span> ABSENSI BUKA
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <span class="qr-card-subtitle" style="font-size:12px;color:#64748b;display:block;margin-top:2px;">
+                    Klik untuk <span class="action-text"><?= $isCardOpen ? 'menutup' : 'membuka' ?></span> QR code presensi mahasiswa
+                </span>
             </div>
         </div>
-    </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="btn btn-sm btn-outline-primary pretes-qr-toggle-btn" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:8px;pointer-events:none;display:inline-flex;align-items:center;gap:6px;">
+                <span class="qr-btn-text"><?= $isCardOpen ? 'Tutup QR Code' : 'Buka QR Code' ?></span>
+                <span class="summary-chevron" style="display:inline-block;font-size:11px;">▼</span>
+            </span>
+        </div>
+    </summary>
     <div class="card-body" style="padding:18px 20px;">
         <div class="pretes-qr-sessions">
         <?php foreach ($groups as $group): 
@@ -494,7 +560,7 @@ include __DIR__ . '/header.php';
             $session = pretesSession($pdo, $scope);
             $url = pretesAttendanceUrl($session);
             $isOpen = (bool)$session['is_open'];
-            $isTarget = ((int)($_GET['session_id'] ?? 0) === (int)$session['id']) || (count($groups) === 1);
+            $isTarget = ((int)($_GET['session_id'] ?? 0) === (int)$session['id']);
         ?>
             <details class="pretes-qr-session" id="qr-session-<?= (int)$session['id'] ?>" <?= $isTarget ? 'open' : '' ?>>
                 <summary>
@@ -574,7 +640,7 @@ include __DIR__ . '/header.php';
         <?php endforeach; ?>
         </div>
     </div>
-</div>
+</details>
 <?php endif; ?>
 
 <!-- ── 2. FORM INPUT NILAI MAHASISWA TERPILIH ── -->
@@ -879,6 +945,42 @@ document.querySelector('.reset-all-scores')?.addEventListener('click', function(
 });
 
 // ── 3. Accordion Sesi QR Code ───────────────────────────────────────────────
+var qrCard = document.querySelector('.pretes-qr-card-accordion');
+if (qrCard) {
+    function updateQrCardUI() {
+        var isOpen = qrCard.open;
+        var btnText = qrCard.querySelector('.qr-btn-text');
+        var actionText = qrCard.querySelector('.action-text');
+        if (btnText) {
+            btnText.textContent = isOpen ? 'Tutup QR Code' : 'Buka QR Code';
+        }
+        if (actionText) {
+            actionText.textContent = isOpen ? 'menutup' : 'membuka';
+        }
+        if (isOpen) {
+            // Render QR code pada sesi yang sedang terbuka
+            qrCard.querySelectorAll('.pretes-qr-session[open]').forEach(function(sess) {
+                var el = sess.querySelector('.pretes-qr');
+                if (el && !el.dataset.rendered && el.dataset.url) {
+                    new QRCode(el, {
+                        text: el.dataset.url,
+                        width: 180,
+                        height: 180,
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                    el.dataset.rendered = 'true';
+                }
+            });
+        }
+    }
+    qrCard.addEventListener('toggle', updateQrCardUI);
+
+    // Buka otomatis jika hash URL mengarah ke absensi atau sesi qr
+    if (window.location.hash && (window.location.hash === '#absensi-pretes' || window.location.hash.indexOf('#qr-session') === 0)) {
+        qrCard.open = true;
+        updateQrCardUI();
+    }
+}
 document.querySelectorAll('.pretes-qr-session').forEach(function(details) {
     function renderSessionQr() {
         if (!details.open) return;
