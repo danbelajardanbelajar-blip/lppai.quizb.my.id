@@ -308,20 +308,392 @@ $rataRataAngkatan = ($countAssessed > 0) ? round($sumTotalAvg / $countAssessed, 
 ksort($dosenList);
 ksort($ruangList);
 
+// ── HELPER EXCEL NATIVE (OPENXML .XLSX & SPREADSHEETML .XLS) ─────────────────
+if (!function_exists('pretesXlsxColLetter')) {
+    function pretesXlsxColLetter($num) {
+        $col = '';
+        while ($num > 0) {
+            $mod = ($num - 1) % 26;
+            $col = chr(65 + $mod) . $col;
+            $num = intdiv($num - $mod - 1, 26);
+        }
+        return $col;
+    }
+}
+
+if (!function_exists('pretesExportRosterToXlsxNative')) {
+    function pretesExportRosterToXlsxNative($filename, $periodeName, $headers, $roster, $componentKeys, $totalComponents) {
+        if (!class_exists('ZipArchive')) {
+            return false;
+        }
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'rekap_xlsx_') . '.xlsx';
+        $zip = new ZipArchive();
+        if ($zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return false;
+        }
+
+        // [Content_Types].xml
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' .
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' .
+            '<Default Extension="xml" ContentType="application/xml"/>' .
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' .
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' .
+            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' .
+            '</Types>');
+
+        // _rels/.rels
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' .
+            '</Relationships>');
+
+        // xl/_rels/workbook.xml.rels
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' .
+            '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' .
+            '</Relationships>');
+
+        // xl/workbook.xml
+        $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
+            '<bookViews><workbookView xWindow="0" yWindow="0" windowWidth="20480" windowHeight="10240"/></bookViews>' .
+            '<sheets><sheet name="Rekap Nilai Pretes" sheetId="1" r:id="rId1"/></sheets>' .
+            '</workbook>');
+
+        // xl/styles.xml
+        $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+            '<fonts count="4">' .
+            '<font><sz val="11"/><color rgb="FF0F172A"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><b/><sz val="13"/><color rgb="FF0D5C3A"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><sz val="11"/><color rgb="FF475569"/><name val="Calibri"/><family val="2"/></font>' .
+            '</fonts>' .
+            '<fills count="3">' .
+            '<fill><patternFill patternType="none"/></fill>' .
+            '<fill><patternFill patternType="gray125"/></fill>' .
+            '<fill><patternFill patternType="solid"><fgColor rgb="FF0D5C3A"/></patternFill></fill>' .
+            '</fills>' .
+            '<borders count="2">' .
+            '<border><left/><right/><top/><bottom/><diagonal/></border>' .
+            '<border>' .
+            '<left style="thin"><color rgb="FFCBD5E1"/></left>' .
+            '<right style="thin"><color rgb="FFCBD5E1"/></right>' .
+            '<top style="thin"><color rgb="FFCBD5E1"/></top>' .
+            '<bottom style="thin"><color rgb="FFCBD5E1"/></bottom>' .
+            '<diagonal/>' .
+            '</border>' .
+            '</borders>' .
+            '<cellStyleXfs count="1">' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' .
+            '</cellStyleXfs>' .
+            '<cellXfs count="6">' .
+            '<!-- 0: Default -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' .
+            '<!-- 1: Header Green Bold Center -->' .
+            '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' .
+            '<!-- 2: Data Left -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' .
+            '<!-- 3: Data Center -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '<!-- 4: Title Banner -->' .
+            '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '<!-- 5: Subtitle Banner -->' .
+            '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '</cellXfs>' .
+            '</styleSheet>';
+        $zip->addFromString('xl/styles.xml', $stylesXml);
+
+        // xl/worksheets/sheet1.xml
+        $rowsXml = [];
+
+        // Row 1: Banner Title
+        $rowsXml[] = '<row r="1" ht="28" customHeight="1">' .
+            '<c r="A1" t="inlineStr" s="4"><is><t>LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA</t></is></c>' .
+            '</row>';
+
+        // Row 2: Subtitle
+        $rowsXml[] = '<row r="2" ht="22" customHeight="1">' .
+            '<c r="A2" t="inlineStr" s="5"><is><t>REKAPITULASI NILAI PRETES PAI - PERIODE: ' . htmlspecialchars($periodeName, ENT_XML1, 'UTF-8') . '</t></is></c>' .
+            '</row>';
+
+        // Row 4: Column Headers
+        $headerCells = [];
+        foreach ($headers as $colIdx => $h) {
+            $colLetter = pretesXlsxColLetter($colIdx + 1);
+            $headerCells[] = '<c r="' . $colLetter . '4" t="inlineStr" s="1"><is><t>' . htmlspecialchars($h, ENT_XML1, 'UTF-8') . '</t></is></c>';
+        }
+        $rowsXml[] = '<row r="4" ht="26" customHeight="1">' . implode('', $headerCells) . '</row>';
+
+        $totalCols = count($headers);
+        $lastColLetter = pretesXlsxColLetter($totalCols);
+
+        // Row 5+: Data Rows atau Pesan Kosong
+        if (empty($roster)) {
+            $rowsXml[] = '<row r="5" ht="24" customHeight="1">' .
+                '<c r="A5" t="inlineStr" s="3"><is><t>Tidak ada data peserta yang sesuai dengan filter yang dipilih.</t></is></c>' .
+                '</row>';
+            $extraMerge = '<mergeCell ref="A5:' . $lastColLetter . '5"/>';
+            $mergeCount = 3;
+        } else {
+            $extraMerge = '';
+            $mergeCount = 2;
+            $rowNum = 5;
+            foreach ($roster as $idx => $r) {
+                $cells = [];
+                $colIdx = 1;
+
+                // 1. No
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . ($idx + 1) . '</v></c>';
+                // 2. NIM
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars((string)($r['nim'] ?? ''), ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 3. Nama Mahasiswa
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['nama_lengkap'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 4. Prodi
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['program_studi'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 5. Fakultas
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['fakultas'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 6. Hari
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['hari_pilihan'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 7. Ruangan
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['ruangan'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 8. Dosen Penguji
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['dosen_penguji'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 9. Kehadiran
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . (!empty($r['is_hadir']) ? 'Hadir' : 'Belum Hadir') . '</t></is></c>';
+
+                // 10..21: 12 Komponen Nilai
+                foreach ($componentKeys as $ck) {
+                    $val = $r['scores'][$ck] ?? null;
+                    if ($val !== null && is_numeric($val)) {
+                        $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . (float)$val . '</v></c>';
+                    } else {
+                        $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                    }
+                }
+
+                // 22. Komponen Terisi
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . ($r['filled_count'] ?? 0) . '/' . $totalComponents . '</t></is></c>';
+                // 23. Rata-Rata
+                if (isset($r['average']) && $r['average'] !== null && is_numeric($r['average'])) {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . round((float)$r['average'], 2) . '</v></c>';
+                } else {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                }
+                // 24. Predikat
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['predikat'] ?? '-', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 25. Status Kelulusan
+                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . $statusText . '</t></is></c>';
+
+                $rowsXml[] = '<row r="' . $rowNum . '">' . implode('', $cells) . '</row>';
+                $rowNum++;
+            }
+        }
+
+        // Lebar kolom terukur
+        $colWidths = [
+            1 => 6,   // No
+            2 => 16,  // NIM
+            3 => 28,  // Nama
+            4 => 20,  // Prodi
+            5 => 16,  // Fakultas
+            6 => 12,  // Hari
+            7 => 14,  // Ruangan
+            8 => 26,  // Dosen Penguji
+            9 => 14,  // Kehadiran
+            10 => 11, 11 => 11, 12 => 11, 13 => 11, 14 => 11, 15 => 11,
+            16 => 11, 17 => 11, 18 => 11, 19 => 11, 20 => 11, 21 => 11,
+            22 => 12, // Terisi
+            23 => 12, // Rata-rata
+            24 => 10, // Predikat
+            25 => 16, // Status
+        ];
+        $colsXml = [];
+        foreach ($colWidths as $cNum => $w) {
+            $colsXml[] = '<col min="' . $cNum . '" max="' . $cNum . '" width="' . $w . '" customWidth="1"/>';
+        }
+
+        $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+            '<cols>' . implode('', $colsXml) . '</cols>' .
+            '<sheetData>' . implode('', $rowsXml) . '</sheetData>' .
+            '<mergeCells count="' . $mergeCount . '">' .
+            '<mergeCell ref="A1:' . $lastColLetter . '1"/>' .
+            '<mergeCell ref="A2:' . $lastColLetter . '2"/>' .
+            $extraMerge .
+            '</mergeCells>' .
+            '</worksheet>';
+
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+        $zip->close();
+
+        // Stream file XLSX ke browser pengguna
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header("Content-Disposition: attachment; filename=\"{$filename}.xlsx\"");
+        header('Content-Length: ' . filesize($tmpFile));
+        header('Cache-Control: max-age=0, no-cache, must-revalidate');
+        header('Pragma: public');
+        readfile($tmpFile);
+        @unlink($tmpFile);
+        exit;
+    }
+}
+
+if (!function_exists('pretesExportRosterToXlsXml')) {
+    function pretesExportRosterToXlsXml($filename, $periodeName, $headers, $roster, $componentKeys, $totalComponents) {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+        header("Content-Disposition: attachment; filename=\"{$filename}.xls\"");
+        header('Cache-Control: max-age=0, no-cache, must-revalidate');
+        header('Pragma: public');
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
+        echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+        echo ' xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
+        echo ' xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
+        echo ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' . "\n";
+        echo '<Styles>' . "\n";
+        echo ' <Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#0F172A"/></Style>' . "\n";
+        echo ' <Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0D5C3A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="DataLeft"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="DataCenter"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#0D5C3A"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>' . "\n";
+        echo ' <Style ss:ID="SubTitle"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#475569"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>' . "\n";
+        echo '</Styles>' . "\n";
+        echo '<Worksheet ss:Name="Rekap Nilai Pretes">' . "\n";
+        echo '<Table>' . "\n";
+
+        $widths = [40, 100, 170, 130, 110, 80, 90, 160, 90, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 80, 80, 70, 100];
+        foreach ($widths as $w) {
+            echo '<Column ss:Width="' . $w . '"/>' . "\n";
+        }
+
+        $totalCols = count($headers);
+        echo '<Row ss:Height="28"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="Title"><Data ss:Type="String">LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA</Data></Cell></Row>' . "\n";
+        echo '<Row ss:Height="22"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="SubTitle"><Data ss:Type="String">REKAPITULASI NILAI PRETES PAI - PERIODE: ' . htmlspecialchars($periodeName, ENT_XML1, 'UTF-8') . '</Data></Cell></Row>' . "\n";
+        echo '<Row ss:Height="12"></Row>' . "\n";
+
+        echo '<Row ss:Height="26">' . "\n";
+        foreach ($headers as $h) {
+            echo '<Cell ss:StyleID="Header"><Data ss:Type="String">' . htmlspecialchars($h, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+        }
+        echo '</Row>' . "\n";
+
+        if (empty($roster)) {
+            echo '<Row ss:Height="24"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="DataCenter"><Data ss:Type="String">Tidak ada data peserta yang sesuai dengan filter yang dipilih.</Data></Cell></Row>' . "\n";
+        } else {
+            foreach ($roster as $idx => $r) {
+                echo '<Row ss:Height="20">' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . ($idx + 1) . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars((string)($r['nim'] ?? ''), ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['nama_lengkap'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['program_studi'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['fakultas'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['hari_pilihan'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['ruangan'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['dosen_penguji'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . (!empty($r['is_hadir']) ? 'Hadir' : 'Belum Hadir') . '</Data></Cell>' . "\n";
+
+                foreach ($componentKeys as $ck) {
+                    $val = $r['scores'][$ck] ?? null;
+                    if ($val !== null && is_numeric($val)) {
+                        echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . (float)$val . '</Data></Cell>' . "\n";
+                    } else {
+                        echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                    }
+                }
+
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . ($r['filled_count'] ?? 0) . '/' . $totalComponents . '</Data></Cell>' . "\n";
+                if (isset($r['average']) && $r['average'] !== null && is_numeric($r['average'])) {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . round((float)$r['average'], 2) . '</Data></Cell>' . "\n";
+                } else {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                }
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['predikat'] ?? '-', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . $statusText . '</Data></Cell>' . "\n";
+                echo '</Row>' . "\n";
+            }
+        }
+
+        echo '</Table>' . "\n";
+        echo '</Worksheet>' . "\n";
+        echo '</Workbook>' . "\n";
+        exit;
+    }
+}
+
 // ── MODE EXPORT: XLSX / CSV ───────────────────────────────────────────────────
 $exportFormat = strtolower(trim($_GET['export'] ?? ''));
 if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
-    if ($exportFormat === 'excel') $exportFormat = 'xlsx';
     $safePeriode = preg_replace('/[^a-zA-Z0-9]/', '_', $periodeName ?: 'Semua');
     $safeDosen = !empty($filterDosen) ? '_' . preg_replace('/[^a-zA-Z0-9]/', '_', substr($filterDosen, 0, 15)) : '';
     $timestamp = date('Ymd_His');
     $filename = "Rekapitulasi_Nilai_Pretes_{$safePeriode}{$safeDosen}_{$timestamp}";
 
-    // Cek ketersediaan PhpSpreadsheet
+    $headers = [
+        'No', 'NIM', 'Nama Mahasiswa', 'Prodi', 'Fakultas', 'Hari', 'Ruangan', 'Dosen Penguji', 'Kehadiran',
+        'Ujian Tulis', 'Praktik Wudlu', 'Doa Stlh Wudlu', 'Tayammum', 'Mandi Besar', 'Jamak Qashar',
+        'Shalat Subuh', 'Al Bayyinah', "Al 'Alaq", 'Al Dluha', 'Istighasah', 'Shalat Jenazah',
+        'Terisi', 'Rata-rata', 'Predikat', 'Status Kelulusan'
+    ];
+
+    // JIKA USER MEMILIH FORMAT CSV SECARA EKSPLISIT
+    if ($exportFormat === 'csv') {
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header("Content-Disposition: attachment; filename=\"{$filename}.csv\"");
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers);
+
+        foreach ($roster as $idx => $r) {
+            $rowCSV = [
+                $idx + 1,
+                "'" . (string)($r['nim'] ?? ''),
+                $r['nama_lengkap'] ?? '',
+                $r['program_studi'] ?? '',
+                $r['fakultas'] ?? '',
+                $r['hari_pilihan'] ?? '',
+                $r['ruangan'] ?? '',
+                $r['dosen_penguji'] ?? '',
+                !empty($r['is_hadir']) ? 'Hadir' : 'Belum Hadir',
+            ];
+            foreach ($componentKeys as $ck) {
+                $val = $r['scores'][$ck] ?? null;
+                $rowCSV[] = ($val !== null) ? $val : '-';
+            }
+            $rowCSV[] = ($r['filled_count'] ?? 0) . "/{$totalComponents}";
+            $rowCSV[] = ($r['average'] !== null) ? $r['average'] : '-';
+            $rowCSV[] = $r['predikat'] ?? '-';
+            $rowCSV[] = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+
+            fputcsv($out, $rowCSV);
+        }
+        fclose($out);
+        exit;
+    }
+
+    // JIKA USER MEMILIH FORMAT EXCEL (xlsx / excel)
+    // 1. Prioritas 1: Gunakan PhpSpreadsheet jika tersedia di vendor
     $autoloadPaths = [
         __DIR__ . '/../vendor/autoload.php',
         __DIR__ . '/../../vendor/autoload.php',
+        __DIR__ . '/../../../vendor/autoload.php',
+        dirname(__DIR__) . '/vendor/autoload.php',
         $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php',
+        $_SERVER['DOCUMENT_ROOT'] . '/../vendor/autoload.php',
+        dirname($_SERVER['DOCUMENT_ROOT']) . '/vendor/autoload.php',
+        '/public_html/vendor/autoload.php',
+        '/home/' . get_current_user() . '/public_html/vendor/autoload.php',
+        '/home/' . get_current_user() . '/vendor/autoload.php',
     ];
     $hasSpreadsheet = false;
     foreach ($autoloadPaths as $p) {
@@ -334,119 +706,91 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
         }
     }
 
-    if ($exportFormat === 'xlsx' && $hasSpreadsheet) {
-        while (ob_get_level()) ob_end_clean();
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Rekap Nilai Pretes');
+    if ($hasSpreadsheet) {
+        try {
+            while (ob_get_level()) ob_end_clean();
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Rekap Nilai Pretes');
 
-        // Judul Lembar Kerja
-        $sheet->setCellValue('A1', 'LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA');
-        $sheet->setCellValue('A2', "REKAPITULASI NILAI PRETES PAI - PERIODE: {$periodeName}");
-        $sheet->mergeCells('A1:U1');
-        $sheet->mergeCells('A2:U2');
-        $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(13);
-        $sheet->getStyle('A1:A2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            // Judul Lembar Kerja (Merge A1:Y1 dan A2:Y2 untuk 25 kolom)
+            $sheet->setCellValue('A1', 'LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA');
+            $sheet->setCellValue('A2', "REKAPITULASI NILAI PRETES PAI - PERIODE: {$periodeName}");
+            $sheet->mergeCells('A1:Y1');
+            $sheet->mergeCells('A2:Y2');
+            $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(13);
+            $sheet->getStyle('A1:A2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
 
-        // Header Tabel Kolom
-        $headers = [
-            'No', 'NIM', 'Nama Mahasiswa', 'Prodi', 'Fakultas', 'Hari', 'Ruangan', 'Dosen Penguji', 'Kehadiran',
-            'Ujian Tulis', 'Praktik Wudlu', 'Doa Stlh Wudlu', 'Tayammum', 'Mandi Besar', 'Jamak Qashar',
-            'Shalat Subuh', 'Al Bayyinah', "Al 'Alaq", 'Al Dluha', 'Istighasah', 'Shalat Jenazah',
-            'Terisi', 'Rata-rata', 'Predikat', 'Status Kelulusan'
-        ];
+            // Header Tabel Kolom
+            $colChar = 'A';
+            foreach ($headers as $idx => $h) {
+                $sheet->setCellValue("{$colChar}4", $h);
+                $sheet->getColumnDimension($colChar)->setAutoSize(true);
+                $colChar++;
+            }
+            $lastCol = pretesXlsxColLetter(count($headers));
 
-        $colChar = 'A';
-        foreach ($headers as $idx => $h) {
-            $sheet->setCellValue("{$colChar}4", $h);
-            $sheet->getColumnDimension($colChar)->setAutoSize(true);
-            $colChar++;
-        }
-        $lastCol = chr(ord('A') + count($headers) - 1);
+            $sheet->getStyle("A4:{$lastCol}4")->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF0D5C3A']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            ]);
+            $sheet->getRowDimension(4)->setRowHeight(26);
 
-        $sheet->getStyle("A4:{$lastCol}4")->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
-            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF0D5C3A']],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
-        ]);
-        $sheet->getRowDimension(4)->setRowHeight(26);
+            $rowNum = 5;
+            if (empty($roster)) {
+                $sheet->setCellValue("A5", "Tidak ada data peserta yang sesuai dengan filter yang dipilih.");
+                $sheet->mergeCells("A5:{$lastCol}5");
+                $sheet->getStyle("A5")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            } else {
+                foreach ($roster as $idx => $r) {
+                    $c = 'A';
+                    $sheet->setCellValue("{$c}{$rowNum}", $idx + 1); $c++;
+                    $sheet->setCellValueExplicit("{$c}{$rowNum}", (string)($r['nim'] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['nama_lengkap'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['program_studi'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['fakultas'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['hari_pilihan'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['ruangan'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['dosen_penguji'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", !empty($r['is_hadir']) ? 'Hadir' : 'Belum Hadir'); $c++;
 
-        $rowNum = 5;
-        foreach ($roster as $idx => $r) {
-            $c = 'A';
-            $sheet->setCellValue("{$c}{$rowNum}", $idx + 1); $c++;
-            $sheet->setCellValueExplicit("{$c}{$rowNum}", (string)$r['nim'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['nama_lengkap']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['program_studi']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['fakultas']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['hari_pilihan']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['ruangan']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['dosen_penguji']); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['is_hadir'] ? 'Hadir' : 'Belum Hadir'); $c++;
+                    foreach ($componentKeys as $ck) {
+                        $v = $r['scores'][$ck] ?? null;
+                        $sheet->setCellValue("{$c}{$rowNum}", $v !== null ? $v : '-');
+                        $c++;
+                    }
 
-            foreach ($componentKeys as $ck) {
-                $v = $r['scores'][$ck];
-                $sheet->setCellValue("{$c}{$rowNum}", $v !== null ? $v : '-');
-                $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", ($r['filled_count'] ?? 0) . "/{$totalComponents}"); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", ($r['average'] !== null) ? $r['average'] : '-'); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['predikat'] ?? '-'); $c++;
+                    
+                    $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                    $sheet->setCellValue("{$c}{$rowNum}", $statusText); $c++;
+
+                    $rowNum++;
+                }
             }
 
-            $sheet->setCellValue("{$c}{$rowNum}", "{$r['filled_count']}/{$totalComponents}"); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['average'] !== null ? $r['average'] : '-'); $c++;
-            $sheet->setCellValue("{$c}{$rowNum}", $r['predikat']); $c++;
-            
-            $statusText = ($r['status_lulus'] === 'lulus') ? 'LULUS' : (($r['status_lulus'] === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
-            $sheet->setCellValue("{$c}{$rowNum}", $statusText); $c++;
-
-            $rowNum++;
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header("Content-Disposition: attachment; filename=\"{$filename}.xlsx\"");
+            header('Cache-Control: max-age=0, no-cache, must-revalidate');
+            header('Pragma: public');
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+        } catch (Throwable $e) {
+            error_log("PhpSpreadsheet gagal, fallback ke native generator: " . $e->getMessage());
         }
-
-        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header("Content-Disposition: attachment; filename=\"{$filename}.xlsx\"");
-        header('Cache-Control: max-age=0');
-        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $writer->save('php://output');
-        exit;
-    } else {
-        // Fallback: Export CSV dengan UTF-8 BOM
-        while (ob_get_level()) ob_end_clean();
-        header('Content-Type: text/csv; charset=UTF-8');
-        header("Content-Disposition: attachment; filename=\"{$filename}.csv\"");
-        echo "\xEF\xBB\xBF"; // UTF-8 BOM
-
-        $out = fopen('php://output', 'w');
-        fputcsv($out, [
-            'No', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Fakultas', 'Hari', 'Ruangan', 'Dosen Penguji', 'Kehadiran',
-            'Ujian Tulis', 'Praktik Wudlu', 'Doa Setelah Wudlu', 'Praktik Tayammum', 'Niat Mandi Besar', 'Niat Jamak Qashar',
-            'Bacaan Shalat Subuh', 'Al Bayyinah', "Al 'Alaq", 'Al Dluha', 'Istighasah', 'Shalat Jenazah',
-            'Komponen Terisi', 'Rata-Rata', 'Predikat', 'Status Kelulusan'
-        ]);
-
-        foreach ($roster as $idx => $r) {
-            $rowCSV = [
-                $idx + 1,
-                "'" . (string)$r['nim'],
-                $r['nama_lengkap'],
-                $r['program_studi'],
-                $r['fakultas'],
-                $r['hari_pilihan'],
-                $r['ruangan'],
-                $r['dosen_penguji'],
-                $r['is_hadir'] ? 'Hadir' : 'Belum Hadir',
-            ];
-            foreach ($componentKeys as $ck) {
-                $val = $r['scores'][$ck];
-                $rowCSV[] = ($val !== null) ? $val : '-';
-            }
-            $rowCSV[] = "{$r['filled_count']}/{$totalComponents}";
-            $rowCSV[] = ($r['average'] !== null) ? $r['average'] : '-';
-            $rowCSV[] = $r['predikat'];
-            $rowCSV[] = ($r['status_lulus'] === 'lulus') ? 'LULUS' : (($r['status_lulus'] === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
-
-            fputcsv($out, $rowCSV);
-        }
-        fclose($out);
-        exit;
     }
+
+    // 2. Prioritas 2: Gunakan Native OpenXML XLSX Generator (ZipArchive bawaan PHP)
+    if (class_exists('ZipArchive')) {
+        pretesExportRosterToXlsxNative($filename, $periodeName, $headers, $roster, $componentKeys, $totalComponents);
+    }
+
+    // 3. Prioritas 3: Gunakan SpreadsheetML (XML Spreadsheet 2003 .xls) - Selalu format Excel asli, bukan CSV
+    pretesExportRosterToXlsXml($filename, $periodeName, $headers, $roster, $componentKeys, $totalComponents);
 }
 
 // ── MODE CETAK RESMI (A4 LANDSCAPE) ───────────────────────────────────────────

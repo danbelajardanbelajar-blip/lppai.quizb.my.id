@@ -130,6 +130,20 @@ function runPretesRekapNilaiTests() {
         if (strpos($adminContent, "dataTable.ext.errMode = 'none'") === false) {
             $failures[] = "Pengamanan dataTable.ext.errMode = 'none' tidak ditemukan";
         }
+
+        // 9. Cek Fitur Ekspor Excel Asli (XLSX / XLS, Bukan CSV)
+        if (strpos($adminContent, 'pretesExportRosterToXlsxNative') === false) {
+            $failures[] = "Fungsi generator XLSX asli 'pretesExportRosterToXlsxNative' tidak ditemukan di admin/pretes-rekap-nilai.php";
+        }
+        if (strpos($adminContent, 'pretesExportRosterToXlsXml') === false) {
+            $failures[] = "Fungsi generator SpreadsheetML 'pretesExportRosterToXlsXml' tidak ditemukan di admin/pretes-rekap-nilai.php";
+        }
+        if (strpos($adminContent, 'pretesXlsxColLetter') === false) {
+            $failures[] = "Fungsi mapping kolom Excel 'pretesXlsxColLetter' tidak ditemukan di admin/pretes-rekap-nilai.php";
+        }
+        if (strpos($adminContent, "header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');") === false) {
+            $failures[] = "Header MIME application/vnd.openxmlformats-officedocument.spreadsheetml.sheet untuk Excel asli tidak ditemukan";
+        }
     }
 
     if (file_exists($dosenFile)) {
