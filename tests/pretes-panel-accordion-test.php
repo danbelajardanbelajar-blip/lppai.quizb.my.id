@@ -39,6 +39,12 @@ assertTrue(strpos($content, 'btn-toggle-inline-score') !== false, 'Class btn-tog
 assertTrue(strpos($content, 'form-inline-score') !== false, 'Class form-inline-score harus ada');
 assertTrue(strpos($content, 'is_ajax') !== false, 'Parameter is_ajax harus didukung untuk AJAX saving');
 
+// Verifikasi elemen mobile ergonomic touch support
+assertTrue(strpos($content, 'pretes-preset-chip') !== false, 'Class pretes-preset-chip harus ada untuk touch preset tombol');
+assertTrue(strpos($content, 'pretes-score-card') !== false, 'Class pretes-score-card harus ada untuk card scoring mobile');
+assertTrue(strpos($content, 'save-success-glow') !== false, 'Class save-success-glow harus ada untuk visual feedback');
+assertTrue(strpos($content, 'inputmode="decimal"') !== false, 'Atribut inputmode decimal harus aktif untuk keyboard HP yang ramah angka');
+
 // Verifikasi 12 komponen ada dalam form accordion
 assertTrue(strpos($content, 'name="scores[<?= $key ?>]"') !== false, 'Input skor dinamis harus ada di form inline');
 

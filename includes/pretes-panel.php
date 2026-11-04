@@ -691,45 +691,461 @@ include __DIR__ . '/header.php';
 
 <!-- Catatan: Form input nilai 12 komponen kini berada langsung di dalam baris accordion setiap mahasiswa pada tabel di bawah. -->
 
-<!-- ── 2. DAFTAR MAHASISWA & ACCORDION PENILAIAN 12 KOMPONEN ── -->
+<!-- ── 2. DAFTAR MAHASISWA & ACCORDION PENILAIAN 12 KOMPONEN (MOBILE FIRST) ── -->
 <style>
-    #peserta-pretes .pretes-roster-body { padding: 20px; }
-    #table-peserta-pretes { table-layout: fixed; width: 100%; border-collapse: collapse; }
-    #table-peserta-pretes th, #table-peserta-pretes td { padding: 14px 16px; white-space: normal; overflow-wrap: anywhere; }
-    #table-peserta-pretes .student-action { width: 145px; text-align: right; }
-    #table-peserta-pretes .student-name { font-weight: 800; color: #0f172a; font-size: 15px; line-height: 1.4; }
-    #table-peserta-pretes .student-meta { margin-top: 5px; font-size: 12.5px; line-height: 1.5; color: #64748b; }
-    .student-header-toggle {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 6px 8px;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: background-color 0.15s ease, color 0.15s ease;
-        user-select: none;
+/* ── Layout & Responsive Table/Card Styles ── */
+#peserta-pretes .pretes-roster-body {
+    padding: 20px;
+}
+#table-peserta-pretes {
+    width: 100%;
+    border-collapse: collapse;
+}
+#table-peserta-pretes th {
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+}
+#table-peserta-pretes td {
+    padding: 14px 16px;
+    vertical-align: top;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+#table-peserta-pretes .student-action {
+    width: 155px;
+    text-align: right;
+}
+
+/* Student Header in Row */
+.student-header-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.student-header-toggle:hover {
+    background-color: #f1f5f9;
+}
+.student-header-toggle:hover .student-name {
+    color: #0284c7;
+}
+.student-name {
+    font-weight: 800;
+    color: #0f172a;
+    font-size: 15px;
+    line-height: 1.35;
+}
+.student-meta {
+    margin-top: 5px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+/* Accordion Box */
+.pretes-inline-scoring-box {
+    margin-top: 14px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 14px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.03);
+    animation: inlineFade 0.22s ease-out;
+}
+@keyframes inlineFade {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Save Success Glow Animation */
+.save-success-glow {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25) !important;
+    transition: all 0.3s ease;
+}
+
+/* Live Calc Bar */
+.pretes-live-calc-bar {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.pretes-live-stats {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.pretes-stat-tile-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 2px;
+}
+.pretes-stat-tile-val {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+/* Quick Fill Toolbar */
+.pretes-quick-fill-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.pretes-quick-fill-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748b;
+    margin-right: 2px;
+}
+.pretes-quick-fill-chips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* Categories & Scoring Cards */
+.pretes-category-heading {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #1e293b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #eff6ff;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.pretes-score-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+    gap: 10px;
+}
+.pretes-score-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+.pretes-score-card:focus-within {
+    border-color: #3b82f6;
+    box-shadow: 0 3px 12px rgba(59,130,246,0.1);
+}
+.pretes-score-card-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+.pretes-score-input-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pretes-score-input-num {
+    width: 66px;
+    height: 44px;
+    padding: 6px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 800;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+.pretes-score-input-num:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
+}
+.pretes-preset-chips {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+}
+.pretes-preset-chip {
+    flex: 1;
+    height: 44px;
+    padding: 0;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.pretes-preset-chip:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+.pretes-preset-chip:active {
+    transform: scale(0.94);
+}
+.pretes-preset-chip[aria-pressed="true"] {
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border-color: #16a34a !important;
+    font-weight: 800 !important;
+    box-shadow: 0 3px 10px rgba(22,163,74,0.35) !important;
+}
+
+/* Footer Actions */
+.pretes-inline-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid #e2e8f0;
+    flex-wrap: wrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE OPTIMIZATIONS (@media max-width: 768px)
+   Transform table into beautiful, touch-friendly cards for mobile phones
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    #peserta-pretes .pretes-roster-body {
+        padding: 12px 10px !important;
     }
-    .student-header-toggle:hover {
-        background-color: #f1f5f9;
+    .table-responsive {
+        overflow-x: visible !important;
     }
-    .student-header-toggle:hover .student-name {
-        color: #0284c7;
+    #table-peserta-pretes,
+    #table-peserta-pretes thead,
+    #table-peserta-pretes tbody,
+    #table-peserta-pretes tr,
+    #table-peserta-pretes td {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
-    .pretes-student-row.row-active {
-        background-color: #f8fafc;
+    #table-peserta-pretes thead {
+        display: none !important;
     }
+    #table-peserta-pretes tr.pretes-student-row {
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        overflow: hidden;
+        transition: all 0.2s ease;
+    }
+    #table-peserta-pretes tr.pretes-student-row.row-active {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 4px 18px rgba(59,130,246,0.12) !important;
+    }
+    #table-peserta-pretes td {
+        padding: 14px 14px 8px 14px !important;
+        border: none !important;
+    }
+    #table-peserta-pretes td.student-action {
+        padding: 0 14px 14px 14px !important;
+    }
+    .btn-toggle-inline-score {
+        width: 100% !important;
+        min-height: 46px !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        border-radius: 10px !important;
+        justify-content: center !important;
+    }
+
+    /* Accordion Box on Mobile */
     .pretes-inline-scoring-box {
-        animation: inlineFade 0.22s ease-out;
+        margin-top: 12px;
+        padding: 14px 10px;
+        border-radius: 12px;
     }
-    @keyframes inlineFade {
-        from { opacity: 0; transform: translateY(-5px); }
-        to { opacity: 1; transform: translateY(0); }
+
+    /* Live Calc on Mobile: 3-column clean cards */
+    .pretes-live-calc-bar {
+        padding: 12px 10px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
     }
-    @media (max-width: 600px) {
-        #peserta-pretes .pretes-roster-body { padding: 12px; }
-        #table-peserta-pretes th, #table-peserta-pretes td { padding: 12px 8px; }
-        #table-peserta-pretes .student-action { width: 115px; }
+    .pretes-live-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        width: 100%;
+        text-align: center;
     }
+    .pretes-stat-tile {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 4px;
+        min-width: 0;
+    }
+    .pretes-stat-tile-label {
+        font-size: 9.5px;
+        margin-bottom: 2px;
+    }
+    .pretes-stat-tile-val {
+        font-size: 18px;
+    }
+
+    /* Quick Fill on Mobile: 4x2 thumb-friendly keypad */
+    .pretes-quick-fill-bar {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    .pretes-quick-fill-chips {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 5px;
+    }
+    .pretes-quick-fill-chips .quick-fill-row,
+    .pretes-quick-fill-chips .reset-row-scores {
+        width: 100%;
+        min-height: 40px;
+        font-size: 13px;
+        font-weight: 800;
+        padding: 0;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Scoring cards on Mobile */
+    .pretes-score-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    .pretes-score-card {
+        padding: 10px 10px;
+        border-radius: 10px;
+    }
+    .pretes-score-card-title {
+        font-size: 12.5px;
+        margin-bottom: 6px;
+    }
+    .pretes-score-input-num {
+        width: 58px;
+        height: 42px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
+    .pretes-preset-chip {
+        height: 42px;
+        font-size: 12px;
+        border-radius: 8px;
+    }
+
+    /* Footer buttons on Mobile */
+    .pretes-inline-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .pretes-inline-actions .btn-save-inline {
+        width: 100% !important;
+        min-height: 48px !important;
+        font-size: 15px !important;
+        font-weight: 800 !important;
+        border-radius: 10px !important;
+        justify-content: center !important;
+    }
+    .pretes-inline-actions .btn-close-inline {
+        width: 100% !important;
+        min-height: 44px !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        border-radius: 10px !important;
+        justify-content: center !important;
+    }
+    .pretes-inline-actions .inline-save-feedback {
+        margin-left: 0;
+        margin-top: 4px;
+        text-align: center;
+        display: block;
+        width: 100%;
+    }
+
+    /* DataTables Mobile Controls */
+    .dataTables_wrapper .dataTables_filter {
+        float: none !important;
+        text-align: left !important;
+        margin-bottom: 12px !important;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-top: 4px !important;
+        height: 42px !important;
+        font-size: 15px !important;
+        border-radius: 10px !important;
+        box-sizing: border-box !important;
+    }
+    .dataTables_wrapper .dataTables_length {
+        float: none !important;
+        margin-bottom: 10px !important;
+        font-size: 12.5px !important;
+    }
+    .dataTables_wrapper .dataTables_info {
+        float: none !important;
+        text-align: center !important;
+        margin-top: 14px !important;
+        font-size: 12px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate {
+        float: none !important;
+        text-align: center !important;
+        margin-top: 10px !important;
+        display: flex !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+}
 </style>
 
 <div class="card" id="peserta-pretes" style="border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(0,0,0,0.04);margin-bottom:24px;overflow:hidden;background:#ffffff;">
@@ -743,7 +1159,7 @@ include __DIR__ . '/header.php';
                     Daftar Mahasiswa & Input Nilai Pretes (<?= count($participants) ?> Peserta)
                 </h3>
                 <span style="font-size:12px;color:#64748b;">
-                    Klik nama mahasiswa atau tombol <strong>Input Nilai</strong> untuk mengisi 12 komponen langsung tanpa reload
+                    Sentuh nama mahasiswa atau tombol <strong>Input Nilai</strong> untuk mengisi 12 komponen langsung tanpa reload
                 </span>
             </div>
         </div>
@@ -757,7 +1173,7 @@ include __DIR__ . '/header.php';
                 <p style="font-size:13px;margin:4px 0 0;">Belum ada mahasiswa yang ditugaskan pada periode ini.</p>
             </div>
         <?php else: ?>
-            <div class="table-responsive" style="width:100%;overflow-x:auto;">
+            <div class="table-responsive" style="width:100%;">
                 <table id="table-peserta-pretes" class="table" style="width:100%;border-collapse:collapse;font-size:13px;">
                     <thead>
                         <tr style="border-bottom:2px solid #e2e8f0;background:#f8fafc;">
@@ -778,10 +1194,10 @@ include __DIR__ . '/header.php';
                         $isOpen = ($selectedId === $rId);
                     ?>
                         <tr id="row-student-<?= $rId ?>" class="pretes-student-row <?= $isOpen ? 'row-active' : '' ?>" data-registration-id="<?= $rId ?>">
-                            <td style="vertical-align:top;padding:14px 16px;">
-                                <!-- Student Summary Header (Click to toggle accordion) -->
-                                <div class="student-header-toggle" data-target="inline-scoring-<?= $rId ?>" role="button" tabindex="0" title="Klik untuk membuka/menutup isian nilai">
-                                    <div style="width:42px;height:42px;border-radius:12px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;">
+                            <td style="vertical-align:top;">
+                                <!-- Student Summary Header (Touch friendly toggle) -->
+                                <div class="student-header-toggle" data-target="inline-scoring-<?= $rId ?>" role="button" tabindex="0" title="Sentuh untuk membuka/menutup isian nilai">
+                                    <div style="width:44px;height:44px;border-radius:12px;background:#e0f2fe;color:#0284c7;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;">
                                         <?= strtoupper(substr($row['nama_lengkap'], 0, 1)) ?>
                                     </div>
                                     <div style="flex:1;min-width:0;">
@@ -803,9 +1219,9 @@ include __DIR__ . '/header.php';
                                                     <span class="badge" style="background:#f1f5f9;color:#64748b;font-size:11px;font-weight:700;border:1px solid #cbd5e1;">⚪ Belum Dinilai (0/12)</span>
                                                 <?php elseif ($rCount < 12): ?>
                                                     <?php if ($rStatusLulus === 'tidak_lulus'): ?>
-                                                        <span class="badge" style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;border:1px solid #fecaca;">❌ Ada Nilai &lt; 80 (Sebagian <?= $rCount ?>/12 · Rata-rata <?= number_format($rAvg, 1) ?>)</span>
+                                                        <span class="badge" style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;border:1px solid #fecaca;">❌ Ada Nilai &lt; 80 (Sebagian <?= $rCount ?>/12 · <?= number_format($rAvg, 1) ?>)</span>
                                                     <?php else: ?>
-                                                        <span class="badge" style="background:#fffbeb;color:#b45309;font-size:11px;font-weight:700;border:1px solid #fde68a;">⏳ Sebagian (<?= $rCount ?>/12 · Rata-rata <?= number_format($rAvg, 1) ?>)</span>
+                                                        <span class="badge" style="background:#fffbeb;color:#b45309;font-size:11px;font-weight:700;border:1px solid #fde68a;">⏳ Sebagian (<?= $rCount ?>/12 · <?= number_format($rAvg, 1) ?>)</span>
                                                     <?php endif; ?>
                                                 <?php else: ?>
                                                     <?php if ($rStatusLulus === 'lulus'): ?>
@@ -816,27 +1232,27 @@ include __DIR__ . '/header.php';
                                                 <?php endif; ?>
                                             </span>
                                         </div>
-                                        <div class="student-meta" style="margin-top:5px;font-size:12.5px;color:#64748b;display:flex;flex-wrap:wrap;gap:14px;">
+                                        <div class="student-meta" style="margin-top:5px;font-size:12.5px;color:#64748b;display:flex;flex-wrap:wrap;gap:12px;">
                                             <span><strong>NIM:</strong> <?= sanitize($row['nim']) ?></span>
-                                            <span><strong>Prodi:</strong> <?= sanitize($row['program_studi'] ?: 'Jurusan belum tersedia') ?></span>
+                                            <span><strong>Prodi:</strong> <?= sanitize($row['program_studi'] ?: '-') ?></span>
                                             <span><strong>Sesi:</strong> <?= sanitize($row['hari_pilihan'] ?: 'Senin') ?><?= !empty($row['ruangan']) ? ' · ' . sanitize($row['ruangan']) : '' ?></span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <!-- Inline Scoring Accordion Box -->
-                                <div class="pretes-inline-scoring-box" id="inline-scoring-<?= $rId ?>" style="<?= $isOpen ? 'display:block;' : 'display:none;' ?>margin-top:14px;padding:18px 20px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:14px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.03);">
-                                    <!-- Live Calculation Bar & Quick Fill Toolbar -->
-                                    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-                                        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-                                            <div>
-                                                <div style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;">Rata-rata</div>
-                                                <div style="font-size:22px;font-weight:900;color:#0f172a;line-height:1.1;" class="live-avg-val">
+                                <div class="pretes-inline-scoring-box" id="inline-scoring-<?= $rId ?>" style="<?= $isOpen ? 'display:block;' : 'display:none;' ?>">
+                                    <!-- Live Calculation & Quick Fill Toolbar -->
+                                    <div class="pretes-live-calc-bar">
+                                        <div class="pretes-live-stats">
+                                            <div class="pretes-stat-tile">
+                                                <div class="pretes-stat-tile-label">Rata-rata</div>
+                                                <div class="pretes-stat-tile-val live-avg-val">
                                                     <?= $rCount > 0 ? number_format($rAvg, 2) : '—' ?>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <div style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;">Predikat</div>
+                                            <div class="pretes-stat-tile">
+                                                <div class="pretes-stat-tile-label">Predikat</div>
                                                 <div class="live-grade-val">
                                                     <?php if ($rCount === 0): ?>
                                                         <span class="badge" style="background:#e2e8f0;color:#64748b;font-size:11px;font-weight:700;">Belum Lengkap</span>
@@ -847,25 +1263,27 @@ include __DIR__ . '/header.php';
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <div style="font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;">Kelengkapan</div>
-                                                <div style="font-size:13px;font-weight:800;color:#0f172a;">
-                                                    <span class="live-filled-val"><?= $rCount ?></span> / 12 Komponen
+                                            <div class="pretes-stat-tile">
+                                                <div class="pretes-stat-tile-label">Kelengkapan</div>
+                                                <div style="font-size:13px;font-weight:800;color:#0f172a;line-height:1.2;">
+                                                    <span class="live-filled-val"><?= $rCount ?></span> / 12
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <!-- Quick Fill All Toolbar for this student -->
-                                        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
-                                            <span style="font-size:11.5px;font-weight:700;color:#64748b;margin-right:2px;">Isi Semua:</span>
-                                            <?php foreach ([60, 70, 75, 80, 85, 90, 100] as $preset): ?>
-                                            <button type="button" class="btn btn-sm btn-secondary quick-fill-row" data-score="<?= $preset ?>" style="padding:4px 8px;font-size:11.5px;font-weight:700;border-radius:6px;">
-                                                <?= $preset ?>
-                                            </button>
-                                            <?php endforeach; ?>
-                                            <button type="button" class="btn btn-sm btn-outline-danger reset-row-scores" style="padding:4px 8px;font-size:11.5px;font-weight:700;border-radius:6px;">
-                                                Reset
-                                            </button>
+                                        <!-- Quick Fill Toolbar -->
+                                        <div class="pretes-quick-fill-bar">
+                                            <span class="pretes-quick-fill-label">⚡ Isi Cepat:</span>
+                                            <div class="pretes-quick-fill-chips">
+                                                <?php foreach ([60, 70, 75, 80, 85, 90, 100] as $preset): ?>
+                                                <button type="button" class="btn btn-sm btn-secondary quick-fill-row" data-score="<?= $preset ?>" title="Isi semua dengan nilai <?= $preset ?>">
+                                                    <?= $preset ?>
+                                                </button>
+                                                <?php endforeach; ?>
+                                                <button type="button" class="btn btn-sm btn-outline-danger reset-row-scores" title="Kosongkan isian nilai">
+                                                    Reset
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -880,27 +1298,28 @@ include __DIR__ . '/header.php';
                                         $compNum = 0;
                                         foreach ($componentCategories as $catTitle => $catItems): 
                                         ?>
-                                            <div style="margin-bottom:16px;">
-                                                <div style="font-size:12px;font-weight:800;color:#1e293b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid #e2e8f0;">
+                                            <div style="margin-bottom:18px;">
+                                                <div class="pretes-category-heading">
+                                                    <?= $catTitle === 'Ujian CBT' ? '📝' : ($catTitle === 'Praktik Ibadah & Thaharah' ? '🕌' : '📖') ?>
                                                     <?= $catTitle ?>
                                                 </div>
-                                                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr));gap:10px;">
+                                                <div class="pretes-score-grid">
                                                 <?php foreach ($catItems as $key => $label): $compNum++; 
                                                     $cVal = isset($rowScores[$key]) && is_numeric($rowScores[$key]) ? (string)$rowScores[$key] : '';
                                                 ?>
-                                                    <div class="pretes-score-box" style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
-                                                        <label for="score-<?= $rId ?>-<?= $key ?>" style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">
+                                                    <div class="pretes-score-card">
+                                                        <label for="score-<?= $rId ?>-<?= $key ?>" class="pretes-score-card-title">
                                                             <?= $compNum ?>. <?= sanitize($label) ?>
                                                         </label>
-                                                        <div class="pretes-score-row" style="display:flex;align-items:center;gap:6px;">
-                                                            <input id="score-<?= $rId ?>-<?= $key ?>" name="scores[<?= $key ?>]" type="number" min="0" max="100" step="0.01"
-                                                                value="<?= sanitize($cVal) ?>" placeholder="0–100" style="width:64px;height:36px;font-size:14px;">
-                                                            <div style="display:flex;gap:3px;flex:1;">
+                                                        <div class="pretes-score-input-row">
+                                                            <input id="score-<?= $rId ?>-<?= $key ?>" name="scores[<?= $key ?>]" type="number" min="0" max="100" step="0.01" inputmode="decimal"
+                                                                value="<?= sanitize($cVal) ?>" placeholder="0–100" class="pretes-score-input-num" aria-label="Nilai <?= sanitize($label) ?>">
+                                                            <div class="pretes-preset-chips">
                                                                 <?php foreach ([60, 70, 80, 90, 100] as $preset): 
                                                                     $isBtnPressed = ($cVal !== '' && (float)$cVal === (float)$preset);
                                                                 ?>
-                                                                <button type="button" class="score-preset" data-score="<?= $preset ?>" aria-pressed="<?= $isBtnPressed ? 'true' : 'false' ?>"
-                                                                    style="height:36px;font-size:11px;">
+                                                                <button type="button" class="pretes-preset-chip score-preset" data-score="<?= $preset ?>" aria-pressed="<?= $isBtnPressed ? 'true' : 'false' ?>"
+                                                                    aria-label="Pilih nilai <?= $preset ?> untuk <?= sanitize($label) ?>">
                                                                     <?= $preset ?>
                                                                 </button>
                                                                 <?php endforeach; ?>
@@ -912,23 +1331,23 @@ include __DIR__ . '/header.php';
                                             </div>
                                         <?php endforeach; ?>
 
-                                        <!-- Actions inside Accordion -->
-                                        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;flex-wrap:wrap;">
-                                            <button type="submit" class="btn btn-success btn-save-inline" style="padding:9px 22px;font-size:13px;font-weight:800;border-radius:8px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(22,163,74,0.25);">
-                                                💾 Simpan Nilai
+                                        <!-- Footer Action Buttons inside Accordion -->
+                                        <div class="pretes-inline-actions">
+                                            <button type="submit" class="btn btn-success btn-save-inline" style="padding:10px 24px;font-size:14px;font-weight:800;border-radius:10px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(22,163,74,0.3);">
+                                                💾 Simpan Nilai <?= sanitize(explode(' ', trim($row['nama_lengkap']))[0]) ?>
                                             </button>
-                                            <button type="button" class="btn btn-secondary btn-close-inline" data-target="inline-scoring-<?= $rId ?>" style="padding:9px 16px;font-size:13px;font-weight:700;border-radius:8px;">
+                                            <button type="button" class="btn btn-secondary btn-close-inline" data-target="inline-scoring-<?= $rId ?>" style="padding:10px 18px;font-size:13.5px;font-weight:700;border-radius:10px;">
                                                 ✕ Tutup
                                             </button>
-                                            <span class="inline-save-feedback" style="font-size:12.5px;font-weight:700;margin-left:6px;"></span>
+                                            <span class="inline-save-feedback" style="font-size:13px;font-weight:700;margin-left:6px;"></span>
                                         </div>
                                     </form>
                                 </div>
                             </td>
-                            <td class="student-action" style="vertical-align:top;padding:14px 16px 14px 0;">
+                            <td class="student-action">
                                 <button type="button" class="btn <?= $isOpen ? 'btn-secondary' : 'btn-primary' ?> btn-toggle-inline-score" data-target="inline-scoring-<?= $rId ?>"
                                     aria-expanded="<?= $isOpen ? 'true' : 'false' ?>" aria-label="Input nilai <?= sanitize($row['nama_lengkap']) ?>"
-                                    style="min-height:38px;padding:8px 12px;font-size:12px;font-weight:700;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;">
+                                    style="min-height:42px;padding:8px 14px;font-size:13px;font-weight:800;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;">
                                     <span class="btn-toggle-text"><?= $isOpen ? '✕ Tutup' : '✏️ Input Nilai' ?></span>
                                     <span class="btn-toggle-arrow"><?= $isOpen ? '▲' : '▼' ?></span>
                                 </button>
@@ -977,6 +1396,13 @@ function toggleStudentAccordion(boxId) {
             if (arrow) arrow.textContent = '▲';
         });
         updateRowLiveScores(box);
+
+        // Smooth scroll ke posisi baris bila di mobile agar nyaman di mata
+        if (window.innerWidth <= 768 && row) {
+            setTimeout(function() {
+                row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
     }
 }
 
@@ -1037,10 +1463,10 @@ function updateRowLiveScores(container) {
 
 function updateInputPresetHighlight(inp) {
     if (!inp) return;
-    var row = inp.closest('.pretes-score-row');
+    var row = inp.closest('.pretes-score-input-row');
     if (!row) return;
     var val = inp.value.trim();
-    row.querySelectorAll('.score-preset').forEach(function(btn) {
+    row.querySelectorAll('.pretes-preset-chip').forEach(function(btn) {
         var isPressed = (val !== '' && Number(val) === Number(btn.dataset.score));
         btn.setAttribute('aria-pressed', isPressed ? 'true' : 'false');
     });
@@ -1073,9 +1499,9 @@ document.addEventListener('click', function(e) {
     }
 
     // 3d. Individual score preset button clicked
-    var presetBtn = e.target.closest('.score-preset');
+    var presetBtn = e.target.closest('.pretes-preset-chip');
     if (presetBtn) {
-        var scoreRow = presetBtn.closest('.pretes-score-row');
+        var scoreRow = presetBtn.closest('.pretes-score-input-row');
         if (scoreRow) {
             var inp = scoreRow.querySelector('input');
             if (inp) {
@@ -1116,7 +1542,7 @@ document.addEventListener('click', function(e) {
 
 // 3g. Input change listener (live update)
 document.addEventListener('input', function(e) {
-    if (e.target && e.target.matches('.pretes-score-row input[type="number"]')) {
+    if (e.target && e.target.matches('.pretes-score-input-num')) {
         updateInputPresetHighlight(e.target);
         var box = e.target.closest('.pretes-inline-scoring-box');
         if (box) updateRowLiveScores(box);
@@ -1132,6 +1558,7 @@ document.addEventListener('submit', function(e) {
     var saveBtn = form.querySelector('.btn-save-inline');
     var feedbackEl = form.querySelector('.inline-save-feedback');
     var originalBtnHtml = saveBtn ? saveBtn.innerHTML : '💾 Simpan Nilai';
+    var row = form.closest('tr');
 
     if (saveBtn) {
         saveBtn.disabled = true;
@@ -1166,6 +1593,12 @@ document.addEventListener('submit', function(e) {
                 setTimeout(function() { feedbackEl.innerHTML = ''; }, 4500);
             }
 
+            // Glow animation on row
+            if (row) {
+                row.classList.add('save-success-glow');
+                setTimeout(function() { row.classList.remove('save-success-glow'); }, 1800);
+            }
+
             // Update row status badge
             var badgeWrap = document.getElementById('badge-status-' + data.registration_id);
             if (badgeWrap) {
@@ -1174,9 +1607,9 @@ document.addEventListener('submit', function(e) {
                     badgeHtml = '<span class="badge" style="background:#f1f5f9;color:#64748b;font-size:11px;font-weight:700;border:1px solid #cbd5e1;">⚪ Belum Dinilai (0/12)</span>';
                 } else if (data.count < 12) {
                     if (data.status_lulus === 'tidak_lulus') {
-                        badgeHtml = '<span class="badge" style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;border:1px solid #fecaca;">❌ Ada Nilai &lt; 80 (Sebagian ' + data.count + '/12 · Rata-rata ' + data.average + ')</span>';
+                        badgeHtml = '<span class="badge" style="background:#fef2f2;color:#dc2626;font-size:11px;font-weight:700;border:1px solid #fecaca;">❌ Ada Nilai &lt; 80 (Sebagian ' + data.count + '/12 · ' + data.average + ')</span>';
                     } else {
-                        badgeHtml = '<span class="badge" style="background:#fffbeb;color:#b45309;font-size:11px;font-weight:700;border:1px solid #fde68a;">⏳ Sebagian (' + data.count + '/12 · Rata-rata ' + data.average + ')</span>';
+                        badgeHtml = '<span class="badge" style="background:#fffbeb;color:#b45309;font-size:11px;font-weight:700;border:1px solid #fde68a;">⏳ Sebagian (' + data.count + '/12 · ' + data.average + ')</span>';
                     }
                 } else {
                     if (data.status_lulus === 'lulus') {
@@ -1188,7 +1621,6 @@ document.addEventListener('submit', function(e) {
                 badgeWrap.innerHTML = badgeHtml;
             }
 
-            // Real-time counter check: if student reached 12, increment 'Lengkap' if not counted before
             var box = form.closest('.pretes-inline-scoring-box');
             if (box) updateRowLiveScores(box);
         } else {
