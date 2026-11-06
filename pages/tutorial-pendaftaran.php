@@ -71,8 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
             $msgType = 'danger';
         } else {
             $dayLower = strtolower($hari_pilihan);
-            $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
-            $terisi = $registeredCounts[$hari_pilihan] ?? 0;
+            $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
+            
+            // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
+            $stmtCurrent = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
+            $stmtCurrent->execute([$hari_pilihan]);
+            $terisi = (int)$stmtCurrent->fetchColumn();
             
             if ($totalKuota <= 0 || $terisi >= $totalKuota) {
                 $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
