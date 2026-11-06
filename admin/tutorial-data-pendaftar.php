@@ -659,12 +659,10 @@ foreach ($allPretesList as $p) {
     $uid = (int)$p['user_id'];
     if (!isset($registeredTutorialUserIds[$uid])) {
         $statusLulus = strtolower(trim($p['pretes_status_lulus'] ?? ''));
-        if ($statusLulus === 'tidak_lulus') {
-            $unregisteredPretesTidakLulus++;
-        } elseif ($statusLulus === 'lulus') {
+        if ($statusLulus === 'lulus') {
             $unregisteredPretesLulus++;
         } else {
-            $unregisteredPretesBelumDinilai++;
+            $unregisteredPretesTidakLulus++;
         }
         
         $prd = trim($p['program_studi'] ?? 'Lainnya');
@@ -1221,7 +1219,6 @@ include __DIR__ . '/../includes/header.php';
                     <select id="filterPretesStatus" class="form-control" style="width: 100%; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
                         <option value="">Semua Status Pretes</option>
                         <option value="tidak_lulus">❌ Tidak Lulus (Wajib Tutorial)</option>
-                        <option value="belum_dinilai">⏳ Belum Dinilai / Lainnya</option>
                         <option value="lulus">✅ Lulus Pretes (Bebas Tutorial)</option>
                     </select>
                 </div>
@@ -1260,9 +1257,7 @@ include __DIR__ . '/../includes/header.php';
                         $no = 1;
                         foreach ($unregisteredPretes as $p): 
                             $stLulus = strtolower(trim($p['pretes_status_lulus'] ?? ''));
-                            $statusCategory = 'belum_dinilai';
-                            if ($stLulus === 'tidak_lulus') $statusCategory = 'tidak_lulus';
-                            elseif ($stLulus === 'lulus') $statusCategory = 'lulus';
+                            $statusCategory = ($stLulus === 'lulus') ? 'lulus' : 'tidak_lulus';
                             
                             $cleanPhone = preg_replace('/[^0-9]/', '', $p['no_hp'] ?? '');
                             if (strpos($cleanPhone, '0') === 0) {
@@ -1282,18 +1277,16 @@ include __DIR__ . '/../includes/header.php';
                                 </span>
                             </td>
                             <td>
-                                <?php if ($statusCategory === 'tidak_lulus'): ?>
-                                    <span class="badge badge-danger" style="font-weight: 700;">❌ Tidak Lulus (Wajib)</span>
-                                    <?php if ($p['pretes_nilai'] !== null): ?>
-                                        <div style="font-size: 11px; color: #991b1b; margin-top: 2px;">Nilai: <?= number_format($p['pretes_nilai'], 1) ?></div>
-                                    <?php endif; ?>
-                                <?php elseif ($statusCategory === 'lulus'): ?>
+                                <?php if ($statusCategory === 'lulus'): ?>
                                     <span class="badge badge-success">✅ Lulus Pretes (Bebas)</span>
                                     <?php if ($p['pretes_nilai'] !== null): ?>
                                         <div style="font-size: 11px; color: #166534; margin-top: 2px;">Nilai: <?= number_format($p['pretes_nilai'], 1) ?></div>
                                     <?php endif; ?>
                                 <?php else: ?>
-                                    <span class="badge badge-warning">⏳ Belum Dinilai</span>
+                                    <span class="badge badge-danger" style="font-weight: 700;">❌ Tidak Lulus (Wajib)</span>
+                                    <?php if ($p['pretes_nilai'] !== null && $p['pretes_nilai'] > 0): ?>
+                                        <div style="font-size: 11px; color: #991b1b; margin-top: 2px;">Nilai: <?= number_format($p['pretes_nilai'], 1) ?></div>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
                             <td>

@@ -103,14 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                if ($filled === 0) {
-                    $skippedCount++;
-                    continue;
-                }
-
-                $avg = round($sum / $totalComponents, 2);
-                $statusLulus = getPretesStatusLulus($scores);
-                if ($filled < $totalComponents || $statusLulus === 'menunggu') $statusLulus = 'tidak_lulus';
+                $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : 0.00;
+                $rawStatus = getPretesStatusLulus($scores);
+                $statusLulus = ($filled === $totalComponents && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
                 
                 $predikat = getPretesPredikat($avg);
                 $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$totalComponents} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
@@ -130,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $syncedCount++;
             }
 
-            $message = "Berhasil mensinkronkan {$syncedCount} nilai peserta ke Hasil Pretes resmi." . ($skippedCount > 0 ? " ({$skippedCount} peserta dilewati karena belum ada komponen yang dinilai)" : "");
+            $message = "Berhasil mensinkronkan {$syncedCount} nilai peserta ke Hasil Pretes resmi (status definitif: Lulus / Tidak Lulus).";
             $msgType = 'success';
         }
     }
@@ -242,12 +237,13 @@ foreach ($rawRows as $row) {
         }
     }
 
-    $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : null;
+    $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : 0.00;
     $predikat = getPretesPredikat($avg);
-    $statusLulus = getPretesStatusLulus($scores);
+    $rawStatus = getPretesStatusLulus($scores);
+    $statusLulus = ($filled === $totalComponents && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
 
     if ($statusLulus === 'lulus') $lulusCount++;
-    elseif ($statusLulus === 'tidak_lulus') $tidakLulusCount++;
+    else $tidakLulusCount++;
 
     if ($filled === $totalComponents) {
         $lengkapCount++;
@@ -488,7 +484,7 @@ if (!function_exists('pretesExportRosterToXlsxNative')) {
                 // 24. Predikat
                 $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['predikat'] ?? '-', ENT_XML1, 'UTF-8') . '</t></is></c>';
                 // 25. Status Kelulusan
-                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : 'TIDAK LULUS';
                 $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . $statusText . '</t></is></c>';
 
                 $rowsXml[] = '<row r="' . $rowNum . '">' . implode('', $cells) . '</row>';
@@ -618,7 +614,7 @@ if (!function_exists('pretesExportRosterToXlsXml')) {
                     echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
                 }
                 echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['predikat'] ?? '-', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
-                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : 'TIDAK LULUS';
                 echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . $statusText . '</Data></Cell>' . "\n";
                 echo '</Row>' . "\n";
             }
@@ -675,7 +671,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
             $rowCSV[] = ($r['filled_count'] ?? 0) . "/{$totalComponents}";
             $rowCSV[] = ($r['average'] !== null) ? $r['average'] : '-';
             $rowCSV[] = $r['predikat'] ?? '-';
-            $rowCSV[] = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+            $rowCSV[] = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : 'TIDAK LULUS';
 
             fputcsv($out, $rowCSV);
         }
@@ -767,7 +763,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
                     $sheet->setCellValue("{$c}{$rowNum}", ($r['average'] !== null) ? $r['average'] : '-'); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['predikat'] ?? '-'); $c++;
                     
-                    $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : ((($r['status_lulus'] ?? '') === 'tidak_lulus') ? 'TIDAK LULUS' : 'MENUNGGU');
+                    $statusText = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : 'TIDAK LULUS';
                     $sheet->setCellValue("{$c}{$rowNum}", $statusText); $c++;
 
                     $rowNum++;
@@ -939,10 +935,8 @@ if ($isPrint) {
                     <td>
                         <?php if ($r['status_lulus'] === 'lulus'): ?>
                             <span class="badge-lulus">LULUS</span>
-                        <?php elseif ($r['status_lulus'] === 'tidak_lulus'): ?>
-                            <span class="badge-tdk-lulus">TIDAK LULUS</span>
                         <?php else: ?>
-                            <span style="color:#d97706;">MENUNGGU</span>
+                            <span class="badge-tdk-lulus">TIDAK LULUS</span>
                         <?php endif; ?>
                     </td>
                 </tr>
@@ -1295,8 +1289,7 @@ include __DIR__ . '/../includes/header.php';
                 <select name="status_lulus" class="form-control" style="width:100%; padding:8px; border-radius:8px; font-size:13px;" onchange="this.form.submit()">
                     <option value="">-- Semua Kelulusan --</option>
                     <option value="lulus" <?= ($filterStatus === 'lulus') ? 'selected' : '' ?>>🎉 Lulus (semua komponen ≥80)</option>
-                    <option value="tidak_lulus" <?= ($filterStatus === 'tidak_lulus') ? 'selected' : '' ?>>❌ Tidak Lulus (ada nilai &lt;80)</option>
-                    <option value="menunggu" <?= ($filterStatus === 'menunggu') ? 'selected' : '' ?>>⏳ Belum Lengkap</option>
+                    <option value="tidak_lulus" <?= ($filterStatus === 'tidak_lulus') ? 'selected' : '' ?>>❌ Tidak Lulus (Wajib Tutorial)</option>
                 </select>
             </div>
 
@@ -1435,10 +1428,8 @@ include __DIR__ . '/../includes/header.php';
                     <td>
                         <?php if ($r['status_lulus'] === 'lulus'): ?>
                             <span class="badge-lulus-box status-lulus">✓ LULUS</span>
-                        <?php elseif ($r['status_lulus'] === 'tidak_lulus'): ?>
-                            <span class="badge-lulus-box status-tidak">✕ GAGAL</span>
                         <?php else: ?>
-                            <span class="badge-lulus-box status-menunggu" title="<?= $r['filled_count'] ?>/12 komponen terisi">⏳ MENUNGGU</span>
+                            <span class="badge-lulus-box status-tidak">✕ TIDAK LULUS</span>
                         <?php endif; ?>
                     </td>
 

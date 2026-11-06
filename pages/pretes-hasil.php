@@ -244,7 +244,7 @@ include __DIR__ . '/../includes/header.php';
                                     <?php if ($detail['is_good']): ?>
                                         <span class="badge badge-success" style="font-size:11.5px;">✅ Memenuhi (≥80)</span>
                                     <?php elseif ($detail['value'] !== null): ?>
-                                        <span class="badge badge-danger" style="font-size:11.5px;">❌ Belum Memenuhi (&lt;80)</span>
+                                        <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Memenuhi (&lt;80)</span>
                                     <?php else: ?>
                                         <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Terpenuhi (0)</span>
                                     <?php endif; ?>
