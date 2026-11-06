@@ -37,11 +37,27 @@ $gelombangs = [
 $active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
-    $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
-    foreach ($stmtCount->fetchAll() as $row) {
-        $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
+    $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
+    $targetGelombang = trim($active_gel['gelombang']);
+    $stmtCount = $pdo->prepare("
+        SELECT hari_pilihan, COUNT(*) as cnt 
+        FROM tutorial_registrations 
+        WHERE gelombang = ?
+          AND (
+              REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
+              OR tahun_ajaran LIKE ?
+              OR (
+                  (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
+                  AND created_at >= ?
+              )
+          )
+        GROUP BY hari_pilihan
+    ");
+    $stmtCount->execute([$targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
+    foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $hari = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
         if (isset($registeredCounts[$hari])) {
-            $registeredCounts[$hari] += $row['cnt'];
+            $registeredCounts[$hari] = (int)$row['cnt'];
         }
     }
 }
@@ -74,8 +90,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
             $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
             
             // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
-            $stmtCurrent = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
-            $stmtCurrent->execute([$hari_pilihan]);
+            $stmtCurrent = $pdo->prepare("
+                SELECT COUNT(*) 
+                FROM tutorial_registrations 
+                WHERE LOWER(hari_pilihan) = LOWER(?)
+                  AND gelombang = ?
+                  AND (
+                      REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
+                      OR tahun_ajaran LIKE ?
+                      OR (
+                          (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
+                          AND created_at >= ?
+                      )
+                  )
+            ");
+            $stmtCurrent->execute([$hari_pilihan, $targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
             $terisi = (int)$stmtCurrent->fetchColumn();
             
             if ($totalKuota <= 0 || $terisi >= $totalKuota) {

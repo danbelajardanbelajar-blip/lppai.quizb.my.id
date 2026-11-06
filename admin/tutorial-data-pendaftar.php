@@ -383,13 +383,61 @@ $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHE
 
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
+    $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
+    $targetSemester = trim($active_gel['semester']);
+    $targetGelombang = trim($active_gel['gelombang']);
+    $targetYearSem = $targetYear . '-' . $targetSemester;
+    $targetCreatedAt = $active_gel['created_at'];
+
     try {
-        // Coba hitung berdasarkan hari_pilihan dari SEMUA registrasi aktif
-        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
-        foreach ($stmtCount->fetchAll() as $row) {
-            $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
+        $stmtCount = $pdo->prepare("
+            SELECT tr.hari_pilihan, COUNT(*) as cnt
+            FROM tutorial_registrations tr
+            JOIN users u ON tr.user_id = u.id
+            LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+            WHERE tr.id IN (
+                SELECT MAX(candidate.id)
+                FROM tutorial_registrations candidate
+                LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
+                WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
+                  AND (
+                      REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
+                      OR candidate.tahun_ajaran LIKE ?
+                      OR (
+                          (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
+                          AND (
+                              REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                              OR TRIM(period_class.semester) = ?
+                              OR candidate.created_at >= ?
+                          )
+                      )
+                  )
+                  AND (
+                      period_class.id IS NULL
+                      OR TRIM(period_class.semester) = ?
+                      OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                      OR period_class.semester LIKE ?
+                  )
+                GROUP BY candidate.user_id
+            )
+              AND $notLulusSQL
+            GROUP BY tr.hari_pilihan
+        ");
+        $stmtCount->execute([
+            $targetGelombang,
+            $targetYear,
+            '%' . $targetYear . '%',
+            $targetYearSem,
+            $targetSemester,
+            $targetCreatedAt,
+            $targetSemester,
+            $targetYearSem,
+            '%' . $targetYear . '%'
+        ]);
+        foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $hari = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
             if (isset($registeredCounts[$hari])) {
-                $registeredCounts[$hari] += $row['cnt'];
+                $registeredCounts[$hari] = (int)$row['cnt'];
             }
         }
     } catch (Exception $e) {

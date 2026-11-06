@@ -24,7 +24,7 @@ $msgType = '';
 $isMessageHtml = false;
 
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
-$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch() ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch() ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC, id DESC LIMIT 1")->fetch();
 
 // Condition to exclude Lulus
 $notLulusSQL = "u.id NOT IN (
@@ -375,13 +375,61 @@ $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHE
 
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
+    $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
+    $targetSemester = trim($active_gel['semester']);
+    $targetGelombang = trim($active_gel['gelombang']);
+    $targetYearSem = $targetYear . '-' . $targetSemester;
+    $targetCreatedAt = $active_gel['created_at'];
+
     try {
-        // Coba hitung berdasarkan hari_pilihan dari SEMUA registrasi aktif
-        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
-        foreach ($stmtCount->fetchAll() as $row) {
-            $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
+        $stmtCount = $pdo->prepare("
+            SELECT tr.hari_pilihan, COUNT(*) as cnt
+            FROM tutorial_registrations tr
+            JOIN users u ON tr.user_id = u.id
+            LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+            WHERE tr.id IN (
+                SELECT MAX(candidate.id)
+                FROM tutorial_registrations candidate
+                LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
+                WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
+                  AND (
+                      REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
+                      OR candidate.tahun_ajaran LIKE ?
+                      OR (
+                          (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
+                          AND (
+                              REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                              OR TRIM(period_class.semester) = ?
+                              OR candidate.created_at >= ?
+                          )
+                      )
+                  )
+                  AND (
+                      period_class.id IS NULL
+                      OR TRIM(period_class.semester) = ?
+                      OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                      OR period_class.semester LIKE ?
+                  )
+                GROUP BY candidate.user_id
+            )
+              AND $notLulusSQL
+            GROUP BY tr.hari_pilihan
+        ");
+        $stmtCount->execute([
+            $targetGelombang,
+            $targetYear,
+            '%' . $targetYear . '%',
+            $targetYearSem,
+            $targetSemester,
+            $targetCreatedAt,
+            $targetSemester,
+            $targetYearSem,
+            '%' . $targetYear . '%'
+        ]);
+        foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $hari = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
             if (isset($registeredCounts[$hari])) {
-                $registeredCounts[$hari] += $row['cnt'];
+                $registeredCounts[$hari] = (int)$row['cnt'];
             }
         }
     } catch (Exception $e) {
@@ -601,8 +649,8 @@ include __DIR__ . '/../includes/header.php';
                     <div style="font-size:12px; color:#64748b; margin-top:-4px;">Kuota:</div>
                     <input type="number" name="kuota_<?= $dayLower ?>" id="qe_kuota_<?= $dayLower ?>" value="<?= $totalKuota ?>" min="0" style="width:100%;padding:6px;border:1.5px solid #e5e7eb;border-radius:6px;font-size:14px;background:#fff;">
                     
-                    <div style="font-size:12px; margin-top:2px; font-weight:600; color: <?= $sisaKuota < 0 ? '#ef4444' : '#10b981' ?>;">
-                        Sisa Kuota: <?= $sisaKuota ?>
+                    <div id="qe_sisa_kuota_<?= $dayLower ?>" data-terisi="<?= $terisi ?>" style="font-size:12px; margin-top:2px; font-weight:600; color: <?= $sisaKuota <= 0 ? '#ef4444' : '#10b981' ?>;">
+                        Sisa Kuota: <?= max(0, $sisaKuota) ?><?= $sisaKuota <= 0 ? ' (Penuh)' : '' ?>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -615,6 +663,22 @@ include __DIR__ . '/../includes/header.php';
 
 
 <script>
+function updateQESisaKuota(day) {
+    const sisaEl = document.getElementById('qe_sisa_kuota_' + day);
+    const kuotaInput = document.getElementById('qe_kuota_' + day);
+    if (!sisaEl || !kuotaInput) return;
+    const terisi = parseInt(sisaEl.getAttribute('data-terisi') || '0', 10);
+    const kuota = parseInt(kuotaInput.value || '0', 10);
+    const sisa = kuota - terisi;
+    if (sisa <= 0) {
+        sisaEl.style.color = '#ef4444';
+        sisaEl.textContent = 'Sisa Kuota: ' + Math.max(0, sisa) + ' (Penuh)';
+    } else {
+        sisaEl.style.color = '#10b981';
+        sisaEl.textContent = 'Sisa Kuota: ' + sisa;
+    }
+}
+
 function calculateQEKuota(day) {
     const container = document.getElementById('qe_tutors_' + day + '_container');
     const selects = container.querySelectorAll('select');
@@ -623,8 +687,22 @@ function calculateQEKuota(day) {
         if (sel.value.trim() !== '') validTutors++;
     });
     const kuotaInput = document.getElementById('qe_kuota_' + day);
-    if (kuotaInput) kuotaInput.value = validTutors * 30;
+    if (kuotaInput) {
+        kuotaInput.value = validTutors * 30;
+        updateQESisaKuota(day);
+    }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    ['senin', 'selasa', 'rabu', 'kamis', 'jumat'].forEach(function(day) {
+        const inp = document.getElementById('qe_kuota_' + day);
+        if (inp) {
+            inp.addEventListener('input', function() {
+                updateQESisaKuota(day);
+            });
+        }
+    });
+});
 
 function addQETutorRow(day) {
     const container = document.getElementById('qe_tutors_' + day + '_container');

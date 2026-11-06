@@ -544,7 +544,7 @@ if ($current_gel) {
         foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
             if (isset($registeredCounts[$hari])) {
-                $registeredCounts[$hari] += $row['cnt'];
+                $registeredCounts[$hari] = (int)$row['cnt'];
             }
         }
     } catch (Exception $e) {
