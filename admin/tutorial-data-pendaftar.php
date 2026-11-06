@@ -24,7 +24,7 @@ $msgType = '';
 $isMessageHtml = false;
 
 // Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
-$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch() ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch();
 
 // Condition to exclude Lulus
 $notLulusSQL = "u.id NOT IN (
@@ -461,14 +461,51 @@ $allStudents = $pdo->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 
-$allRegistrations = $pdo->query("
+$allRegistrations = [];
+if ($active_gel) {
+    $activeYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
+    $activeSemester = trim($active_gel['semester']);
+    // Pilih pendaftaran terakhir DI DALAM periode aktif, bukan terakhir lintas periode.
+    // Pendaftaran tanpa tahun ajaran hanya diterima sejak periode aktif dibuat.
+    $stmtRegistrations = $pdo->prepare("
     SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
-    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
+    WHERE tr.id IN (
+        SELECT MAX(candidate.id)
+        FROM tutorial_registrations candidate
+        LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
+        WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
+          AND (
+              REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
+              OR (
+                  (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
+                  AND (
+                      REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                      OR (period_class.id IS NULL AND candidate.created_at >= ?)
+                  )
+              )
+          )
+          AND (
+              period_class.id IS NULL
+              OR TRIM(period_class.semester) = ?
+              OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+          )
+        GROUP BY candidate.user_id
+    )
       AND $notLulusSQL
     ORDER BY tr.created_at DESC
-")->fetchAll();
+    ");
+    $stmtRegistrations->execute([
+        $active_gel['gelombang'],
+        $activeYear,
+        $activeYear . '-' . $activeSemester,
+        $active_gel['created_at'],
+        $activeSemester,
+        $activeYear . '-' . $activeSemester,
+    ]);
+    $allRegistrations = $stmtRegistrations->fetchAll();
+}
 
 $listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
 
@@ -533,6 +570,11 @@ include __DIR__ . '/../includes/header.php';
         <span style="font-size:18px;">📝</span> Data Pendaftar Tutorial
     </div>
     <div class="card-body">
+        <?php if ($active_gel): ?>
+            <p class="text-muted">Pendaftar periode aktif: <?= sanitize($active_gel['tahun_ajaran']) ?> / <?= sanitize($active_gel['semester']) ?> / <?= sanitize($active_gel['gelombang']) ?>.</p>
+        <?php else: ?>
+            <div class="alert alert-info">Belum ada periode tutorial aktif. Aktifkan periode melalui menu Kelola Gelombang untuk menampilkan pendaftar.</div>
+        <?php endif; ?>
         <div id="bulkActionsPendaftarContainer" style="margin-bottom: 16px; display: none;">
             <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAllPendaftar" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Pilih Semua</button>
             <button type="button" class="btn btn-sm btn-danger" id="btnBulkDeletePendaftar" style="margin-left:8px; display: none;">🗑️ Hapus Semua</button>
