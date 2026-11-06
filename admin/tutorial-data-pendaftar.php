@@ -23,8 +23,16 @@ $message = '';
 $msgType = '';
 $isMessageHtml = false;
 
-// Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
-$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch();
+// Ambil daftar gelombang dari master_gelombang
+$allGelombang = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+$active_gel = null;
+foreach ($allGelombang as $g) {
+    if ($g['status'] === 'aktif') {
+        $active_gel = $g;
+        break;
+    }
+}
 
 // Condition to exclude Lulus
 $notLulusSQL = "u.id NOT IN (
@@ -461,50 +469,148 @@ $allStudents = $pdo->query("
 ")->fetchAll(PDO::FETCH_ASSOC);
 
 
+// =============================================================
+// FILTER & DATA PENDAFTAR TUTORIAL
+// =============================================================
+$selected_gel_id = isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active';
+$current_gel = null;
+
+if ($selected_gel_id === 'all') {
+    $current_gel = null;
+} elseif (is_numeric($selected_gel_id)) {
+    foreach ($allGelombang as $g) {
+        if ($g['id'] == $selected_gel_id) {
+            $current_gel = $g;
+            break;
+        }
+    }
+    if (!$current_gel) {
+        $current_gel = $active_gel;
+        $selected_gel_id = $active_gel ? (string)$active_gel['id'] : 'all';
+    }
+} else {
+    $selected_gel_id = 'active';
+    $current_gel = $active_gel;
+}
+
 $allRegistrations = [];
-if ($active_gel) {
-    $activeYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
-    $activeSemester = trim($active_gel['semester']);
-    // Pilih pendaftaran terakhir DI DALAM periode aktif, bukan terakhir lintas periode.
-    // Pendaftaran tanpa tahun ajaran hanya diterima sejak periode aktif dibuat.
+
+if ($selected_gel_id === 'all') {
+    $stmtRegistrations = $pdo->query("
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
+        FROM tutorial_registrations tr
+        JOIN users u ON tr.user_id = u.id
+        LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        WHERE tr.id IN (
+            SELECT MAX(candidate.id)
+            FROM tutorial_registrations candidate
+            GROUP BY candidate.user_id
+        )
+          AND $notLulusSQL
+        ORDER BY tr.created_at DESC
+    ");
+    $allRegistrations = $stmtRegistrations->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($current_gel) {
+    $targetYear = str_replace('/', '-', trim($current_gel['tahun_ajaran']));
+    $targetSemester = trim($current_gel['semester']);
     $stmtRegistrations = $pdo->prepare("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
-    FROM tutorial_registrations tr
-    JOIN users u ON tr.user_id = u.id
-    WHERE tr.id IN (
-        SELECT MAX(candidate.id)
-        FROM tutorial_registrations candidate
-        LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
-        WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
-          AND (
-              REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
-              OR (
-                  (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
-                  AND (
-                      REPLACE(TRIM(period_class.semester), '/', '-') = ?
-                      OR (period_class.id IS NULL AND candidate.created_at >= ?)
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
+        FROM tutorial_registrations tr
+        JOIN users u ON tr.user_id = u.id
+        LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        WHERE tr.id IN (
+            SELECT MAX(candidate.id)
+            FROM tutorial_registrations candidate
+            LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
+            WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
+              AND (
+                  REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
+                  OR (
+                      (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
+                      AND (
+                          REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                          OR (period_class.id IS NULL AND candidate.created_at >= ?)
+                      )
                   )
               )
-          )
-          AND (
-              period_class.id IS NULL
-              OR TRIM(period_class.semester) = ?
-              OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
-          )
-        GROUP BY candidate.user_id
-    )
-      AND $notLulusSQL
-    ORDER BY tr.created_at DESC
+              AND (
+                  period_class.id IS NULL
+                  OR TRIM(period_class.semester) = ?
+                  OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+              )
+            GROUP BY candidate.user_id
+        )
+          AND $notLulusSQL
+        ORDER BY tr.created_at DESC
     ");
     $stmtRegistrations->execute([
-        $active_gel['gelombang'],
-        $activeYear,
-        $activeYear . '-' . $activeSemester,
-        $active_gel['created_at'],
-        $activeSemester,
-        $activeYear . '-' . $activeSemester,
+        $current_gel['gelombang'],
+        $targetYear,
+        $targetYear . '-' . $targetSemester,
+        $current_gel['created_at'],
+        $targetSemester,
+        $targetYear . '-' . $targetSemester,
     ]);
-    $allRegistrations = $stmtRegistrations->fetchAll();
+    $allRegistrations = $stmtRegistrations->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Perhitungan Statistik Lengkap
+$totalPendaftar = count($allRegistrations);
+$totalSudahDiplot = 0;
+$totalBelumDiplot = 0;
+
+$hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+$statsHari = [
+    'Senin' => 0,
+    'Selasa' => 0,
+    'Rabu' => 0,
+    'Kamis' => 0,
+    'Jumat' => 0,
+    'Belum Memilih' => 0
+];
+$statsJurusan = [];
+
+foreach ($allRegistrations as $reg) {
+    if (!empty($reg['tutorial_class_id'])) {
+        $totalSudahDiplot++;
+    } else {
+        $totalBelumDiplot++;
+    }
+
+    $rawHari = trim($reg['hari_pilihan'] ?? '');
+    $hariProper = ucfirst(strtolower($rawHari));
+    if (in_array($hariProper, $hariList)) {
+        $statsHari[$hariProper]++;
+    } elseif (empty($rawHari) || $rawHari === '-') {
+        $statsHari['Belum Memilih']++;
+    } else {
+        if (!isset($statsHari[$rawHari])) $statsHari[$rawHari] = 0;
+        $statsHari[$rawHari]++;
+    }
+
+    $prodi = trim($reg['program_studi'] ?? '');
+    if ($prodi === '') $prodi = 'Belum Ditentukan';
+    if (!isset($statsJurusan[$prodi])) {
+        $statsJurusan[$prodi] = 0;
+    }
+    $statsJurusan[$prodi]++;
+}
+arsort($statsJurusan);
+
+$persenSudahDiplot = $totalPendaftar > 0 ? round(($totalSudahDiplot / $totalPendaftar) * 100, 1) : 0;
+$persenBelumDiplot = $totalPendaftar > 0 ? round(($totalBelumDiplot / $totalPendaftar) * 100, 1) : 0;
+
+// Data Kuota Periode Terpilih
+$kuotaTotal = 0;
+$kuotaPerHari = [];
+$targetGelForQuota = $current_gel ?: $active_gel;
+if ($targetGelForQuota) {
+    foreach ($hariList as $h) {
+        $key = 'kuota_' . strtolower($h);
+        $k = (int)($targetGelForQuota[$key] ?? 0);
+        $kuotaPerHari[$h] = $k;
+        $kuotaTotal += $k;
+    }
 }
 
 $listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
@@ -517,64 +623,383 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <style>
-.custom-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 0;
-    overflow-x: auto;
+.stat-subtext {
+    font-size: 11.5px;
+    margin-top: 4px;
+    font-weight: 500;
 }
-.custom-tab {
-    padding: 12px 20px;
-    cursor: pointer;
-    background: transparent;
-    border: none;
-    font-size: 15px;
+.stat-pill-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
     font-weight: 600;
-    color: #64748b;
-    border-bottom: 3px solid transparent;
+}
+.day-stat-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    background: #ffffff;
     transition: all 0.2s ease;
-    white-space: nowrap;
+    cursor: pointer;
 }
-.custom-tab:hover {
-    color: #3b82f6;
+.day-stat-card:hover {
+    border-color: #3b82f6;
     background: #f8fafc;
+    transform: translateX(3px);
 }
-.custom-tab.active {
-    color: #3b82f6;
-    border-bottom-color: #3b82f6;
+.day-stat-card.active-filter {
+    border-color: #2563eb;
+    background: #eff6ff;
 }
-.tab-content {
-    display: none;
-    animation: fadeIn 0.3s ease;
+.day-progress-bar-bg {
+    background: #f1f5f9;
+    border-radius: 999px;
+    height: 7px;
+    overflow: hidden;
+    margin-top: 6px;
 }
-.tab-content.active {
+.day-progress-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+.prodi-stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 6px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.prodi-stat-item:hover {
+    border-color: #3b82f6;
+    background: #f8fafc;
+    transform: translateX(3px);
+}
+.prodi-stat-item.active-filter {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+.filter-box-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+}
+.filter-form-label {
     display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 6px;
 }
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(5px); }
-    to { opacity: 1; transform: translateY(0); }
+.filter-form-select {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1.5px solid #cbd5e1;
+    background: #fff;
+    color: #1e293b;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+.filter-form-select:focus {
+    border-color: #3b82f6;
 }
 </style>
-
-
 
 <div>
 
 <!-- ===================================================
-     CARD: DATA PENDAFTAR TUTORIAL
+     HEADER TITLE & STATUS PERIODE
      =================================================== -->
-<div class="card" style="margin-bottom: 24px;">
-    <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600;">
-        <span style="font-size:18px;">📝</span> Data Pendaftar Tutorial
+<div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+    <div>
+        <h2 style="font-size: 22px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">
+            📊 Data & Statistik Pendaftar Tutorial
+        </h2>
+        <p style="color: #64748b; font-size: 13.5px; margin: 0;">
+            Pantau ringkasan pendaftar, sebaran pilihan hari, kuota kelas, serta filtering data tutorial secara real-time.
+        </p>
+    </div>
+    <div>
+        <?php if ($selected_gel_id === 'all'): ?>
+            <span class="badge badge-info" style="font-size: 13px; padding: 6px 14px;">
+                🌐 Mode: Menampilkan Semua Periode
+            </span>
+        <?php elseif ($current_gel): ?>
+            <span class="badge <?= $current_gel['status'] === 'aktif' ? 'badge-success' : 'badge-secondary' ?>" style="font-size: 13px; padding: 6px 14px;">
+                <?= $current_gel['status'] === 'aktif' ? '🟢 Periode Aktif' : '⚪ Periode Riwayat' ?>: <?= sanitize($current_gel['tahun_ajaran']) ?> / <?= sanitize($current_gel['semester']) ?> / <?= sanitize($current_gel['gelombang']) ?>
+            </span>
+        <?php else: ?>
+            <span class="badge badge-warning" style="font-size: 13px; padding: 6px 14px;">
+                ⚠️ Belum Ada Periode Aktif
+            </span>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- ===================================================
+     1. STAT GRID UTAMA (4 STAT CARDS)
+     =================================================== -->
+<div class="stat-grid" style="margin-bottom: 24px;">
+    <!-- 1. Total Pendaftar -->
+    <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div class="stat-info">
+            <h3><?= number_format($totalPendaftar) ?></h3>
+            <p>Total Pendaftar</p>
+            <div class="stat-subtext" style="color: #2563eb;">
+                <?= $selected_gel_id === 'all' ? 'Seluruh Periode' : ($current_gel ? sanitize($current_gel['tahun_ajaran']) . ' (' . sanitize($current_gel['gelombang']) . ')' : '-') ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Sudah Diplot -->
+    <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div class="stat-info">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+                <h3><?= number_format($totalSudahDiplot) ?></h3>
+                <span class="stat-pill-badge badge-success"><?= $persenSudahDiplot ?>%</span>
+            </div>
+            <p>Sudah Diplot ke Kelas</p>
+            <div class="stat-subtext" style="color: #166534;">Mendapatkan jadwal tutorial</div>
+        </div>
+    </div>
+
+    <!-- 3. Belum Diplot (Menunggu) -->
+    <div class="stat-card">
+        <div class="stat-icon orange">⏳</div>
+        <div class="stat-info">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+                <h3><?= number_format($totalBelumDiplot) ?></h3>
+                <span class="stat-pill-badge badge-warning"><?= $persenBelumDiplot ?>%</span>
+            </div>
+            <p>Belum Diplot (Menunggu)</p>
+            <div class="stat-subtext" style="color: #b45309;">Menunggu antrean kelas</div>
+        </div>
+    </div>
+
+    <!-- 4. Total Kuota -->
+    <div class="stat-card">
+        <div class="stat-icon purple">🎯</div>
+        <div class="stat-info">
+            <h3><?= $kuotaTotal > 0 ? number_format($kuotaTotal) : '-' ?></h3>
+            <p>Total Kuota Kelas</p>
+            <div class="stat-subtext" style="color: #6d28d9;">
+                <?php if ($kuotaTotal > 0): ?>
+                    <?php if ($kuotaTotal >= $totalPendaftar): ?>
+                        Sisa <?= number_format($kuotaTotal - $totalPendaftar) ?> kursi tersedia
+                    <?php else: ?>
+                        Over kapasitas <?= number_format($totalPendaftar - $kuotaTotal) ?> pendaftar
+                    <?php endif; ?>
+                <?php else: ?>
+                    Kuota gelombang belum diatur
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================================================
+     2. DETAIL SEBARAN PILIHAN HARI & JURUSAN (2 CARDS)
+     =================================================== -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin-bottom: 24px;">
+    
+    <!-- CARD KIRI: Sebaran Pilihan Hari & Kapasitas Kuota -->
+    <div class="card" style="box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius); margin-bottom: 0;">
+        <div class="card-header" style="background-color: #f8fafc; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span>📅</span> <strong>Sebaran Pilihan Hari & Kuota</strong>
+            </div>
+            <span style="font-size: 11.5px; color: #64748b;">Klik kartu untuk filter tabel</span>
+        </div>
+        <div class="card-body" style="padding: 16px 20px;">
+            <?php foreach ($hariList as $hari): 
+                $count = $statsHari[$hari] ?? 0;
+                $kuota = $kuotaPerHari[$hari] ?? 0;
+                $percent = $kuota > 0 ? min(100, round(($count / $kuota) * 100)) : ($totalPendaftar > 0 ? round(($count / $totalPendaftar) * 100) : 0);
+                
+                $barColor = '#10b981'; // Green
+                $badgeText = "$count mhs";
+                if ($kuota > 0) {
+                    $badgeText = "$count / $kuota kursi ($percent%)";
+                    if ($count > $kuota) {
+                        $barColor = '#ef4444'; // Red over
+                    } elseif ($count >= $kuota * 0.85) {
+                        $barColor = '#f59e0b'; // Amber warning
+                    }
+                }
+            ?>
+                <div class="day-stat-card" onclick="filterByHari('<?= $hari ?>')" title="Klik untuk memfilter tabel ke Hari <?= $hari ?>">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <strong style="color: #1e293b; font-size: 13.5px;"><?= $hari ?></strong>
+                            <?php if ($kuota > 0 && $count >= $kuota): ?>
+                                <span class="badge badge-danger" style="font-size: 10px; padding: 2px 6px;">Penuh</span>
+                            <?php endif; ?>
+                        </div>
+                        <span style="font-size: 12.5px; font-weight: 600; color: #475569;"><?= $badgeText ?></span>
+                    </div>
+                    <div class="day-progress-bar-bg">
+                        <div class="day-progress-bar-fill" style="width: <?= max(4, $percent) ?>%; background: <?= $barColor ?>;"></div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+
+            <?php if (($statsHari['Belum Memilih'] ?? 0) > 0): ?>
+                <div class="day-stat-card" onclick="filterByHari('Belum Memilih')" style="border-style: dashed;" title="Klik untuk memfilter yang belum memilih hari">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #64748b; font-size: 13.5px;">⚠️ Belum Memilih Hari</strong>
+                        <span class="badge badge-secondary"><?= $statsHari['Belum Memilih'] ?> mhs</span>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- CARD KANAN: Sebaran Program Studi / Jurusan -->
+    <div class="card" style="box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius); margin-bottom: 0;">
+        <div class="card-header" style="background-color: #f8fafc; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span>🎓</span> <strong>Sebaran Program Studi (<?= count($statsJurusan) ?> Prodi)</strong>
+            </div>
+            <span style="font-size: 11.5px; color: #64748b;">Klik prodi untuk filter tabel</span>
+        </div>
+        <div class="card-body" style="padding: 16px 20px; max-height: 330px; overflow-y: auto;">
+            <?php if (empty($statsJurusan)): ?>
+                <div class="text-muted text-center" style="padding: 24px 0;">Belum ada data pendaftar pada periode ini.</div>
+            <?php else: ?>
+                <?php foreach ($statsJurusan as $prodiName => $prodiCount): 
+                    $prodiPercent = $totalPendaftar > 0 ? round(($prodiCount / $totalPendaftar) * 100, 1) : 0;
+                ?>
+                    <div class="prodi-stat-item" onclick="filterByJurusan('<?= htmlspecialchars($prodiName, ENT_QUOTES) ?>')" title="Klik untuk memfilter tabel ke Prodi <?= htmlspecialchars($prodiName) ?>">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 13px; color: #1e293b; font-weight: 500;"><?= sanitize($prodiName) ?></span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 12px; color: #64748b;"><?= $prodiPercent ?>%</span>
+                            <span class="badge badge-primary" style="font-size: 11.5px; padding: 4px 8px;"><?= $prodiCount ?> mhs</span>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+
+</div>
+
+<!-- ===================================================
+     3. FILTER & PENCARIAN PANEL
+     =================================================== -->
+<div class="filter-box-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">🔍</span>
+            <strong style="font-size: 15px; color: #1e293b;">Filter Data Pendaftar</strong>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnResetFilter" style="background:#fff; border:1px solid #cbd5e1; color:#475569; padding:5px 14px; font-size:12px; border-radius:6px; font-weight:600;">
+            🔄 Reset Semua Filter
+        </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; align-items: flex-end;">
+        
+        <!-- Filter 1: Periode / Gelombang (Server-side) -->
+        <div>
+            <label class="filter-form-label">
+                📌 Periode / Gelombang
+            </label>
+            <select id="selectGelombang" class="filter-form-select" onchange="changeGelombang(this.value)">
+                <option value="active" <?= $selected_gel_id === 'active' ? 'selected' : '' ?>>
+                    🌟 Periode Aktif <?= $active_gel ? '(' . sanitize($active_gel['tahun_ajaran']) . ' - ' . sanitize($active_gel['semester']) . ' - ' . sanitize($active_gel['gelombang']) . ')' : '(Tidak Ada)' ?>
+                </option>
+                <optgroup label="Pilih Periode Tertentu">
+                    <?php foreach ($allGelombang as $g): ?>
+                        <option value="<?= $g['id'] ?>" <?= ($selected_gel_id == $g['id']) ? 'selected' : '' ?>>
+                            <?= sanitize($g['tahun_ajaran']) ?> - <?= sanitize($g['semester']) ?> (<?= sanitize($g['gelombang']) ?>) <?= $g['status'] === 'aktif' ? '[Aktif]' : '[Nonaktif]' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </optgroup>
+                <option value="all" <?= $selected_gel_id === 'all' ? 'selected' : '' ?>>
+                    🌐 Tampilkan Semua Periode (Semua Gelombang)
+                </option>
+            </select>
+        </div>
+
+        <!-- Filter 2: Status Plotting Kelas (Client-side) -->
+        <div>
+            <label class="filter-form-label">
+                📌 Status Plotting Kelas
+            </label>
+            <select id="filterStatusPlotting" class="filter-form-select">
+                <option value="">Semua Status</option>
+                <option value="menunggu">⏳ Menunggu (Belum Diplot)</option>
+                <option value="diplot">✅ Sudah Diplot ke Kelas</option>
+            </select>
+        </div>
+
+        <!-- Filter 3: Pilihan Hari (Client-side) -->
+        <div>
+            <label class="filter-form-label">
+                📌 Pilihan Hari
+            </label>
+            <select id="filterPilihanHari" class="filter-form-select">
+                <option value="">Semua Pilihan Hari</option>
+                <?php foreach ($hariList as $h): ?>
+                    <option value="<?= $h ?>"><?= $h ?> (<?= $statsHari[$h] ?? 0 ?> mhs)</option>
+                <?php endforeach; ?>
+                <option value="Belum Memilih">Belum Memilih (<?= $statsHari['Belum Memilih'] ?? 0 ?> mhs)</option>
+            </select>
+        </div>
+
+        <!-- Filter 4: Program Studi (Client-side) -->
+        <div>
+            <label class="filter-form-label">
+                📌 Program Studi / Jurusan
+            </label>
+            <select id="filterJurusan" class="filter-form-select">
+                <option value="">Semua Program Studi</option>
+                <?php foreach ($listJurusan as $jur): ?>
+                    <option value="<?= sanitize($jur) ?>"><?= sanitize($jur) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
+    </div>
+</div>
+
+<!-- ===================================================
+     4. TABEL DATA PENDAFTAR TUTORIAL
+     =================================================== -->
+<div class="card" style="margin-bottom: 24px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius);">
+    <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size:18px;">📝</span>
+            <span style="font-size: 16px;">Tabel Data Pendaftar</span>
+            <span class="badge badge-info" id="badgeTotalFiltered" style="font-size: 12px;"><?= number_format($totalPendaftar) ?> pendaftar</span>
+        </div>
+        <div style="font-size: 13px; color: #64748b;">
+            <?php if ($selected_gel_id === 'all'): ?>
+                <span>Menampilkan seluruh pendaftar lintas periode</span>
+            <?php elseif ($current_gel): ?>
+                <span>Periode: <strong><?= sanitize($current_gel['tahun_ajaran']) ?></strong> / <strong><?= sanitize($current_gel['semester']) ?></strong> / <strong class="badge <?= $current_gel['status'] === 'aktif' ? 'badge-success' : 'badge-secondary' ?>"><?= sanitize($current_gel['gelombang']) ?></strong></span>
+            <?php else: ?>
+                <span class="text-danger">Belum ada periode tutorial aktif</span>
+            <?php endif; ?>
+        </div>
     </div>
     <div class="card-body">
-        <?php if ($active_gel): ?>
-            <p class="text-muted">Pendaftar periode aktif: <?= sanitize($active_gel['tahun_ajaran']) ?> / <?= sanitize($active_gel['semester']) ?> / <?= sanitize($active_gel['gelombang']) ?>.</p>
-        <?php else: ?>
-            <div class="alert alert-info">Belum ada periode tutorial aktif. Aktifkan periode melalui menu Kelola Gelombang untuk menampilkan pendaftar.</div>
-        <?php endif; ?>
         <div id="bulkActionsPendaftarContainer" style="margin-bottom: 16px; display: none;">
             <button type="button" class="btn btn-sm btn-secondary" id="btnCheckAllPendaftar" data-checked="false" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">☑️ Pilih Semua</button>
             <button type="button" class="btn btn-sm btn-danger" id="btnBulkDeletePendaftar" style="margin-left:8px; display: none;">🗑️ Hapus Semua</button>
@@ -586,7 +1011,7 @@ include __DIR__ . '/../includes/header.php';
         </form>
 
         <div class="table-responsive">
-            <table class="table" id="tablePendaftar">
+            <table class="table" id="tablePendaftar" style="width: 100%;">
                 <thead>
                     <tr>
                         <th style="width: 40px; text-align: center;">Pilih</th>
@@ -599,20 +1024,48 @@ include __DIR__ . '/../includes/header.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($allRegistrations as $reg): ?>
-                    <tr>
+                    <?php foreach ($allRegistrations as $reg): 
+                        $rawH = trim($reg['hari_pilihan'] ?? '');
+                        $h = ucfirst(strtolower($rawH));
+                        if (empty($h) || $h === '-') {
+                            $h = 'Belum Memilih';
+                        }
+                        $badgeClass = 'badge-primary';
+                        if ($h === 'Senin') $badgeClass = 'badge-info';
+                        elseif ($h === 'Selasa') $badgeClass = 'badge-primary';
+                        elseif ($h === 'Rabu') $badgeClass = 'badge-success';
+                        elseif ($h === 'Kamis') $badgeClass = 'badge-warning';
+                        elseif ($h === 'Jumat') $badgeClass = 'badge-danger';
+                        elseif ($h === 'Belum Memilih') $badgeClass = 'badge-secondary';
+                    ?>
+                    <tr data-hari="<?= htmlspecialchars($h, ENT_QUOTES) ?>"
+                        data-status="<?= !empty($reg['tutorial_class_id']) ? 'diplot' : 'menunggu' ?>"
+                        data-jurusan="<?= htmlspecialchars(trim($reg['program_studi'] ?? ''), ENT_QUOTES) ?>">
                         <td style="text-align: center;">
                             <input type="checkbox" class="check-pendaftar" name="reg_ids[]" value="<?= $reg['id'] ?>" style="width: 18px; height: 18px; cursor: pointer;">
                         </td>
-                        <td><strong><?= sanitize($reg['nama_lengkap']) ?></strong></td>
+                        <td>
+                            <strong><?= sanitize($reg['nama_lengkap']) ?></strong>
+                            <?php if ($selected_gel_id === 'all' && !empty($reg['tahun_ajaran'])): ?>
+                                <div style="font-size: 11px; color: #64748b;"><?= sanitize($reg['tahun_ajaran']) ?> (<?= sanitize($reg['gelombang'] ?? '-') ?>)</div>
+                            <?php endif; ?>
+                        </td>
                         <td><?= sanitize($reg['nim'] ?: '-') ?></td>
                         <td><?= sanitize($reg['program_studi'] ?: '-') ?></td>
-                        <td><span class="badge badge-primary"><?= sanitize($reg['hari_pilihan'] ?: 'Belum Memilih') ?></span></td>
+                        <td><span class="badge <?= $badgeClass ?>"><?= sanitize($h) ?></span></td>
                         <td>
-                            <?php if ($reg['tutorial_class_id']): ?>
-                                <span class="badge badge-success">Sudah diplot</span>
+                            <?php if (!empty($reg['tutorial_class_id'])): ?>
+                                <span class="badge badge-success">✓ Sudah diplot</span>
+                                <?php if (!empty($reg['nama_kelas'])): ?>
+                                    <div style="font-size: 11.5px; color: #15803d; font-weight: 600; margin-top: 3px;">
+                                        🏫 <?= sanitize($reg['nama_kelas']) ?>
+                                        <?php if (!empty($reg['dosen_kelas'])): ?>
+                                            <div style="font-size: 10.5px; color: #64748b; font-weight: 400;">Tutor: <?= sanitize($reg['dosen_kelas']) ?></div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             <?php else: ?>
-                                <span class="badge badge-warning">Menunggu</span>
+                                <span class="badge badge-warning">⏳ Menunggu</span>
                             <?php endif; ?>
                         </td>
                         <td>
@@ -635,29 +1088,11 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-</div> <!-- End of tab-pendaftar -->
-
-
-
-
-
-
-
-
+</div> <!-- End of content wrapper -->
 
 <script>
-var classDosenMap = {
-<?php foreach ($classes as $c): ?>
-    "<?= $c['id'] ?>": <?= json_encode($c['dosen_pengampu'] ?: '-') ?>,
-<?php endforeach; ?>
-};
-
-window.openEditModal = function(regId, classId, dosen, ruangan) {
-    document.getElementById('edit_reg_id').value = regId;
-    document.getElementById('edit_class_id').value = classId;
-    document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
-    document.getElementById('edit_ruangan').value = ruangan;
-    document.getElementById('editPesertaModal').style.display = 'flex';
+window.changeGelombang = function(val) {
+    window.location.href = 'tutorial-data-pendaftar.php?gelombang_id=' + encodeURIComponent(val);
 };
 
 window.openEditPendaftarModal = function(regId, hariPilihan) {
@@ -670,31 +1105,42 @@ window.closeEditPendaftarModal = function() {
     document.getElementById('editPendaftarModal').style.display = 'none';
 };
 
-var editClassIdEl = document.getElementById('edit_class_id');
-if (editClassIdEl) {
-    editClassIdEl.addEventListener('change', function() {
-        var classId = this.value;
-        document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
-    });
-}
-
-window.closeEditModal = function() {
-    document.getElementById('editPesertaModal').style.display = 'none';
-};
-
 (function () {
-    var filterKelasBottom = document.getElementById('filterKelasBottom');
-
     setTimeout(function() {
         if (window.jQuery && window.jQuery.fn.DataTable) {
             var $ = window.jQuery;
             
+            // Custom filtering untuk DataTables
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'tablePendaftar') return true;
+                
+                var tr = settings.aoData[dataIndex].nTr;
+                var rowHari = tr.getAttribute('data-hari') || '';
+                var rowStatus = tr.getAttribute('data-status') || '';
+                var rowJurusan = tr.getAttribute('data-jurusan') || '';
+                
+                var filterHari = $('#filterPilihanHari').val();
+                var filterStatus = $('#filterStatusPlotting').val();
+                var filterJurusan = $('#filterJurusan').val();
+                
+                if (filterHari && rowHari !== filterHari) {
+                    return false;
+                }
+                if (filterStatus && rowStatus !== filterStatus) {
+                    return false;
+                }
+                if (filterJurusan && rowJurusan !== filterJurusan) {
+                    return false;
+                }
+                return true;
+            });
+
             // Inisialisasi DataTable untuk Data Pendaftar
-            $('#tablePendaftar').DataTable({
+            var tablePendaftar = $('#tablePendaftar').DataTable({
                 "destroy": true,
                 "pageLength": 10,
                 "language": {
-                    "search": "Cari:",
+                    "search": "Cari Mahasiswa / NIM:",
                     "lengthMenu": "Tampilkan _MENU_ data",
                     "info": "Menampilkan _START_ - _END_ dari _TOTAL_ data",
                     "paginate": {
@@ -705,214 +1151,59 @@ window.closeEditModal = function() {
                     }
                 }
             });
-            var tableEl = $('#participantTable');
-            
-            if (filterKelasBottom) {
-                $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-                if (settings.nTable.id !== 'participantTable') return true;
-                
-                var selectedClassId = filterKelasBottom.value;
-                if (!selectedClassId || selectedClassId === 'ALL') return true;
-                
-                var tr = settings.aoData[dataIndex].nTr;
-                var rowClassId = tr.getAttribute('data-class-id');
-                return rowClassId === selectedClassId;
-            });
-            
-            filterKelasBottom.addEventListener('change', function() {
-                if ($.fn.DataTable.isDataTable(tableEl)) {
-                    tableEl.DataTable().draw();
-                }
-                
-                var selectedClassId = filterKelasBottom.value;
-                var countBadge = document.querySelector('.card-header span.badge-count');
-                var emptyState = document.getElementById('tableEmptyState');
-                var tableDiv = document.getElementById('tableResponsiveContainer');
-                
-                if (selectedClassId === '') {
-                    if (emptyState) {
-                        emptyState.style.display = 'flex';
-                        emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
-                        emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial.';
-                    }
-                    if (tableDiv) tableDiv.style.display = 'none';
-                    if (countBadge) countBadge.textContent = '0';
-                    var bulkContainer = document.getElementById('bulkActionsContainer');
-                    if (bulkContainer) bulkContainer.style.display = 'none';
-                    var btnDeleteClass = document.getElementById('btnDeleteClass');
-                    if (btnDeleteClass) btnDeleteClass.style.display = 'none';
-                } else {
-                    if ($.fn.DataTable.isDataTable(tableEl)) {
-                        var info = tableEl.DataTable().page.info();
-                        var count = info.recordsDisplay;
-                        if (countBadge) countBadge.textContent = count;
-                        
-                        if (count === 0 && emptyState) {
-                            emptyState.style.display = 'flex';
-                            emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
-                            emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
-                            if (tableDiv) tableDiv.style.display = 'none';
-                            var bulkContainer = document.getElementById('bulkActionsContainer');
-                            if (bulkContainer) bulkContainer.style.display = 'none';
-                        } else {
-                            if (emptyState) emptyState.style.display = 'none';
-                            if (tableDiv) tableDiv.style.display = 'block';
-                            var bulkContainer = document.getElementById('bulkActionsContainer');
-                            if (bulkContainer) bulkContainer.style.display = 'block';
-                            var btnDeleteClass = document.getElementById('btnDeleteClass');
-                            if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
-                        }
-                        if (emptyState) emptyState.style.display = 'none';
-                        if (tableDiv) tableDiv.style.display = 'block';
-                        var bulkContainer = document.getElementById('bulkActionsContainer');
-                        if (bulkContainer) bulkContainer.style.display = 'block';
-                        var btnDeleteClass = document.getElementById('btnDeleteClass');
-                        if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
+
+            function updateFilterCount() {
+                if (tablePendaftar) {
+                    var info = tablePendaftar.page.info();
+                    var countBadge = document.getElementById('badgeTotalFiltered');
+                    if (countBadge) {
+                        countBadge.textContent = info.recordsDisplay + ' pendaftar';
                     }
                 }
+            }
+
+            // Event listener filter instan
+            $('#filterPilihanHari, #filterStatusPlotting, #filterJurusan').on('change', function() {
+                tablePendaftar.draw();
+                updateFilterCount();
+                updateBulkPendaftarButtons();
             });
-            
-            setTimeout(function() {
-                filterKelasBottom.dispatchEvent(new Event('change'));
-            }, 100);
-            }
 
+            // Tombol Reset Filter
+            $('#btnResetFilter').on('click', function() {
+                $('#filterPilihanHari').val('');
+                $('#filterStatusPlotting').val('');
+                $('#filterJurusan').val('');
+                tablePendaftar.search('').draw();
+                updateFilterCount();
+                updateBulkPendaftarButtons();
+                $('.day-stat-card').removeClass('active-filter');
+                $('.prodi-stat-item').removeClass('active-filter');
+            });
 
-            // Logic untuk Check All
-            var btnCheckAll = document.getElementById('btnCheckAll');
-            if (btnCheckAll) {
-                btnCheckAll.addEventListener('click', function() {
-                    var isChecked = this.getAttribute('data-checked') === 'true';
-                    var newCheckedState = !isChecked;
-                    this.setAttribute('data-checked', newCheckedState);
-                    this.innerHTML = newCheckedState ? '☐ Batal Centang' : '☑️ Centang Semua';
-                    
-                    if ($.fn.DataTable.isDataTable(tableEl)) {
-                        var dt = tableEl.DataTable();
-                        $(dt.rows({ search: 'applied' }).nodes()).find('.check-peserta').prop('checked', newCheckedState);
-                    } else {
-                        var checkboxes = document.querySelectorAll('#participantTable tbody .check-peserta');
-                        checkboxes.forEach(function(cb) {
-                            cb.checked = newCheckedState;
-                        });
-                    }
-                });
-            }
+            // Quick click handlers for Stat Cards
+            window.filterByHari = function(hari) {
+                $('#filterPilihanHari').val(hari).trigger('change');
+                $('.day-stat-card').removeClass('active-filter');
+                var el = document.getElementById('tablePendaftar');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
 
-            // Logic untuk Delete Class
-            var btnDeleteClass = document.getElementById('btnDeleteClass');
-            if (btnDeleteClass) {
-                btnDeleteClass.addEventListener('click', function() {
-                    var selectedClassId = filterKelasBottom.value;
-                    if (!selectedClassId || selectedClassId === 'ALL' || selectedClassId === '') {
-                        alert('Silakan pilih kelas terlebih dahulu.');
-                        return;
-                    }
+            window.filterByJurusan = function(jurusan) {
+                $('#filterJurusan').val(jurusan).trigger('change');
+                $('.prodi-stat-item').removeClass('active-filter');
+                var el = document.getElementById('tablePendaftar');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            };
 
-                    if (typeof showConfirm === 'function') {
-                        showConfirm(this.getAttribute('data-my-confirm'), function() {
-                            var form = document.createElement('form');
-                            form.method = 'POST';
-                            form.style.display = 'none';
-
-                            var csrfInput = document.createElement('input');
-                            csrfInput.type = 'hidden';
-                            csrfInput.name = 'csrf_token';
-                            csrfInput.value = '<?= csrfToken() ?>';
-                            form.appendChild(csrfInput);
-
-                            var actionInput = document.createElement('input');
-                            actionInput.type = 'hidden';
-                            actionInput.name = 'action';
-                            actionInput.value = 'delete_class';
-                            form.appendChild(actionInput);
-
-                            var classIdInput = document.createElement('input');
-                            classIdInput.type = 'hidden';
-                            classIdInput.name = 'class_id';
-                            classIdInput.value = selectedClassId;
-                            form.appendChild(classIdInput);
-
-                            document.body.appendChild(form);
-                            form.submit();
-                        }, 'danger');
-                    } else {
-                        if (confirm(this.getAttribute('data-my-confirm'))) {
-                            var form = document.createElement('form');
-                            form.method = 'POST';
-                            form.style.display = 'none';
-
-                            var csrfInput = document.createElement('input');
-                            csrfInput.type = 'hidden';
-                            csrfInput.name = 'csrf_token';
-                            csrfInput.value = '<?= csrfToken() ?>';
-                            form.appendChild(csrfInput);
-
-                            var actionInput = document.createElement('input');
-                            actionInput.type = 'hidden';
-                            actionInput.name = 'action';
-                            actionInput.value = 'delete_class';
-                            form.appendChild(actionInput);
-
-                            var classIdInput = document.createElement('input');
-                            classIdInput.type = 'hidden';
-                            classIdInput.name = 'class_id';
-                            classIdInput.value = selectedClassId;
-                            form.appendChild(classIdInput);
-
-                            document.body.appendChild(form);
-                            form.submit();
-                        }
-                    }
-                });
-            }
-
-            // Logic untuk Bulk Delete
-            var btnBulkDelete = document.getElementById('btnBulkDelete');
-            if (btnBulkDelete) {
-                btnBulkDelete.addEventListener('click', function() {
-                    var checked = [];
-                    if ($.fn.DataTable.isDataTable(tableEl)) {
-                        $(tableEl.DataTable().rows({ search: 'applied' }).nodes()).find('.check-peserta:checked').each(function() {
-                            checked.push(this);
-                        });
-                    } else {
-                        document.querySelectorAll('#participantTable tbody .check-peserta:checked').forEach(function(cb) {
-                            checked.push(cb);
-                        });
-                    }
-                    
-                    if (checked.length === 0) {
-                        alert('Silakan centang minimal satu peserta terlebih dahulu.');
-                        return;
-                    }
-                    
-                    if (confirm('Yakin ingin mengeluarkan ' + checked.length + ' peserta yang dicentang dari kelas ini?')) {
-                        var form = document.getElementById('formBulkDelete');
-                        if (form) {
-                            form.innerHTML = `<input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                              <input type="hidden" name="action" value="bulk_delete">`;
-                            checked.forEach(chk => {
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'reg_ids[]';
-                                input.value = chk.value;
-                                form.appendChild(input);
-                            });
-                            form.submit();
-                        }
-                    }
-                });
-            }
-            
             // Fitur Checkbox untuk tabel Data Pendaftar Tutorial
             const checkAllPendaftarBtn = document.getElementById('btnCheckAllPendaftar');
             const bulkDeletePendaftarBtn = document.getElementById('btnBulkDeletePendaftar');
             const bulkActionsPendaftarContainer = document.getElementById('bulkActionsPendaftarContainer');
 
             function getPendaftarNodes() {
-                if (window.jQuery && $.fn.DataTable.isDataTable($('#tablePendaftar'))) {
-                    return $('#tablePendaftar').DataTable().rows({ search: 'applied' }).nodes();
+                if (tablePendaftar) {
+                    return tablePendaftar.rows({ search: 'applied' }).nodes();
                 }
                 return document;
             }
@@ -923,6 +1214,9 @@ window.closeEditModal = function() {
                 if (totalCount > 0) {
                     bulkActionsPendaftarContainer.style.display = 'block';
                     bulkDeletePendaftarBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                    if (checkedCount > 0) {
+                        bulkDeletePendaftarBtn.innerHTML = '🗑️ Hapus ' + checkedCount + ' Terpilih';
+                    }
                 } else {
                     bulkActionsPendaftarContainer.style.display = 'none';
                 }
@@ -946,14 +1240,7 @@ window.closeEditModal = function() {
                 });
             }
 
-            // Delegasikan event change agar checkbox di halaman lain (pagination) tetap berfungsi
-            if (window.jQuery) {
-                $('#tablePendaftar').on('change', '.check-pendaftar', updateBulkPendaftarButtons);
-            } else {
-                document.querySelectorAll('.check-pendaftar').forEach(chk => {
-                    chk.addEventListener('change', updateBulkPendaftarButtons);
-                });
-            }
+            $('#tablePendaftar').on('change', '.check-pendaftar', updateBulkPendaftarButtons);
 
             if (bulkDeletePendaftarBtn) {
                 bulkDeletePendaftarBtn.addEventListener('click', function() {
@@ -981,65 +1268,9 @@ window.closeEditModal = function() {
                     }
                 });
             }
-            
-            // Inisialisasi DataTable untuk Semua Mahasiswa
-            var tableSemua = $('#tableSemuaMahasiswa').DataTable({
-                "destroy": true,
-                "pageLength": 10,
-                "language": {
-                    "search": "Cari Mahasiswa:",
-                    "lengthMenu": "Tampilkan _MENU_ data",
-                    "info": "Menampilkan _START_ - _END_ dari _TOTAL_ data",
-                    "paginate": {
-                        "first": "Pertama",
-                        "last": "Terakhir",
-                        "next": "Selanjutnya",
-                        "previous": "Sebelumnya"
-                    }
-                }
-            });
 
-            // Filter berdasarkan Jurusan yang dipilih di tab Kolektif
-            var selectJurusan = document.getElementById('selectJurusanKolektif');
-            if (selectJurusan) {
-                selectJurusan.addEventListener('change', function() {
-                    var val = this.value;
-                    // Kolom Jurusan ada di index 3 (NIM, Angkatan, Nama Lengkap, Jurusan, Status, Aksi)
-                    if (val) {
-                        tableSemua.column(3).search('^' + $.fn.dataTable.util.escapeRegex(val) + '$', true, false).draw();
-                    } else {
-                        tableSemua.column(3).search('').draw();
-                    }
-                });
-            }
-
-            // Custom Filtering for Angkatan and Status
-            $.fn.dataTable.ext.search.push(
-                function(settings, data, dataIndex) {
-                    if (settings.nTable.id !== 'tableSemuaMahasiswa') {
-                        return true;
-                    }
-                    var filterAngkatan = $('#filterAngkatanSemua').val();
-                    var filterStatus = $('#filterStatusSemua').val();
-                    
-                    var angkatan = data[1] || ""; // Index 1: Angkatan
-                    var status = data[4] || "";   // Index 4: Status
-                    
-                    if (filterAngkatan && angkatan.indexOf(filterAngkatan) === -1) {
-                        return false;
-                    }
-                    if (filterStatus && status.indexOf(filterStatus) === -1) {
-                        return false;
-                    }
-                    return true;
-                }
-            );
-
-            $('#filterAngkatanSemua, #filterStatusSemua').on('change', function() {
-                tableSemua.draw();
-            });
         }
-    }, 500);
+    }, 400);
 
 })();
 </script>
@@ -1060,12 +1291,13 @@ window.closeEditModal = function() {
                     <option value="">-- Pilih Hari --</option>
                     <?php 
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    $modalGel = $current_gel ?: $active_gel;
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
-                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
-                        $terisi = $registeredCounts[$day] ?? 0;
+                        $kuota = $modalGel["kuota_$dayLower"] ?? 0;
+                        $terisi = $statsHari[$day] ?? 0;
                         $sisa = $kuota - $terisi;
-                        $isFull = $sisa <= 0;
+                        $isFull = ($kuota > 0 && $sisa <= 0);
                     ?>
                     <option value="<?= $day ?>">
                         <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
@@ -1099,12 +1331,13 @@ window.closeEditModal = function() {
                     <option value="">-- Pilih Hari --</option>
                     <?php 
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    $modalGel = $current_gel ?: $active_gel;
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
-                        $kuota = $active_gel["kuota_$dayLower"] ?? 0;
-                        $terisi = $registeredCounts[$day] ?? 0;
+                        $kuota = $modalGel["kuota_$dayLower"] ?? 0;
+                        $terisi = $statsHari[$day] ?? 0;
                         $sisa = $kuota - $terisi;
-                        $isFull = $sisa <= 0;
+                        $isFull = ($kuota > 0 && $sisa <= 0);
                     ?>
                     <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
                         <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
