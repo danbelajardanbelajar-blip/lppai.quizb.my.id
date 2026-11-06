@@ -615,6 +615,67 @@ if ($targetGelForQuota) {
 
 $listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
 
+// =============================================================
+// QUERY PESERTA PRETES YANG BELUM MENDAFTARKAN DIRI PADA TUTORIAL
+// =============================================================
+$registeredTutorialUserIds = [];
+foreach ($allRegistrations as $reg) {
+    $registeredTutorialUserIds[(int)$reg['user_id']] = true;
+}
+
+$allPretesQuery = $pdo->query("
+    SELECT 
+        pr.id as pretes_id,
+        pr.user_id,
+        pr.periode as pretes_periode,
+        pr.status as pretes_kehadiran,
+        pr.ruangan as pretes_ruangan,
+        pr.hari_pilihan as pretes_hari,
+        u.nama_lengkap,
+        u.nim,
+        u.program_studi,
+        u.no_hp,
+        u.email,
+        pres.nilai as pretes_nilai,
+        pres.status_lulus as pretes_status_lulus
+    FROM pretes_registrations pr
+    JOIN users u ON pr.user_id = u.id
+    LEFT JOIN pretes_results pres ON pres.user_id = u.id
+    WHERE pr.id IN (
+        SELECT MAX(id) FROM pretes_registrations GROUP BY user_id
+    )
+    AND u.role = 'mahasiswa'
+    ORDER BY u.nama_lengkap ASC
+");
+$allPretesList = $allPretesQuery ? $allPretesQuery->fetchAll(PDO::FETCH_ASSOC) : [];
+
+$unregisteredPretes = [];
+$unregisteredPretesTidakLulus = 0;
+$unregisteredPretesBelumDinilai = 0;
+$unregisteredPretesLulus = 0;
+$unregisteredProdiCounts = [];
+
+foreach ($allPretesList as $p) {
+    $uid = (int)$p['user_id'];
+    if (!isset($registeredTutorialUserIds[$uid])) {
+        $statusLulus = strtolower(trim($p['pretes_status_lulus'] ?? ''));
+        if ($statusLulus === 'tidak_lulus') {
+            $unregisteredPretesTidakLulus++;
+        } elseif ($statusLulus === 'lulus') {
+            $unregisteredPretesLulus++;
+        } else {
+            $unregisteredPretesBelumDinilai++;
+        }
+        
+        $prd = trim($p['program_studi'] ?? 'Lainnya');
+        if ($prd === '') $prd = 'Belum Ditentukan';
+        $unregisteredProdiCounts[$prd] = ($unregisteredProdiCounts[$prd] ?? 0) + 1;
+        
+        $unregisteredPretes[] = $p;
+    }
+}
+arsort($unregisteredProdiCounts);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -809,6 +870,23 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
     </div>
+
+    <!-- 5. Peserta Pretes Belum Daftar Tutorial -->
+    <div class="stat-card" style="cursor: pointer;" onclick="switchTableTab('pretes'); var el = document.getElementById('sectionPretesBelumDaftar'); if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });" title="Klik untuk melihat peserta pretes yang belum mendaftar tutorial">
+        <div class="stat-icon red">⚠️</div>
+        <div class="stat-info">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+                <h3><?= number_format(count($unregisteredPretes)) ?></h3>
+                <?php if ($unregisteredPretesTidakLulus > 0): ?>
+                    <span class="stat-pill-badge badge-danger"><?= $unregisteredPretesTidakLulus ?> Wajib</span>
+                <?php endif; ?>
+            </div>
+            <p>Pretes Belum Daftar</p>
+            <div class="stat-subtext" style="color: #b91c1c;">
+                <?= $unregisteredPretesTidakLulus ?> tdk lulus, <?= $unregisteredPretesBelumDinilai ?> blm dinilai
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ===================================================
@@ -980,8 +1058,28 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ===================================================
-     4. TABEL DATA PENDAFTAR TUTORIAL
+     4. TAB SWITCHER (PENDAFTAR TUTORIAL VS PRETES BELUM DAFTAR)
      =================================================== -->
+<div class="custom-tab-bar" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 0; overflow-x: auto;">
+    <button type="button" class="tab-btn active" id="tabBtnPendaftar" onclick="switchTableTab('pendaftar')"
+        style="padding: 12px 22px; font-size: 15px; font-weight: 700; border: none; background: transparent; cursor: pointer; border-bottom: 3px solid #2563eb; color: #2563eb; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; transition: all 0.2s;">
+        <span>📝 Data Pendaftar Tutorial</span>
+        <span class="badge badge-primary" style="font-size: 12px;"><?= number_format($totalPendaftar) ?></span>
+    </button>
+    <button type="button" class="tab-btn" id="tabBtnPretesUnregistered" onclick="switchTableTab('pretes')"
+        style="padding: 12px 22px; font-size: 15px; font-weight: 600; border: none; background: transparent; cursor: pointer; border-bottom: 3px solid transparent; color: #64748b; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; transition: all 0.2s;">
+        <span>⚠️ Peserta Pretes Belum Daftar</span>
+        <span class="badge badge-danger" style="font-size: 12px;"><?= number_format(count($unregisteredPretes)) ?></span>
+        <?php if ($unregisteredPretesTidakLulus > 0): ?>
+            <span class="badge badge-warning" style="font-size: 11px;" title="Tidak Lulus Pretes (Wajib Tutorial)"><?= $unregisteredPretesTidakLulus ?> tdk lulus</span>
+        <?php endif; ?>
+    </button>
+</div>
+
+<!-- ===================================================
+     SECTION TAB 1: TABEL DATA PENDAFTAR TUTORIAL
+     =================================================== -->
+<div id="sectionPendaftarTutorial">
 <div class="card" style="margin-bottom: 24px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius);">
     <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -1087,6 +1185,134 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+</div> <!-- End of sectionPendaftarTutorial -->
+
+<!-- ===================================================
+     SECTION TAB 2: PESERTA PRETES BELUM DAFTAR TUTORIAL
+     =================================================== -->
+<div id="sectionPretesBelumDaftar" style="display: none;">
+    <div class="card" style="margin-bottom: 24px; box-shadow: var(--shadow); border: 1px solid rgba(0,0,0,0.06); border-radius: var(--radius);">
+        <div class="card-header" style="background-color: #f8fafc; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">⚠️</span>
+                <span style="font-size: 16px;">Peserta Pretes yang Belum Mendaftar Tutorial</span>
+                <span class="badge badge-danger" id="badgeTotalPretesFiltered" style="font-size: 12px;"><?= number_format(count($unregisteredPretes)) ?> mahasiswa</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <span class="badge badge-danger" style="font-size: 11.5px;">❌ <?= $unregisteredPretesTidakLulus ?> Tidak Lulus (Wajib)</span>
+                <span class="badge badge-warning" style="font-size: 11.5px;">⏳ <?= $unregisteredPretesBelumDinilai ?> Belum Dinilai</span>
+                <span class="badge badge-success" style="font-size: 11.5px;">✅ <?= $unregisteredPretesLulus ?> Lulus (Bebas)</span>
+            </div>
+        </div>
+        <div class="card-body">
+            
+            <!-- Quick Filter Bar for Pretes Table -->
+            <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Filter Status Kelulusan Pretes:</label>
+                    <select id="filterPretesStatus" class="form-control" style="width: 100%; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                        <option value="">Semua Status Pretes</option>
+                        <option value="tidak_lulus">❌ Tidak Lulus (Wajib Tutorial)</option>
+                        <option value="belum_dinilai">⏳ Belum Dinilai / Lainnya</option>
+                        <option value="lulus">✅ Lulus Pretes (Bebas Tutorial)</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 180px;">
+                    <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Filter Program Studi:</label>
+                    <select id="filterPretesProdi" class="form-control" style="width: 100%; font-size: 13px; padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                        <option value="">Semua Program Studi</option>
+                        <?php foreach ($listJurusan as $jur): ?>
+                            <option value="<?= sanitize($jur) ?>"><?= sanitize($jur) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div style="align-self: flex-end;">
+                    <button type="button" class="btn btn-sm btn-secondary" id="btnResetPretesFilter" style="background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 7px 14px; font-size: 12px; border-radius: 6px; font-weight: 600;">
+                        🔄 Reset Filter
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table" id="tablePretesBelumDaftar" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">No</th>
+                            <th>Nama Mahasiswa</th>
+                            <th>NIM</th>
+                            <th>Jurusan</th>
+                            <th>Periode Pretes</th>
+                            <th>Status Pretes</th>
+                            <th>Kontak / WA</th>
+                            <th style="text-align: center;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $no = 1;
+                        foreach ($unregisteredPretes as $p): 
+                            $stLulus = strtolower(trim($p['pretes_status_lulus'] ?? ''));
+                            $statusCategory = 'belum_dinilai';
+                            if ($stLulus === 'tidak_lulus') $statusCategory = 'tidak_lulus';
+                            elseif ($stLulus === 'lulus') $statusCategory = 'lulus';
+                            
+                            $cleanPhone = preg_replace('/[^0-9]/', '', $p['no_hp'] ?? '');
+                            if (strpos($cleanPhone, '0') === 0) {
+                                $cleanPhone = '62' . substr($cleanPhone, 1);
+                            }
+                        ?>
+                        <tr data-status="<?= $statusCategory ?>" data-jurusan="<?= htmlspecialchars(trim($p['program_studi'] ?? ''), ENT_QUOTES) ?>">
+                            <td style="text-align: center; color: #64748b;"><?= $no++ ?></td>
+                            <td>
+                                <strong style="color: #1e293b;"><?= sanitize($p['nama_lengkap']) ?></strong>
+                            </td>
+                            <td><?= sanitize($p['nim'] ?: '-') ?></td>
+                            <td><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                            <td>
+                                <span class="badge badge-info" style="font-size: 11px;">
+                                    <?= sanitize($p['pretes_periode'] ?: '-') ?>
+                                </span>
+                            </td>
+                            <td>
+                                <?php if ($statusCategory === 'tidak_lulus'): ?>
+                                    <span class="badge badge-danger" style="font-weight: 700;">❌ Tidak Lulus (Wajib)</span>
+                                    <?php if ($p['pretes_nilai'] !== null): ?>
+                                        <div style="font-size: 11px; color: #991b1b; margin-top: 2px;">Nilai: <?= number_format($p['pretes_nilai'], 1) ?></div>
+                                    <?php endif; ?>
+                                <?php elseif ($statusCategory === 'lulus'): ?>
+                                    <span class="badge badge-success">✅ Lulus Pretes (Bebas)</span>
+                                    <?php if ($p['pretes_nilai'] !== null): ?>
+                                        <div style="font-size: 11px; color: #166534; margin-top: 2px;">Nilai: <?= number_format($p['pretes_nilai'], 1) ?></div>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span class="badge badge-warning">⏳ Belum Dinilai</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($cleanPhone)): ?>
+                                    <a href="https://wa.me/<?= $cleanPhone ?>?text=<?= urlencode("Assalamualaikum Wr. Wb. Halo {$p['nama_lengkap']}, mengingatkan bahwa pendaftaran kelas tutorial LPPAI telah dibuka. Silakan segera login dan memilih hari tutorial di https://lppai.quizb.my.id") ?>" 
+                                       target="_blank" class="btn btn-sm btn-outline-success" style="padding: 3px 8px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;" title="Kirim Pengingat WhatsApp">
+                                        <span>💬</span> <?= sanitize($p['no_hp']) ?>
+                                    </a>
+                                <?php else: ?>
+                                    <span style="color: #94a3b8; font-size: 12px;">-</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align: center;">
+                                <button type="button" class="btn btn-sm btn-success" style="padding: 4px 10px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                                    onclick="openAddSingleRegistrationModal(<?= (int)$p['user_id'] ?>, <?= htmlspecialchars(json_encode($p['nama_lengkap']), ENT_QUOTES) ?>)">
+                                    <span>➕</span> Daftarkan
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
 
 </div> <!-- End of content wrapper -->
 
@@ -1099,6 +1325,47 @@ window.openEditPendaftarModal = function(regId, hariPilihan) {
     document.getElementById('edit_pendaftar_reg_id').value = regId;
     document.getElementById('edit_pendaftar_hari').value = hariPilihan;
     document.getElementById('editPendaftarModal').style.display = 'flex';
+};
+
+window.switchTableTab = function(tabName) {
+    var pendaftarSection = document.getElementById('sectionPendaftarTutorial');
+    var pretesSection = document.getElementById('sectionPretesBelumDaftar');
+    var btnPendaftar = document.getElementById('tabBtnPendaftar');
+    var btnPretes = document.getElementById('tabBtnPretesUnregistered');
+    
+    if (tabName === 'pretes') {
+        if (pendaftarSection) pendaftarSection.style.display = 'none';
+        if (pretesSection) pretesSection.style.display = 'block';
+        if (btnPendaftar) {
+            btnPendaftar.style.borderBottomColor = 'transparent';
+            btnPendaftar.style.color = '#64748b';
+            btnPendaftar.style.fontWeight = '600';
+        }
+        if (btnPretes) {
+            btnPretes.style.borderBottomColor = '#2563eb';
+            btnPretes.style.color = '#2563eb';
+            btnPretes.style.fontWeight = '700';
+        }
+        if (window.jQuery && $.fn.DataTable.isDataTable('#tablePretesBelumDaftar')) {
+            $('#tablePretesBelumDaftar').DataTable().columns.adjust().draw();
+        }
+    } else {
+        if (pendaftarSection) pendaftarSection.style.display = 'block';
+        if (pretesSection) pretesSection.style.display = 'none';
+        if (btnPendaftar) {
+            btnPendaftar.style.borderBottomColor = '#2563eb';
+            btnPendaftar.style.color = '#2563eb';
+            btnPendaftar.style.fontWeight = '700';
+        }
+        if (btnPretes) {
+            btnPretes.style.borderBottomColor = 'transparent';
+            btnPretes.style.color = '#64748b';
+            btnPretes.style.fontWeight = '600';
+        }
+        if (window.jQuery && $.fn.DataTable.isDataTable('#tablePendaftar')) {
+            $('#tablePendaftar').DataTable().columns.adjust().draw();
+        }
+    }
 };
 
 window.closeEditPendaftarModal = function() {
@@ -1167,6 +1434,59 @@ window.closeEditPendaftarModal = function() {
                 tablePendaftar.draw();
                 updateFilterCount();
                 updateBulkPendaftarButtons();
+            });
+
+            // Inisialisasi DataTable untuk Peserta Pretes Belum Daftar
+            var tablePretes = $('#tablePretesBelumDaftar').DataTable({
+                "destroy": true,
+                "pageLength": 10,
+                "language": {
+                    "search": "Cari Peserta Pretes:",
+                    "lengthMenu": "Tampilkan _MENU_ data",
+                    "info": "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+                    "paginate": {
+                        "first": "Pertama",
+                        "last": "Terakhir",
+                        "next": "Selanjutnya",
+                        "previous": "Sebelumnya"
+                    }
+                }
+            });
+
+            // Custom filter untuk tablePretesBelumDaftar
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                if (settings.nTable.id !== 'tablePretesBelumDaftar') return true;
+                
+                var tr = settings.aoData[dataIndex].nTr;
+                var rowStatus = tr.getAttribute('data-status') || '';
+                var rowJurusan = tr.getAttribute('data-jurusan') || '';
+                
+                var filterStatus = $('#filterPretesStatus').val();
+                var filterJurusan = $('#filterPretesProdi').val();
+                
+                if (filterStatus && rowStatus !== filterStatus) {
+                    return false;
+                }
+                if (filterJurusan && rowJurusan !== filterJurusan) {
+                    return false;
+                }
+                return true;
+            });
+
+            $('#filterPretesStatus, #filterPretesProdi').on('change', function() {
+                tablePretes.draw();
+                var info = tablePretes.page.info();
+                var badge = document.getElementById('badgeTotalPretesFiltered');
+                if (badge) badge.textContent = info.recordsDisplay + ' mahasiswa';
+            });
+
+            $('#btnResetPretesFilter').on('click', function() {
+                $('#filterPretesStatus').val('');
+                $('#filterPretesProdi').val('');
+                tablePretes.search('').draw();
+                var info = tablePretes.page.info();
+                var badge = document.getElementById('badgeTotalPretesFiltered');
+                if (badge) badge.textContent = info.recordsDisplay + ' mahasiswa';
             });
 
             // Tombol Reset Filter
