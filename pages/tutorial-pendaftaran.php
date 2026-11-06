@@ -20,6 +20,7 @@ try {
     $pdo->exec("ALTER TABLE tutorial_registrations MODIFY tutorial_class_id INT NULL");
     $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN hari_pilihan VARCHAR(20) DEFAULT NULL");
     $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN gelombang VARCHAR(20) DEFAULT NULL");
+    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL");
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
 } catch (Exception $e) {}
 
@@ -36,7 +37,7 @@ $gelombangs = [
 $active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
-    $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') GROUP BY hari_pilihan");
+    $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
     foreach ($stmtCount->fetchAll() as $row) {
         $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
         if (isset($registeredCounts[$hari])) {
@@ -73,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
             $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
             $terisi = $registeredCounts[$hari_pilihan] ?? 0;
             
-            if ($terisi >= $totalKuota) {
+            if ($totalKuota <= 0 || $terisi >= $totalKuota) {
                 $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
                 $msgType = 'danger';
             } else {
@@ -88,8 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
                 $message = 'Anda sudah terdaftar di gelombang ini.';
                 $msgType = 'warning';
             } else {
-                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
-                $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang]);
+                $tahun_ajaran = $active_gel['tahun_ajaran'] ?? (date('Y') . '/' . (date('Y') + 1));
+                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?, ?)");
+                $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang, $tahun_ajaran]);
                 $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
                 $msgType = 'success';
                 
