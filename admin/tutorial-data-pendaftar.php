@@ -651,7 +651,6 @@ $allPretesList = $allPretesQuery ? $allPretesQuery->fetchAll(PDO::FETCH_ASSOC) :
 
 $unregisteredPretes = [];
 $unregisteredPretesTidakLulus = 0;
-$unregisteredPretesBelumDinilai = 0;
 $unregisteredPretesLulus = 0;
 $unregisteredProdiCounts = [];
 
@@ -881,7 +880,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <p>Pretes Belum Daftar</p>
             <div class="stat-subtext" style="color: #b91c1c;">
-                <?= $unregisteredPretesTidakLulus ?> tdk lulus, <?= $unregisteredPretesBelumDinilai ?> blm dinilai
+                <?= $unregisteredPretesTidakLulus ?> wajib tutorial, <?= $unregisteredPretesLulus ?> lulus pretes
             </div>
         </div>
     </div>
@@ -1205,9 +1204,8 @@ include __DIR__ . '/../includes/header.php';
                 <span class="badge badge-danger" id="badgeTotalPretesFiltered" style="font-size: 12px;"><?= number_format(count($unregisteredPretes)) ?> mahasiswa</span>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <span class="badge badge-danger" style="font-size: 11.5px;">❌ <?= $unregisteredPretesTidakLulus ?> Tidak Lulus (Wajib)</span>
-                <span class="badge badge-warning" style="font-size: 11.5px;">⏳ <?= $unregisteredPretesBelumDinilai ?> Belum Dinilai</span>
-                <span class="badge badge-success" style="font-size: 11.5px;">✅ <?= $unregisteredPretesLulus ?> Lulus (Bebas)</span>
+                <span class="badge badge-danger" style="font-size: 11.5px;">❌ <?= $unregisteredPretesTidakLulus ?> Tidak Lulus (Wajib Tutorial)</span>
+                <span class="badge badge-success" style="font-size: 11.5px;">✅ <?= $unregisteredPretesLulus ?> Lulus Pretes (Bebas)</span>
             </div>
         </div>
         <div class="card-body">
