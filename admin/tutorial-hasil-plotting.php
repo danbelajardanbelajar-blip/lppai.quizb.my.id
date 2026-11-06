@@ -23,8 +23,40 @@ $message = '';
 $msgType = '';
 $isMessageHtml = false;
 
-// Ambil data gelombang aktif terlebih dahulu agar bisa dipakai di pengecekan kuota
-$active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+// Ambil daftar gelombang dari master_gelombang
+$allGelombang = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+
+$active_gel = null;
+foreach ($allGelombang as $g) {
+    if ($g['status'] === 'aktif') {
+        $active_gel = $g;
+        break;
+    }
+}
+if (!$active_gel && !empty($allGelombang)) {
+    $active_gel = $allGelombang[0];
+}
+
+$selected_gel_id = isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active';
+$current_gel = null;
+
+if ($selected_gel_id === 'all') {
+    $current_gel = null;
+} elseif (is_numeric($selected_gel_id)) {
+    foreach ($allGelombang as $g) {
+        if ($g['id'] == $selected_gel_id) {
+            $current_gel = $g;
+            break;
+        }
+    }
+    if (!$current_gel) {
+        $current_gel = $active_gel;
+        $selected_gel_id = 'active';
+    }
+} else {
+    $selected_gel_id = 'active';
+    $current_gel = $active_gel;
+}
 
 // Condition to exclude Lulus
 $notLulusSQL = "u.id NOT IN (
@@ -42,18 +74,44 @@ $notLulusSQL = "u.id NOT IN (
 if (isset($_GET['ajax_jurusan'])) {
     header('Content-Type: application/json');
     $jurusan = $_GET['ajax_jurusan'];
-    $stmt = $pdo->prepare("
-        SELECT u.id as user_id, u.nim, u.nama_lengkap, 
-               MAX(tr.id) as reg_id,
-               (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
-               MAX(tr.hari_pilihan) as hari_pilihan
-        FROM users u 
-        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
-        WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
-        GROUP BY u.id
-        ORDER BY u.nama_lengkap
-    ");
-    $stmt->execute([$jurusan]);
+    if ($active_gel) {
+        $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
+        $targetGel = trim($active_gel['gelombang']);
+        $stmt = $pdo->prepare("
+            SELECT u.id as user_id, u.nim, u.nama_lengkap, 
+                   MAX(tr.id) as reg_id,
+                   (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
+                   MAX(tr.hari_pilihan) as hari_pilihan
+            FROM users u 
+            LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id 
+                AND tr.gelombang = ?
+                AND (
+                    REPLACE(TRIM(tr.tahun_ajaran), '/', '-') = ?
+                    OR tr.tahun_ajaran LIKE ?
+                    OR (
+                        (tr.tahun_ajaran IS NULL OR TRIM(tr.tahun_ajaran) = '')
+                        AND tr.created_at >= ?
+                    )
+                )
+            WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
+            GROUP BY u.id
+            ORDER BY u.nama_lengkap
+        ");
+        $stmt->execute([$targetGel, $targetYear, '%' . $targetYear . '%', $active_gel['created_at'], $jurusan]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT u.id as user_id, u.nim, u.nama_lengkap, 
+                   MAX(tr.id) as reg_id,
+                   (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
+                   MAX(tr.hari_pilihan) as hari_pilihan
+            FROM users u 
+            LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id
+            WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
+            GROUP BY u.id
+            ORDER BY u.nama_lengkap
+        ");
+        $stmt->execute([$jurusan]);
+    }
     echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     exit;
 }
@@ -79,11 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $kuota      = (int)($_POST['kuota'] ?? 0);
             $userIds  = array_filter(array_map('intval', (array)($_POST['user_ids'] ?? [])));
 
-            // Nilai Default
-            $gelombang = 'gel1';
-            $tahun = date('Y');
-            $semester = $tahun . '-' . ($tahun+1) . '-Ganjil';
-            $tahun_ajaran = $tahun . '-' . ($tahun+1);
+            // Nilai Default sesuai periode aktif
+            $gelombang = $active_gel['gelombang'] ?? 'gel1';
+            $tahun_ajaran = !empty($active_gel['tahun_ajaran']) ? str_replace('/', '-', $active_gel['tahun_ajaran']) : (date('Y') . '-' . (date('Y')+1));
+            $semester = !empty($active_gel['semester']) ? $active_gel['semester'] : ($tahun_ajaran . '-Ganjil');
             
             $tipe_nilai = 'mandiri';
             if ($gelombang === 'gel1') $tipe_nilai = 'gel 1';
@@ -361,24 +418,130 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 /* =============================================================
    DATA
    ============================================================= */
-$students = $pdo->query("
-    SELECT id, nama_lengkap, nim, program_studi
-    FROM users
-    WHERE role = 'mahasiswa'
-    AND id IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)
-    ORDER BY nama_lengkap
-")->fetchAll();
-$classes  = $pdo->query("SELECT * FROM tutorial_classes WHERE (semester LIKE '2025%' OR semester LIKE '2026%' OR semester LIKE '2027%' OR semester LIKE '2028%' OR semester LIKE '2029%' OR semester LIKE '2030%') ORDER BY gelombang, hari, nama_kelas")->fetchAll();
+$classes = [];
+$registrations = [];
+
+if ($current_gel) {
+    $targetYear = str_replace('/', '-', trim($current_gel['tahun_ajaran']));
+    $targetSemester = trim($current_gel['semester']);
+    $targetGelombang = trim($current_gel['gelombang']);
+    $targetYearSem = $targetYear . '-' . $targetSemester;
+    $targetCreatedAt = $current_gel['created_at'];
+
+    // 1. Ambil daftar kelas untuk periode aktif
+    $stmtClasses = $pdo->prepare("
+        SELECT * FROM tutorial_classes 
+        WHERE gelombang = ?
+          AND (
+              TRIM(semester) = ?
+              OR REPLACE(TRIM(semester), '/', '-') = ?
+              OR semester LIKE ?
+          )
+        ORDER BY gelombang, hari, nama_kelas
+    ");
+    $stmtClasses->execute([
+        $targetGelombang,
+        $targetSemester,
+        $targetYearSem,
+        '%' . $targetYear . '%'
+    ]);
+    $classes = $stmtClasses->fetchAll(PDO::FETCH_ASSOC);
+
+    // 2. Ambil data pendaftar yang sudah diplot ke kelas HANYA dari periode aktif
+    $stmtRegs = $pdo->prepare("
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+        FROM tutorial_registrations tr
+        JOIN users u ON tr.user_id = u.id
+        JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        WHERE tr.id IN (
+            SELECT MAX(candidate.id)
+            FROM tutorial_registrations candidate
+            LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
+            WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
+              AND (
+                  REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
+                  OR candidate.tahun_ajaran LIKE ?
+                  OR (
+                      (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
+                      AND (
+                          candidate.created_at >= ?
+                          OR TRIM(period_class.semester) = ?
+                          OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                      )
+                  )
+              )
+              AND (
+                  period_class.id IS NULL
+                  OR TRIM(period_class.semester) = ?
+                  OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
+                  OR period_class.semester LIKE ?
+              )
+            GROUP BY candidate.user_id
+        )
+          AND tc.gelombang = ?
+          AND (
+              TRIM(tc.semester) = ?
+              OR REPLACE(TRIM(tc.semester), '/', '-') = ?
+              OR tc.semester LIKE ?
+          )
+          AND $notLulusSQL
+        ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
+    ");
+    $stmtRegs->execute([
+        $targetGelombang,
+        $targetYear,
+        '%' . $targetYear . '%',
+        $targetCreatedAt,
+        $targetSemester,
+        $targetYearSem,
+        $targetSemester,
+        $targetYearSem,
+        '%' . $targetYear . '%',
+        $targetGelombang,
+        $targetSemester,
+        $targetYearSem,
+        '%' . $targetYear . '%'
+    ]);
+    $registrations = $stmtRegs->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    // Mode fallback jika semua periode
+    $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari, nama_kelas")->fetchAll(PDO::FETCH_ASSOC);
+    $registrations = $pdo->query("
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+        FROM tutorial_registrations tr
+        JOIN users u ON tr.user_id = u.id
+        JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations GROUP BY user_id)
+          AND $notLulusSQL
+        ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
+    ")->fetchAll(PDO::FETCH_ASSOC);
+}
+
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
-$roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll();
-$tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
+$roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll(PDO::FETCH_ASSOC);
+$tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
-if ($active_gel) {
+if ($current_gel) {
     try {
-        // Coba hitung berdasarkan hari_pilihan dari SEMUA registrasi aktif
-        $stmtCount = $pdo->query("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY hari_pilihan");
-        foreach ($stmtCount->fetchAll() as $row) {
+        $targetYear = str_replace('/', '-', trim($current_gel['tahun_ajaran']));
+        $targetGel = trim($current_gel['gelombang']);
+        $stmtCount = $pdo->prepare("
+            SELECT hari_pilihan, COUNT(*) as cnt 
+            FROM tutorial_registrations 
+            WHERE gelombang = ?
+              AND (
+                  REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
+                  OR tahun_ajaran LIKE ?
+                  OR (
+                      (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
+                      AND created_at >= ?
+                  )
+              )
+            GROUP BY hari_pilihan
+        ");
+        $stmtCount->execute([$targetGel, $targetYear, '%' . $targetYear . '%', $current_gel['created_at']]);
+        foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $hari = ucfirst(strtolower(trim($row['hari_pilihan'])));
             if (isset($registeredCounts[$hari])) {
                 $registeredCounts[$hari] += $row['cnt'];
@@ -427,48 +590,6 @@ $classHariMap = [];
 foreach ($classes as $c) {
     $classHariMap[$c['id']] = $c['hari'] ?? '';
 }
-
-// Mahasiswa yang sudah terdaftar (untuk tanda di checklist)
-$registered = $pdo->query("
-    SELECT tr.user_id, tr.tutorial_class_id
-    FROM tutorial_registrations tr
-")->fetchAll(PDO::FETCH_KEY_PAIR); // user_id => tutorial_class_id (mungkin multi, gunakan fetchAll biasa)
-
-$registeredPairs = [];
-foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)")->fetchAll() as $row) {
-    $registeredPairs[$row['user_id'] . '_' . $row['tutorial_class_id']] = true;
-}
-
-$registrations = $pdo->query("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
-    FROM tutorial_registrations tr
-    JOIN users u ON tr.user_id = u.id
-    JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
-      AND $notLulusSQL
-    ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
-")->fetchAll();
-
-$allStudents = $pdo->query("
-    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, 
-           MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
-           (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
-    FROM users u
-    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
-    WHERE u.role = 'mahasiswa' AND $notLulusSQL
-    GROUP BY u.id
-    ORDER BY u.program_studi, u.nama_lengkap
-")->fetchAll(PDO::FETCH_ASSOC);
-
-
-$allRegistrations = $pdo->query("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
-    FROM tutorial_registrations tr
-    JOIN users u ON tr.user_id = u.id
-    WHERE tr.id IN (SELECT MAX(id) FROM tutorial_registrations WHERE (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL) GROUP BY user_id)
-      AND $notLulusSQL
-    ORDER BY tr.created_at DESC
-")->fetchAll();
 
 $listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
 
@@ -530,6 +651,39 @@ include __DIR__ . '/../includes/header.php';
 
 
 <div>
+
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:20px; margin-bottom: 20px;">
+    <div>
+        <h2 style="font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 4px 0;">Hasil Plotting & Jadwal Tutorial</h2>
+        <p style="color: #64748b; margin: 0; font-size: 14px;">Menampilkan kelas dan peserta yang terdaftar pada periode aktif.</p>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <?php if ($current_gel): ?>
+            <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+                Periode Aktif: <?= sanitize($current_gel['tahun_ajaran']) ?> / <?= sanitize($current_gel['semester']) ?> / <?= sanitize($current_gel['gelombang']) ?>
+            </span>
+        <?php else: ?>
+            <span style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+                ⚠️ Belum ada periode tutorial aktif
+            </span>
+        <?php endif; ?>
+
+        <?php if (!empty($allGelombang) && count($allGelombang) > 1): ?>
+            <select id="filterPeriodeSelect" onchange="window.location.href='?gelombang_id='+this.value"
+                style="padding: 6px 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 500; color: #334155; background: #fff; cursor: pointer;">
+                <option value="active" <?= $selected_gel_id === 'active' ? 'selected' : '' ?>>
+                    🌟 Periode Aktif (<?= $active_gel ? sanitize($active_gel['tahun_ajaran'] . ' - ' . $active_gel['gelombang']) : 'Tidak ada' ?>)
+                </option>
+                <?php foreach ($allGelombang as $g): ?>
+                    <option value="<?= $g['id'] ?>" <?= $selected_gel_id == $g['id'] ? 'selected' : '' ?>>
+                        <?= sanitize($g['tahun_ajaran']) ?> - <?= sanitize($g['semester']) ?> - <?= sanitize($g['gelombang']) ?> <?= $g['status'] === 'aktif' ? '(Aktif)' : '' ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        <?php endif; ?>
+    </div>
+</div>
 
 <!-- ===================================================
      CARD: DAFTAR PESERTA
@@ -627,7 +781,7 @@ $chartData = json_encode(array_values($statsKelas));
 <div class="card" style="margin-top: 30px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
         <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
-            <span style="font-size:20px;">📋</span> Daftar Peserta Tutorial (<span class="badge-count" style="background:#e0e7ff; color:#4f46e5; padding:2px 8px; border-radius:12px; font-size:14px;">0</span>)
+            <span style="font-size:20px;">📋</span> Daftar Peserta Tutorial (<span class="badge-count" style="background:#e0e7ff; color:#4f46e5; padding:2px 8px; border-radius:12px; font-size:14px;"><?= count($registrations) ?></span>)
         </span>
         <div style="display:flex; gap:12px; align-items:center;">
             <div style="flex:1; max-width:300px;">
@@ -850,27 +1004,25 @@ window.closeEditModal = function() {
                         var count = info.recordsDisplay;
                         if (countBadge) countBadge.textContent = count;
                         
-                        if (count === 0 && emptyState) {
-                            emptyState.style.display = 'flex';
-                            emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
-                            emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
+                        if (count === 0) {
+                            if (emptyState) {
+                                emptyState.style.display = 'flex';
+                                emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
+                                emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form plotting.';
+                            }
                             if (tableDiv) tableDiv.style.display = 'none';
                             var bulkContainer = document.getElementById('bulkActionsContainer');
                             if (bulkContainer) bulkContainer.style.display = 'none';
+                            var btnDeleteClass = document.getElementById('btnDeleteClass');
+                            if (btnDeleteClass) btnDeleteClass.style.display = (selectedClassId !== 'ALL' ? 'inline-block' : 'none');
                         } else {
                             if (emptyState) emptyState.style.display = 'none';
                             if (tableDiv) tableDiv.style.display = 'block';
                             var bulkContainer = document.getElementById('bulkActionsContainer');
                             if (bulkContainer) bulkContainer.style.display = 'block';
                             var btnDeleteClass = document.getElementById('btnDeleteClass');
-                            if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
+                            if (btnDeleteClass) btnDeleteClass.style.display = (selectedClassId !== 'ALL' ? 'inline-block' : 'none');
                         }
-                        if (emptyState) emptyState.style.display = 'none';
-                        if (tableDiv) tableDiv.style.display = 'block';
-                        var bulkContainer = document.getElementById('bulkActionsContainer');
-                        if (bulkContainer) bulkContainer.style.display = 'block';
-                        var btnDeleteClass = document.getElementById('btnDeleteClass');
-                        if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
                     }
                 }
             });
