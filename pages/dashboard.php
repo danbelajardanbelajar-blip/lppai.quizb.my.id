@@ -458,8 +458,16 @@ include __DIR__ . '/../includes/header.php';
                 <div class="ann-date">🕐 <?= date('d M Y, H:i', strtotime($ann['created_at'])) ?></div>
                 <div class="ann-content"><?= nl2br(sanitize($ann['konten'])) ?></div>
                 <?php if (!empty($ann['link_tujuan'])): ?>
+                <?php
+                    $targetUrl = $ann['link_tujuan'];
+                    if ($ann['tipe'] === 'hasil_pretes' || stripos($ann['judul'], 'hasil pretes') !== false) {
+                        if (strpos($targetUrl, 'pretes-peserta') !== false || empty($targetUrl)) {
+                            $targetUrl = '/pages/pretes-hasil.php';
+                        }
+                    }
+                ?>
                 <div style="margin-top: 15px;">
-                    <a href="<?= BASE_URL . sanitize($ann['link_tujuan']) ?>" class="btn btn-primary" style="display:inline-block; padding:8px 16px; font-size:14px; width:auto; text-decoration:none; background:var(--primary); color:#fff; border-radius:6px; font-weight:600;">
+                    <a href="<?= BASE_URL . sanitize($targetUrl) ?>" class="btn btn-primary" style="display:inline-block; padding:8px 16px; font-size:14px; width:auto; text-decoration:none; background:var(--primary); color:#fff; border-radius:6px; font-weight:600;">
                         Buka Halaman ➔
                     </a>
                 </div>

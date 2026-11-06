@@ -15,6 +15,10 @@ try {
 try {
     $pdo->exec("ALTER TABLE announcements MODIFY COLUMN tipe VARCHAR(50) NOT NULL");
 } catch (Exception $e) {}
+try {
+    // Normalisasi link tujuan pengumuman hasil pretes ke halaman pretes-hasil.php
+    $pdo->exec("UPDATE announcements SET link_tujuan = '/pages/pretes-hasil.php' WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') AND (link_tujuan LIKE '%pretes-peserta.php%' OR link_tujuan IS NULL)");
+} catch (Exception $e) {}
 
 $user = getCurrentUser();
 $message = '';
@@ -37,7 +41,8 @@ $tipeOptions = [
 $linkOptions = [
     '' => '-- Tidak Ada Link --',
     '/pages/pretes-daftar.php' => 'Pendaftaran Pretes',
-    '/pages/pretes-peserta.php' => 'Jadwal & Hasil Pretes',
+    '/pages/pretes-peserta.php' => 'Peserta & Jadwal Pretes',
+    '/pages/pretes-hasil.php' => 'Pengumuman Hasil Pretes',
     '/pages/tutorial-pendaftaran.php' => 'Pendaftaran Tutorial',
     '/pages/tutorial-pembagian.php' => 'Cek Pembagian Kelas',
     '/pages/tutorial-pengumuman.php' => 'Cek Kelulusan Tutorial',
@@ -305,7 +310,7 @@ function bindAutoLink(tipeId, linkId) {
         if (val === 'pendaftaran_pretes') {
             linkEl.value = '/pages/pretes-daftar.php';
         } else if (val === 'hasil_pretes') {
-            linkEl.value = '/pages/pretes-peserta.php';
+            linkEl.value = '/pages/pretes-hasil.php';
         } else if (val === 'pendaftaran_gel1' || val === 'pendaftaran_gel2' || val === 'pendaftaran_mandiri') {
             linkEl.value = '/pages/tutorial-pendaftaran.php';
         } else if (val.indexOf('pembagian_kelas') !== -1) {
