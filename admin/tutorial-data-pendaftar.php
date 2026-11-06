@@ -1118,6 +1118,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Jurusan</th>
                         <th>Pilihan Hari</th>
                         <th>Status Kelas</th>
+                        <th>Tanggal &amp; Waktu Daftar</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
@@ -1135,6 +1136,10 @@ include __DIR__ . '/../includes/header.php';
                         elseif ($h === 'Kamis') $badgeClass = 'badge-warning';
                         elseif ($h === 'Jumat') $badgeClass = 'badge-danger';
                         elseif ($h === 'Belum Memilih') $badgeClass = 'badge-secondary';
+                        $registeredAt = trim($reg['created_at'] ?? '');
+                        $registeredTimestamp = ($registeredAt !== '' && strpos($registeredAt, '0000-00-00') !== 0)
+                            ? strtotime($registeredAt)
+                            : false;
                     ?>
                     <tr data-hari="<?= htmlspecialchars($h, ENT_QUOTES) ?>"
                         data-status="<?= !empty($reg['tutorial_class_id']) ? 'diplot' : 'menunggu' ?>"
@@ -1165,6 +1170,9 @@ include __DIR__ . '/../includes/header.php';
                             <?php else: ?>
                                 <span class="badge badge-warning">⏳ Menunggu</span>
                             <?php endif; ?>
+                        </td>
+                        <td data-order="<?= $registeredTimestamp !== false ? $registeredTimestamp : 0 ?>" style="white-space: nowrap;">
+                            <?= $registeredTimestamp !== false ? date('d/m/Y H:i', $registeredTimestamp) : '-' ?>
                         </td>
                         <td>
                             <button type="button" class="btn btn-sm btn-warning" style="margin-right:4px;"
