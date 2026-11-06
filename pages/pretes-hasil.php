@@ -20,14 +20,17 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $myResults = $stmt->fetchAll();
 
-// Get all published results (public announcement)
-$allResults = $pdo->query("
-    SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi
-    FROM pretes_results pr
-    JOIN users u ON pr.user_id = u.id
-    WHERE pr.status_lulus != 'belum_diumumkan'
-    ORDER BY pr.nilai DESC
-")->fetchAll();
+// Get all published results (public announcement) - hanya dimuat untuk Admin dan Dosen
+$allResults = [];
+if (isAdmin() || isDosen()) {
+    $allResults = $pdo->query("
+        SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi
+        FROM pretes_results pr
+        JOIN users u ON pr.user_id = u.id
+        WHERE pr.status_lulus != 'belum_diumumkan'
+        ORDER BY pr.nilai DESC
+    ")->fetchAll();
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -39,6 +42,9 @@ include __DIR__ . '/../includes/header.php';
         <?php if (empty($myResults)): ?>
             <div class="alert alert-info">
                 Anda belum memiliki hasil pretes. Pastikan Anda sudah mendaftar dan mengikuti pretes.
+            </div>
+            <div style="margin-top:16px;">
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none;">🏠 Kembali ke Dashboard</a>
             </div>
         <?php else: ?>
             <?php foreach ($myResults as $result): ?>
@@ -72,13 +78,33 @@ include __DIR__ . '/../includes/header.php';
                     <strong>Keterangan:</strong> <?= sanitize($result['keterangan']) ?>
                 </div>
                 <?php endif; ?>
+
+                <?php if ($result['status_lulus'] === 'lulus'): ?>
+                    <div style="margin-top:16px; background:#ecfdf5; border:1px solid #a7f3d0; padding:14px 18px; border-radius:8px; color:#065f46; font-size:14px; line-height:1.5;">
+                        🎉 <strong>Selamat!</strong> Anda dinyatakan <strong>LULUS Pretes</strong> dan dibebaskan dari kewajiban mengikuti program Tutorial LPPAI.
+                    </div>
+                <?php elseif ($result['status_lulus'] === 'tidak_lulus'): ?>
+                    <div style="margin-top:16px; background:#fff1f2; border:1px solid #fecdd3; padding:14px 18px; border-radius:8px; color:#9f1239; font-size:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; line-height:1.5;">
+                        <div>
+                            ⚠️ <strong>Informasi:</strong> Anda belum dinyatakan lulus Pretes. Silakan mendaftarkan diri pada program <strong>Tutorial LPPAI</strong> pada gelombang pendaftaran yang dibuka.
+                        </div>
+                        <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-sm btn-danger" style="text-decoration:none; white-space:nowrap; padding:8px 16px; font-weight:700;">
+                            📝 Daftar Tutorial ➔
+                        </a>
+                    </div>
+                <?php endif; ?>
             </div>
             <?php endforeach; ?>
+
+            <div style="margin-top:20px;">
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none;">🏠 Kembali ke Dashboard</a>
+            </div>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- All Results -->
+<?php if (isAdmin() || isDosen()): ?>
+<!-- All Results (Hanya untuk Admin / Dosen) -->
 <div class="card">
     <div class="card-header">📋 Daftar Hasil Pretes (Semua Peserta)</div>
     <div class="card-body">
@@ -124,6 +150,6 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-
