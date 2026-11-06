@@ -36,6 +36,46 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $myPretesReg = $stmt->fetch();
 
+// Cek status periode pretes aktif
+$activePretes = null;
+try {
+    $activePretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
+} catch (Exception $e) {}
+
+// Pretes dinyatakan selesai jika tidak ada periode master_pretes yang aktif atau status periode mahasiswa sudah nonaktif
+$isPretesSelesai = false;
+if (!$activePretes) {
+    $isPretesSelesai = true;
+} elseif ($myPretesReg && !empty($myPretesReg['periode'])) {
+    try {
+        $stmtPer = $pdo->prepare("SELECT status FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
+        $stmtPer->execute([$myPretesReg['periode']]);
+        $perStatus = $stmtPer->fetchColumn();
+        if ($perStatus !== false && $perStatus !== 'aktif') {
+            $isPretesSelesai = true;
+        }
+    } catch (Exception $e) {}
+}
+
+// Cek kelulusan pretes
+$isPretesLulus = ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus');
+
+// Tentukan teks status pretes di dashboard
+if ($isPretesSelesai) {
+    // Karena periode pretes sudah selesai, status definitif: Lulus atau Tidak Lulus (tidak ada status menunggu)
+    $pretesStatusText = $isPretesLulus ? '✅ Lulus' : '❌ Tidak Lulus';
+} else {
+    if ($isPretesLulus) {
+        $pretesStatusText = '✅ Lulus';
+    } elseif ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'tidak_lulus') {
+        $pretesStatusText = '❌ Belum Lulus';
+    } elseif ($myPretesReg || $pretesResult) {
+        $pretesStatusText = '⏳ Menunggu';
+    } else {
+        $pretesStatusText = '-';
+    }
+}
+
 // Cek status kehadiran pretes
 $isHadirPretes = false;
 $pretesAttendedAt = null;
@@ -53,8 +93,14 @@ if ($myPretesReg) {
     } catch (Exception $e) {}
 }
 
-// Get tutorial registrations
-$stmt = $pdo->prepare("SELECT tr.*, tc.nama_kelas, tc.gelombang, tc.hari, tc.jam, tc.ruangan FROM tutorial_registrations tr JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id WHERE tr.user_id = ? AND (tahun_ajaran LIKE '%2026%' OR tahun_ajaran LIKE '%2027%' OR tahun_ajaran LIKE '%2028%' OR tahun_ajaran LIKE '%2029%' OR tahun_ajaran LIKE '%2030%') ORDER BY tr.created_at DESC");
+// Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
+$stmt = $pdo->prepare("
+    SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan 
+    FROM tutorial_registrations tr 
+    LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
+    WHERE tr.user_id = ? AND (tr.tahun_ajaran LIKE '%2026%' OR tr.tahun_ajaran LIKE '%2027%' OR tr.tahun_ajaran LIKE '%2028%' OR tr.tahun_ajaran LIKE '%2029%' OR tr.tahun_ajaran LIKE '%2030%') 
+    ORDER BY tr.created_at DESC
+");
 $stmt->execute([$user['id']]);
 $tutorialRegs = $stmt->fetchAll();
 
@@ -68,7 +114,10 @@ foreach ($tutorialRegs as $reg) {
     if (!empty($reg['nomor_sertifikat'])) {
         $isLulusTutorial = true;
     }
-    $registeredGels[] = $reg['gelombang']; // 'gel1', 'gel2', 'mandiri'
+    $gVal = $reg['gelombang'] ?: ($reg['kelas_gelombang'] ?? '');
+    if ($gVal) {
+        $registeredGels[] = $gVal; // 'gel1', 'gel2', 'mandiri'
+    }
 }
 
 $recentAnnouncements = [];
@@ -153,21 +202,34 @@ include __DIR__ . '/../includes/header.php';
     <div class="stat-card">
         <div class="stat-icon blue">📝</div>
         <div class="stat-info">
-            <h3><?= $pretesResult ? ($pretesResult['status_lulus'] === 'lulus' ? '✅ Lulus' : ($pretesResult['status_lulus'] === 'tidak_lulus' ? '❌ Belum Lulus' : '⏳ Menunggu')) : '-' ?></h3>
+            <h3 style="<?= $pretesStatusText === '❌ Tidak Lulus' ? 'color:#dc2626;' : ($pretesStatusText === '✅ Lulus' ? 'color:#16a34a;' : '') ?>">
+                <?= $pretesStatusText ?>
+            </h3>
             <p>Status Pretes</p>
         </div>
     </div>
     <div class="stat-card">
         <div class="stat-icon orange">📚</div>
         <div class="stat-info">
-            <h3><?= count($tutorialRegs) ?></h3>
-            <p>Kelas Tutorial</p>
+            <?php if (!empty($tutorialRegs)): ?>
+                <?php 
+                $firstTutor = $tutorialRegs[0];
+                $hariPilihanTutor = !empty($firstTutor['hari_pilihan']) ? $firstTutor['hari_pilihan'] : (!empty($firstTutor['kelas_hari']) ? $firstTutor['kelas_hari'] : '');
+                ?>
+                <h3 style="font-size:17px; font-weight:700; color:var(--primary);">
+                    <?= $hariPilihanTutor ? 'Hari ' . sanitize($hariPilihanTutor) : 'Terdaftar' ?>
+                </h3>
+                <p>Pilihan Hari Tutorial</p>
+            <?php else: ?>
+                <h3>0</h3>
+                <p>Kelas Tutorial</p>
+            <?php endif; ?>
         </div>
     </div>
 </div>
 
-<!-- Pretes Registration & Schedule (Usulan 1) -->
-<?php if ($myPretesReg): ?>
+<!-- Pretes Registration & Schedule (Disembunyikan jika pretes dinyatakan selesai) -->
+<?php if ($myPretesReg && !$isPretesSelesai): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary); box-shadow: var(--shadow);">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc;">
         <div style="display:flex; align-items:center; gap:10px;">
@@ -378,6 +440,40 @@ include __DIR__ . '/../includes/header.php';
 </div>
 <?php endif; ?>
 
+<!-- Banner Ringkasan Hasil Pretes (Tampil jika pretes dinyatakan selesai) -->
+<?php if ($myPretesReg && $isPretesSelesai): ?>
+<div class="card" style="margin-bottom: 24px; border-left: 4px solid <?= $isPretesLulus ? '#10b981' : '#ef4444' ?>; box-shadow: var(--shadow);">
+    <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:18px 22px;">
+        <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:26px; background:<?= $isPretesLulus ? '#dcfce7' : '#fee2e2' ?>; flex-shrink:0;">
+                <?= $isPretesLulus ? '🎉' : '📢' ?>
+            </div>
+            <div>
+                <h3 style="margin:0 0 3px 0; font-size:16px; font-weight:700; color:#1e293b;">
+                    Pretes Periode <?= sanitize($myPretesReg['periode'] ?? '2026/2027') ?> Telah Selesai
+                </h3>
+                <p style="margin:0; font-size:13.5px; color:#64748b; line-height:1.4;">
+                    Status Akhir: <strong style="color:<?= $isPretesLulus ? '#16a34a' : '#dc2626' ?>;"><?= $isPretesLulus ? '✅ LULUS' : '❌ TIDAK LULUS' ?></strong>
+                    <?php if (!$isPretesLulus): ?>
+                        &bull; Anda diwajibkan untuk mendaftar dan mengikuti program <strong>Tutorial LPPAI</strong>.
+                    <?php endif; ?>
+                </p>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-primary" style="text-decoration:none; padding:8px 18px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                📊 Lihat Nilai & Hasil Pretes
+            </a>
+            <?php if (!$isPretesLulus): ?>
+                <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none; padding:8px 18px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px; background:#dc2626; border-color:#dc2626;">
+                    📝 Daftar Tutorial ➔
+                </a>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Tutorial Registrations -->
 <?php if (!empty($tutorialRegs)): ?>
 <div class="card">
@@ -389,7 +485,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th>Kelas</th>
                         <th>Gelombang</th>
-                        <th>Jadwal</th>
+                        <th>Jadwal / Hari Pilihan</th>
                         <th>Ruangan</th>
                         <th>Status</th>
                         <th>Nilai</th>
@@ -399,15 +495,24 @@ include __DIR__ . '/../includes/header.php';
                 <tbody>
                     <?php foreach ($tutorialRegs as $reg): ?>
                     <tr>
-                        <td><?= sanitize($reg['nama_kelas']) ?></td>
+                        <td><strong><?= sanitize($reg['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></strong></td>
                         <td>
                             <?php
                             $gelLabels = ['gel1' => 'Gelombang 1', 'gel2' => 'Gelombang 2', 'mandiri' => 'Mandiri'];
-                            echo $gelLabels[$reg['gelombang']] ?? $reg['gelombang'];
+                            $gVal = $reg['gelombang'] ?: ($reg['kelas_gelombang'] ?? '');
+                            echo $gelLabels[$gVal] ?? $gVal;
                             ?>
                         </td>
-                        <td><?= sanitize($reg['hari']) ?>, <?= sanitize($reg['jam']) ?></td>
-                        <td><?= sanitize($reg['ruangan']) ?></td>
+                        <td>
+                            <?php if (!empty($reg['hari']) || !empty($reg['kelas_hari'])): ?>
+                                <?= sanitize($reg['hari'] ?: $reg['kelas_hari']) ?>, <?= sanitize($reg['jam'] ?: ($reg['kelas_jam'] ?: '13.00 - 14.30')) ?>
+                            <?php elseif (!empty($reg['hari_pilihan'])): ?>
+                                Hari: <strong><?= sanitize($reg['hari_pilihan']) ?></strong> (13.00 - 14.30)
+                            <?php else: ?>
+                                -
+                            <?php endif; ?>
+                        </td>
+                        <td><?= sanitize($reg['ruangan'] ?: ($reg['kelas_ruangan'] ?: 'Menunggu plotting')) ?></td>
                         <td>
                             <?php
                             $statusBadge = [
