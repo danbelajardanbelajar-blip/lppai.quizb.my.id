@@ -108,9 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     continue;
                 }
 
-                $avg = round($sum / $filled, 2);
+                $avg = round($sum / $totalComponents, 2);
                 $statusLulus = getPretesStatusLulus($scores);
-                if ($statusLulus === 'menunggu') $statusLulus = 'belum_diumumkan';
+                if ($filled < $totalComponents || $statusLulus === 'menunggu') $statusLulus = 'tidak_lulus';
                 
                 $predikat = getPretesPredikat($avg);
                 $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$totalComponents} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
@@ -242,7 +242,7 @@ foreach ($rawRows as $row) {
         }
     }
 
-    $avg = ($filled > 0) ? round($sum / $filled, 2) : null;
+    $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : null;
     $predikat = getPretesPredikat($avg);
     $statusLulus = getPretesStatusLulus($scores);
 
