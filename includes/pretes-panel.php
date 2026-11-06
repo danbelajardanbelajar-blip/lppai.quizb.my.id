@@ -108,6 +108,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 exit;
             }
+        } elseif ($action === 'import_cbt_scores') {
+            if ($user['role'] !== 'admin') {
+                throw new InvalidArgumentException('Hanya Administrator yang memiliki wewenang untuk mengimpor nilai CBT.');
+            }
+            require_once __DIR__ . '/pretes-cbt-importer.php';
+            require_once __DIR__ . '/import_eujian_excel.php';
+
+            $rows = [];
+            if (!empty($_POST['cbt_text'])) {
+                $rows = parsePretesCbtText($_POST['cbt_text']);
+            } elseif (isset($_FILES['cbt_file']) && $_FILES['cbt_file']['error'] === UPLOAD_ERR_OK) {
+                $file = $_FILES['cbt_file'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if ($ext === 'csv') {
+                    $rows = parsePretesCbtText(file_get_contents($file['tmp_name']));
+                } else {
+                    $rows = parseSpreadsheetRows($file['tmp_name'], $file['name']);
+                }
+            }
+
+            if (empty($rows)) {
+                throw new InvalidArgumentException('Tidak ada data baris yang ditemukan untuk diimpor.');
+            }
+
+            $targetPeriode = trim($_POST['target_periode'] ?? ($period['periode'] ?? ''));
+            $res = importPretesCbtData($pdo, $rows, $targetPeriode, (int)$user['id'], [
+                'overwrite' => !empty($_POST['overwrite']),
+                'auto_register' => !empty($_POST['auto_register']),
+            ]);
+
+            $pdo->commit();
+            $message = $res['message'];
+            $msgType = $res['success'] ? 'success' : 'danger';
+
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode($res);
+                exit;
+            }
         } else {
             throw new InvalidArgumentException('Tindakan tidak valid.');
         }
@@ -477,21 +516,30 @@ include __DIR__ . '/header.php';
         </div>
     </div>
 
-    <!-- Periode Selector Form -->
-    <form method="GET" data-no-spa style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);padding:8px 12px;border-radius:12px;backdrop-filter:blur(6px);">
-        <label for="pretes-period" style="font-size:12.5px;font-weight:700;color:#ffffff;margin:0;white-space:nowrap;">
-            📅 Periode:
-        </label>
-        <select id="pretes-period" name="pretes_id" onchange="this.form.submit()" 
-            style="background:#ffffff;color:#1e293b;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;outline:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-            <?php foreach ($periods as $item): ?>
-            <option value="<?= (int)$item['id'] ?>" <?= (int)$item['id'] === (int)$periodId ? 'selected' : '' ?>>
-                <?= sanitize($item['periode']) ?> <?= $item['status'] === 'aktif' ? '(Aktif)' : '' ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-        <noscript><button class="btn btn-sm btn-light">Pilih</button></noscript>
-    </form>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <!-- Periode Selector Form -->
+        <form method="GET" data-no-spa style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.15);padding:8px 12px;border-radius:12px;backdrop-filter:blur(6px);margin:0;">
+            <label for="pretes-period" style="font-size:12.5px;font-weight:700;color:#ffffff;margin:0;white-space:nowrap;">
+                📅 Periode:
+            </label>
+            <select id="pretes-period" name="pretes_id" onchange="this.form.submit()" 
+                style="background:#ffffff;color:#1e293b;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;outline:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                <?php foreach ($periods as $item): ?>
+                <option value="<?= (int)$item['id'] ?>" <?= (int)$item['id'] === (int)$periodId ? 'selected' : '' ?>>
+                    <?= sanitize($item['periode']) ?> <?= $item['status'] === 'aktif' ? '(Aktif)' : '' ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+            <noscript><button class="btn btn-sm btn-light">Pilih</button></noscript>
+        </form>
+
+        <?php if ($user['role'] === 'admin'): ?>
+        <button type="button" class="btn btn-warning" onclick="openImportCbtModal()"
+            style="background:#f59e0b;color:#ffffff;border:none;padding:8px 16px;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.15);display:inline-flex;align-items:center;gap:6px;transition:all 0.15s ease;">
+            📥 Import Nilai CBT
+        </button>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- ── STAT CARDS (OVERVIEW PROGRES PENILAIAN) ── -->
@@ -1163,6 +1211,14 @@ include __DIR__ . '/header.php';
                 </span>
             </div>
         </div>
+        <?php if ($user['role'] === 'admin'): ?>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" onclick="openImportCbtModal()"
+                style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:8px 16px;border-radius:10px;background:#2563eb;color:#ffffff;border:none;cursor:pointer;box-shadow:0 2px 6px rgba(37,99,235,0.25);">
+                📥 Import Nilai CBT
+            </button>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="card-body pretes-roster-body">
@@ -1232,10 +1288,22 @@ include __DIR__ . '/header.php';
                                                 <?php endif; ?>
                                             </span>
                                         </div>
-                                        <div class="student-meta" style="margin-top:5px;font-size:12.5px;color:#64748b;display:flex;flex-wrap:wrap;gap:12px;">
+                                        <div class="student-meta" style="margin-top:5px;font-size:12.5px;color:#64748b;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
                                             <span><strong>NIM:</strong> <?= sanitize($row['nim']) ?></span>
                                             <span><strong>Prodi:</strong> <?= sanitize($row['program_studi'] ?: '-') ?></span>
                                             <span><strong>Sesi:</strong> <?= sanitize($row['hari_pilihan'] ?: 'Senin') ?><?= !empty($row['ruangan']) ? ' · ' . sanitize($row['ruangan']) : '' ?></span>
+                                            <?php 
+                                            $cbtVal = $rowScores['ujian_tulis'] ?? null;
+                                            if ($cbtVal !== null && $cbtVal !== '' && is_numeric($cbtVal)): 
+                                                $numCbt = (float)$cbtVal;
+                                                $cbtColor = $numCbt >= 80 ? '#15803d' : '#b91c1c';
+                                                $cbtBg = $numCbt >= 80 ? '#dcfce7' : '#fee2e2';
+                                                $cbtBorder = $numCbt >= 80 ? '#86efac' : '#fca5a5';
+                                            ?>
+                                                <span style="background:<?= $cbtBg ?>;color:<?= $cbtColor ?>;padding:1px 8px;border-radius:6px;font-size:11px;font-weight:800;border:1px solid <?= $cbtBorder ?>;display:inline-flex;align-items:center;gap:4px;" title="Nilai Komponen Ujian Tulis (CBT)">
+                                                    📝 CBT: <?= number_format($numCbt, 1) ?> (<?= $numCbt >= 80 ? 'Lulus' : 'Remidi' ?>)
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -1768,6 +1836,379 @@ if (document.readyState === 'loading') {
     initPretesDataTable();
     checkAutoOpenRegistration();
 }
+
+// ── 7. Fitur Modal Import Nilai CBT Pretes ──────────────────────────────────
+var currentCbtTab = 'file';
+
+function openImportCbtModal() {
+    var modal = document.getElementById('modal-import-cbt');
+    if (modal) {
+        modal.style.display = 'flex';
+        var resultBox = document.getElementById('cbt-result-box');
+        if (resultBox) resultBox.style.display = 'none';
+        var reloadBtn = document.getElementById('btn-reload-cbt-after');
+        if (reloadBtn) reloadBtn.style.display = 'none';
+        var submitBtn = document.getElementById('btn-submit-cbt-import');
+        if (submitBtn) {
+            submitBtn.style.display = 'inline-flex';
+            submitBtn.disabled = false;
+        }
+    }
+}
+
+function closeImportCbtModal() {
+    var modal = document.getElementById('modal-import-cbt');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchCbtInputTab(tab) {
+    currentCbtTab = tab;
+    var tabFile = document.getElementById('tab-cbt-file');
+    var tabPaste = document.getElementById('tab-cbt-paste');
+    var paneFile = document.getElementById('cbt-pane-file');
+    var panePaste = document.getElementById('cbt-pane-paste');
+
+    if (tab === 'file') {
+        if (tabFile) {
+            tabFile.style.color = '#2563eb';
+            tabFile.style.borderBottomColor = '#2563eb';
+            tabFile.style.fontWeight = '800';
+        }
+        if (tabPaste) {
+            tabPaste.style.color = '#64748b';
+            tabPaste.style.borderBottomColor = 'transparent';
+            tabPaste.style.fontWeight = '700';
+        }
+        if (paneFile) paneFile.style.display = 'block';
+        if (panePaste) panePaste.style.display = 'none';
+    } else {
+        if (tabPaste) {
+            tabPaste.style.color = '#2563eb';
+            tabPaste.style.borderBottomColor = '#2563eb';
+            tabPaste.style.fontWeight = '800';
+        }
+        if (tabFile) {
+            tabFile.style.color = '#64748b';
+            tabFile.style.borderBottomColor = 'transparent';
+            tabFile.style.fontWeight = '700';
+        }
+        if (paneFile) paneFile.style.display = 'none';
+        if (panePaste) panePaste.style.display = 'block';
+    }
+}
+
+function handleCbtFileSelected(input) {
+    var fnEl = document.getElementById('cbt-file-name');
+    if (input.files && input.files[0]) {
+        var file = input.files[0];
+        fnEl.textContent = '📄 ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+        fnEl.style.display = 'block';
+    } else {
+        fnEl.style.display = 'none';
+    }
+}
+
+// Drag & drop support on dropzone
+var dropzone = document.getElementById('cbt-dropzone');
+if (dropzone) {
+    ['dragenter', 'dragover'].forEach(function(eventName) {
+        dropzone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#2563eb';
+            dropzone.style.background = '#eff6ff';
+        });
+    });
+    ['dragleave', 'drop'].forEach(function(eventName) {
+        dropzone.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#94a3b8';
+            dropzone.style.background = '#f8fafc';
+        });
+    });
+    dropzone.addEventListener('drop', function(e) {
+        var dt = e.dataTransfer;
+        var files = dt.files;
+        if (files && files.length > 0) {
+            var fileInput = document.getElementById('cbt-file-input');
+            fileInput.files = files;
+            handleCbtFileSelected(fileInput);
+        }
+    });
+}
+
+// Close modal when backdrop clicked
+var modalCbt = document.getElementById('modal-import-cbt');
+if (modalCbt) {
+    modalCbt.addEventListener('click', function(e) {
+        if (e.target === modalCbt) closeImportCbtModal();
+    });
+}
+
+function submitCbtImport() {
+    var targetPeriodeEl = document.getElementById('cbt-target-periode');
+    var targetPeriode = targetPeriodeEl ? targetPeriodeEl.value : '';
+    var overwrite = document.getElementById('cbt-opt-overwrite') && document.getElementById('cbt-opt-overwrite').checked ? '1' : '0';
+    var autoRegister = document.getElementById('cbt-opt-autoreg') && document.getElementById('cbt-opt-autoreg').checked ? '1' : '0';
+
+    var formData = new FormData();
+    formData.append('csrf_token', '<?= csrfToken() ?>');
+    formData.append('periode', targetPeriode);
+    formData.append('overwrite', overwrite);
+    formData.append('auto_register', autoRegister);
+
+    if (currentCbtTab === 'file') {
+        var fileInput = document.getElementById('cbt-file-input');
+        if (!fileInput.files || fileInput.files.length === 0) {
+            alert('Silakan pilih berkas Excel atau CSV terlebih dahulu.');
+            return;
+        }
+        formData.append('cbt_file', fileInput.files[0]);
+    } else {
+        var pasteInput = document.getElementById('cbt-paste-input').value.trim();
+        if (!pasteInput) {
+            alert('Silakan tempelkan (paste) data hasil CBT terlebih dahulu.');
+            return;
+        }
+        formData.append('cbt_text', pasteInput);
+    }
+
+    var submitBtn = document.getElementById('btn-submit-cbt-import');
+    var resultBox = document.getElementById('cbt-result-box');
+    var progressWrap = document.getElementById('cbt-progress-bar-wrap');
+    var feedbackAlert = document.getElementById('cbt-feedback-alert');
+    var tableWrap = document.getElementById('cbt-details-table-wrap');
+    var tbody = document.getElementById('cbt-details-tbody');
+    var reloadBtn = document.getElementById('btn-reload-cbt-after');
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '⏳ Mengimpor...';
+    resultBox.style.display = 'block';
+    progressWrap.style.display = 'block';
+    feedbackAlert.innerHTML = '';
+    tableWrap.style.display = 'none';
+    tbody.innerHTML = '';
+
+    fetch('<?= BASE_URL ?>/admin/ajax-import-pretes-cbt.php', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(function(res) {
+        return res.json();
+    })
+    .then(function(data) {
+        progressWrap.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '🚀 Mulai Import Nilai CBT';
+
+        if (data.success) {
+            feedbackAlert.innerHTML = '<div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:700;">' +
+                '✅ ' + data.message + '</div>';
+            reloadBtn.style.display = 'inline-flex';
+            submitBtn.style.display = 'none';
+        } else {
+            feedbackAlert.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:700;">' +
+                '⚠️ ' + (data.message || 'Gagal memproses impor CBT.') + '</div>';
+        }
+
+        if (data.details && data.details.length > 0) {
+            tableWrap.style.display = 'block';
+            var html = '';
+            data.details.forEach(function(row) {
+                var bg = '#ffffff';
+                var badgeStyle = 'background:#f1f5f9;color:#475569;';
+                if (row.type === 'updated') {
+                    badgeStyle = 'background:#eff6ff;color:#1d4ed8;font-weight:700;';
+                } else if (row.type === 'created') {
+                    badgeStyle = 'background:#f0fdf4;color:#15803d;font-weight:700;';
+                } else if (row.type === 'failed') {
+                    badgeStyle = 'background:#fef2f2;color:#b91c1c;font-weight:700;';
+                    bg = '#fff5f5';
+                }
+                html += '<tr style="border-bottom:1px solid #f1f5f9;background:' + bg + ';">' +
+                    '<td style="padding:6px 10px;font-family:monospace;font-weight:700;">' + (row.nim || '-') + '</td>' +
+                    '<td style="padding:6px 10px;">' + (row.nama || '-') + '</td>' +
+                    '<td style="padding:6px 10px;text-align:center;">' + (row.kelas || '-') + '</td>' +
+                    '<td style="padding:6px 10px;text-align:center;font-weight:800;color:#0f172a;">' + (row.nilai !== undefined ? row.nilai : '-') + '</td>' +
+                    '<td style="padding:6px 10px;"><span style="padding:2px 8px;border-radius:6px;font-size:11px;' + badgeStyle + '">' + (row.status || '') + '</span></td>' +
+                '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+    })
+    .catch(function(err) {
+        progressWrap.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '🚀 Mulai Import Nilai CBT';
+        feedbackAlert.innerHTML = '<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:700;">' +
+            '⚠️ Terjadi kesalahan koneksi saat mengunggah berkas. Silakan coba lagi.</div>';
+    });
+}
+</script>
+
+<?php if ($user['role'] === 'admin'): ?>
+<!-- ── MODAL IMPORT HASIL CBT ────────────────────────────────────────────────── -->
+<div id="modal-import-cbt" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);z-index:99999;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+    <div style="background:#ffffff;border-radius:18px;max-width:760px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);border:1px solid #cbd5e1;display:flex;flex-direction:column;">
+        
+        <!-- Header Modal -->
+        <div style="background:linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);color:#ffffff;padding:20px 24px;border-top-left-radius:17px;border-top-right-radius:17px;display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <div style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#93c5fd;margin-bottom:4px;display:flex;align-items:center;gap:6px;">
+                    <span>📝</span> Modul Penilaian Pretes
+                </div>
+                <h3 style="margin:0;font-size:19px;font-weight:800;color:#ffffff;line-height:1.3;">
+                    Import Hasil Ujian Tulis CBT
+                </h3>
+                <p style="margin:4px 0 0;font-size:12.5px;color:#dbeafe;line-height:1.4;">
+                    Perbarui komponen <strong>Ujian Tulis (CBT)</strong> mahasiswa secara massal dari berkas Excel/CSV atau tempelkan data.
+                </p>
+            </div>
+            <button type="button" onclick="closeImportCbtModal()" style="background:rgba(255,255,255,0.15);border:none;color:#ffffff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+                ✕
+            </button>
+        </div>
+
+        <!-- Body Modal -->
+        <div style="padding:22px 24px;flex:1;">
+            
+            <!-- Kolom Format Notice -->
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #2563eb;padding:12px 16px;border-radius:8px;margin-bottom:20px;font-size:12.5px;color:#334155;line-height:1.5;">
+                <div style="font-weight:700;color:#0f172a;margin-bottom:4px;">
+                    📋 Format Kolom yang Dikenali:
+                </div>
+                <div style="background:#ffffff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:6px;font-family:monospace;font-size:12px;color:#0369a1;font-weight:700;display:inline-block;margin-bottom:6px;">
+                    No. , Nomor Induk , Nama , Kelas , Nilai , Keterangan
+                </div>
+                <div style="font-size:11.5px;color:#64748b;">
+                    • <strong>Nomor Induk</strong>: NIM mahasiswa untuk pencocokan ke database.<br>
+                    • <strong>Kelas</strong>: Hari ujian (Senin / Selasa / Rabu / Kamis / Jumat).<br>
+                    • <strong>Nilai</strong>: Angka skor 0 s.d. 100 yang akan dimasukkan ke komponen <strong>Ujian tulis (CBT)</strong>.
+                </div>
+            </div>
+
+            <!-- Target Periode -->
+            <div style="margin-bottom:18px;">
+                <label for="cbt-target-periode" style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">
+                    📅 Target Periode Pretes:
+                </label>
+                <select id="cbt-target-periode" style="width:100%;padding:10px 14px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:13px;font-weight:600;color:#1e293b;background:#ffffff;outline:none;">
+                    <?php foreach ($periods as $item): ?>
+                    <option value="<?= sanitize($item['periode']) ?>" <?= (int)$item['id'] === (int)$periodId ? 'selected' : '' ?>>
+                        <?= sanitize($item['periode']) ?> <?= $item['status'] === 'aktif' ? '(Aktif)' : '' ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <!-- Tabs: Unggah File vs Salin & Tempel -->
+            <div style="margin-bottom:18px;">
+                <div style="display:flex;gap:8px;border-bottom:2px solid #e2e8f0;padding-bottom:2px;margin-bottom:14px;">
+                    <button type="button" id="tab-cbt-file" onclick="switchCbtInputTab('file')"
+                        style="background:none;border:none;padding:8px 16px;font-size:13px;font-weight:800;color:#2563eb;border-bottom:3px solid #2563eb;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                        📁 Unggah File Excel / CSV
+                    </button>
+                    <button type="button" id="tab-cbt-paste" onclick="switchCbtInputTab('paste')"
+                        style="background:none;border:none;padding:8px 16px;font-size:13px;font-weight:700;color:#64748b;border-bottom:3px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                        📋 Salin &amp; Tempel (Paste) Teks
+                    </button>
+                </div>
+
+                <!-- Input Method 1: File Upload -->
+                <div id="cbt-pane-file">
+                    <div id="cbt-dropzone" style="border:2px dashed #94a3b8;border-radius:12px;padding:26px 20px;text-align:center;background:#f8fafc;cursor:pointer;transition:all 0.2s;"
+                        onclick="document.getElementById('cbt-file-input').click()"
+                        onmouseover="this.style.borderColor='#2563eb';this.style.background='#eff6ff';"
+                        onmouseout="this.style.borderColor='#94a3b8';this.style.background='#f8fafc';">
+                        <div style="font-size:36px;margin-bottom:6px;">📂</div>
+                        <div style="font-size:14px;font-weight:700;color:#0f172a;">
+                            Klik untuk memilih berkas atau seret &amp; lepas ke sini
+                        </div>
+                        <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                            Mendukung berkas <strong>.csv</strong>, <strong>.xlsx</strong>, atau <strong>.xls</strong> (Maksimal 10MB)
+                        </div>
+                        <div id="cbt-file-name" style="margin-top:10px;font-size:12.5px;font-weight:700;color:#2563eb;display:none;"></div>
+                    </div>
+                    <input type="file" id="cbt-file-input" accept=".csv, .xlsx, .xls" style="display:none;" onchange="handleCbtFileSelected(this)">
+                </div>
+
+                <!-- Input Method 2: Paste Textarea -->
+                <div id="cbt-pane-paste" style="display:none;">
+                    <label for="cbt-paste-input" style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">
+                        Tempelkan (Ctrl+V) baris data hasil CBT di bawah ini:
+                    </label>
+                    <textarea id="cbt-paste-input" rows="8" placeholder="No.,Nomor Induk,Nama,Kelas,Nilai,Keterangan&#10;1,24042061,AHMAD NASIK MAULAL HAQQI,Jumat,96,Lulus&#10;1,24081002,ABDUL AZIZ ASY'ARI,kamis,0,Tidak Lulus&#10;2,24032035,AFIYATUS SHOLICHAH,senin,54,Tidak Lulus"
+                        style="width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:10px;font-family:monospace;font-size:12px;color:#1e293b;line-height:1.5;resize:vertical;"></textarea>
+                    <span style="font-size:11px;color:#64748b;display:block;margin-top:4px;">
+                        * Pemisah dapat berupa koma (,), titik koma (;), atau tab dari Microsoft Excel.
+                    </span>
+                </div>
+            </div>
+
+            <!-- Opsi Tambahan -->
+            <div style="background:#f1f5f9;border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;flex-direction:column;gap:8px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#334155;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="cbt-opt-overwrite" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span>Timpa nilai CBT mahasiswa jika sudah pernah diisi sebelumnya</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#334155;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="cbt-opt-autoreg" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span>Otomatis daftarkan mahasiswa ke pretes periode ini jika akun ada di tabel users namun belum terdaftar</span>
+                </label>
+            </div>
+
+            <!-- Area Hasil & Log Impor (Dinamis) -->
+            <div id="cbt-result-box" style="display:none;margin-bottom:18px;">
+                <div id="cbt-progress-bar-wrap" style="display:none;margin-bottom:12px;">
+                    <div style="font-size:12.5px;font-weight:700;color:#2563eb;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                        <span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid #93c5fd;border-top-color:#2563eb;border-radius:50%;animation:spin 0.8s linear infinite;"></span>
+                        Sedang memproses data nilai CBT...
+                    </div>
+                </div>
+                <div id="cbt-feedback-alert"></div>
+                <div id="cbt-details-table-wrap" style="max-height:220px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;display:none;margin-top:10px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead style="background:#f8fafc;position:sticky;top:0;border-bottom:1px solid #e2e8f0;">
+                            <tr>
+                                <th style="padding:6px 10px;text-align:left;">NIM</th>
+                                <th style="padding:6px 10px;text-align:left;">Nama</th>
+                                <th style="padding:6px 10px;text-align:center;">Kelas</th>
+                                <th style="padding:6px 10px;text-align:center;">Nilai</th>
+                                <th style="padding:6px 10px;text-align:left;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cbt-details-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer Modal -->
+        <div style="background:#f8fafc;padding:16px 24px;border-bottom-left-radius:17px;border-bottom-right-radius:17px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <a href="download-template-pretes-cbt.php" class="btn btn-sm btn-outline-secondary" style="font-size:12.5px;font-weight:700;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;border:1.5px solid #cbd5e1;color:#475569;background:#ffffff;">
+                📥 Unduh Template CSV
+            </a>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="closeImportCbtModal()" style="padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;border:none;background:#e2e8f0;color:#475569;cursor:pointer;">
+                    Batal
+                </button>
+                <button type="button" id="btn-submit-cbt-import" onclick="submitCbtImport()" class="btn btn-sm btn-primary" style="padding:8px 20px;border-radius:8px;font-weight:800;font-size:13px;border:none;background:#2563eb;color:#ffffff;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+                    🚀 Mulai Import Nilai CBT
+                </button>
+                <button type="button" id="btn-reload-cbt-after" onclick="window.location.reload()" class="btn btn-sm btn-success" style="display:none;padding:8px 18px;border-radius:8px;font-weight:800;font-size:13px;border:none;background:#16a34a;color:#ffffff;cursor:pointer;">
+                    🔄 Muat Ulang Halaman
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+<?php endif; ?>
 </script>
 
 <?php include __DIR__ . '/footer.php'; ?>
