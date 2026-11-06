@@ -499,8 +499,8 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <th>No</th>
                         <th>NIM (Username)</th>
                         <th>Nama</th>
-                        <th>Tempat Lahir</th>
-                        <th>Tgl Lahir (Password)</th>
+                        <th>No. HP / WA</th>
+                        <th>Tanggal Lahir</th>
                         <th>Prodi</th>
                         <th>Angkatan</th>
                         <th>Role</th>
@@ -584,6 +584,22 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
 </div>
 
 <script>
+window.toggleUserPass = function(btn) {
+    var box = btn.closest('.user-pass-box');
+    if (!box) return;
+    var textEl = box.querySelector('.pass-text');
+    var realPass = textEl.getAttribute('data-pass');
+    if (textEl.textContent.indexOf('•') !== -1) {
+        textEl.textContent = realPass;
+        btn.textContent = '🙈';
+        btn.title = 'Sembunyikan Password';
+    } else {
+        textEl.textContent = '•'.repeat(realPass.length || 8);
+        btn.textContent = '👁️';
+        btn.title = 'Tampilkan Password';
+    }
+};
+
 window.openUserModal = function(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkatan, role) {
     document.getElementById('edit_user_id').value       = id;
     document.getElementById('edit_user_nama').value     = nama;

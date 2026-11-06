@@ -35,7 +35,7 @@ $columns = [
     1 => 'u.id', // No
     2 => 'COALESCE(u.nim, u.username)', // NIM (Username)
     3 => 'u.nama_lengkap',
-    4 => 'u.tempat_lahir',
+    4 => 'u.no_hp',
     5 => 'u.tanggal_lahir',
     6 => 'u.program_studi',
     7 => 'u.angkatan', // Angkatan
@@ -83,11 +83,13 @@ if ($searchValue !== '') {
         u.nim LIKE ? 
         OR u.username LIKE ? 
         OR u.nama_lengkap LIKE ? 
+        OR u.no_hp LIKE ?
         OR u.program_studi LIKE ? 
         OR u.angkatan LIKE ?
     )";
     $searchWildcard = '%' . $searchValue . '%';
     $whereParams = array_merge($whereParams, [
+        $searchWildcard, 
         $searchWildcard, 
         $searchWildcard, 
         $searchWildcard, 
@@ -126,10 +128,32 @@ foreach ($data as $row) {
     $id = $row['id'];
     $nimUsername = htmlspecialchars($row['nim'] ?? $row['username']);
     $namaLengkap = htmlspecialchars($row['nama_lengkap']);
-    $tempatLahir = htmlspecialchars($row['tempat_lahir'] ?? '-');
     $tglLahir = !empty($row['tanggal_lahir']) ? date('d/m/Y', strtotime($row['tanggal_lahir'])) : '-';
     $prodi = htmlspecialchars(!empty($row['program_studi']) ? $row['program_studi'] : '-');
     $angkatan = htmlspecialchars(!empty($row['angkatan']) ? $row['angkatan'] : '-');
+    
+    // Format No HP with WhatsApp direct link
+    $rawHp = trim($row['no_hp'] ?? '');
+    if (!empty($rawHp)) {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $rawHp);
+        if (strpos($cleanPhone, '0') === 0) {
+            $cleanPhone = '62' . substr($cleanPhone, 1);
+        }
+        $noHpHtml = '<a href="https://wa.me/' . $cleanPhone . '" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-success" style="padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; text-decoration:none; border-radius:6px; font-weight:600; white-space:nowrap;" title="Chat via WhatsApp">'
+            . '<span>💬</span> ' . htmlspecialchars($rawHp) . '</a>';
+    } else {
+        $noHpHtml = '<span style="color:#94a3b8; font-size:12px;">-</span>';
+    }
+
+    // Password Login (Default: ddmmyyyy dari tanggal lahir, atau 123456 jika kosong)
+    if (!empty($row['tanggal_lahir'])) {
+        $dt = DateTime::createFromFormat('Y-m-d', $row['tanggal_lahir']);
+        $passwordLogin = $dt ? $dt->format('dmY') : date('dmY', strtotime($row['tanggal_lahir']));
+    } else {
+        $passwordLogin = '123456';
+    }
+    $safePass = htmlspecialchars($passwordLogin, ENT_QUOTES, 'UTF-8');
+    $maskPass = str_repeat('•', strlen($passwordLogin));
     
     // Role badge
     $badgeClass = 'badge-primary';
@@ -175,17 +199,23 @@ foreach ($data as $row) {
         style="margin-right:4px;">✏️ Edit</button>';
         
     // Reset Password
-    $aksi .= '<form method="POST" style="display:inline;margin-right:4px;">
+    $aksi .= '<form method="POST" style="display:inline;margin-right:4px;" action="users.php">
         <input type="hidden" name="csrf_token" value="'.$csrfToken.'">
         <input type="hidden" name="action" value="reset_password">
         <input type="hidden" name="id" value="'.$id.'">
         <button type="submit" class="btn btn-sm btn-secondary"
             data-confirm="Reset password ke tanggal lahir (ddmmyyyy)?">🔑 Reset Pass</button>
     </form>';
+
+    // Password Box (Hide with eye toggle) di sebelah Reset Pass
+    $aksi .= '<span class="user-pass-box" style="display:inline-flex; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:3px 7px; font-family:monospace; font-size:12px; margin-right:4px; vertical-align:middle; gap:4px;" title="Password Login">'
+        . '<span class="pass-text" data-pass="' . $safePass . '" style="min-width:60px; text-align:center; font-weight:700; color:#334155; user-select:all; letter-spacing:1px;">' . $maskPass . '</span>'
+        . '<button type="button" class="btn-toggle-pass" onclick="toggleUserPass(this)" style="background:none; border:none; cursor:pointer; padding:0; font-size:13px; line-height:1; color:#64748b; display:inline-flex; align-items:center;" title="Tampilkan/Sembunyikan Password">👁️</button>'
+        . '</span>';
     
     // Login As & Delete (if not current user)
     if ($id != $_SESSION['user_id']) {
-        $aksi .= '<form method="POST" target="_blank" style="display:inline;margin-right:4px;">
+        $aksi .= '<form method="POST" target="_blank" style="display:inline;margin-right:4px;" action="users.php">
             <input type="hidden" name="csrf_token" value="'.$csrfToken.'">
             <input type="hidden" name="action" value="login_as">
             <input type="hidden" name="id" value="'.$id.'">
@@ -193,7 +223,7 @@ foreach ($data as $row) {
                 data-confirm="Buka tab baru dan login sebagai '.htmlspecialchars($row['nama_lengkap'], ENT_QUOTES).'?">🚪 Login As</button>
         </form>';
         
-        $aksi .= '<form method="POST" style="display:inline;">
+        $aksi .= '<form method="POST" style="display:inline;" action="users.php">
             <input type="hidden" name="csrf_token" value="'.$csrfToken.'">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" value="'.$id.'">
@@ -211,7 +241,7 @@ foreach ($data as $row) {
         $no++,
         '<strong>' . $nimUsername . '</strong>',
         $namaLengkap,
-        $tempatLahir,
+        $noHpHtml,
         $tglLahir,
         $prodi,
         $angkatan,
