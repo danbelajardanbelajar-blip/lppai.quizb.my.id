@@ -1305,9 +1305,9 @@ include __DIR__ . '/../includes/header.php';
                             $stLulus = strtolower(trim($p['pretes_status_lulus'] ?? ''));
                             $statusCategory = ($stLulus === 'lulus') ? 'lulus' : 'tidak_lulus';
                             
-                            $cleanPhone = preg_replace('/[^0-9]/', '', $p['no_hp'] ?? '');
-                            if (strpos($cleanPhone, '0') === 0) {
-                                $cleanPhone = '62' . substr($cleanPhone, 1);
+                            $cleanPhone = formatNoHp($p['no_hp'] ?? '');
+                            if (strlen($cleanPhone) < 9) {
+                                $cleanPhone = '';
                             }
                         ?>
                         <tr data-status="<?= $statusCategory ?>" data-jurusan="<?= htmlspecialchars(trim($p['program_studi'] ?? ''), ENT_QUOTES) ?>">

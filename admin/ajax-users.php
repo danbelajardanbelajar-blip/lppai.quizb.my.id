@@ -134,13 +134,12 @@ foreach ($data as $row) {
     
     // Format No HP with WhatsApp direct link
     $rawHp = trim($row['no_hp'] ?? '');
-    if (!empty($rawHp)) {
-        $cleanPhone = preg_replace('/[^0-9]/', '', $rawHp);
-        if (strpos($cleanPhone, '0') === 0) {
-            $cleanPhone = '62' . substr($cleanPhone, 1);
-        }
+    $cleanPhone = formatNoHp($rawHp);
+    if (!empty($cleanPhone) && strlen($cleanPhone) >= 9) {
         $noHpHtml = '<a href="https://wa.me/' . $cleanPhone . '" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-success" style="padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; text-decoration:none; border-radius:6px; font-weight:600; white-space:nowrap;" title="Chat via WhatsApp">'
             . '<span>💬</span> ' . htmlspecialchars($rawHp) . '</a>';
+    } elseif (!empty($rawHp)) {
+        $noHpHtml = '<span style="color:#64748b; font-size:12px;">' . htmlspecialchars($rawHp) . '</span>';
     } else {
         $noHpHtml = '<span style="color:#94a3b8; font-size:12px;">-</span>';
     }

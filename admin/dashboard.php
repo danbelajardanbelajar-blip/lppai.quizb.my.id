@@ -11,11 +11,8 @@ $pdo = getDBConnection();
 // Format nomor WhatsApp internasional (62...)
 if (!function_exists('formatWaDashboard')) {
     function formatWaDashboard($noHp) {
-        $clean = preg_replace('/[^0-9]/', '', (string)$noHp);
-        if (empty($clean)) return '';
-        if (strpos($clean, '0') === 0) {
-            $clean = '62' . substr($clean, 1);
-        }
+        $clean = formatNoHp($noHp);
+        if (empty($clean) || strlen($clean) < 9) return '';
         return 'https://wa.me/' . $clean;
     }
 }
