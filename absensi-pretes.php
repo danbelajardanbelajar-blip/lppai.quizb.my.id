@@ -64,8 +64,8 @@ if (!empty($token)) {
             if (!$registration) {
                 throw new InvalidArgumentException('Anda tidak terdaftar pada hari, penguji, dan ruangan sesi ini.');
             }
-            $stmt = $pdo->prepare('INSERT INTO pretes_attendance_records (registration_id, session_id) VALUES (?, ?)
-                ON DUPLICATE KEY UPDATE session_id = VALUES(session_id)');
+            $stmt = $pdo->prepare('INSERT INTO pretes_attendance_records (registration_id, session_id, attended_at) VALUES (?, ?, NOW())
+                ON DUPLICATE KEY UPDATE session_id = VALUES(session_id), attended_at = NOW()');
             $stmt->execute([$registration['id'], $session['id']]);
             $pdo->prepare("UPDATE pretes_registrations SET status = 'hadir' WHERE id = ? AND user_id = ?")->execute([$registration['id'], $user['id']]);
             $pdo->commit();
@@ -122,15 +122,11 @@ if (!empty($token)) {
 // KASUS 2: Dibuka Langsung dari Menu Sidebar (Halaman Pemindai Kamera Mandiri)
 // =========================================================================
 requireLogin();
-if (isAdmin()) {
-    header('Location: ' . BASE_URL . '/admin/dashboard.php');
-    exit;
-} elseif (isDosen()) {
-    header('Location: ' . BASE_URL . '/dosen/dashboard.php');
-    exit;
-}
 
 $user = getCurrentUser();
+$isAdminUser = isAdmin();
+$isDosenUser = isDosen();
+
 $pdo = getDBConnection();
 ensurePretesFeatures($pdo);
 
@@ -141,16 +137,21 @@ try {
 } catch (Exception $e) {}
 
 // Ambil data registrasi pretes mahasiswa
-$stmtReg = $pdo->prepare("
-    SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
-    FROM pretes_registrations pr
-    LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
-    WHERE pr.user_id = ?
-    ORDER BY pr.tanggal_daftar DESC
-    LIMIT 1
-");
-$stmtReg->execute([$user['id']]);
-$myPretesReg = $stmtReg->fetch();
+$myPretesReg = null;
+try {
+    $stmtReg = $pdo->prepare("
+        SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+        WHERE pr.user_id = ?
+        ORDER BY pr.tanggal_daftar DESC
+        LIMIT 1
+    ");
+    $stmtReg->execute([$user['id']]);
+    $myPretesReg = $stmtReg->fetch();
+} catch (Exception $e) {
+    error_log("Pretes registration lookup error: " . $e->getMessage());
+}
 
 // Pretes dinyatakan selesai jika tidak ada periode master_pretes yang aktif atau status periode mahasiswa sudah nonaktif
 $isPretesSelesai = false;
@@ -174,19 +175,31 @@ if ($myPretesReg) {
     if (($myPretesReg['status'] ?? '') === 'hadir') {
         $isHadirPretes = true;
     }
-    $stmtAtt = $pdo->prepare("SELECT created_at FROM pretes_attendance_records WHERE registration_id = ? ORDER BY id DESC LIMIT 1");
-    $stmtAtt->execute([$myPretesReg['id']]);
-    $attRow = $stmtAtt->fetch();
-    if ($attRow) {
-        $isHadirPretes = true;
-        $pretesAttendedAt = $attRow['created_at'];
+    try {
+        $stmtAtt = $pdo->prepare("SELECT attended_at FROM pretes_attendance_records WHERE registration_id = ?");
+        $stmtAtt->execute([$myPretesReg['id']]);
+        $pretesAttendedAt = $stmtAtt->fetchColumn();
+        if ($pretesAttendedAt) {
+            $isHadirPretes = true;
+        }
+    } catch (Exception $e) {
+        error_log("Pretes attendance lookup error: " . $e->getMessage());
     }
 }
 
 // Cek hasil kelulusan pretes jika ada
-$stmtHasil = $pdo->prepare("SELECT * FROM pretes_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 1");
-$stmtHasil->execute([$user['id']]);
-$pretesResult = $stmtHasil->fetch();
+$pretesResult = null;
+try {
+    $stmtHasil = $pdo->prepare("SELECT * FROM pretes_results WHERE user_id = ? ORDER BY created_at DESC LIMIT 1");
+    $stmtHasil->execute([$user['id']]);
+    $pretesResult = $stmtHasil->fetch();
+} catch (Exception $e) {
+    try {
+        $stmtHasil = $pdo->prepare("SELECT * FROM pretes_results WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+        $stmtHasil->execute([$user['id']]);
+        $pretesResult = $stmtHasil->fetch();
+    } catch (Exception $e2) {}
+}
 
 include __DIR__ . '/includes/header.php';
 ?>
@@ -202,7 +215,74 @@ include __DIR__ . '/includes/header.php';
         </p>
     </div>
 
-    <?php if ($isPretesSelesai): ?>
+    <?php if ($isAdminUser): ?>
+        <!-- NOTIFIKASI MODE PRATINJAU ADMIN -->
+        <div class="alert alert-info" style="margin-bottom: 20px; border-left: 4px solid #3b82f6; background: #eff6ff; color: #1e40af; border-radius: 10px; padding: 14px 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong>👑 Mode Pratinjau Administrator:</strong> Halaman ini adalah antarmuka pemindai mandiri bagi mahasiswa.
+                    <div style="font-size: 13px; margin-top: 3px; color: #1e3a8a;">
+                        Mahasiswa menggunakan halaman ini untuk memindai QR Code absensi di ruangan ujian menggunakan kamera smartphone.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <a href="<?= BASE_URL ?>/admin/pretes-peserta.php" class="btn btn-sm btn-primary">📋 Data Peserta Pretes</a>
+                    <a href="<?= BASE_URL ?>/admin/dashboard.php" class="btn btn-sm btn-outline-primary">Dashboard Admin</a>
+                </div>
+            </div>
+        </div>
+    <?php elseif ($isDosenUser): ?>
+        <!-- NOTIFIKASI MODE PRATINJAU DOSEN -->
+        <div class="alert alert-info" style="margin-bottom: 20px; border-left: 4px solid #3b82f6; background: #eff6ff; color: #1e40af; border-radius: 10px; padding: 14px 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong>👨‍🏫 Mode Pratinjau Dosen Penguji:</strong> Halaman ini adalah tampilan scan QR mahasiswa.
+                    <div style="font-size: 13px; margin-top: 3px; color: #1e3a8a;">
+                        Untuk membuka sesi QR Code dan melakukan penilaian pretes di ruangan Anda, silakan gunakan menu Penguji Pretes.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <a href="<?= BASE_URL ?>/dosen/pretes.php" class="btn btn-sm btn-primary">📷 Buka Sesi QR Absensi</a>
+                    <a href="<?= BASE_URL ?>/dosen/dashboard.php" class="btn btn-sm btn-outline-primary">Dashboard Dosen</a>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($isAdminUser || $isDosenUser): ?>
+        <!-- MODUL SCANNER KAMERA PRETES (MODE PRATINJAU PETUGAS / DOSEN) -->
+        <div class="card" style="box-shadow: 0 4px 20px rgba(0,0,0,0.06); border-radius: 14px; margin-bottom: 20px;">
+            <div class="card-header" style="background: #10b981; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <span style="font-weight: 700; font-size: 15px;">📷 Kamera Pemindai QR Absensi Pretes (Mode Uji Coba)</span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-sm" onclick="switchCameraPretes()" style="background: rgba(255,255,255,0.25); color: #fff; border: none; font-size: 12px; padding: 4px 10px; border-radius: 6px;">
+                        🔄 Ganti Kamera
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" style="padding: 24px; text-align: center;">
+                <div id="pretes-scan-feedback" style="display: none; margin-bottom: 16px; text-align: left;"></div>
+
+                <div id="scanner-viewport-box" style="width: 100%; max-width: 440px; margin: 0 auto 16px auto; border-radius: 12px; overflow: hidden; background: #0f172a; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-height: 280px; position: relative;">
+                    <div id="reader_pretes_page" style="width: 100%;"></div>
+                </div>
+
+                <p style="color: #64748b; font-size: 13px; margin: 0 0 16px 0;">
+                    🔍 Kamera aktif untuk menguji pemindaian QR Code absensi pretes.
+                </p>
+
+                <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="restartScannerPretes()">
+                        🔄 Muat Ulang Kamera
+                    </button>
+                    <a href="<?= BASE_URL ?>/<?= $isAdminUser ? 'admin/dashboard.php' : 'dosen/dashboard.php' ?>" class="btn btn-outline-primary btn-sm">
+                        🏠 Kembali ke Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    <?php elseif ($isPretesSelesai): ?>
         <!-- PEMBERITAHUAN JIKA PERIODE PRETES SUDAH SELESAI -->
         <div class="card" style="border-left: 4px solid #f59e0b; margin-bottom: 24px;">
             <div class="card-body" style="padding: 24px;">
@@ -334,7 +414,7 @@ include __DIR__ . '/includes/header.php';
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
 
-<?php if (!$isPretesSelesai && $myPretesReg): ?>
+<?php if (($isAdminUser || $isDosenUser) || (!$isPretesSelesai && $myPretesReg)): ?>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
 var html5QrCodePretes = null;

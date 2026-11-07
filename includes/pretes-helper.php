@@ -3,55 +3,59 @@
 function ensurePretesFeatures($pdo) {
     static $ready = false;
     if ($ready) return;
-    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-    if ($driver === 'sqlite') {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_assessments (
-            registration_id INTEGER NOT NULL PRIMARY KEY,
-            scores_json TEXT NOT NULL,
-            assessed_by INTEGER NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_sessions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            scope_hash CHAR(64) NOT NULL UNIQUE,
-            periode VARCHAR(100) NOT NULL,
-            hari VARCHAR(20) NOT NULL,
-            penguji VARCHAR(255) NOT NULL,
-            ruangan VARCHAR(255) NOT NULL,
-            token CHAR(48) NOT NULL UNIQUE,
-            open_until DATETIME DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_records (
-            registration_id INTEGER NOT NULL PRIMARY KEY,
-            session_id INTEGER NOT NULL,
-            attended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-    } else {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_assessments (
-            registration_id INT NOT NULL PRIMARY KEY,
-            scores_json TEXT NOT NULL,
-            assessed_by INT NOT NULL,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_sessions (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            scope_hash CHAR(64) NOT NULL UNIQUE,
-            periode VARCHAR(100) NOT NULL,
-            hari VARCHAR(20) NOT NULL,
-            penguji VARCHAR(255) NOT NULL,
-            ruangan VARCHAR(255) NOT NULL,
-            token CHAR(48) NOT NULL UNIQUE,
-            open_until DATETIME DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_records (
-            registration_id INT NOT NULL PRIMARY KEY,
-            session_id INT NOT NULL,
-            attended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_assessments (
+                registration_id INTEGER NOT NULL PRIMARY KEY,
+                scores_json TEXT NOT NULL,
+                assessed_by INTEGER NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                scope_hash CHAR(64) NOT NULL UNIQUE,
+                periode VARCHAR(100) NOT NULL,
+                hari VARCHAR(20) NOT NULL,
+                penguji VARCHAR(255) NOT NULL,
+                ruangan VARCHAR(255) NOT NULL,
+                token CHAR(48) NOT NULL UNIQUE,
+                open_until DATETIME DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_records (
+                registration_id INTEGER NOT NULL PRIMARY KEY,
+                session_id INTEGER NOT NULL,
+                attended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+        } else {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_assessments (
+                registration_id INT NOT NULL PRIMARY KEY,
+                scores_json TEXT NOT NULL,
+                assessed_by INT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_sessions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                scope_hash CHAR(64) NOT NULL UNIQUE,
+                periode VARCHAR(100) NOT NULL,
+                hari VARCHAR(20) NOT NULL,
+                penguji VARCHAR(255) NOT NULL,
+                ruangan VARCHAR(255) NOT NULL,
+                token CHAR(48) NOT NULL UNIQUE,
+                open_until DATETIME DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_attendance_records (
+                registration_id INT NOT NULL PRIMARY KEY,
+                session_id INT NOT NULL,
+                attended_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+        $ready = true;
+    } catch (Exception $e) {
+        error_log("ensurePretesFeatures warning: " . $e->getMessage());
     }
-    $ready = true;
 }
 
 function pretesComponents() {

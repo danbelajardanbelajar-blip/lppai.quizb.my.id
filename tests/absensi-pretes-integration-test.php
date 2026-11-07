@@ -24,4 +24,15 @@ assert(strpos($absensiCode, "reader_pretes_page") !== false, "In-page HTML5-QRCo
 assert(strpos($absensiCode, "Periode Pretes Telah Selesai") !== false, "Expired period message missing in absensi-pretes.php");
 echo "[PASS] absensi-pretes.php dual mode (token & camera scanner) validated.\n";
 
+// Test 4: Verify pretes_attendance_records queries (no created_at / ORDER BY id)
+assert(strpos($absensiCode, "SELECT created_at FROM pretes_attendance_records") === false, "Found invalid column created_at on pretes_attendance_records!");
+assert(strpos($absensiCode, "SELECT attended_at FROM pretes_attendance_records WHERE registration_id = ?") !== false, "Correct attended_at query missing!");
+assert(strpos($absensiCode, "pretes_attendance_records WHERE registration_id = ? ORDER BY") === false, "Found invalid ORDER BY on pretes_attendance_records!");
+echo "[PASS] Database query schema integrity for pretes_attendance_records verified.\n";
+
+// Test 5: Verify admin/dosen preview support
+assert(strpos($absensiCode, '$isAdminUser') !== false, "isAdminUser check missing in absensi-pretes.php");
+assert(strpos($absensiCode, '$isDosenUser') !== false, "isDosenUser check missing in absensi-pretes.php");
+echo "[PASS] Role-based preview support (admin/dosen/mahasiswa) verified.\n";
+
 echo "ALL ABSENSI PRETES TESTS PASSED!\n";
