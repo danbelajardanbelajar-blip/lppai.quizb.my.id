@@ -16,8 +16,23 @@ try {
     $pdo->exec("ALTER TABLE announcements MODIFY COLUMN tipe VARCHAR(50) NOT NULL");
 } catch (Exception $e) {}
 try {
-    // Normalisasi link tujuan pengumuman hasil pretes ke halaman pretes-hasil.php
-    $pdo->exec("UPDATE announcements SET link_tujuan = '/pages/pretes-hasil.php' WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') AND (link_tujuan LIKE '%pretes-peserta.php%' OR link_tujuan IS NULL)");
+    // Normalisasi link tujuan dan redaksi konten pengumuman hasil pretes jika masih terdapat typo lama
+    $cleanPretesKonten = "Berikut kami sampaikan Pengumuman Hasil Pretes 2026/2027:\n\n"
+        . "🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:\n"
+        . "Selamat atas kelulusan Anda! Harap menyelesaikan tahapan administrasi dan pengambilan sertifikat berikut:\n"
+        . "1. 🕌 Mengikuti kegiatan rutin Majlis Dzikir Al Khidmah di Masjid KH. Soefyan AW setiap awal bulan.\n"
+        . "2. 📱 Melakukan presensi online (kehadiran & kepulangan) melalui sistem serta mengunggah swafoto (selfie) yang jelas dan rapi.\n"
+        . "3. 💳 Menyelesaikan pembayaran biaya administrasi kelulusan pretes sebesar Rp 50.000,-.\n"
+        . "4. 🎓 Mengambil Sertifikat Kelulusan resmi di Kantor LPPAI (Lantai 2 Gedung Fakultas Hukum, sebelah timur kantin) dengan membawa Nota Pembayaran yang sah dan pasfoto 3×4.\n\n"
+        . "⚠️ BAGI MAHASISWA YANG BELUM LULUS PRETES:\n"
+        . "Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, Anda diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1 melalui link di bawah ini.";
+
+    $pdo->prepare("
+        UPDATE announcements 
+        SET konten = ?, link_tujuan = '/pages/pretes-hasil.php' 
+        WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') 
+          AND (konten NOT LIKE '%swafoto%' OR link_tujuan LIKE '%pretes-peserta%' OR link_tujuan IS NULL)
+    ")->execute([$cleanPretesKonten]);
 } catch (Exception $e) {}
 
 $user = getCurrentUser();

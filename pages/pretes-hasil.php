@@ -13,6 +13,26 @@ $pdo = getDBConnection();
 // Pastikan fitur pretes siap
 ensurePretesFeatures($pdo);
 
+// Auto-update pengumuman hasil pretes di database jika masih menggunakan teks lama dengan typo
+try {
+    $cleanPretesKonten = "Berikut kami sampaikan Pengumuman Hasil Pretes 2026/2027:\n\n"
+        . "🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:\n"
+        . "Selamat atas kelulusan Anda! Harap menyelesaikan tahapan administrasi dan pengambilan sertifikat berikut:\n"
+        . "1. 🕌 Mengikuti kegiatan rutin Majlis Dzikir Al Khidmah di Masjid KH. Soefyan AW setiap awal bulan.\n"
+        . "2. 📱 Melakukan presensi online (kehadiran & kepulangan) melalui sistem serta mengunggah swafoto (selfie) yang jelas dan rapi.\n"
+        . "3. 💳 Menyelesaikan pembayaran biaya administrasi kelulusan pretes sebesar Rp 50.000,-.\n"
+        . "4. 🎓 Mengambil Sertifikat Kelulusan resmi di Kantor LPPAI (Lantai 2 Gedung Fakultas Hukum, sebelah timur kantin) dengan membawa Nota Pembayaran yang sah dan pasfoto 3×4.\n\n"
+        . "⚠️ BAGI MAHASISWA YANG BELUM LULUS PRETES:\n"
+        . "Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, Anda diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1 melalui link di bawah ini.";
+
+    $pdo->prepare("
+        UPDATE announcements 
+        SET konten = ?, link_tujuan = '/pages/pretes-hasil.php' 
+        WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') 
+          AND (konten NOT LIKE '%swafoto%' OR link_tujuan LIKE '%pretes-peserta%')
+    ")->execute([$cleanPretesKonten]);
+} catch (Exception $e) {}
+
 // Ambil data pendaftaran & asesmen nilai rinci terbaru mahasiswa
 $stmtReg = $pdo->prepare("
     SELECT pr.*, pa.scores_json, pa.updated_at as assessed_at,
@@ -116,6 +136,128 @@ if (isAdmin() || isDosen()) {
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<style>
+.pretes-ann-box {
+    margin-top: 22px;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+}
+.pretes-ann-box.lulus {
+    border-color: #a7f3d0;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.08);
+}
+.pretes-ann-box.tidak-lulus {
+    border-color: #fecdd3;
+    box-shadow: 0 4px 20px rgba(225, 29, 72, 0.07);
+}
+.pretes-ann-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 14px;
+}
+.pretes-ann-icon-bubble {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+.pretes-ann-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+}
+.pretes-ann-subtitle {
+    margin: 3px 0 0 0;
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.55;
+}
+.pretes-step-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+    margin-bottom: 16px;
+}
+.pretes-step-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.pretes-step-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    border-color: #cbd5e1;
+}
+.pretes-step-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.pretes-step-icon {
+    font-size: 26px;
+    line-height: 1;
+}
+.pretes-step-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.pretes-step-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 6px 0;
+}
+.pretes-step-desc {
+    font-size: 12.5px;
+    color: #475569;
+    line-height: 1.55;
+    margin: 0;
+    flex: 1;
+}
+.pretes-step-footer {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 11.5px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.pretes-ann-callout {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    color: #166534;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.5;
+}
+</style>
+
 <!-- Hasil & Nilai Keseluruhan Pretes Saya -->
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -129,9 +271,88 @@ include __DIR__ . '/../includes/header.php';
             <div class="alert alert-info" style="margin-bottom:16px;">
                 Anda belum memiliki riwayat pretes. Silakan mendaftar pada periode pretes berikutnya atau hubungi LPPAI.
             </div>
-            <div>
+            <div style="margin-bottom:20px;">
                 <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="text-decoration:none;">📝 Daftar Pretes Sekarang</a>
                 <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none; margin-left:8px;">🏠 Kembali ke Dashboard</a>
+            </div>
+
+            <!-- Teks Panduan Resmi Pengumuman Hasil Pretes -->
+            <div class="pretes-ann-box" style="margin-top:16px;">
+                <div class="pretes-ann-header">
+                    <span class="pretes-ann-icon-bubble" style="background:#e0e7ff; color:#3730a3;">📢</span>
+                    <div style="flex:1;">
+                        <h3 class="pretes-ann-title" style="color:#1e1b4b;">
+                            Pengumuman Hasil Pretes 2026/2027
+                        </h3>
+                        <p class="pretes-ann-subtitle">
+                            Informasi petunjuk kelulusan dan tindak lanjut bagi seluruh mahasiswa peserta Pretes LPPAI.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bagian 1: Lulus -->
+                <div style="margin-bottom:18px;">
+                    <h4 style="margin:0 0 10px 0; font-size:14.5px; font-weight:700; color:#065f46; display:flex; align-items:center; gap:6px;">
+                        <span>🎉</span>
+                        <span>Bagi Mahasiswa yang Dinyatakan LULUS Pretes:</span>
+                    </h4>
+                    <div class="pretes-step-grid">
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">🕌</span>
+                                <span class="pretes-step-badge" style="background:#e0f2fe; color:#0369a1;">Langkah 1</span>
+                            </div>
+                            <h4 class="pretes-step-title">Majlis Dzikir Al Khidmah</h4>
+                            <p class="pretes-step-desc">
+                                Menghadiri majlis dzikir rutin di <strong>Masjid KH. Soefyan AW</strong> yang diselenggarakan pada <strong>setiap awal bulan</strong>.
+                            </p>
+                        </div>
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">📱</span>
+                                <span class="pretes-step-badge" style="background:#fef3c7; color:#92400e;">Langkah 2</span>
+                            </div>
+                            <h4 class="pretes-step-title">Presensi Digital & Swafoto</h4>
+                            <p class="pretes-step-desc">
+                                Melakukan absensi kehadiran & kepulangan online via sistem LPPAI dengan mengunggah <strong>swafoto (selfie) yang jelas</strong>.
+                            </p>
+                        </div>
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">💳</span>
+                                <span class="pretes-step-badge" style="background:#dcfce7; color:#15803d;">Langkah 3</span>
+                            </div>
+                            <h4 class="pretes-step-title">Administrasi Pretes</h4>
+                            <p class="pretes-step-desc">
+                                Menyelesaikan pembayaran administrasi kelulusan pretes sebesar <strong style="color:#16a34a;">Rp 50.000,-</strong> melalui kanal resmi.
+                            </p>
+                        </div>
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">🎓</span>
+                                <span class="pretes-step-badge" style="background:#fae8ff; color:#86198f;">Langkah 4</span>
+                            </div>
+                            <h4 class="pretes-step-title">Pengambilan Sertifikat</h4>
+                            <p class="pretes-step-desc">
+                                Mengambil sertifikat di <strong>Kantor LPPAI (Lt. 2 Gedung Fakultas Hukum, Timur Kantin)</strong> dengan membawa <strong>Nota Pembayaran</strong> & <strong>Pasfoto 3×4</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bagian 2: Tidak Lulus -->
+                <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:12px; padding:16px;">
+                    <h4 style="margin:0 0 6px 0; font-size:14.5px; font-weight:700; color:#9f1239; display:flex; align-items:center; gap:6px;">
+                        <span>⚠️</span>
+                        <span>Bagi Mahasiswa yang Dinyatakan TIDAK LULUS Pretes:</span>
+                    </h4>
+                    <p style="margin:0 0 10px 0; font-size:13px; color:#4c0519; line-height:1.5;">
+                        Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1</strong>.
+                    </p>
+                    <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-sm btn-danger" style="text-decoration:none; font-weight:700;">
+                        📝 Daftar Tutorial Gelombang 1 ➔
+                    </a>
+                </div>
             </div>
         <?php else: ?>
             <!-- Box Ringkasan Nilai Keseluruhan -->
@@ -166,26 +387,157 @@ include __DIR__ . '/../includes/header.php';
                         </p>
                     </div>
                 </div>
-
-                <!-- Info Alert Sesuai Status Kelulusan -->
-                <?php if ($statusLulus === 'lulus'): ?>
-                    <div style="margin-top:18px; background:#ecfdf5; border:1.5px solid #a7f3d0; padding:16px 20px; border-radius:10px; color:#065f46; font-size:14px; line-height:1.6;">
-                        🎉 <strong>Selamat, Anda Dinyatakan LULUS Pretes!</strong><br>
-                        Seluruh 12 komponen penilaian pretes Anda telah terpenuhi dengan nilai masing-masing minimal <strong>80</strong> (rata-rata keseluruhan: <strong><?= number_format($avgScore, 2) ?></strong>). Anda secara resmi dibebaskan dari kewajiban mengikuti program Tutorial LPPAI.
-                    </div>
-                <?php else: ?>
-                    <div style="margin-top:18px; background:#fff1f2; border:1.5px solid #fecdd3; padding:16px 20px; border-radius:10px; color:#9f1239; font-size:14px; line-height:1.6; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
-                        <div>
-                            <strong style="font-size:15px; display:block; margin-bottom:4px;">❌ PEMBERITAHUAN: ANDA DINYATAKAN TIDAK LULUS PRETES</strong>
-                            Periode pelaksanaan pretes telah selesai. Berdasarkan hasil evaluasi, Anda memperoleh nilai rata-rata keseluruhan <strong><?= number_format($avgScore, 2) ?></strong> (terpenuhi <strong><?= $filledCount ?> dari <?= $totalComponents ?></strong> komponen wajib). Sesuai standar kelulusan LPPAI, setiap peserta wajib menyelesaikan seluruh 12 komponen dengan skor minimal 80 untuk masing-masing komponen.<br>
-                            Oleh karena itu, Anda <strong>diwajibkan untuk mendaftar dan mengikuti program Tutorial LPPAI</strong>.
-                        </div>
-                        <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none; white-space:nowrap; padding:10px 20px; font-weight:700; font-size:14px; box-shadow:0 2px 6px rgba(220,38,38,0.25);">
-                            📝 Daftar Tutorial Sekarang ➔
-                        </a>
-                    </div>
-                <?php endif; ?>
             </div>
+
+            <!-- ================================================================ -->
+            <!-- PENGUMUMAN & PANDUAN TINDAK LANJUT HASIL PRETES (MODERN UI)      -->
+            <!-- ================================================================ -->
+            <?php if ($statusLulus === 'lulus'): ?>
+                <div class="pretes-ann-box lulus">
+                    <div class="pretes-ann-header">
+                        <span class="pretes-ann-icon-bubble" style="background:#dcfce7; color:#15803d;">🎉</span>
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <h3 class="pretes-ann-title" style="color:#065f46;">
+                                    Selamat, Anda Dinyatakan LULUS Pretes!
+                                </h3>
+                                <span class="badge badge-success" style="font-size:11.5px; padding:4px 10px;">
+                                    Bebas Tutorial LPPAI
+                                </span>
+                            </div>
+                            <p class="pretes-ann-subtitle" style="color:#047857;">
+                                Seluruh 12 komponen penilaian pretes Anda telah terpenuhi dengan nilai masing-masing minimal <strong>80</strong> (Rata-rata Keseluruhan: <strong><?= number_format($avgScore, 2) ?></strong> | Predikat: <strong><?= $predikat ?></strong>). Anda secara resmi dibebaskan dari kewajiban mengikuti program Tutorial LPPAI.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Header Panduan Langkah -->
+                    <div style="margin-top:14px; margin-bottom:12px;">
+                        <div style="display:inline-flex; align-items:center; gap:6px; background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; font-size:12px; font-weight:700; padding:4px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:0.5px;">
+                            📢 4 Tahapan Tindak Lanjut & Pengambilan Sertifikat
+                        </div>
+                        <p style="margin:8px 0 0 0; font-size:13.5px; color:#374151;">
+                            Untuk keperluan pencetakan dan legalisasi <strong>Sertifikat Kelulusan Pretes</strong>, silakan selesaikan tahapan berikut secara berurutan:
+                        </p>
+                    </div>
+
+                    <!-- 4 Card Grid Responsive -->
+                    <div class="pretes-step-grid">
+                        <!-- Langkah 1 -->
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">🕌</span>
+                                <span class="pretes-step-badge" style="background:#e0f2fe; color:#0369a1;">Langkah 1</span>
+                            </div>
+                            <h4 class="pretes-step-title">Majlis Dzikir Al Khidmah</h4>
+                            <p class="pretes-step-desc">
+                                Menghadiri majlis dzikir rutin di <strong>Masjid KH. Soefyan AW</strong> yang diselenggarakan pada <strong>setiap awal bulan</strong>.
+                            </p>
+                            <div class="pretes-step-footer">
+                                <span>📅</span>
+                                <span>Waktu: Jumat awal bulan</span>
+                            </div>
+                        </div>
+
+                        <!-- Langkah 2 -->
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">📱</span>
+                                <span class="pretes-step-badge" style="background:#fef3c7; color:#92400e;">Langkah 2</span>
+                            </div>
+                            <h4 class="pretes-step-title">Presensi Digital & Swafoto</h4>
+                            <p class="pretes-step-desc">
+                                Melakukan absensi kehadiran & kepulangan secara online melalui sistem dengan mengunggah <strong>swafoto (selfie) yang jelas</strong>.
+                            </p>
+                            <div class="pretes-step-footer">
+                                <span>📸</span>
+                                <span>Unggah swafoto datang & pulang</span>
+                            </div>
+                        </div>
+
+                        <!-- Langkah 3 -->
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">💳</span>
+                                <span class="pretes-step-badge" style="background:#dcfce7; color:#15803d;">Langkah 3</span>
+                            </div>
+                            <h4 class="pretes-step-title">Administrasi Pretes</h4>
+                            <p class="pretes-step-desc">
+                                Menyelesaikan pembayaran biaya administrasi kelulusan pretes sebesar <strong style="color:#16a34a;">Rp 50.000,-</strong> melalui kanal resmi.
+                            </p>
+                            <div class="pretes-step-footer">
+                                <span>🧾</span>
+                                <span>Simpan nota/bukti pembayaran</span>
+                            </div>
+                        </div>
+
+                        <!-- Langkah 4 -->
+                        <div class="pretes-step-card">
+                            <div class="pretes-step-card-header">
+                                <span class="pretes-step-icon">🎓</span>
+                                <span class="pretes-step-badge" style="background:#fae8ff; color:#86198f;">Langkah 4</span>
+                            </div>
+                            <h4 class="pretes-step-title">Pengambilan Sertifikat</h4>
+                            <p class="pretes-step-desc">
+                                Mengambil sertifikat fisik di <strong>Kantor LPPAI (Lt. 2 Gedung Fakultas Hukum, Timur Kantin)</strong> dengan membawa <strong>Nota Pembayaran</strong> & <strong>Pasfoto 3×4</strong>.
+                            </p>
+                            <div class="pretes-step-footer">
+                                <span>📍</span>
+                                <span>Kantor LPPAI Lt. 2 Fak. Hukum</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Callout Note -->
+                    <div class="pretes-ann-callout">
+                        <span style="font-size:20px; flex-shrink:0;">💡</span>
+                        <div>
+                            <strong>Catatan Penting:</strong> Pastikan Anda telah menyelesaikan presensi Al Khidmah serta membawa dokumen fisik (nota pembayaran sah dan pasfoto 3×4) saat mendatangi kantor LPPAI agar penyerahan sertifikat dapat langsung diproses oleh petugas.
+                        </div>
+                    </div>
+                </div>
+
+            <?php else: ?>
+                <div class="pretes-ann-box tidak-lulus">
+                    <div class="pretes-ann-header" style="border-bottom-color:#fee2e2;">
+                        <span class="pretes-ann-icon-bubble" style="background:#ffe4e6; color:#e11d48;">⚠️</span>
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <h3 class="pretes-ann-title" style="color:#9f1239;">
+                                    Pemberitahuan: Anda Belum Memenuhi Standar Kelulusan Pretes
+                                </h3>
+                                <span class="badge badge-danger" style="font-size:11.5px; padding:4px 10px;">
+                                    Wajib Ikut Tutorial
+                                </span>
+                            </div>
+                            <p class="pretes-ann-subtitle" style="color:#881337;">
+                                Berdasarkan evaluasi akhir, Anda memperoleh nilai rata-rata keseluruhan <strong><?= number_format($avgScore, 2) ?></strong> (terpenuhi <strong><?= $filledCount ?> dari <?= $totalComponents ?></strong> komponen wajib). Sesuai standar akademik LPPAI, kelulusan mensyaratkan seluruh 12 komponen bernilai minimal <strong>80</strong>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Kotak Tindak Lanjut Pendaftaran Tutorial -->
+                    <div style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:12px; padding:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div style="max-width:640px;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; background:#fee2e2; color:#b91c1c; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:8px; text-transform:uppercase;">
+                                📌 Tindak Lanjut Wajib Mahasiswa
+                            </div>
+                            <h4 style="margin:0 0 6px 0; font-size:16px; font-weight:800; color:#881337;">
+                                Pendaftaran Program Pembinaan Tutorial LPPAI Gelombang 1
+                            </h4>
+                            <p style="margin:0; font-size:13.5px; color:#4c0519; line-height:1.55;">
+                                Bagi mahasiswa yang dinyatakan tidak lulus pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial Gelombang 1</strong> guna mengikuti pembinaan materi agama Islam dan memenuhi syarat kelulusan sertifikasi LPPAI.
+                            </p>
+                        </div>
+                        <div>
+                            <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 22px; font-weight:700; font-size:14px; border-radius:10px; box-shadow:0 4px 14px rgba(225,29,72,0.25); white-space:nowrap;">
+                                <span>📝</span>
+                                <span>Daftar Tutorial Gelombang 1 Sekarang ➔</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <!-- Tabel Rincian Nilai Keseluruhan (12 Komponen) -->
             <div style="margin-top:20px;">
@@ -276,8 +628,11 @@ include __DIR__ . '/../includes/header.php';
             <!-- Tombol Navigasi -->
             <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                 <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none;">🏠 Kembali ke Dashboard</a>
-                <?php if ($statusLulus === 'tidak_lulus'): ?>
-                    <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-primary" style="text-decoration:none;">📝 Daftar Program Tutorial</a>
+                <?php if ($statusLulus === 'lulus'): ?>
+                    <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-outline-success" style="text-decoration:none;">🕌 Presensi Al Khidmah</a>
+                    <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="text-decoration:none;">📷 Ambil Sertifikat</a>
+                <?php else: ?>
+                    <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none;">📝 Daftar Program Tutorial Gelombang 1</a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
