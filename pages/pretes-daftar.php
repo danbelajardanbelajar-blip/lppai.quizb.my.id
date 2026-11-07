@@ -332,11 +332,21 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <?php else: ?>
-<!-- Fallback jika belum ada periode pretes yang dibuka -->
-<div class="empty-state card">
-    <div class="icon">🔒</div>
-    <h3>Pendaftaran Pretes Belum Dibuka</h3>
-    <p>Saat ini belum ada periode pretes yang membuka pendaftaran. Silakan tunggu informasi dari admin/TU LPPAI.</p>
+<!-- Fallback jika belum ada periode pretes yang dibuka atau periode telah selesai -->
+<div class="empty-state card" style="padding:40px 20px; text-align:center;">
+    <div class="icon" style="font-size:48px; margin-bottom:12px;">🔒</div>
+    <h3 style="margin-bottom:8px;">Pendaftaran Pretes Sedang Ditutup / Telah Berakhir</h3>
+    <p style="color:#64748b; max-width:550px; margin:0 auto 18px auto; line-height:1.6;">
+        Saat ini pendaftaran pretes sedang ditutup karena periode pelaksanaan pretes telah berakhir. Bagi mahasiswa yang belum mengikuti atau belum lulus pretes, Anda diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI.
+    </p>
+    <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-success" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:10px 22px; font-weight:700; border-radius:8px;">
+            📝 Daftar Program Tutorial Gelombang 1 &rarr;
+        </a>
+        <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:10px 20px; font-weight:600; border-radius:8px;">
+            🏠 Kembali ke Dashboard
+        </a>
+    </div>
 </div>
 <?php endif; ?>
 

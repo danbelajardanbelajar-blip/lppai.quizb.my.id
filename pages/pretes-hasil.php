@@ -66,6 +66,43 @@ $stmtRes = $pdo->prepare("
 $stmtRes->execute([$user['id']]);
 $myResult = $stmtRes->fetch();
 
+// ── Cek Status Periode Pretes & Tutorial Aktif ──────────────────────────────
+$activePretes = null;
+try {
+    $activePretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
+} catch (Exception $e) {}
+
+// Cek apakah ada gelombang tutorial aktif di sistem
+$activeGelombang = null;
+try {
+    $activeGelombang = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
+} catch (Exception $e) {}
+
+// Pretes dinyatakan selesai jika:
+// 1. Tidak ada periode master_pretes yang berstatus 'aktif'
+// 2. ATAU status periode pretes mahasiswa sudah nonaktif/selesai
+// 3. ATAU sistem saat ini sedang aktif menjalankan periode Tutorial (gelombang aktif)
+$isPretesSelesai = false;
+if (!$activePretes) {
+    $isPretesSelesai = true;
+} elseif ($myReg && !empty($myReg['periode'])) {
+    try {
+        $stmtPer = $pdo->prepare("SELECT status FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
+        $stmtPer->execute([$myReg['periode']]);
+        $perStatus = $stmtPer->fetchColumn();
+        if ($perStatus !== false && $perStatus !== 'aktif') {
+            $isPretesSelesai = true;
+        }
+    } catch (Exception $e) {}
+}
+if (!$isPretesSelesai && $activeGelombang) {
+    // Jika tutorial sudah aktif berjalan, pendaftaran pretes bagi yang belum terdaftar telah ditutup
+    $isPretesSelesai = true;
+}
+
+// Cek apakah mahasiswa memiliki riwayat pretes (pendaftaran, hasil nilai, atau asesmen terisi)
+$hasPretesRecord = (!empty($myResult) || !empty($myReg));
+
 // Parsing nilai rinci 12 komponen
 $scores = [];
 if (!empty($myReg['scores_json'])) {
@@ -125,6 +162,7 @@ if ($isLulus) {
     }
 }
 $statusLulus = $isLulus ? 'lulus' : 'tidak_lulus';
+$hasPretesRecord = (!empty($myResult) || !empty($myReg) || $filledCount > 0);
 
 $periodeDisplay = !empty($myReg['periode']) ? $myReg['periode'] : (!empty($myResult['schedule_periode']) ? $myResult['schedule_periode'] : 'Pretes 2026/2027');
 
@@ -269,19 +307,65 @@ include __DIR__ . '/../includes/header.php';
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <span style="font-weight:700; font-size:16px;">📊 Pengumuman Hasil Kelulusan Pretes</span>
-        <span class="badge <?= $statusLulus === 'lulus' ? 'badge-success' : 'badge-danger' ?>" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
-            Status Akhir: <?= $statusLulus === 'lulus' ? 'LULUS' : 'TIDAK LULUS' ?>
-        </span>
+        <?php if ($hasPretesRecord): ?>
+            <span class="badge <?= $statusLulus === 'lulus' ? 'badge-success' : 'badge-danger' ?>" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
+                Status Akhir: <?= $statusLulus === 'lulus' ? 'LULUS' : 'TIDAK LULUS' ?>
+            </span>
+        <?php else: ?>
+            <span class="badge" style="background:<?= $isPretesSelesai ? '#fee2e2' : '#f1f5f9' ?>; color:<?= $isPretesSelesai ? '#991b1b' : '#475569' ?>; border:1px solid <?= $isPretesSelesai ? '#fecaca' : '#cbd5e1' ?>; font-size:12.5px; padding:5px 12px; font-weight:700;">
+                Status: <?= $isPretesSelesai ? 'BELUM MENGIKUTI PRETES' : 'BELUM TERDAFTAR' ?>
+            </span>
+        <?php endif; ?>
     </div>
     <div class="card-body">
-        <?php if (!$myResult && !$myReg && $filledCount === 0): ?>
-            <div class="alert alert-info" style="margin-bottom:16px;">
-                Anda belum memiliki riwayat pretes. Silakan mendaftar pada periode pretes berikutnya atau hubungi LPPAI.
-            </div>
-            <div style="margin-bottom:20px;">
-                <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="text-decoration:none;">📝 Daftar Pretes Sekarang</a>
-                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none; margin-left:8px;">🏠 Kembali ke Dashboard</a>
-            </div>
+        <?php if (!$hasPretesRecord): ?>
+            <?php if ($isPretesSelesai): ?>
+                <!-- Informasi Periode Pretes Telah Berakhir & Rekomendasi Wajib Tutorial -->
+                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:18px 20px; margin-bottom:22px; display:flex; gap:16px; align-items:flex-start;">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#fef3c7; color:#b45309; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">
+                        ⏳
+                    </div>
+                    <div style="flex:1;">
+                        <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:700; color:#92400e;">
+                            Periode Pretes Telah Berakhir
+                        </h3>
+                        <p style="margin:0 0 14px 0; color:#78350f; font-size:13.5px; line-height:1.6;">
+                            Pelaksanaan dan pendaftaran Pretes untuk periode ini telah resmi ditutup karena sistem LPPAI saat ini sedang menjalankan periode Tutorial. Karena Anda belum memiliki riwayat kelulusan pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1</strong>.
+                        </p>
+                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                            <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-success" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:9px 18px; font-size:13.5px; font-weight:700; border-radius:8px;">
+                                📝 Daftar Program Tutorial Gelombang 1 &rarr;
+                            </a>
+                            <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:9px 18px; font-size:13.5px; font-weight:600; border-radius:8px;">
+                                🏠 Kembali ke Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- Informasi Pendaftaran Pretes Sedang Dibuka -->
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:18px 20px; margin-bottom:22px; display:flex; gap:16px; align-items:flex-start;">
+                    <div style="width:48px; height:48px; border-radius:12px; background:#dbeafe; color:#1d4ed8; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0;">
+                        ℹ️
+                    </div>
+                    <div style="flex:1;">
+                        <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:700; color:#1e40af;">
+                            Pendaftaran Pretes Sedang Dibuka
+                        </h3>
+                        <p style="margin:0 0 14px 0; color:#1e3a8a; font-size:13.5px; line-height:1.6;">
+                            Anda belum memiliki riwayat pretes. Silakan pilih hari dan jadwal pelaksanaan pretes yang tersedia sebelum kuota penuh.
+                        </p>
+                        <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                            <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:9px 18px; font-size:13.5px; font-weight:700; border-radius:8px;">
+                                📝 Daftar Pretes Sekarang &rarr;
+                            </a>
+                            <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:9px 18px; font-size:13.5px; font-weight:600; border-radius:8px;">
+                                🏠 Kembali ke Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <!-- Teks Panduan Resmi Pengumuman Hasil Pretes -->
             <div class="pretes-ann-box" style="margin-top:16px;">
