@@ -15,6 +15,61 @@ $isMahasiswa = !$isAdmin && !$isDosen;
 
 $action = $_GET['action'] ?? '';
 
+// Label gelombang
+$gelLabels = [
+    'gel1' => 'Gelombang 1 (Ganjil)',
+    'gel2' => 'Gelombang 2 (Genap)',
+    'mandiri' => 'Mandiri'
+];
+
+// Ambil seluruh daftar periode dari master_gelombang dan tentukan periode aktif
+$allGelombang = [];
+$active_gel = null;
+try {
+    $active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $allGelombang = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    if (!$active_gel && !empty($allGelombang)) {
+        $active_gel = $allGelombang[0];
+    }
+} catch (Exception $e) {}
+
+// Parameter filter periode (default selalu 'active' sesuai instruksi)
+$selected_gel_id = isset($_GET['periode']) ? trim($_GET['periode']) : (isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active');
+$current_gel = null;
+
+if ($selected_gel_id === 'all') {
+    $current_gel = null;
+} elseif (is_numeric($selected_gel_id)) {
+    foreach ($allGelombang as $g) {
+        if ($g['id'] == $selected_gel_id) {
+            $current_gel = $g;
+            break;
+        }
+    }
+    if (!$current_gel) {
+        $current_gel = $active_gel;
+        $selected_gel_id = 'active';
+    }
+} else {
+    $selected_gel_id = 'active';
+    $current_gel = $active_gel;
+}
+
+// Persiapan parameter filter periode aktif
+$targetYear = '';
+$targetYearRaw = '';
+$targetSemester = '';
+$targetGelombang = '';
+$targetYearSem = '';
+
+if ($current_gel) {
+    $targetYear = str_replace(['/', ' '], ['-', ''], trim($current_gel['tahun_ajaran']));
+    $targetYearRaw = trim($current_gel['tahun_ajaran']);
+    $targetSemester = trim($current_gel['semester']);
+    $targetGelombang = trim($current_gel['gelombang']);
+    $targetYearSem = $targetYear . '-' . $targetSemester;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit_nilai') {
     if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
         die("Invalid CSRF token.");
@@ -58,63 +113,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 if ($isAdmin || $isDosen) {
-    // 1. Fetch daftar kelas untuk Dropdown Filter
-    if ($isAdmin) {
-        $stmt = $pdo->query("
-            SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
-            FROM tutorial_classes tc
-            LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
-            WHERE (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
-            GROUP BY tc.gelombang, tc.nama_kelas
-            ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
-        ");
-        $unique_classes = $stmt->fetchAll();
-    } else {
-        $stmt = $pdo->prepare("
-            SELECT tc.nama_kelas, tc.gelombang, GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ') as dosen_pengampu, COUNT(tr.id) as jml_mhs
-            FROM tutorial_classes tc
-            LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
-            WHERE tc.dosen_pengampu = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
-            GROUP BY tc.gelombang, tc.nama_kelas
-            ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
-        ");
-        $stmt->execute([$user['nama_lengkap']]);
-        $unique_classes = $stmt->fetchAll();
+    // 1. Fetch daftar kelas untuk Dropdown Filter (hanya dari periode yang dipilih/aktif)
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $concatExpr = ($driver === 'sqlite') 
+        ? "GROUP_CONCAT(tc.dosen_pengampu, ', ')" 
+        : "GROUP_CONCAT(DISTINCT tc.dosen_pengampu SEPARATOR ', ')";
+
+    $classWhere = [];
+    $classParams = [];
+
+    if ($current_gel) {
+        $classWhere[] = "tc.gelombang = ?";
+        $classParams[] = $targetGelombang;
+        $classWhere[] = "(
+            TRIM(tc.semester) = ?
+            OR REPLACE(TRIM(tc.semester), '/', '-') = ?
+            OR REPLACE(TRIM(tc.semester), ' ', '') LIKE ?
+            OR tc.semester LIKE ?
+        )";
+        $classParams[] = $targetSemester;
+        $classParams[] = $targetYearSem;
+        $classParams[] = '%' . $targetYear . '%';
+        $classParams[] = '%' . $targetYear . '%';
     }
+
+    if ($isDosen) {
+        $classWhere[] = "tc.dosen_pengampu = ?";
+        $classParams[] = $user['nama_lengkap'];
+    }
+
+    $whereClassStr = !empty($classWhere) ? "WHERE " . implode(" AND ", $classWhere) : "";
+
+    $stmtClasses = $pdo->prepare("
+        SELECT tc.nama_kelas, tc.gelombang, $concatExpr as dosen_pengampu, COUNT(tr.id) as jml_mhs
+        FROM tutorial_classes tc
+        LEFT JOIN tutorial_registrations tr ON tc.id = tr.tutorial_class_id
+        $whereClassStr
+        GROUP BY tc.gelombang, tc.nama_kelas
+        ORDER BY tc.gelombang ASC, tc.nama_kelas ASC
+    ");
+    $stmtClasses->execute($classParams);
+    $unique_classes = $stmtClasses->fetchAll();
     
     $filter_class = $_GET['class_name'] ?? '';
-    $filter_ta = $_GET['tahun_ajaran'] ?? '';
-    $students = [];
-    
-    // 2. Build Query untuk mengambil mahasiswa (Filtered)
+    $studentsWhere = [];
+    $studentsParams = [];
+
+    // 2. Build Query untuk mengambil mahasiswa (Filtered per periode aktif)
+    if ($current_gel) {
+        $studentsWhere[] = "tc.gelombang = ?";
+        $studentsParams[] = $targetGelombang;
+        $studentsWhere[] = "(
+            TRIM(tc.semester) = ?
+            OR REPLACE(TRIM(tc.semester), '/', '-') = ?
+            OR REPLACE(TRIM(tc.semester), ' ', '') LIKE ?
+            OR tc.semester LIKE ?
+        )";
+        $studentsParams[] = $targetSemester;
+        $studentsParams[] = $targetYearSem;
+        $studentsParams[] = '%' . $targetYear . '%';
+        $studentsParams[] = '%' . $targetYear . '%';
+    }
+
+    if ($isDosen) {
+        $studentsWhere[] = "tc.dosen_pengampu = ?";
+        $studentsParams[] = $user['nama_lengkap'];
+    }
+
+    if ($filter_class !== '') {
+        $studentsWhere[] = "tc.nama_kelas = ?";
+        $studentsParams[] = $filter_class;
+    }
+
+    $whereStudentsStr = !empty($studentsWhere) ? "WHERE " . implode(" AND ", $studentsWhere) : "";
+
     $sql = "
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.semester as class_semester, tc.dosen_pengampu
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+        $whereStudentsStr
+        ORDER BY tc.gelombang ASC, tc.nama_kelas ASC, u.nama_lengkap ASC
     ";
-    $params = [];
-    
-    if ($isDosen) {
-        $sql .= " WHERE tc.dosen_pengampu = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')";
-        $params[] = $user['nama_lengkap'];
-    } else {
-        $sql .= " WHERE (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')";
-    }
-    
-    if ($filter_class !== '') {
-        $sql .= " AND tc.nama_kelas = ?";
-        $params[] = $filter_class;
-    }
-    if ($filter_ta !== '') {
-        $sql .= " AND tc.semester LIKE ?";
-        $params[] = $filter_ta . '%';
-    }
-    
-    $sql .= " ORDER BY tc.gelombang ASC, tc.nama_kelas ASC, u.nama_lengkap ASC";
     
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    $stmt->execute($studentsParams);
     $students = $stmt->fetchAll();
     
     // 3. EXPORT LOGIC
@@ -203,8 +286,10 @@ if ($isAdmin || $isDosen) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
         
+        $periodLabel = $current_gel ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $targetYear . '_' . $targetSemester . '_' . $targetGelombang) : 'SemuaPeriode';
+        $classLabel = $filter_class ? preg_replace('/[^a-zA-Z0-9_-]/', '_', $filter_class) : 'SemuaKelas';
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        $filename = 'Rekap_Nilai_Mahasiswa_' . ($filter_class ?: 'Semua') . '_' . date('Ymd') . '.xlsx';
+        $filename = 'Rekap_Nilai_' . $periodLabel . '_' . $classLabel . '_' . date('Ymd') . '.xlsx';
         
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="'.urlencode($filename).'"');
@@ -214,72 +299,148 @@ if ($isAdmin || $isDosen) {
         exit;
     }
 } else {
-    // Mahasiswa Logic
+    // Mahasiswa Logic (prioritaskan kelas periode aktif)
+    $mhsWhere = ["tr.user_id = ?"];
+    $mhsParams = [$user['id']];
+
+    if ($current_gel) {
+        $mhsWhere[] = "tc.gelombang = ?";
+        $mhsParams[] = $targetGelombang;
+        $mhsWhere[] = "(
+            TRIM(tc.semester) = ?
+            OR REPLACE(TRIM(tc.semester), '/', '-') = ?
+            OR REPLACE(TRIM(tc.semester), ' ', '') LIKE ?
+            OR tc.semester LIKE ?
+        )";
+        $mhsParams[] = $targetSemester;
+        $mhsParams[] = $targetYearSem;
+        $mhsParams[] = '%' . $targetYear . '%';
+        $mhsParams[] = '%' . $targetYear . '%';
+    }
+
+    $whereMhsStr = "WHERE " . implode(" AND ", $mhsWhere);
+
     $stmt = $pdo->prepare("
-        SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu
+        SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.gelombang, tc.semester as class_semester
         FROM tutorial_registrations tr
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-        WHERE tr.user_id = ? AND (tc.semester LIKE '%2026%' OR tc.semester LIKE '%2027%' OR tc.semester LIKE '%2028%' OR tc.semester LIKE '%2029%' OR tc.semester LIKE '%2030%')
+        $whereMhsStr
         ORDER BY tr.created_at DESC
     ");
-    $stmt->execute([$user['id']]);
+    $stmt->execute($mhsParams);
     $my_classes = $stmt->fetchAll();
+
+    // Fallback: Jika belum ada di periode aktif, tampilkan kelas historis milik mahasiswa
+    if (empty($my_classes) && $current_gel) {
+        $stmtFallback = $pdo->prepare("
+            SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.gelombang, tc.semester as class_semester
+            FROM tutorial_registrations tr
+            JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+            WHERE tr.user_id = ?
+            ORDER BY tr.created_at DESC
+        ");
+        $stmtFallback->execute([$user['id']]);
+        $my_classes = $stmtFallback->fetchAll();
+    }
 }
 
 include __DIR__ . '/includes/header.php';
 ?>
 
-<div class="mb-4">
-    <h2 class="page-title"><?= PAGE_TITLE ?></h2>
-    <?php if ($isAdmin): ?>
-        <p class="text-muted">Kelola dan ekspor data nilai dari semua mahasiswa dan kelas tutorial.</p>
-    <?php elseif ($isDosen): ?>
-        <p class="text-muted">Pantau nilai mahasiswa dari kelas yang Anda ampu.</p>
-    <?php else: ?>
-        <p class="text-muted">Lihat rincian nilai kelas tutorial yang Anda ikuti.</p>
+<div class="mb-4" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+    <div>
+        <h2 class="page-title" style="margin:0;"><?= PAGE_TITLE ?></h2>
+        <?php if ($isAdmin): ?>
+            <p class="text-muted" style="margin:4px 0 0 0;">Kelola dan ekspor data rekapitulasi nilai mahasiswa tutorial berdasarkan periode aktif.</p>
+        <?php elseif ($isDosen): ?>
+            <p class="text-muted" style="margin:4px 0 0 0;">Pantau rekapitulasi nilai mahasiswa dari kelas tutorial yang Anda ampu pada periode aktif.</p>
+        <?php else: ?>
+            <p class="text-muted" style="margin:4px 0 0 0;">Lihat rincian nilai kelas tutorial yang Anda ikuti pada periode aktif.</p>
+        <?php endif; ?>
+    </div>
+    <?php if ($current_gel): ?>
+        <div style="background: #ecfdf5; border: 1.5px solid #a7f3d0; padding: 8px 16px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(16,185,129,0.08);">
+            <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#10b981;"></span>
+            <div style="font-size: 13px; color: #065f46; font-weight: 700;">
+                Periode Aktif: <?= sanitize($current_gel['tahun_ajaran']) ?> &bull; <?= sanitize($current_gel['semester']) ?> &bull; <?= sanitize($gelLabels[$current_gel['gelombang']] ?? $current_gel['gelombang']) ?>
+            </div>
+        </div>
     <?php endif; ?>
 </div>
 
 <?php if ($isAdmin || $isDosen): ?>
     
-    <!-- Filter Card -->
+    <!-- Filter Card Periode & Kelas -->
     <div class="card" style="margin-bottom:20px;">
         <div class="card-body">
-            <form method="GET" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-                <div style="flex:1; min-width: 200px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Tahun Ajaran</label>
-                    <select name="tahun_ajaran" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
-                        <option value="">-- Semua Tahun Ajaran --</option>
-                        <?php
-                        $startYear = 2026;
-                        $endYear = 2050;
-                        for ($y = $startYear; $y < $endYear; $y++) {
-                            $label = $y . '-' . ($y + 1);
-                            $selected = ($filter_ta === $label) ? 'selected' : '';
-                            echo "<option value=\"$label\" $selected>$label</option>";
-                        }
-                        ?>
+            <form method="GET" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+                <!-- Filter Periode Tutorial -->
+                <div style="flex:1; min-width: 260px;">
+                    <label style="display:block; margin-bottom:6px; font-weight:700; font-size:13px; color:#1e293b;">
+                        📅 Periode / Gelombang Tutorial
+                    </label>
+                    <select name="periode" class="form-control" style="width:100%; padding:9px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13.5px;" onchange="this.form.submit()">
+                        <option value="active" <?= $selected_gel_id === 'active' ? 'selected' : '' ?>>
+                            🌟 Periode Aktif <?= $active_gel ? '(' . sanitize($active_gel['tahun_ajaran']) . ' - ' . sanitize($active_gel['semester']) . ' - ' . sanitize($gelLabels[$active_gel['gelombang']] ?? $active_gel['gelombang']) . ')' : '' ?>
+                        </option>
+                        <?php if (!empty($allGelombang)): ?>
+                            <optgroup label="Pilih Periode Lain:">
+                                <?php foreach ($allGelombang as $g): ?>
+                                    <option value="<?= $g['id'] ?>" <?= ($selected_gel_id == $g['id']) ? 'selected' : '' ?>>
+                                        <?= sanitize($g['tahun_ajaran']) ?> - <?= sanitize($g['semester']) ?> - <?= sanitize($gelLabels[$g['gelombang']] ?? $g['gelombang']) ?> <?= $g['status'] === 'aktif' ? '(Aktif)' : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
+                        <option value="all" <?= $selected_gel_id === 'all' ? 'selected' : '' ?>>🌐 Semua Periode (Historis)</option>
                     </select>
                 </div>
-                <div style="flex:1; min-width: 200px;">
-                    <label style="display:block; margin-bottom:5px; font-weight:bold;">Filter Kelas</label>
-                    <select name="class_name" class="form-control" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:4px;" onchange="this.form.submit()">
+
+                <!-- Filter Kelas -->
+                <div style="flex:1; min-width: 240px;">
+                    <label style="display:block; margin-bottom:6px; font-weight:700; font-size:13px; color:#1e293b;">
+                        👥 Filter Kelas
+                    </label>
+                    <select name="class_name" class="form-control" style="width:100%; padding:9px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13.5px;" onchange="this.form.submit()">
                         <option value="">-- Tampilkan Semua Kelas --</option>
                         <?php foreach($unique_classes as $c): ?>
                             <option value="<?= sanitize($c['nama_kelas']) ?>" <?= $filter_class == $c['nama_kelas'] ? 'selected' : '' ?>>
-                                <?= sanitize($c['nama_kelas']) ?> (Gel. <?= sanitize($c['gelombang']) ?>) - <?= sanitize($c['dosen_pengampu'] ?: 'Tanpa Dosen') ?> - <?= sanitize($c['jml_mhs']) ?> Mahasiswa
+                                <?= sanitize($c['nama_kelas']) ?> (<?= sanitize($gelLabels[$c['gelombang']] ?? $c['gelombang']) ?>) - <?= sanitize($c['dosen_pengampu'] ?: 'Tanpa Dosen') ?> (<?= sanitize($c['jml_mhs']) ?> Mhs)
                             </option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+
+                <div>
+                    <a href="rekap-nilai.php" class="btn btn-secondary" style="padding:9px 16px; border-radius:8px; font-size:13.5px; text-decoration:none;">🔄 Reset</a>
                 </div>
             </form>
         </div>
     </div>
     
     <div class="card">
-        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>Daftar Nilai Mahasiswa: <strong><?= $filter_class !== '' ? sanitize($filter_class) : 'Semua Kelas' ?> <?= $filter_ta !== '' ? '('.sanitize($filter_ta).')' : '' ?></strong></span>
-            <a href="?class_name=<?= urlencode($filter_class) ?>&tahun_ajaran=<?= urlencode($filter_ta) ?>&action=export" class="btn btn-sm btn-success" data-no-spa="true">📄 Export Excel</a>
+        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <span style="font-weight:700; font-size:15px; color:#1e293b;">
+                    📋 Daftar Nilai Mahasiswa: <strong><?= $filter_class !== '' ? sanitize($filter_class) : 'Semua Kelas' ?></strong>
+                </span>
+                <div style="margin-top:4px;">
+                    <?php if ($current_gel): ?>
+                        <span style="background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px;">
+                            <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981;"></span>
+                            Periode Aktif: <?= sanitize($current_gel['tahun_ajaran']) ?> (<?= sanitize($current_gel['semester']) ?> - <?= sanitize($gelLabels[$current_gel['gelombang']] ?? $current_gel['gelombang']) ?>)
+                        </span>
+                    <?php else: ?>
+                        <span style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 3px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600;">
+                            Semua Periode (Historis)
+                        </span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <a href="?class_name=<?= urlencode($filter_class) ?>&periode=<?= urlencode($selected_gel_id) ?>&action=export" class="btn btn-sm btn-success" data-no-spa="true" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; padding:7px 14px; border-radius:8px;">
+                <span>📄</span>
+                <span>Export Excel</span>
+            </a>
         </div>
         <div class="card-body">
             <?php if (empty($students)): ?>
@@ -354,9 +515,19 @@ include __DIR__ . '/includes/header.php';
         <div style="display:grid; gap:20px;">
         <?php foreach ($my_classes as $mc): ?>
             <div class="card" style="border-top:4px solid var(--primary);">
-                <div class="card-header">
-                    <h3 style="margin:0;"><?= sanitize($mc['nama_kelas']) ?></h3>
-                    <small style="color:#64748b;">Dosen: <?= sanitize($mc['dosen_pengampu']) ?></small>
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <h3 style="margin:0;"><?= sanitize($mc['nama_kelas']) ?></h3>
+                        <small style="color:#64748b;">Dosen: <?= sanitize($mc['dosen_pengampu']) ?></small>
+                    </div>
+                    <div>
+                        <span class="badge badge-primary">
+                            <?= sanitize($gelLabels[$mc['gelombang']] ?? $mc['gelombang']) ?>
+                        </span>
+                        <?php if ($current_gel && $mc['gelombang'] === $current_gel['gelombang']): ?>
+                            <span class="badge badge-success" style="margin-left:4px;">Periode Aktif</span>
+                        <?php endif; ?>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div style="display:flex; flex-wrap:wrap; gap:20px; justify-content:space-between; align-items:center; margin-bottom:20px;">
