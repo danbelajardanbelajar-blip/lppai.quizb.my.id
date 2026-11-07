@@ -7,10 +7,11 @@ $sidebarCode = file_get_contents(__DIR__ . '/../includes/sidebar.php');
 $dashboardCode = file_get_contents(__DIR__ . '/../pages/dashboard.php');
 $absensiCode = file_get_contents(__DIR__ . '/../absensi-pretes.php');
 
-// Test 1: Sidebar does not contain dashboard.php?scan=pretes
+// Test 1: Sidebar does not contain dashboard.php?scan=pretes and has single absensi link (in bottom submenu)
 assert(strpos($sidebarCode, 'dashboard.php?scan=pretes') === false, "Sidebar still contains dashboard.php?scan=pretes");
-assert(strpos($sidebarCode, 'absensi-pretes.php') !== false, "Sidebar does not link to absensi-pretes.php");
-echo "[PASS] Sidebar navigation is clean and points to absensi-pretes.php.\n";
+assert(strpos($sidebarCode, 'Scan Absensi Pretes') === false, "Sidebar still has duplicate Scan Absensi Pretes in top menu");
+assert(substr_count($sidebarCode, '<a href="<?= BASE_URL ?>/absensi-pretes.php"') === 1, "Expected exactly 1 absensi-pretes link tag in sidebar");
+echo "[PASS] Sidebar navigation is clean and points to single absensi-pretes.php in submenu.\n";
 
 // Test 2: Legacy redirect in pages/dashboard.php
 assert(strpos($dashboardCode, "\$_GET['scan'] === 'pretes'") !== false, "Legacy redirect condition missing in dashboard.php");

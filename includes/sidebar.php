@@ -170,9 +170,6 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="page-nav <?= menuActive('pretes-peserta.php') ?>">
                 <span class="icon">📋</span> Peserta & Jadwal Pretes
             </a>
-            <a href="<?= BASE_URL ?>/absensi-pretes.php" class="page-nav <?= menuActive('absensi-pretes.php') ?>">
-                <span class="icon">📷</span> Scan Absensi Pretes
-            </a>
             <a href="<?= BASE_URL ?>/pretes-hasil.php" class="page-nav <?= menuActive('pretes-hasil.php') ?>">
                 <span class="icon">📊</span> Hasil Pretes
             </a>
