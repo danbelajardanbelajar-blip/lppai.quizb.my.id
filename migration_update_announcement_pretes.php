@@ -10,6 +10,17 @@ require_once __DIR__ . '/config/database.php';
 try {
     $pdo = getDBConnection();
 
+    // 1. Pastikan tabel announcements dan kolomnya menggunakan utf8mb4 (dukungan emoji 4-byte)
+    try {
+        $pdo->exec("SET NAMES utf8mb4");
+        $pdo->exec("ALTER TABLE announcements CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $pdo->exec("ALTER TABLE announcements MODIFY COLUMN judul VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        $pdo->exec("ALTER TABLE announcements MODIFY COLUMN konten TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        echo "Tabel 'announcements' berhasil dikonversi ke utf8mb4.\n";
+    } catch (Exception $e) {
+        echo "Catatan konversi charset: " . $e->getMessage() . "\n";
+    }
+
     $cleanJudul = '📢 Pengumuman Hasil Kelulusan Pretes 2026/2027';
     $cleanKonten = "Berikut kami sampaikan Pengumuman Hasil Pretes 2026/2027:\n\n"
         . "🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:\n"

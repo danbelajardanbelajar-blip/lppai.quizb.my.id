@@ -574,10 +574,37 @@ include __DIR__ . '/../includes/header.php';
             </div>
         <?php else: ?>
             <?php foreach ($recentAnnouncements as $ann): ?>
+            <?php
+                $kontenDisplay = $ann['konten'];
+                // Normalisasi peninggalan encoding non-utf8mb4 (tanda tanya ? pengganti emoji)
+                $kontenDisplay = str_replace(
+                    [
+                        '? BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:',
+                        '1. ? Mengikuti',
+                        '2. ? Melakukan',
+                        '3. ? Menyelesaikan',
+                        '4. ? Mengambil',
+                        '?? BAGI MAHASISWA YANG BELUM LULUS PRETES:',
+                        '? BAGI MAHASISWA YANG BELUM LULUS PRETES:',
+                        '? BAGI MAHASISWA YANG TIDAK LULUS PRETES:'
+                    ],
+                    [
+                        '🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:',
+                        '1. 🕌 Mengikuti',
+                        '2. 📱 Melakukan',
+                        '3. 💳 Menyelesaikan',
+                        '4. 🎓 Mengambil',
+                        '⚠️ BAGI MAHASISWA YANG BELUM LULUS PRETES:',
+                        '⚠️ BAGI MAHASISWA YANG BELUM LULUS PRETES:',
+                        '⚠️ BAGI MAHASISWA YANG TIDAK LULUS PRETES:'
+                    ],
+                    $kontenDisplay
+                );
+            ?>
             <div class="announcement-card">
                 <div class="ann-title"><?= sanitize($ann['judul']) ?></div>
                 <div class="ann-date">🕐 <?= date('d M Y, H:i', strtotime($ann['created_at'])) ?></div>
-                <div class="ann-content"><?= nl2br(sanitize($ann['konten'])) ?></div>
+                <div class="ann-content"><?= nl2br(sanitize($kontenDisplay)) ?></div>
                 <?php if (!empty($ann['link_tujuan'])): ?>
                 <?php
                     $targetUrl = $ann['link_tujuan'];

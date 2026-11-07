@@ -16,7 +16,13 @@ try {
     $pdo->exec("ALTER TABLE announcements MODIFY COLUMN tipe VARCHAR(50) NOT NULL");
 } catch (Exception $e) {}
 try {
-    // Normalisasi link tujuan dan redaksi konten pengumuman hasil pretes jika masih terdapat typo lama
+    $pdo->exec("SET NAMES utf8mb4");
+    $pdo->exec("ALTER TABLE announcements CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("ALTER TABLE announcements MODIFY COLUMN judul VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("ALTER TABLE announcements MODIFY COLUMN konten TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+} catch (Exception $e) {}
+try {
+    // Normalisasi link tujuan dan redaksi konten pengumuman hasil pretes jika masih terdapat typo lama atau charset non-utf8mb4
     $cleanPretesKonten = "Berikut kami sampaikan Pengumuman Hasil Pretes 2026/2027:\n\n"
         . "🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:\n"
         . "Selamat atas kelulusan Anda! Harap menyelesaikan tahapan administrasi dan pengambilan sertifikat berikut:\n"
@@ -31,7 +37,7 @@ try {
         UPDATE announcements 
         SET konten = ?, link_tujuan = '/pages/pretes-hasil.php' 
         WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') 
-          AND (konten NOT LIKE '%swafoto%' OR link_tujuan LIKE '%pretes-peserta%' OR link_tujuan IS NULL)
+          AND (konten NOT LIKE '%swafoto%' OR konten LIKE '%? BAGI%' OR link_tujuan LIKE '%pretes-peserta%' OR link_tujuan IS NULL)
     ")->execute([$cleanPretesKonten]);
 } catch (Exception $e) {}
 
