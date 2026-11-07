@@ -170,7 +170,7 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="page-nav <?= menuActive('pretes-peserta.php') ?>">
                 <span class="icon">📋</span> Peserta & Jadwal Pretes
             </a>
-            <a href="<?= BASE_URL ?>/dashboard.php?scan=pretes" class="page-nav <?= ($currentPage === 'dashboard.php' && isset($_GET['scan']) && $_GET['scan'] === 'pretes') ? 'active' : '' ?>">
+            <a href="<?= BASE_URL ?>/absensi-pretes.php" class="page-nav <?= menuActive('absensi-pretes.php') ?>">
                 <span class="icon">📷</span> Scan Absensi Pretes
             </a>
             <a href="<?= BASE_URL ?>/pretes-hasil.php" class="page-nav <?= menuActive('pretes-hasil.php') ?>">
@@ -192,12 +192,12 @@ function menuActive($page) {
             </a>
             <div class="menu-label">Absensi</div>
             <div class="menu-item has-submenu">
-                <a href="#" class="page-nav submenu-toggle <?= (in_array($currentPage, ['absensi-tutorial.php', 'absensi-alkhidmah.php']) || ($currentPage === 'dashboard.php' && isset($_GET['scan']) && $_GET['scan'] === 'pretes')) ? 'active' : '' ?>">
+                <a href="#" class="page-nav submenu-toggle <?= in_array($currentPage, ['absensi-pretes.php', 'absensi-tutorial.php', 'absensi-alkhidmah.php']) ? 'active' : '' ?>">
                     <span class="icon">📅</span> Absensi
                     <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
                 </a>
-                <div class="submenu" style="display: <?= (in_array($currentPage, ['absensi-tutorial.php', 'absensi-alkhidmah.php']) || ($currentPage === 'dashboard.php' && isset($_GET['scan']) && $_GET['scan'] === 'pretes')) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
-                    <a href="<?= BASE_URL ?>/dashboard.php?scan=pretes" class="page-nav <?= ($currentPage === 'dashboard.php' && isset($_GET['scan']) && $_GET['scan'] === 'pretes') ? 'active' : '' ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
+                <div class="submenu" style="display: <?= in_array($currentPage, ['absensi-pretes.php', 'absensi-tutorial.php', 'absensi-alkhidmah.php']) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
+                    <a href="<?= BASE_URL ?>/absensi-pretes.php" class="page-nav <?= menuActive('absensi-pretes.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi Pretes
                     </a>
                     <a href="<?= BASE_URL ?>/absensi-tutorial.php" class="page-nav <?= menuActive('absensi-tutorial.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">

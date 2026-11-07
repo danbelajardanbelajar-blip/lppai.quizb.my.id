@@ -6,6 +6,12 @@ define('PAGE_TITLE', 'Dashboard Mahasiswa');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
+// Redirect link scan lama (?scan=pretes) ke halaman mandiri absensi-pretes.php
+if (isset($_GET['scan']) && $_GET['scan'] === 'pretes') {
+    header('Location: ' . BASE_URL . '/absensi-pretes.php');
+    exit;
+}
+
 if (isAdmin()) {
     header('Location: ' . BASE_URL . '/admin/dashboard.php');
     exit;
