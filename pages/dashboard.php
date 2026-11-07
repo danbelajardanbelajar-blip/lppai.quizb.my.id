@@ -4,6 +4,7 @@
  */
 define('PAGE_TITLE', 'Dashboard Mahasiswa');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireLogin();
 
 // Redirect link scan lama (?scan=pretes) ke halaman mandiri absensi-pretes.php
@@ -65,6 +66,9 @@ if (!$activePretes) {
 
 // Cek kelulusan pretes
 $isPretesLulus = ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus');
+if (!$isPretesLulus) {
+    $isPretesLulus = isUserLulusPretes($pdo, $user['id']);
+}
 
 // Tentukan teks status pretes di dashboard
 if ($isPretesSelesai) {

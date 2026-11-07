@@ -4,6 +4,7 @@
  */
 define('PAGE_TITLE', 'Pendaftaran Tutorial');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireLogin();
 
 if (isAdmin()) {
@@ -13,6 +14,9 @@ if (isAdmin()) {
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+
+// Cek kelulusan pretes (mahasiswa yang lulus pretes dibebaskan dari tutorial)
+$isLulusPretes = isUserLulusPretes($pdo, $user['id']);
 
 // Auto-patch database for new registration flow
 try {
@@ -64,78 +68,83 @@ if ($active_gel) {
 
 // Handle Form Submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
-    $token        = $_POST['csrf_token'] ?? '';
-    $hari_pilihan = $_POST['hari_pilihan'] ?? '';
-    $gelombang    = $_POST['gelombang'] ?? '';
-    $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
-
-    if (!verifyCsrf($token)) {
-        $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
-        $msgType = 'danger';
-    } elseif (!in_array($hari_pilihan, $validDays) || !isset($gelombangs[$gelombang])) {
-        $message = 'Pilih hari yang valid.';
-        $msgType = 'danger';
-    } elseif (!$active_gel || ($active_gel['status'] ?? '') !== 'aktif' || $active_gel['gelombang'] !== $gelombang) {
-        $message = 'Pendaftaran untuk gelombang ini sedang ditutup atau dinonaktifkan.';
-        $msgType = 'danger';
+    if ($isLulusPretes) {
+        $message = 'Alhamdulillah, Anda telah dinyatakan LULUS Pretes dan dibebaskan dari kewajiban mengikuti program Tutorial LPPAI, sehingga tidak perlu mendaftar.';
+        $msgType = 'info';
     } else {
-        // Cek pengumuman aktif
-        $stmtAnn = $pdo->prepare("SELECT id FROM announcements WHERE tipe = ? AND is_active = 1 LIMIT 1");
-        $stmtAnn->execute([$gelombangs[$gelombang]['annType']]);
-        if (!$stmtAnn->fetch()) {
-            $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
+        $token        = $_POST['csrf_token'] ?? '';
+        $hari_pilihan = $_POST['hari_pilihan'] ?? '';
+        $gelombang    = $_POST['gelombang'] ?? '';
+        $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+
+        if (!verifyCsrf($token)) {
+            $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
+            $msgType = 'danger';
+        } elseif (!in_array($hari_pilihan, $validDays) || !isset($gelombangs[$gelombang])) {
+            $message = 'Pilih hari yang valid.';
+            $msgType = 'danger';
+        } elseif (!$active_gel || ($active_gel['status'] ?? '') !== 'aktif' || $active_gel['gelombang'] !== $gelombang) {
+            $message = 'Pendaftaran untuk gelombang ini sedang ditutup atau dinonaktifkan.';
             $msgType = 'danger';
         } else {
-            $dayLower = strtolower($hari_pilihan);
-            $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
-            
-            // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
-            $stmtCurrent = $pdo->prepare("
-                SELECT COUNT(*) 
-                FROM tutorial_registrations 
-                WHERE LOWER(hari_pilihan) = LOWER(?)
-                  AND gelombang = ?
-                  AND (
-                      REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
-                      OR tahun_ajaran LIKE ?
-                      OR (
-                          (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
-                          AND created_at >= ?
-                      )
-                  )
-            ");
-            $stmtCurrent->execute([$hari_pilihan, $targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
-            $terisi = (int)$stmtCurrent->fetchColumn();
-            
-            if ($totalKuota <= 0 || $terisi >= $totalKuota) {
-                $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+            // Cek pengumuman aktif
+            $stmtAnn = $pdo->prepare("SELECT id FROM announcements WHERE tipe = ? AND is_active = 1 LIMIT 1");
+            $stmtAnn->execute([$gelombangs[$gelombang]['annType']]);
+            if (!$stmtAnn->fetch()) {
+                $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
                 $msgType = 'danger';
             } else {
-                // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
-            $stmtReg = $pdo->prepare("
-                SELECT tr.id FROM tutorial_registrations tr 
-                LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
-                WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
-            ");
-            $stmtReg->execute([$user['id'], $gelombang, $gelombang]);
-            if ($stmtReg->fetch()) {
-                $message = 'Anda sudah terdaftar di gelombang ini.';
-                $msgType = 'warning';
-            } else {
-                $tahun_ajaran = $active_gel['tahun_ajaran'] ?? (date('Y') . '/' . (date('Y') + 1));
-                $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?, ?)");
-                $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang, $tahun_ajaran]);
-                $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
-                $msgType = 'success';
+                $dayLower = strtolower($hari_pilihan);
+                $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
                 
-                // Update counter lokal agar UI segera merefleksikan perubahan
-                if (isset($registeredCounts[$hari_pilihan])) {
-                    $registeredCounts[$hari_pilihan]++;
+                // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
+                $stmtCurrent = $pdo->prepare("
+                    SELECT COUNT(*) 
+                    FROM tutorial_registrations 
+                    WHERE LOWER(hari_pilihan) = LOWER(?)
+                      AND gelombang = ?
+                      AND (
+                          REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
+                          OR tahun_ajaran LIKE ?
+                          OR (
+                              (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
+                              AND created_at >= ?
+                          )
+                      )
+                ");
+                $stmtCurrent->execute([$hari_pilihan, $targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
+                $terisi = (int)$stmtCurrent->fetchColumn();
+                
+                if ($totalKuota <= 0 || $terisi >= $totalKuota) {
+                    $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                    $msgType = 'danger';
+                } else {
+                    // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
+                    $stmtReg = $pdo->prepare("
+                        SELECT tr.id FROM tutorial_registrations tr 
+                        LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
+                        WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
+                    ");
+                    $stmtReg->execute([$user['id'], $gelombang, $gelombang]);
+                    if ($stmtReg->fetch()) {
+                        $message = 'Anda sudah terdaftar di gelombang ini.';
+                        $msgType = 'warning';
+                    } else {
+                        $tahun_ajaran = $active_gel['tahun_ajaran'] ?? (date('Y') . '/' . (date('Y') + 1));
+                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?, ?)");
+                        $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang, $tahun_ajaran]);
+                        $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
+                        $msgType = 'success';
+                        
+                        // Update counter lokal agar UI segera merefleksikan perubahan
+                        if (isset($registeredCounts[$hari_pilihan])) {
+                            $registeredCounts[$hari_pilihan]++;
+                        }
+                    }
                 }
             }
         }
     }
-}
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -147,6 +156,35 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($message): ?>
     <div class="alert alert-<?= $msgType ?>"><?= sanitize($message) ?></div>
+<?php endif; ?>
+
+<?php if ($isLulusPretes): ?>
+    <!-- PEMBERITAHUAN MAHASISWA SUDAH LULUS PRETES (BEBAS TUTORIAL) -->
+    <div class="card" style="border-top: 4px solid #10b981; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 12px;">
+        <div class="card-body" style="padding: 30px 24px; text-align: center;">
+            <div style="width: 64px; height: 64px; background: #ecfdf5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px auto; color: #059669; border: 2px solid #a7f3d0;">
+                🎉
+            </div>
+            <h3 style="font-size: 20px; font-weight: 800; color: #065f46; margin: 0 0 10px 0;">
+                Selamat, Anda Dinyatakan LULUS Pretes!
+            </h3>
+            <p style="color: #047857; font-size: 14.5px; max-width: 640px; margin: 0 auto 20px auto; line-height: 1.6;">
+                Berdasarkan hasil evaluasi pretes LPPAI, Anda telah memenuhi standar kelulusan seluruh komponen nilai. Sesuai ketentuan akademik LPPAI, Anda secara resmi <strong>dibebaskan dari kewajiban mengikuti program Tutorial LPPAI</strong> dan tidak perlu melakukan pendaftaran kelas.
+            </p>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 20px; max-width: 540px; margin: 0 auto 24px auto; font-size: 13.5px; color: #166534; text-align: left; line-height: 1.8;">
+                ✓ Status Evaluasi: <strong>LULUS PRETES (Bebas Tutorial)</strong><br>
+                ✓ Informasi Pengambilan Sertifikat: Silakan pantau pengumuman resmi atau buka menu <strong>Scan Pengambilan Sertifikat</strong> ketika periode pembagian sertifikat telah dibuka.
+            </div>
+            <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-primary" style="padding: 10px 22px; font-size: 13.5px; font-weight: 700;">
+                    📊 Lihat Rincian Nilai Pretes
+                </a>
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-outline-primary" style="padding: 10px 22px; font-size: 13.5px; font-weight: 600;">
+                    🏠 Kembali ke Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
 <?php endif; ?>
 
 <?php
@@ -174,7 +212,7 @@ foreach ($gelombangs as $gelKey => $g):
     $stmtReg->execute([$user['id'], $gelKey, $gelKey]);
     $sudahDaftar = $stmtReg->fetch();
 
-    if ($announcement || $sudahDaftar): // Tampilkan hanya jika ada pengumuman buka ATAU sudah pernah daftar
+    if (($announcement || $sudahDaftar) && (!$isLulusPretes || $sudahDaftar)): // Tampilkan hanya jika ada pengumuman buka ATAU sudah pernah daftar
 ?>
 <div class="card" style="margin-bottom: 30px; border-top: 4px solid var(--primary);">
     <div class="card-header" style="background:#f8fafc;">
@@ -219,7 +257,7 @@ foreach ($gelombangs as $gelKey => $g):
                 </div>
             </div>
         
-        <?php elseif ($announcement && $isGelActive): ?>
+        <?php elseif ($announcement && $isGelActive && !$isLulusPretes): ?>
             <!-- Form Pendaftaran Hari -->
             <form method="POST">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -250,7 +288,7 @@ foreach ($gelombangs as $gelKey => $g):
 </div>
 <?php endif; endforeach; ?>
 
-<?php if (!$adaBuka && !isset($sudahDaftar)): ?>
+<?php if (!$adaBuka && !isset($sudahDaftar) && !$isLulusPretes): ?>
     <!-- Fallback if nothing is open -->
     <div class="empty-state card">
         <div class="icon">🔒</div>

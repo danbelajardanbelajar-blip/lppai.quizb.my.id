@@ -90,6 +90,44 @@ function getPretesStatusLulus($scores) {
     return $complete ? 'lulus' : 'menunggu';
 }
 
+/** Cek apakah user telah dinyatakan lulus pretes (baik dari tabel pretes_results maupun asesmen 12 komponen). */
+function isUserLulusPretes($pdo, $userId) {
+    if (!$pdo || !$userId) return false;
+
+    // 1. Cek dari tabel pretes_results
+    try {
+        $stmt = $pdo->prepare("SELECT status_lulus FROM pretes_results WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$userId]);
+        $status = strtolower(trim((string)$stmt->fetchColumn()));
+        if ($status === 'lulus') {
+            return true;
+        }
+    } catch (Exception $e) {}
+
+    // 2. Cek dari data asesmen di pretes_registrations & pretes_assessments
+    try {
+        $stmt = $pdo->prepare("
+            SELECT pa.scores_json 
+            FROM pretes_registrations pr
+            JOIN pretes_assessments pa ON pa.registration_id = pr.id
+            WHERE pr.user_id = ?
+            ORDER BY pr.id DESC LIMIT 1
+        ");
+        $stmt->execute([$userId]);
+        $json = $stmt->fetchColumn();
+        if ($json) {
+            $scores = json_decode($json, true);
+            if (is_array($scores) && function_exists('getPretesStatusLulus')) {
+                if (getPretesStatusLulus($scores) === 'lulus') {
+                    return true;
+                }
+            }
+        }
+    } catch (Exception $e) {}
+
+    return false;
+}
+
 if (!function_exists('getPretesPredikat')) {
     function getPretesPredikat($score) {
         if ($score === null || $score === '') return '-';
