@@ -134,8 +134,14 @@ $recentAnnouncements = [];
 foreach ($allAnnouncements as $ann) {
     $tipe = $ann['tipe'];
     
-    // 1. Jika sudah lulus, jangan tampilkan pengumuman pendaftaran tutorial
-    if ($isLulusTutorial && strpos($tipe, 'pendaftaran_') === 0 && $tipe !== 'pendaftaran_pretes') {
+    // 1. Jika sudah lulus tutorial ATAU sudah lulus pretes, jangan tampilkan pengumuman pendaftaran tutorial
+    $isTutorialRegAnnouncement = (
+        (strpos($tipe, 'pendaftaran_') === 0 && $tipe !== 'pendaftaran_pretes')
+        || stripos($ann['judul'], 'pendaftaran tutorial') !== false
+        || (!empty($ann['link_tujuan']) && stripos($ann['link_tujuan'], 'tutorial-pendaftaran') !== false)
+    );
+
+    if (($isLulusTutorial || $isPretesLulus) && $isTutorialRegAnnouncement) {
         continue;
     }
     

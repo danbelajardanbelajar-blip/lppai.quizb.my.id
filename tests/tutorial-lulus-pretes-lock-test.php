@@ -68,6 +68,34 @@ echo "[PASS] pages/tutorial-pendaftaran.php lock & UI confirmed.\n";
 $dashCode = file_get_contents(__DIR__ . '/../pages/dashboard.php');
 assert(strpos($dashCode, 'isUserLulusPretes($pdo, $user[\'id\'])') !== false, "isUserLulusPretes fallback missing in dashboard.php");
 assert(strpos($dashCode, 'if (!$isPretesLulus):') !== false, "Daftar Tutorial button hiding condition missing in dashboard.php");
-echo "[PASS] pages/dashboard.php integration confirmed.\n";
+assert(strpos($dashCode, '($isLulusTutorial || $isPretesLulus) && $isTutorialRegAnnouncement') !== false, "Tutorial registration announcement filtering missing for lulus pretes in dashboard.php");
+echo "[PASS] pages/dashboard.php integration & announcement filtering confirmed.\n";
+
+// Test 4: Simulation of announcement filter logic for Lulus Pretes student
+$sampleAnnouncements = [
+    ['id' => 1, 'tipe' => 'hasil_pretes', 'judul' => 'Pengumuman Hasil Pretes 2026', 'konten' => '...', 'link_tujuan' => '/pages/pretes-hasil.php'],
+    ['id' => 2, 'tipe' => 'pendaftaran_gel1', 'judul' => 'Pendaftaran Tutorial Gelombang 1', 'konten' => 'Bagi Yang Belum Lulus, silahkan Mendaftarkan diri', 'link_tujuan' => '/pages/tutorial-pendaftaran.php'],
+    ['id' => 3, 'tipe' => 'umum', 'judul' => 'Pendaftaran Tutorial Mandiri Dibuka', 'konten' => '...', 'link_tujuan' => 'tutorial-pendaftaran.php'],
+    ['id' => 4, 'tipe' => 'umum', 'judul' => 'Kajian Rutin Kampus', 'konten' => '...', 'link_tujuan' => '']
+];
+$isPretesLulus = true;
+$isLulusTutorial = false;
+$filtered = [];
+foreach ($sampleAnnouncements as $ann) {
+    $tipe = $ann['tipe'];
+    $isTutorialRegAnnouncement = (
+        (strpos($tipe, 'pendaftaran_') === 0 && $tipe !== 'pendaftaran_pretes')
+        || stripos($ann['judul'], 'pendaftaran tutorial') !== false
+        || (!empty($ann['link_tujuan']) && stripos($ann['link_tujuan'], 'tutorial-pendaftaran') !== false)
+    );
+    if (($isLulusTutorial || $isPretesLulus) && $isTutorialRegAnnouncement) {
+        continue;
+    }
+    $filtered[] = $ann;
+}
+assert(count($filtered) === 2, "Expected exactly 2 announcements (hasil pretes & kajian), got " . count($filtered));
+assert($filtered[0]['id'] === 1, "First announcement should be Pengumuman Hasil Pretes");
+assert($filtered[1]['id'] === 4, "Second announcement should be Kajian Rutin Kampus");
+echo "[PASS] Announcement filter simulation verified: Tutorial registration cards completely removed for Lulus Pretes students.\n";
 
 echo "ALL TUTORIAL LULUS PRETES LOCK TESTS PASSED!\n";
