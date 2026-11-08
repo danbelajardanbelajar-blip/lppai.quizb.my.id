@@ -49,6 +49,9 @@ assert(strpos($css, '.segmented-control') !== false, "CSS style.css harus mendef
 assert(strpos($css, '.quick-action-btn') !== false, "CSS style.css harus mendefinisikan .quick-action-btn");
 assert(strpos($css, '.badge-gold') !== false, "CSS style.css harus mendefinisikan .badge-gold");
 assert(strpos($css, '.badge-emerald') !== false, "CSS style.css harus mendefinisikan .badge-emerald");
+assert(strpos($css, '.modal-backdrop') !== false, "CSS style.css harus mendefinisikan .modal-backdrop");
+assert(strpos($css, '.modal-content') !== false, "CSS style.css harus mendefinisikan .modal-content");
+assert(strpos($css, '.modal-backdrop.show') !== false, "CSS style.css harus mendefinisikan .modal-backdrop.show");
 
 // 5. Verifikasi Integrasi di Dashboard Mahasiswa, Admin, & Dosen
 assert(strpos($dashMhs, 'welcome-card') !== false, "Dashboard Mahasiswa harus menggunakan .welcome-card");
