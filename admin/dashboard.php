@@ -6,6 +6,7 @@ define('PAGE_TITLE', 'Dashboard Admin');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
+$user = getCurrentUser();
 $pdo = getDBConnection();
 
 // Format nomor WhatsApp internasional (62...)
@@ -149,6 +150,31 @@ if (empty($recentPretesRegs)) {
 include __DIR__ . '/../includes/header.php';
 ?>
 
+<!-- Welcome Card -->
+<div class="card welcome-card">
+    <div class="card-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div class="welcome-avatar" style="background:linear-gradient(135deg, #0b3b22, #156138);color:#ffffff;">
+            🏛️
+        </div>
+        <div style="flex:1;min-width:240px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                <h2 style="font-size:22px;margin:0;font-weight:800;color:var(--primary-dark);letter-spacing:-0.3px;">Selamat Datang, <?= sanitize($user['nama_lengkap'] ?? 'Administrator LPPAI') ?>!</h2>
+                <span class="badge badge-gold">Executive Console</span>
+            </div>
+            <div class="welcome-chips">
+                <span class="welcome-chip">🛡️ Role: <strong>Administrator LPPAI</strong></span>
+                <span class="welcome-chip">⚡ Status: <strong>Sistem Terpantau Stabil</strong></span>
+                <?php if ($activePretes): ?>
+                    <span class="welcome-chip">✍️ Pretes: <strong><?= sanitize($activePretes['periode']) ?></strong></span>
+                <?php endif; ?>
+                <?php if ($activeTutorial): ?>
+                    <span class="welcome-chip">📚 Tutorial: <strong><?= sanitize($activeTutorial['tahun_ajaran']) ?> (<?= sanitize($activeTutorial['gelombang']) ?>)</strong></span>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Stat Grid Utama -->
 <div class="stat-grid">
     <div class="stat-card">
@@ -203,17 +229,19 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Quick Actions -->
 <div class="card" style="margin-top:20px;">
-    <div class="card-header">⚡ Aksi Cepat</div>
-    <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a href="<?= BASE_URL ?>/admin/tutorial-data-pendaftar.php" class="btn btn-primary" style="width:auto;background:#059669;border-color:#059669;">👥 Data Pendaftar Tutorial</a>
-        <a href="<?= BASE_URL ?>/admin/tutorial-hasil-plotting.php" class="btn btn-secondary" style="width:auto;">📊 Hasil Plotting Tutorial</a>
-        <a href="<?= BASE_URL ?>/admin/tutorial-kelas.php" class="btn btn-secondary" style="width:auto;">🏫 Kelola Kelas</a>
-        <a href="<?= BASE_URL ?>/admin/pretes-jadwal.php" class="btn btn-success" style="width:auto;">📅 Kelola Jadwal Pretes</a>
-        <a href="<?= BASE_URL ?>/admin/pretes-rekap-nilai.php" class="btn btn-warning" style="width:auto;">🎓 Rekapitulasi Nilai Pretes</a>
-        <a href="<?= BASE_URL ?>/admin/pengumuman.php" class="btn btn-primary" style="width:auto;">📢 Kelola Pengumuman</a>
-        <a href="<?= BASE_URL ?>/admin/pengambilan-sertifikat.php" class="btn btn-info" style="width:auto;">🎓 Pengambilan Sertifikat</a>
-        <a href="<?= BASE_URL ?>/admin/inventaris-surat.php" class="btn btn-secondary" style="width:auto;">📑 Inventaris Surat</a>
-        <a href="<?= BASE_URL ?>/admin/log-aktivitas.php" class="btn btn-primary" style="width:auto;background:linear-gradient(135deg, #1e293b, #334155);color:#fff;border:none;">📜 Log Aktivitas Pengguna</a>
+    <div class="card-header">⚡ Aksi Cepat Administrasi</div>
+    <div class="card-body">
+        <div class="quick-actions-grid">
+            <a href="<?= BASE_URL ?>/admin/tutorial-data-pendaftar.php" class="quick-action-btn success">👥 Data Pendaftar Tutorial</a>
+            <a href="<?= BASE_URL ?>/admin/tutorial-hasil-plotting.php" class="quick-action-btn">📊 Hasil Plotting Tutorial</a>
+            <a href="<?= BASE_URL ?>/admin/tutorial-kelas.php" class="quick-action-btn">🏫 Kelola Kelas</a>
+            <a href="<?= BASE_URL ?>/admin/pretes-jadwal.php" class="quick-action-btn primary">📅 Kelola Jadwal Pretes</a>
+            <a href="<?= BASE_URL ?>/admin/pretes-rekap-nilai.php" class="quick-action-btn warning">🎓 Rekapitulasi Nilai Pretes</a>
+            <a href="<?= BASE_URL ?>/admin/pengumuman.php" class="quick-action-btn primary">📢 Kelola Pengumuman</a>
+            <a href="<?= BASE_URL ?>/admin/pengambilan-sertifikat.php" class="quick-action-btn info">🎓 Pengambilan Sertifikat</a>
+            <a href="<?= BASE_URL ?>/admin/inventaris-surat.php" class="quick-action-btn">📑 Inventaris Surat</a>
+            <a href="<?= BASE_URL ?>/admin/log-aktivitas.php" class="quick-action-btn dark">📜 Log Aktivitas Pengguna</a>
+        </div>
     </div>
 </div>
 

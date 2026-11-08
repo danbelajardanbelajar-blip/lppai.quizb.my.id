@@ -174,16 +174,21 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- Welcome Card -->
-<div class="card" style="border-left: 4px solid var(--primary); margin-bottom: 24px;">
-    <div class="card-body" style="display:flex;align-items:center;gap:20px;">
-        <div class="stat-icon green" style="width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;">
+<div class="card welcome-card">
+    <div class="card-body" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div class="welcome-avatar">
             👋
         </div>
-        <div>
-            <h2 style="font-size:22px;margin-bottom:4px;">Assalamu'alaikum, <?= sanitize($user['nama_lengkap']) ?>!</h2>
-            <p style="color:var(--text-muted);font-size:14px;">
-                NIM: <?= sanitize($user['nim']) ?> | <?= sanitize($user['program_studi']) ?> - <?= sanitize($user['fakultas']) ?>
-            </p>
+        <div style="flex:1;min-width:240px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+                <h2 style="font-size:22px;margin:0;font-weight:800;color:var(--primary-dark);letter-spacing:-0.3px;">Assalamu'alaikum, <?= sanitize($user['nama_lengkap']) ?>!</h2>
+                <span class="badge badge-emerald">Mahasiswa Aktif</span>
+            </div>
+            <div class="welcome-chips">
+                <span class="welcome-chip">🆔 NIM: <strong><?= sanitize($user['nim']) ?></strong></span>
+                <span class="welcome-chip">🎓 <strong><?= sanitize($user['program_studi']) ?></strong></span>
+                <span class="welcome-chip">🏛️ <?= sanitize($user['fakultas']) ?></span>
+            </div>
         </div>
     </div>
 </div>
