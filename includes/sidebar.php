@@ -219,9 +219,16 @@ function menuActive($page) {
         </a>
 
         <div class="menu-label">Akun</div>
-        <a href="<?= BASE_URL ?>/logout.php">
+        <a href="<?= BASE_URL ?>/logout.php" style="margin-bottom:14px;">
             <span class="icon">🚪</span> Keluar
         </a>
+
+        <div style="padding: 10px 14px 20px; text-align: center;">
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 7px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; color: rgba(255,255,255,0.55); width: 100%; box-sizing:border-box;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span>
+                <span>LPPAI Core &bull; Online</span>
+            </div>
+        </div>
     </nav>
 </aside>
 <script>
