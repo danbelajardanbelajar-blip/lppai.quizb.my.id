@@ -91,6 +91,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $syncedCount = 0;
             $skippedCount = 0;
 
+            try {
+            // Deteksi kolom pretes_results yang tersedia agar sinkronisasi tidak gagal (HTTP 500)
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            $resCols = [];
+            if ($driver === 'sqlite') {
+                foreach ($pdo->query("PRAGMA table_info(pretes_results)")->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                    $resCols[strtolower($c['name'])] = $c;
+                }
+            } else {
+                foreach ($pdo->query("SHOW COLUMNS FROM pretes_results")->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                    $resCols[strtolower($c['Field'])] = $c;
+                }
+                if (!isset($resCols['nilai'])) {
+                    $pdo->exec("ALTER TABLE pretes_results ADD COLUMN nilai DECIMAL(5,2) NULL");
+                    $resCols['nilai'] = true;
+                }
+                if (!isset($resCols['keterangan'])) {
+                    $pdo->exec("ALTER TABLE pretes_results ADD COLUMN keterangan TEXT NULL");
+                    $resCols['keterangan'] = true;
+                }
+                // status_lulus bertipe ENUM tanpa 'tidak_lulus' akan menolak nilai -> ubah ke VARCHAR
+                $typeStatus = strtolower($resCols['status_lulus']['Type'] ?? '');
+                if (strpos($typeStatus, 'enum') === 0 && strpos($typeStatus, "'tidak_lulus'") === false) {
+                    $pdo->exec("ALTER TABLE pretes_results MODIFY status_lulus VARCHAR(30) NOT NULL DEFAULT 'belum_diumumkan'");
+                }
+                // pretes_schedule_id NOT NULL tanpa default membuat INSERT gagal -> jadikan nullable
+                if (isset($resCols['pretes_schedule_id']) && strtoupper($resCols['pretes_schedule_id']['Null'] ?? '') === 'NO' && $resCols['pretes_schedule_id']['Default'] === null) {
+                    $pdo->exec("ALTER TABLE pretes_results MODIFY pretes_schedule_id INT NULL");
+                }
+            }
+            $hasKet = isset($resCols['keterangan']);
+            $hasUpd = isset($resCols['updated_at']);
+
+            $pdo->beginTransaction();
             foreach ($toSync as $item) {
                 $scores = json_decode($item['scores_json'] ?? '{}', true);
                 $sum = 0;
@@ -116,17 +150,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $existing = $check->fetch();
 
                 if ($existing) {
-                    $upd = $pdo->prepare("UPDATE pretes_results SET nilai = ?, status_lulus = ?, keterangan = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?");
-                    $upd->execute([$avg, $statusLulus, $keterangan, $item['user_id']]);
+                    $setSql = "nilai = ?, status_lulus = ?" . ($hasKet ? ", keterangan = ?" : "") . ($hasUpd ? ", updated_at = CURRENT_TIMESTAMP" : "");
+                    $vals = $hasKet ? [$avg, $statusLulus, $keterangan, $item['user_id']] : [$avg, $statusLulus, $item['user_id']];
+                    $upd = $pdo->prepare("UPDATE pretes_results SET {$setSql} WHERE user_id = ?");
+                    $upd->execute($vals);
                 } else {
-                    $ins = $pdo->prepare("INSERT INTO pretes_results (user_id, nilai, status_lulus, keterangan) VALUES (?, ?, ?, ?)");
-                    $ins->execute([$item['user_id'], $avg, $statusLulus, $keterangan]);
+                    if ($hasKet) {
+                        $ins = $pdo->prepare("INSERT INTO pretes_results (user_id, nilai, status_lulus, keterangan) VALUES (?, ?, ?, ?)");
+                        $ins->execute([$item['user_id'], $avg, $statusLulus, $keterangan]);
+                    } else {
+                        $ins = $pdo->prepare("INSERT INTO pretes_results (user_id, nilai, status_lulus) VALUES (?, ?, ?)");
+                        $ins->execute([$item['user_id'], $avg, $statusLulus]);
+                    }
                 }
                 $syncedCount++;
             }
+            $pdo->commit();
 
             $message = "Berhasil mensinkronkan {$syncedCount} nilai peserta ke Hasil Pretes resmi (status definitif: Lulus / Tidak Lulus).";
             $msgType = 'success';
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                error_log('[pretes-rekap-nilai sync] ' . $e->getMessage());
+                $message = 'Sinkronisasi gagal: ' . $e->getMessage();
+                $msgType = 'danger';
+            }
         }
     }
 }
