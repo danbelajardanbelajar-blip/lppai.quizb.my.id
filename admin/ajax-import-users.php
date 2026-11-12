@@ -102,6 +102,7 @@ foreach ($headerRow as $idx => $h) {
     elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir') || str_contains($h, 'tgl')) $colMap['tanggal_lahir'] = $idx;
     elseif (str_contains($h, 'email')) $colMap['email'] = $idx;
     elseif (str_contains($h, 'hp') || str_contains($h, 'phone') || str_contains($h, 'telp')) $colMap['no_hp'] = $idx;
+    elseif (str_contains($h, 'jenis') || str_contains($h, 'jalur') || str_contains($h, 'rpl') || str_contains($h, 'reguler')) $colMap['jenis_program'] = $idx;
     elseif (str_contains($h, 'prodi') || str_contains($h, 'program') || str_contains($h, 'studi')) $colMap['program_studi'] = $idx;
     elseif (str_contains($h, 'role') || str_contains($h, 'peran')) $colMap['role'] = $idx;
 }
@@ -114,6 +115,7 @@ if (!empty($missing)) {
 }
 
 $pdo = getDBConnection();
+ensureJenisProgramColumn($pdo);
 
 
 $imported = 0;
@@ -130,6 +132,7 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
     $email = trim((string)($row[$colMap['email'] ?? -1] ?? ''));
     $noHp = formatNoHp(trim((string)($row[$colMap['no_hp'] ?? -1] ?? '')));
     $prodi = trim((string)($row[$colMap['program_studi'] ?? -1] ?? ''));
+    $jenisProgram = normalizeJenisProgram($row[$colMap['jenis_program'] ?? -1] ?? 'Reguler');
     $roleVal = strtolower(trim((string)($row[$colMap['role'] ?? -1] ?? '')));
     $role = in_array($roleVal, ['admin', 'mahasiswa', 'dosen']) ? $roleVal : 'mahasiswa';
     
@@ -183,8 +186,8 @@ foreach (array_slice($rows, 1) as $rowNum => $row) {
     $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
     $nim_prefix = substr(trim($nim), 0, 2);
     $isActive = ($role !== 'mahasiswa' || $nim_prefix === '24' || $angkatan === '2024') ? 1 : 0;
-    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, angkatan, tanggal_lahir, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $angkatan, $tglLahirDB, $role, $isActive]);
+    $stmt = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, email, no_hp, program_studi, jenis_program, angkatan, tanggal_lahir, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $stmt->execute([$username, $hash, $nama, $nim, $tmptLahir, $email, $noHp, $prodi, $jenisProgram, $angkatan, $tglLahirDB, $role, $isActive]);
 
     $userId = $pdo->lastInsertId();
 

@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if (!empty($certCode)) {
     try {
         $sqlLookup = "
-            SELECT u.nama_lengkap, u.nim, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
+            SELECT u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.tempat_lahir, u.tanggal_lahir,
                    tr.id as reg_id, tr.user_id, tr.tahun_ajaran, tr.tipe_nilai,
                    tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
                    tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
@@ -907,7 +907,7 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
 
                         <div class="cert-meta-grid">
                             <div class="cert-meta-item">NIM: <strong><?= htmlspecialchars($cert['nim']) ?></strong></div>
-                            <div class="cert-meta-item">Program Studi: <strong><?= htmlspecialchars($cert['program_studi'] ?: '-') ?></strong></div>
+                            <div class="cert-meta-item">Program Studi: <strong><?= htmlspecialchars($cert['program_studi'] ?: '-') ?></strong> <?= renderJenisProgramBadge($cert['jenis_program'] ?? 'Reguler', true) ?></div>
                             <div class="cert-meta-item">TTL: <strong><?= htmlspecialchars($ttlLahir) ?></strong></div>
                         </div>
 

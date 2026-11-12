@@ -496,7 +496,7 @@ foreach ($pdo->query("SELECT user_id, tutorial_class_id FROM tutorial_registrati
 }
 
 $registrations = $pdo->query("
-    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+    SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -545,7 +545,7 @@ $allRegistrations = [];
 
 if ($selected_gel_id === 'all') {
     $stmtRegistrations = $pdo->query("
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -562,7 +562,7 @@ if ($selected_gel_id === 'all') {
     $targetYear = str_replace('/', '-', trim($current_gel['tahun_ajaran']));
     $targetSemester = trim($current_gel['semester']);
     $stmtRegistrations = $pdo->prepare("
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -682,6 +682,7 @@ $allPretesQuery = $pdo->query("
         u.nama_lengkap,
         u.nim,
         u.program_studi,
+        u.jenis_program,
         u.no_hp,
         u.email,
         pres.nilai as pretes_nilai,
@@ -1199,7 +1200,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td><?= sanitize($reg['nim'] ?: '-') ?></td>
-                        <td><?= sanitize($reg['program_studi'] ?: '-') ?></td>
+                        <td><?= formatProdiDisplay($reg['program_studi'] ?? '', $reg['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><span class="badge <?= $badgeClass ?>"><?= sanitize($h) ?></span></td>
                         <td>
                             <?php if (!empty($reg['tutorial_class_id'])): ?>
@@ -1316,7 +1317,7 @@ include __DIR__ . '/../includes/header.php';
                                 <strong style="color: #1e293b;"><?= sanitize($p['nama_lengkap']) ?></strong>
                             </td>
                             <td><?= sanitize($p['nim'] ?: '-') ?></td>
-                            <td><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                            <td><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
                             <td>
                                 <span class="badge badge-info" style="font-size: 11px;">
                                     <?= sanitize($p['pretes_periode'] ?: '-') ?>

@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/SessionDatabaseHandler.php';
 require_once __DIR__ . '/activity-logger.php';
+require_once __DIR__ . '/user-helper.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     // Konfigurasi masa aktif sesi tahan lama (30 hari = 2.592.000 detik)
@@ -30,6 +31,7 @@ if (session_status() === PHP_SESSION_NONE) {
     $sessionHandler = new SessionDatabaseHandler($pdo);
     session_set_save_handler($sessionHandler, true);
     session_start();
+    ensureJenisProgramColumn($pdo);
 }
 
 function isLoggedIn() {
@@ -120,6 +122,7 @@ function loginUser($username, $password) {
         $_SESSION['nim'] = $user['nim'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['program_studi'] = $user['program_studi'];
+        $_SESSION['jenis_program'] = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
         $_SESSION['fakultas'] = $user['fakultas'];
         $_SESSION['angkatan'] = $user['angkatan'] ?? '';
         
@@ -200,6 +203,7 @@ function getCurrentUser() {
         'nim' => $_SESSION['nim'] ?? '',
         'role' => $_SESSION['role'],
         'program_studi' => $_SESSION['program_studi'] ?? '',
+        'jenis_program' => normalizeJenisProgram($_SESSION['jenis_program'] ?? 'Reguler'),
         'fakultas' => $_SESSION['fakultas'] ?? '',
         'angkatan' => $_SESSION['angkatan'] ?? '',
         'is_active' => $_SESSION['is_active'] ?? 0,
@@ -261,6 +265,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
             $_SESSION['nim'] = $user['nim'];
             $_SESSION['role'] = $user['role'];
             $_SESSION['program_studi'] = $user['program_studi'];
+            $_SESSION['jenis_program'] = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
             $_SESSION['fakultas'] = $user['fakultas'];
             $_SESSION['angkatan'] = $user['angkatan'] ?? '';
             $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 1;

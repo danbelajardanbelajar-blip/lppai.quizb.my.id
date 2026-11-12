@@ -116,7 +116,7 @@ $totalPages = ceil($totalRecords / $limit);
 
 // Ambil data absensi dengan limit
 $sql = "
-    SELECT a.*, u.nama_lengkap, u.program_studi, u.fakultas 
+    SELECT a.*, u.nama_lengkap, u.program_studi, u.jenis_program, u.fakultas 
     FROM absensi_alkhidmah a 
     JOIN users u ON a.nim = u.nim 
     $whereClause
@@ -278,7 +278,7 @@ include __DIR__ . '/../includes/header.php';
                                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                                     <div>
                                         <h5 class="card-title mb-1 absensi-nama" style="font-size:16px; font-weight:bold; margin:0;"><?= htmlspecialchars($row['nama_lengkap']) ?></h5>
-                                        <h6 class="card-subtitle text-muted absensi-nim" style="font-size:13px; margin-top:4px;"><?= htmlspecialchars($row['nim']) ?> - <?= htmlspecialchars($row['program_studi']) ?></h6>
+                                        <h6 class="card-subtitle text-muted absensi-nim" style="font-size:13px; margin-top:4px;"><?= htmlspecialchars($row['nim']) ?> - <?= htmlspecialchars($row['program_studi']) ?> <?= renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true) ?></h6>
                                     </div>
                                     <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:11px; padding:4px 8px; border-radius:6px;"><?= htmlspecialchars($row['tanggal']) ?></span>
                                 </div>

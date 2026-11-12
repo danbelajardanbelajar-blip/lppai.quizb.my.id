@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+ensureJenisProgramColumn($pdo);
 $message = '';
 $msgType = '';
 
@@ -27,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email   = trim($_POST['email'] ?? '');
             $noHp    = formatNoHp(trim($_POST['no_hp'] ?? ''));
             $prodi   = trim($_POST['program_studi'] ?? '');
+            $jenisProgram = normalizeJenisProgram($_POST['jenis_program'] ?? 'Reguler');
             $role    = $_POST['role'] ?? 'mahasiswa';
             
             // Extract angkatan dari NIM
@@ -54,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                     $hash = password_hash($passwordRaw, PASSWORD_DEFAULT);
                     $isActive = ($role !== 'mahasiswa' || $nim_prefix === '24' || $angkatan === '2024') ? 1 : 0;
-                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, tempat_lahir, tanggal_lahir, angkatan, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $tmptLahir, $tglLahir, $angkatan, $role, $isActive]);
+                    $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, email, no_hp, program_studi, jenis_program, tempat_lahir, tanggal_lahir, angkatan, role, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                        ->execute([$username, $hash, $nama, $nim, $email, $noHp, $prodi, $jenisProgram, $tmptLahir, $tglLahir, $angkatan, $role, $isActive]);
                     $safeNim = sanitize($nim);
                     $safePass = sanitize($passwordRaw);
                     $message = "User berhasil ditambahkan! Login: Username=<strong>$safeNim</strong>, Password=<strong>$safePass</strong>";
@@ -69,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $email   = trim($_POST['email'] ?? '');
             $noHp    = formatNoHp(trim($_POST['no_hp'] ?? ''));
             $prodi   = trim($_POST['program_studi'] ?? '');
+            $jenisProgram = normalizeJenisProgram($_POST['jenis_program'] ?? 'Reguler');
             $tmptLahir= trim($_POST['tempat_lahir'] ?? '');
             $tglLahir= trim($_POST['tanggal_lahir'] ?? '');
             $angkatan = trim($_POST['angkatan'] ?? '');
@@ -82,8 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($id === (int)$_SESSION['user_id'] && $role !== 'admin') {
                     $role = 'admin'; // proteksi: admin tidak bisa turunkan role sendiri
                 }
-                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, tempat_lahir = ?, tanggal_lahir = ?, angkatan = ?, role = ? WHERE id = ?")
-                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $tmptLahir ?: null, $tglLahir ?: null, $angkatan ?: null, $role, $id]);
+                $pdo->prepare("UPDATE users SET nama_lengkap = ?, email = ?, no_hp = ?, program_studi = ?, jenis_program = ?, tempat_lahir = ?, tanggal_lahir = ?, angkatan = ?, role = ? WHERE id = ?")
+                    ->execute([$nama, $email ?: null, $noHp ?: null, $prodi ?: null, $jenisProgram, $tmptLahir ?: null, $tglLahir ?: null, $angkatan ?: null, $role, $id]);
                 $message = 'Data pengguna berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -154,6 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $_SESSION['nim'] = $user['nim'];
                     $_SESSION['role'] = $user['role'];
                     $_SESSION['program_studi'] = $user['program_studi'];
+                    $_SESSION['jenis_program'] = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
                     $_SESSION['fakultas'] = $user['fakultas'];
 
                     // Catat aktivitas login sebagai mode penyamaran admin
@@ -399,6 +403,13 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <label>Program Studi</label>
                     <input type="text" name="program_studi" placeholder="Program studi">
                 </div>
+                <div class="form-group" id="group_jenis_program">
+                    <label>Jenis Program *</label>
+                    <select name="jenis_program">
+                        <option value="Reguler">Reguler</option>
+                        <option value="RPL">RPL</option>
+                    </select>
+                </div>
 
                 <div class="form-group">
                     <label>Email</label>
@@ -414,13 +425,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                 function toggleFields() {
                     const role = document.getElementById('create_role').value;
                     const prodi = document.getElementById('group_prodi');
+                    const jenisProgram = document.getElementById('group_jenis_program');
                     const labelNim = document.getElementById('label_nim');
                     
                     if (role === 'mahasiswa') {
                         prodi.style.display = 'block';
+                        if (jenisProgram) jenisProgram.style.display = 'block';
                         labelNim.innerHTML = 'NIM * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     } else {
                         prodi.style.display = 'none';
+                        if (jenisProgram) jenisProgram.style.display = 'none';
                         labelNim.innerHTML = 'Username / NIP * <small style="color:#888;">(digunakan sebagai username login)</small>';
                     }
                 }
@@ -468,6 +482,16 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div style="flex: 1; min-width: 190px;">
+                <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                    🏷️ <span>Jenis Program</span>
+                </label>
+                <select id="filter_jenis_program" class="form-control" style="border-radius: 8px; border: 1px solid #ced4da; padding: 10px 14px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); appearance: auto; background-color: #fff; color: #495057; font-size: 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;">
+                    <option value="">Semua Jenis</option>
+                    <option value="Reguler">Reguler</option>
+                    <option value="RPL">RPL</option>
+                </select>
+            </div>
             <div style="flex: 1; min-width: 220px;">
                 <label style="font-weight: 600; font-size: 14px; color: #495057; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                     👤 <span>Role Pengguna</span>
@@ -502,6 +526,7 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                         <th>No. HP / WA</th>
                         <th>Tanggal Lahir</th>
                         <th>Prodi</th>
+                        <th>Jenis Program</th>
                         <th>Angkatan</th>
                         <th>Role</th>
                         <th>Aksi</th>
@@ -553,6 +578,13 @@ document.getElementById('modal-import').addEventListener('click', function(e) {
                     <input type="text" name="program_studi" id="edit_user_prodi" placeholder="Program studi">
                 </div>
                 <div class="form-group">
+                    <label>Jenis Program *</label>
+                    <select name="jenis_program" id="edit_user_jenis_program">
+                        <option value="Reguler">Reguler</option>
+                        <option value="RPL">RPL</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Angkatan</label>
                     <input type="text" name="angkatan" id="edit_user_angkatan" placeholder="Contoh: 2024">
                 </div>
@@ -600,16 +632,17 @@ window.toggleUserPass = function(btn) {
     }
 };
 
-window.openUserModal = function(id, nama, email, noHp, prodi, tmptLahir, tglLahir, angkatan, role) {
-    document.getElementById('edit_user_id').value       = id;
-    document.getElementById('edit_user_nama').value     = nama;
-    document.getElementById('edit_user_email').value    = email;
-    document.getElementById('edit_user_nohp').value     = noHp;
-    document.getElementById('edit_user_prodi').value    = prodi;
-    document.getElementById('edit_user_tmptlahir').value= tmptLahir;
-    document.getElementById('edit_user_tgllahir').value = tglLahir;
-    document.getElementById('edit_user_angkatan').value = angkatan;
-    document.getElementById('edit_user_role').value     = role;
+window.openUserModal = function(id, nama, email, noHp, prodi, jenisProgram, tmptLahir, tglLahir, angkatan, role) {
+    document.getElementById('edit_user_id').value            = id;
+    document.getElementById('edit_user_nama').value          = nama;
+    document.getElementById('edit_user_email').value         = email;
+    document.getElementById('edit_user_nohp').value          = noHp;
+    document.getElementById('edit_user_prodi').value         = prodi;
+    document.getElementById('edit_user_jenis_program').value = jenisProgram || 'Reguler';
+    document.getElementById('edit_user_tmptlahir').value     = tmptLahir;
+    document.getElementById('edit_user_tgllahir').value      = tglLahir;
+    document.getElementById('edit_user_angkatan').value      = angkatan;
+    document.getElementById('edit_user_role').value          = role;
     document.getElementById('editUserModal').classList.add('show');
 };
 
@@ -625,7 +658,7 @@ if (!window._editUserBound) {
         var btn = e.target.closest('.btn-edit-user');
         if (btn) {
             var d = btn.dataset;
-            window.openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.tmptLahir, d.tglLahir, d.angkatan, d.role);
+            window.openUserModal(d.id, d.nama, d.email, d.noHp, d.prodi, d.jenisProgram, d.tmptLahir, d.tglLahir, d.angkatan, d.role);
             return;
         }
         if (e.target && e.target.id === 'editUserModal') window.closeUserModal();
@@ -701,6 +734,7 @@ function initUsersPage() {
             data: function (d) {
                 d.filterAngkatan = $('#filter_angkatan').val();
                 d.filterProdi = $('#filter_prodi').val();
+                d.filterJenisProgram = $('#filter_jenis_program').val();
                 d.filterRole = $('#filter_role').val();
                 d.filterActive = $('#filter_active').val();
             },
@@ -712,7 +746,7 @@ function initUsersPage() {
         lengthMenu: [10, 25, 50, 100, 500],
         order: [[3, 'asc']],
         columnDefs: [
-            { orderable: false, targets: [0, 9] }
+            { orderable: false, targets: [0, 10] }
         ],
         language: {
             search: 'Cari:',
@@ -731,7 +765,7 @@ function initUsersPage() {
     });
 
     // Reload table on filter change
-    $('#filter_angkatan, #filter_prodi, #filter_role, #filter_active').on('change', function() {
+    $('#filter_angkatan, #filter_prodi, #filter_jenis_program, #filter_role, #filter_active').on('change', function() {
         table.ajax.reload();
     });
 

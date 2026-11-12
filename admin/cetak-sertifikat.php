@@ -25,7 +25,7 @@ $whereLulus = "
 ";
 
 $sqlBase = "
-    SELECT u.nama_lengkap, u.nim, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
+    SELECT u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran, tr.tipe_nilai,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
@@ -576,7 +576,7 @@ $thnNow = date('Y');
                     <div class="student-name"><?= htmlspecialchars($data['nama_lengkap']) ?></div>
                     <div class="student-detail">
                         NIM: <strong><?= htmlspecialchars($data['nim'] ?: '-') ?></strong> &nbsp;&nbsp;|&nbsp;&nbsp; 
-                        Program Studi: <strong><?= htmlspecialchars($data['program_studi'] ?: '-') ?></strong><br>
+                        Program Studi: <strong><?= htmlspecialchars($data['program_studi'] ?: '-') ?> (<?= htmlspecialchars(normalizeJenisProgram($data['jenis_program'] ?? 'Reguler')) ?>)</strong><br>
                         Tempat, Tanggal Lahir: <?= htmlspecialchars($ttlLahir) ?>
                     </div>
 

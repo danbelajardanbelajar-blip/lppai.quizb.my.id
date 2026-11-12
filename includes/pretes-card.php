@@ -804,7 +804,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                                 </div>
                                 <div>
                                     <dt>Program studi</dt>
-                                    <dd><?= sanitize($cardValue($user['program_studi'] ?? null)) ?></dd>
+                                    <dd><?= sanitize($cardValue($user['program_studi'] ?? null)) ?> <span style="display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;margin-left:4px;"><?= sanitize(strtoupper(trim((string)($user['jenis_program'] ?? 'Reguler'))) === 'RPL' ? 'RPL' : 'Reguler') ?></span></dd>
                                 </div>
                                 <div>
                                     <dt>Fakultas</dt>

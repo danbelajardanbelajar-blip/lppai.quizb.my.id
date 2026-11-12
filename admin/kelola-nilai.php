@@ -185,6 +185,14 @@ require_once __DIR__ . '/../includes/header.php';
                         ?>
                     </select>
                 </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label class="filter-label">🏷️ Jenis Program</label>
+                    <select id="filterJenisProgram" class="premium-filter">
+                        <option value="">Semua Jenis</option>
+                        <option value="Reguler">Reguler</option>
+                        <option value="RPL">RPL</option>
+                    </select>
+                </div>
                 <div style="flex: 1; min-width: 180px;">
                     <label class="filter-label">🎓 Status Kelulusan</label>
                     <select id="filterLulus" class="premium-filter">
@@ -399,6 +407,7 @@ $(document).ready(function() {
                 d.filterTahunAjaran = $('#filterTahunAjaran').val();
                 d.filterTipeNilai = $('#filterTipeNilai').val();
                 d.filterJurusan = $('#filterJurusan').val();
+                d.filterJenisProgram = $('#filterJenisProgram').val();
                 d.filterLulus = $('#filterLulus').val();
             }
         },
@@ -415,7 +424,7 @@ $(document).ready(function() {
     });
 
     // Event listener untuk filter dropdown
-    $('#filterTahunAjaran, #filterTipeNilai, #filterJurusan, #filterLulus').on('change', function() {
+    $('#filterTahunAjaran, #filterTipeNilai, #filterJurusan, #filterJenisProgram, #filterLulus').on('change', function() {
         table.ajax.reload();
     });
 

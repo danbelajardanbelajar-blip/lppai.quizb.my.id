@@ -498,7 +498,7 @@ $registrations = $pdo->query("
 ")->fetchAll();
 
 $allStudents = $pdo->query("
-    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, 
+    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program, 
            MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
            (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
     FROM users u
@@ -681,7 +681,7 @@ include __DIR__ . '/../includes/header.php';
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['nim'] ?: '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize((strlen(trim($m['nim'])) >= 2) ? "20" . substr(trim($m['nim']), 0, 2) : '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><strong><?= sanitize($m['nama_lengkap']) ?></strong></td>
-                            <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['program_studi'] ?: '-') ?></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= formatProdiDisplay($m['program_studi'] ?? '', $m['jenis_program'] ?? 'Reguler', true) ?></td>
                             <td style="padding: 10px 16px; text-align: center;">
                                 <?php if ($isReg): ?>
                                     <span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (<?= sanitize($m['hari_pilihan']) ?>)</span>

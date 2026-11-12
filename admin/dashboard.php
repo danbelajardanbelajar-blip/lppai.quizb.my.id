@@ -85,7 +85,7 @@ if ($activeTutorial) {
     $targetTahun = str_replace('/', '-', trim($activeTutorial['tahun_ajaran']));
     try {
         $stmtTutorial = $pdo->prepare("
-            SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.no_hp,
+            SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.no_hp,
                    tc.nama_kelas, tc.hari as kelas_hari, tc.ruangan, tc.dosen_pengampu
             FROM tutorial_registrations tr
             JOIN users u ON tr.user_id = u.id
@@ -110,7 +110,7 @@ if ($activeTutorial) {
 if (empty($recentTutorialRegs)) {
     try {
         $recentTutorialRegs = $pdo->query("
-            SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.no_hp,
+            SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.no_hp,
                    tc.nama_kelas, tc.hari as kelas_hari, tc.ruangan, tc.dosen_pengampu
             FROM tutorial_registrations tr
             JOIN users u ON tr.user_id = u.id
@@ -125,7 +125,7 @@ $recentPretesRegs = [];
 if ($activePretes) {
     try {
         $stmtPretes = $pdo->prepare("
-            SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.no_hp
+            SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.no_hp
             FROM pretes_registrations pr
             JOIN users u ON pr.user_id = u.id
             WHERE pr.periode = ?
@@ -139,7 +139,7 @@ if ($activePretes) {
 if (empty($recentPretesRegs)) {
     try {
         $recentPretesRegs = $pdo->query("
-            SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.no_hp
+            SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.no_hp
             FROM pretes_registrations pr
             JOIN users u ON pr.user_id = u.id
             ORDER BY pr.id DESC LIMIT 10
@@ -319,7 +319,7 @@ include __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['nim']) ?></td>
-                                <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['program_studi'] ?? '-') ?></td>
+                                <td style="padding:10px 14px; color:#475569;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true, true) ?></td>
                                 <td style="padding:10px 14px;">
                                     <?php if (!empty($r['nama_kelas'])): ?>
                                         <span class="badge" style="background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:6px; font-weight:600; font-size:12px;">
@@ -398,7 +398,7 @@ include __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['nim']) ?></td>
-                                <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['program_studi'] ?? '-') ?></td>
+                                <td style="padding:10px 14px; color:#475569;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true, true) ?></td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['periode']) ?></td>
                                 <td style="padding:10px 14px;">
                                     <?php if (!empty($r['hari_pilihan'])): ?>

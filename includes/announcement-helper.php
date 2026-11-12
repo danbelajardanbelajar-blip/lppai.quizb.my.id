@@ -38,7 +38,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
 
     if (strpos($tipe, 'kelulusan') !== false) {
         $stmt = $pdo->prepare("
-            SELECT tr.*, tc.nama_kelas, u.nama_lengkap, u.nim, u.program_studi
+            SELECT tr.*, tc.nama_kelas, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
             FROM tutorial_registrations tr
             JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
             JOIN users u ON tr.user_id = u.id
@@ -368,7 +368,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                                 <td><?= $i + 1 ?></td>
                                 <td><?= sanitize($r['nama_lengkap']) ?></td>
                                 <td><?= sanitize($r['nim']) ?></td>
-                                <td><?= sanitize($r['program_studi']) ?></td>
+                                <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td><?= sanitize($r['nama_kelas']) ?></td>
                                 <td><strong><?= $r['nilai_akhir'] ? number_format($r['nilai_akhir'], 1) : '-' ?></strong></td>
                                 <td>

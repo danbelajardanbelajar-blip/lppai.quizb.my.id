@@ -196,7 +196,7 @@ if ($isDosen) {
 $sql = "
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.ruangan, pr.dosen_penguji,
            pr.status as status_hadir, pr.tanggal_daftar,
-           u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.no_hp,
+           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas, u.no_hp,
            pa.scores_json, pa.updated_at as assessed_at,
            ar.attended_at
     FROM pretes_registrations pr
@@ -312,6 +312,7 @@ foreach ($rawRows as $row) {
         'nama_lengkap'  => $row['nama_lengkap'],
         'nim'           => $row['nim'],
         'program_studi' => $row['program_studi'] ?: '-',
+        'jenis_program' => normalizeJenisProgram($row['jenis_program'] ?? 'Reguler'),
         'fakultas'      => $row['fakultas'] ?: '-',
         'hari_pilihan'  => ucfirst(strtolower(trim($row['hari_pilihan'] ?: 'Senin'))),
         'jam'           => $row['jam'] ?: '13.00 WIB',
@@ -343,7 +344,7 @@ foreach ($rawRows as $row) {
     // Filter Search text
     if (!empty($filterSearch)) {
         $q = strtolower($filterSearch);
-        $searchBody = strtolower($itemData['nama_lengkap'] . ' ' . $itemData['nim'] . ' ' . $itemData['program_studi'] . ' ' . $itemData['dosen_penguji']);
+        $searchBody = strtolower($itemData['nama_lengkap'] . ' ' . $itemData['nim'] . ' ' . $itemData['program_studi'] . ' ' . $itemData['jenis_program'] . ' ' . $itemData['dosen_penguji']);
         if (strpos($searchBody, $q) === false) continue;
     }
 
@@ -500,6 +501,8 @@ if (!function_exists('pretesExportRosterToXlsxNative')) {
                 $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['nama_lengkap'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
                 // 4. Prodi
                 $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['program_studi'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 5. Jenis Program
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars(normalizeJenisProgram($r['jenis_program'] ?? 'Reguler'), ENT_XML1, 'UTF-8') . '</t></is></c>';
                 // 5. Fakultas
                 $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['fakultas'] ?? '', ENT_XML1, 'UTF-8') . '</t></is></c>';
                 // 6. Hari
@@ -615,7 +618,7 @@ if (!function_exists('pretesExportRosterToXlsXml')) {
         echo '<Worksheet ss:Name="Rekap Nilai Pretes">' . "\n";
         echo '<Table>' . "\n";
 
-        $widths = [40, 100, 170, 130, 110, 80, 90, 160, 90, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 80, 80, 70, 100];
+        $widths = [40, 100, 170, 130, 85, 110, 80, 90, 160, 90, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 80, 80, 70, 100];
         foreach ($widths as $w) {
             echo '<Column ss:Width="' . $w . '"/>' . "\n";
         }
@@ -640,6 +643,7 @@ if (!function_exists('pretesExportRosterToXlsXml')) {
                 echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars((string)($r['nim'] ?? ''), ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
                 echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['nama_lengkap'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
                 echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['program_studi'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars(normalizeJenisProgram($r['jenis_program'] ?? 'Reguler'), ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
                 echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['fakultas'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
                 echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['hari_pilihan'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
                 echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['ruangan'] ?? '', ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
@@ -684,7 +688,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
     $filename = "Rekapitulasi_Nilai_Pretes_{$safePeriode}{$safeDosen}_{$timestamp}";
 
     $headers = [
-        'No', 'NIM', 'Nama Mahasiswa', 'Prodi', 'Fakultas', 'Hari', 'Ruangan', 'Dosen Penguji', 'Kehadiran',
+        'No', 'NIM', 'Nama Mahasiswa', 'Prodi', 'Jenis Program', 'Fakultas', 'Hari', 'Ruangan', 'Dosen Penguji', 'Kehadiran',
         'Ujian Tulis', 'Praktik Wudlu', 'Doa Stlh Wudlu', 'Tayammum', 'Mandi Besar', 'Jamak Qashar',
         'Shalat Subuh', 'Al Bayyinah', "Al 'Alaq", 'Al Dluha', 'Istighasah', 'Shalat Jenazah',
         'Terisi', 'Rata-rata', 'Predikat', 'Status Kelulusan'
@@ -706,6 +710,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
                 "'" . (string)($r['nim'] ?? ''),
                 $r['nama_lengkap'] ?? '',
                 $r['program_studi'] ?? '',
+                normalizeJenisProgram($r['jenis_program'] ?? 'Reguler'),
                 $r['fakultas'] ?? '',
                 $r['hari_pilihan'] ?? '',
                 $r['ruangan'] ?? '',
@@ -795,6 +800,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
                     $sheet->setCellValueExplicit("{$c}{$rowNum}", (string)($r['nim'] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['nama_lengkap'] ?? ''); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['program_studi'] ?? ''); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", normalizeJenisProgram($r['jenis_program'] ?? 'Reguler')); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['fakultas'] ?? ''); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['hari_pilihan'] ?? ''); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['ruangan'] ?? ''); $c++;
@@ -969,7 +975,7 @@ if ($isPrint) {
                     <td><?= $idx + 1 ?></td>
                     <td><?= sanitize($r['nim']) ?></td>
                     <td class="text-left" style="font-weight:600;"><?= sanitize($r['nama_lengkap']) ?></td>
-                    <td><?= sanitize($r['program_studi']) ?></td>
+                    <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
                     <td><?= sanitize($r['hari_pilihan']) ?><br><small style="color:#475569;"><?= sanitize($r['ruangan']) ?></small></td>
                     
                     <?php foreach ($componentKeys as $ck): 
@@ -1417,7 +1423,7 @@ include __DIR__ . '/../includes/header.php';
                         <strong style="color:#0f172a; font-size:13.5px;"><?= sanitize($r['nama_lengkap']) ?></strong>
                         <div style="font-size:11.5px; color:#64748b; font-family:monospace;"><?= sanitize($r['nim']) ?></div>
                     </td>
-                    <td style="text-align:left; font-size:12.5px;"><?= sanitize($r['program_studi']) ?></td>
+                    <td style="text-align:left; font-size:12.5px;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
                     <td style="font-size:12px;">
                         <span style="font-weight:700; color:#0f172a;"><?= sanitize($r['hari_pilihan']) ?></span>
                         <div style="color:#64748b;"><?= sanitize($r['ruangan']) ?></div>

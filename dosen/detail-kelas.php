@@ -137,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $stmt = $pdo->prepare("
     SELECT tr.id as reg_id, tr.user_id, tr.status, 
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_detail,
-           u.nama_lengkap, u.nim, u.program_studi
+           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
     FROM tutorial_registrations tr
     JOIN users u ON tr.user_id = u.id
     WHERE tr.tutorial_class_id = ?
@@ -237,7 +237,7 @@ include __DIR__ . '/../includes/header.php';
                                 <td align="center"><?= $no++ ?></td>
                                 <td>
                                     <strong><?= sanitize($s['nama_lengkap']) ?></strong><br>
-                                    <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?></small>
+                                    <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?> <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></small>
                                 </td>
                                 <td align="center"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>

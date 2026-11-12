@@ -17,6 +17,7 @@ $availableColumns = [
     'nama_lengkap'   => ['label' => 'Nama Mahasiswa',        'default' => true],
     'nim'            => ['label' => 'NIM',                   'default' => true],
     'program_studi'  => ['label' => 'Program Studi',         'default' => true],
+    'jenis_program'  => ['label' => 'Jenis Program',         'default' => true],
     'fakultas'       => ['label' => 'Fakultas',              'default' => true],
     'hari_pilihan'   => ['label' => 'Hari Pelaksanaan',      'default' => true],
     'jam'            => ['label' => 'Waktu / Jam',           'default' => true],
@@ -34,6 +35,7 @@ $availableColumns = [
 // ── Tangkap Parameter Filter ───────────────────────────────────────────────────
 $filterHari   = trim($_GET['hari'] ?? '');
 $filterProdi  = trim($_GET['prodi'] ?? '');
+$filterJenis  = trim($_GET['jenis_program'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
 $filterCred   = trim($_GET['cred'] ?? '');
 $filterSearch = trim($_GET['q'] ?? ($_GET['nama'] ?? ($_GET['nim'] ?? '')));
@@ -68,6 +70,11 @@ if ($filterProdi !== '') {
     $params[] = $filterProdi;
 }
 
+if ($filterJenis !== '') {
+    $whereConditions[] = "u.jenis_program = ?";
+    $params[] = normalizeJenisProgram($filterJenis);
+}
+
 if ($filterStatus !== '') {
     $whereConditions[] = "pr.status = ?";
     $params[] = $filterStatus;
@@ -92,7 +99,7 @@ $whereSql = implode(' AND ', $whereConditions);
 $querySql = "
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
-           u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.email, u.no_hp
+           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas, u.email, u.no_hp
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     WHERE {$whereSql}
@@ -265,6 +272,9 @@ if ($isDownload) {
                     case 'program_studi':
                         $val = $row['program_studi'] ?? '';
                         break;
+                    case 'jenis_program':
+                        $val = normalizeJenisProgram($row['jenis_program'] ?? 'Reguler');
+                        break;
                     case 'fakultas':
                         $val = $row['fakultas'] ?? '';
                         break;
@@ -394,6 +404,9 @@ if ($isDownload) {
                     break;
                 case 'program_studi':
                     $line[] = $row['program_studi'] ?? '';
+                    break;
+                case 'jenis_program':
+                    $line[] = normalizeJenisProgram($row['jenis_program'] ?? 'Reguler');
                     break;
                 case 'fakultas':
                     $line[] = $row['fakultas'] ?? '';
@@ -629,6 +642,18 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
 
+                <!-- Filter Jenis Program -->
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">
+                        🏷️ Jenis Program
+                    </label>
+                    <select name="jenis_program" id="filter-jenis-program" style="width:100%;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:13px;background:#fff;outline:none;">
+                        <option value="">Semua Jenis</option>
+                        <option value="Reguler" <?= ($filterJenis === 'Reguler') ? 'selected' : '' ?>>Reguler</option>
+                        <option value="RPL" <?= ($filterJenis === 'RPL') ? 'selected' : '' ?>>RPL</option>
+                    </select>
+                </div>
+
                 <!-- Filter Status Hadir -->
                 <div>
                     <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">
@@ -786,6 +811,10 @@ include __DIR__ . '/../includes/header.php';
 
                                             <?php case 'program_studi': ?>
                                                 <?= sanitize($r['program_studi'] ?: '-') ?>
+                                                <?php break; ?>
+
+                                            <?php case 'jenis_program': ?>
+                                                <?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?>
                                                 <?php break; ?>
 
                                             <?php case 'fakultas': ?>

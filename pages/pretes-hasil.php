@@ -170,7 +170,7 @@ $periodeDisplay = !empty($myReg['periode']) ? $myReg['periode'] : (!empty($myRes
 $allResults = [];
 if (isAdmin() || isDosen()) {
     $allResults = $pdo->query("
-        SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi
+        SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
         FROM pretes_results pr
         JOIN users u ON pr.user_id = u.id
         WHERE pr.status_lulus != 'belum_diumumkan'
@@ -760,7 +760,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= $i + 1 ?></td>
                         <td><?= sanitize($r['nama_lengkap']) ?></td>
                         <td><?= sanitize($r['nim']) ?></td>
-                        <td><?= sanitize($r['program_studi']) ?></td>
+                        <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><strong><?= $r['nilai'] !== null ? number_format($r['nilai'], 2) : '-' ?></strong></td>
                         <td>
                             <?php if ($r['status_lulus'] === 'lulus'): ?>

@@ -180,7 +180,7 @@ if (!$message && isset($_SESSION['pretes_flash'])) {
 // ── Ambil Data Mahasiswa Ditugaskan ─────────────────────────────────────────
 $participants = [];
 if ($period) {
-    $sql = 'SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, pa.scores_json, pa.updated_at AS assessed_at,
+    $sql = 'SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, pa.scores_json, pa.updated_at AS assessed_at,
         ar.attended_at FROM pretes_registrations pr 
         JOIN users u ON u.id = pr.user_id
         LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
@@ -1290,7 +1290,7 @@ include __DIR__ . '/header.php';
                                         </div>
                                         <div class="student-meta" style="margin-top:5px;font-size:12.5px;color:#64748b;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">
                                             <span><strong>NIM:</strong> <?= sanitize($row['nim']) ?></span>
-                                            <span><strong>Prodi:</strong> <?= sanitize($row['program_studi'] ?: '-') ?></span>
+                                            <span><strong>Prodi:</strong> <?= sanitize($row['program_studi'] ?: '-') ?> <?= renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true) ?></span>
                                             <span><strong>Sesi:</strong> <?= sanitize($row['hari_pilihan'] ?: 'Senin') ?><?= !empty($row['ruangan']) ? ' · ' . sanitize($row['ruangan']) : '' ?></span>
                                             <?php 
                                             $cbtVal = $rowScores['ujian_tulis'] ?? null;

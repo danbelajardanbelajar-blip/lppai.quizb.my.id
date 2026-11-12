@@ -17,6 +17,7 @@ if (isset($_SESSION['admin_login_as'])) {
         $_SESSION['nim'] = $user['nim'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['program_studi'] = $user['program_studi'];
+        $_SESSION['jenis_program'] = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
         $_SESSION['fakultas'] = $user['fakultas'];
         
         // Hapus penanda backup

@@ -278,7 +278,7 @@ if ($autoSyncRes && (!empty($autoSyncRes['updated']) || !empty($autoSyncRes['mat
 $participants = $pdo->query("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
-           u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.email, u.no_hp
+           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas, u.email, u.no_hp
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     ORDER BY u.nama_lengkap ASC
@@ -753,7 +753,7 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= $i + 1 ?></td>
                         <td data-search="<?= sanitize($p['nama_lengkap']) ?>"><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
                         <td data-search="<?= sanitize($p['nim']) ?>"><?= sanitize($p['nim']) ?></td>
-                        <td data-search="<?= sanitize($p['program_studi']) ?>"><?= sanitize($p['program_studi']) ?></td>
+                        <td data-search="<?= sanitize(trim(($p['program_studi'] ?? '') . ' ' . normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'))) ?>"><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
                         <?php 
                         $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));

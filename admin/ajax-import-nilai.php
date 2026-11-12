@@ -92,6 +92,7 @@ try {
     foreach ($header as $idx => $h) {
         if (str_contains($h, 'nim')) $colMap['nim'] = $idx;
         elseif (str_contains($h, 'nama')) $colMap['nama'] = $idx;
+        elseif (str_contains($h, 'jenis') || str_contains($h, 'jalur') || str_contains($h, 'rpl') || str_contains($h, 'reguler')) $colMap['jenis_program'] = $idx;
         elseif (str_contains($h, 'jurusan') || str_contains($h, 'prodi')) $colMap['jurusan'] = $idx;
         elseif (str_contains($h, 'tempat') || str_contains($h, 'tmpt')) $colMap['tempat_lahir'] = $idx;
         elseif (str_contains($h, 'tanggal') || str_contains($h, 'lahir')) $colMap['tanggal_lahir'] = $idx;
@@ -111,6 +112,7 @@ try {
     }
 
     $pdo = getDBConnection();
+    ensureJenisProgramColumn($pdo);
     $imported = 0;
     $skipped = 0;
     $errors = [];
@@ -137,7 +139,7 @@ try {
         (user_id, status, gelombang, tahun_ajaran, tipe_nilai, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
         VALUES (?, 'lulus', 'lawas', ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
+    $stmtInsertUser = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, jenis_program, tempat_lahir, tanggal_lahir, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'mahasiswa')");
     $stmtUpdateUserDyn = $pdo->prepare("UPDATE users SET program_studi = ?, tempat_lahir = ?, tanggal_lahir = ? WHERE id = ?");
 
     $pdo->beginTransaction();
@@ -171,6 +173,7 @@ try {
         
         $tmptLahir = trim((string)($row[$colMap['tempat_lahir'] ?? -1] ?? ''));
         $jurusan = trim((string)($row[$colMap['jurusan'] ?? -1] ?? ''));
+        $jenisProgramRaw = trim((string)($row[$colMap['jenis_program'] ?? -1] ?? ''));
         
         if (!$userId) {
             $nama_lengkap = trim((string)($row[$colMap['nama']] ?? ''));
@@ -178,7 +181,7 @@ try {
             
             try {
                 $password = password_hash($nim, PASSWORD_BCRYPT, ['cost' => 8]);
-                $stmtInsertUser->execute([$nim, $password, $nama_lengkap, $nim, ($jurusan!==''?$jurusan:null), ($tmptLahir!==''?$tmptLahir:null), $tglLahir]);
+                $stmtInsertUser->execute([$nim, $password, $nama_lengkap, $nim, ($jurusan!==''?$jurusan:null), normalizeJenisProgram($jenisProgramRaw !== '' ? $jenisProgramRaw : 'Reguler'), ($tmptLahir!==''?$tmptLahir:null), $tglLahir]);
                 $userId = $pdo->lastInsertId();
             } catch (Exception $e) {
                 $errors[] = "Baris $dataRow: Gagal membuat akun otomatis untuk NIM '$nim'. (" . $e->getMessage() . ")";
@@ -187,13 +190,14 @@ try {
             }
         } else {
             // Update user fields if provided
-            if ($jurusan !== '' || $tmptLahir !== '' || $tglLahir !== null) {
+            if ($jurusan !== '' || $jenisProgramRaw !== '' || $tmptLahir !== '' || $tglLahir !== null) {
                 // To keep transaction fast and statements prepared, we use the full update statement if anything is changed.
                 // We'll read existing first or just overwrite all 3? Let's just use the prepared full update to avoid building dynamic SQL in the loop
                 // But it's better to only update what's changed. The existing logic builds SQL. Let's keep existing logic but just prepare it locally since it's rare to change.
                 $updates = [];
                 $params = [];
                 if ($jurusan !== '') { $updates[] = "program_studi = ?"; $params[] = $jurusan; }
+                if ($jenisProgramRaw !== '') { $updates[] = "jenis_program = ?"; $params[] = normalizeJenisProgram($jenisProgramRaw); }
                 if ($tmptLahir !== '') { $updates[] = "tempat_lahir = ?"; $params[] = $tmptLahir; }
                 if ($tglLahir !== null) { $updates[] = "tanggal_lahir = ?"; $params[] = $tglLahir; }
                 

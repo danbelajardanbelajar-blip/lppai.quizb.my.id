@@ -77,7 +77,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
 
     // 1. Cari data sertifikat umum terlebih dahulu
     $stmtFind = $pdo->prepare("
-        SELECT tr.*, u.nim, u.nama_lengkap, u.program_studi
+        SELECT tr.*, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         WHERE (tr.nomor_sertifikat = ? OR u.nim = ?)
@@ -138,6 +138,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
                 'nama_lengkap'     => $scannedCert['nama_lengkap'],
                 'nim'              => $scannedCert['nim'],
                 'program_studi'    => $scannedCert['program_studi'],
+                'jenis_program'    => normalizeJenisProgram($scannedCert['jenis_program'] ?? 'Reguler'),
                 'tahun_ajaran'     => $scannedCert['tahun_ajaran'] ?? '-'
             ],
             'pickup_info' => $pickupData,
@@ -200,6 +201,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
                 'nama_lengkap'     => $scannedCert['nama_lengkap'],
                 'nim'              => $scannedCert['nim'],
                 'program_studi'    => $scannedCert['program_studi'],
+                'jenis_program'    => normalizeJenisProgram($scannedCert['jenis_program'] ?? 'Reguler'),
                 'tahun_ajaran'     => $scannedCert['tahun_ajaran'] ?? '-'
             ],
             'pickup_id'   => $newPickupId,
@@ -221,7 +223,7 @@ $myCert = null;
 $myPickup = null;
 try {
     $stmtMy = $pdo->prepare("
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         WHERE tr.user_id = ?
@@ -380,7 +382,7 @@ include __DIR__ . '/../includes/header.php';
         <div style="margin-top:16px; padding:12px 16px; background:#f8fafc; border-radius:10px; border:1px solid #e2e8f0; font-size:13.5px; display:flex; gap:20px; flex-wrap:wrap;">
             <div>Mahasiswa: <strong><?= htmlspecialchars($currentUser['nama_lengkap']) ?></strong></div>
             <div>NIM: <strong><?= htmlspecialchars($currentUser['nim'] ?: '-') ?></strong></div>
-            <div>Program Studi: <strong><?= htmlspecialchars($currentUser['program_studi'] ?: '-') ?></strong></div>
+            <div>Program Studi: <strong><?= htmlspecialchars($currentUser['program_studi'] ?: '-') ?></strong> <?= renderJenisProgramBadge($currentUser['jenis_program'] ?? 'Reguler', true) ?></div>
             <?php if ($myCert): ?>
                 <div>No. Sertifikat Anda: <strong style="color:#1e3a8a;"><?= htmlspecialchars($myCert['nomor_sertifikat']) ?></strong></div>
             <?php endif; ?>
@@ -613,7 +615,7 @@ function processCertificateCode(rawCode) {
         document.getElementById('resNoSert').innerText = data.cert.nomor_sertifikat;
         document.getElementById('resNama').innerText = data.cert.nama_lengkap;
         document.getElementById('resNim').innerText = data.cert.nim;
-        document.getElementById('resProdi').innerText = data.cert.program_studi || '-';
+        document.getElementById('resProdi').innerText = (data.cert.program_studi || '-') + ' (' + (data.cert.jenis_program || 'Reguler') + ')';
         document.getElementById('resWaktu').innerText = data.tanggal || (data.pickup_info ? data.pickup_info.tanggal_pengambilan : 'Hari ini');
 
         var pickupId = data.pickup_id || 0;

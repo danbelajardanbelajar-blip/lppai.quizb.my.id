@@ -399,7 +399,7 @@ if ($active_pretes) {
 $participants = $pdo->query("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
-           u.nama_lengkap, u.nim, u.program_studi, u.fakultas
+           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     WHERE (pr.periode = " . $pdo->quote($active_pretes['periode']) . " OR pr.periode LIKE '%2026%' OR pr.periode LIKE '%2027%' OR pr.periode LIKE '%2028%' OR pr.periode LIKE '%2029%' OR pr.periode LIKE '%2030%')
@@ -852,7 +852,7 @@ function addQETutorRow(day) {
                         <td><?= $i + 1 ?></td>
                         <td><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($p['nim']) ?></td>
-                        <td><?= sanitize($p['program_studi']) ?></td>
+                        <td><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?>">
                             <span class="badge badge-info" style="font-size:12px;">
                                 <?= sanitize($curHari ?: 'Senin') ?>

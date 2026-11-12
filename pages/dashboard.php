@@ -186,7 +186,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="welcome-chips">
                 <span class="welcome-chip">🆔 NIM: <strong><?= sanitize($user['nim']) ?></strong></span>
-                <span class="welcome-chip">🎓 <strong><?= sanitize($user['program_studi']) ?></strong></span>
+                <span class="welcome-chip">🎓 <strong><?= sanitize($user['program_studi']) ?></strong> <?= renderJenisProgramBadge($user['jenis_program'] ?? 'Reguler', true) ?></span>
                 <span class="welcome-chip">🏛️ <?= sanitize($user['fakultas']) ?></span>
             </div>
         </div>

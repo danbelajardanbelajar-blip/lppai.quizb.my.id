@@ -19,7 +19,7 @@ if (!isAdmin() && $mode !== 'single' && $id == 0 && empty($noSert)) {
 if ($mode === 'single' || $id > 0 || !empty($noSert)) {
     if ($id > 0) {
         $stmt = $pdo->prepare("
-            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp
+            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp, u.jenis_program
             FROM pengambilan_sertifikat ps
             LEFT JOIN users u ON ps.nim = u.nim
             WHERE ps.id = ?
@@ -27,7 +27,7 @@ if ($mode === 'single' || $id > 0 || !empty($noSert)) {
         $stmt->execute([$id]);
     } else {
         $stmt = $pdo->prepare("
-            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp
+            SELECT ps.*, u.tempat_lahir, u.tanggal_lahir, u.no_hp, u.jenis_program
             FROM pengambilan_sertifikat ps
             LEFT JOIN users u ON ps.nim = u.nim
             WHERE ps.nomor_sertifikat = ?
@@ -227,7 +227,7 @@ if ($mode === 'single' || $id > 0 || !empty($noSert)) {
                 </tr>
                 <tr>
                     <th>Program Studi / Jurusan</th>
-                    <td>: <?= sanitize($data['program_studi'] ?: '-') ?></td>
+                    <td>: <?= sanitize($data['program_studi'] ?: '-') ?> (<?= sanitize(normalizeJenisProgram($data['jenis_program'] ?? 'Reguler')) ?>)</td>
                 </tr>
                 <tr>
                     <th>Tahun Ajaran</th>
@@ -279,7 +279,7 @@ if ($mode === 'single' || $id > 0 || !empty($noSert)) {
 
 // ── MODE 2: BERITA ACARA REKAPITULASI PENGAMBILAN SERTIFIKAT ─────
 $sqlRekap = "
-    SELECT tr.nomor_sertifikat, tr.tahun_ajaran, u.nim, u.nama_lengkap, u.program_studi,
+    SELECT tr.nomor_sertifikat, tr.tahun_ajaran, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program,
            ps.tanggal_pengambilan, ps.nama_penerima, ps.hubungan_penerima, ps.petugas_nama
     FROM pengambilan_sertifikat ps
     JOIN tutorial_registrations tr ON ps.nomor_sertifikat = tr.nomor_sertifikat
@@ -473,7 +473,7 @@ $rows = $pdo->query($sqlRekap)->fetchAll();
                         <td><strong style="color:#1a5632;"><?= sanitize($r['nomor_sertifikat']) ?></strong></td>
                         <td style="text-align:center;"><?= sanitize($r['nim']) ?></td>
                         <td><strong><?= sanitize($r['nama_lengkap']) ?></strong></td>
-                        <td><?= sanitize($r['program_studi'] ?: '-') ?></td>
+                        <td><?= sanitize($r['program_studi'] ?: '-') ?> (<?= sanitize(normalizeJenisProgram($r['jenis_program'] ?? 'Reguler')) ?>)</td>
                         <td style="text-align:center;"><?= date('d/m/Y H:i', strtotime($r['tanggal_pengambilan'])) ?></td>
                         <td>
                             <?= sanitize($r['nama_penerima']) ?>

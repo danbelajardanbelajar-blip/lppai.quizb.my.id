@@ -21,6 +21,7 @@ $searchValue = trim($_POST['search']['value'] ?? $_GET['search']['value'] ?? '')
 $filterTahunAjaran = $_POST['filterTahunAjaran'] ?? '';
 $filterTipeNilai = $_POST['filterTipeNilai'] ?? '';
 $filterJurusan = $_POST['filterJurusan'] ?? '';
+$filterJenisProgram = $_POST['filterJenisProgram'] ?? '';
 $filterLulus = $_POST['filterLulus'] ?? '';
 
 $orderColIndex = $_POST['order'][0]['column'] ?? $_GET['order'][0]['column'] ?? 1;
@@ -78,6 +79,11 @@ if ($filterJurusan !== '') {
     $whereParams[] = $filterJurusan;
 }
 
+if ($filterJenisProgram !== '') {
+    $fromClause .= " AND u.jenis_program = ?";
+    $whereParams[] = normalizeJenisProgram($filterJenisProgram);
+}
+
 if ($filterLulus !== '') {
     // Karena query utama sudah dilimit hanya LULUS, filter ini sebenarnya tidak akan berfungsi untuk 'tidak_lulus' atau 'belum_lengkap'.
     // Namun kita tetap pertahankan untuk menghindari error pada frontend jika filter dikirimkan.
@@ -96,6 +102,7 @@ if ($searchValue !== '') {
         u.nim LIKE ? 
         OR u.nama_lengkap LIKE ? 
         OR u.program_studi LIKE ? 
+        OR u.jenis_program LIKE ? 
         OR tr.tahun_ajaran LIKE ?
         OR tr.tipe_nilai LIKE ?
         OR tr.nilai_thaharah LIKE ?
@@ -106,7 +113,7 @@ if ($searchValue !== '') {
         OR tr.nilai_ujian_tulis LIKE ?
     )";
     $searchWildcard = "%$searchValue%";
-    $whereParams = array_fill(0, 11, $searchWildcard);
+    $whereParams = array_merge($whereParams, array_fill(0, 12, $searchWildcard));
 }
 
 // 2. Get Filtered Records
@@ -116,7 +123,7 @@ $recordsFiltered = $stmtFiltered->fetchColumn();
 
 // 3. Get Data with Pagination
 $dataQuery = "
-    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.tempat_lahir, u.tanggal_lahir,
+    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program, u.tempat_lahir, u.tanggal_lahir,
            tr.id as reg_id, tr.tahun_ajaran, tr.tipe_nilai,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
@@ -208,7 +215,7 @@ foreach ($data as $i => $row) {
         $start + $i + 1, // Nomor urut
         htmlspecialchars($row['nim'] ?: '-'),
         '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
-        htmlspecialchars($row['program_studi'] ?: '-'),
+        formatProdiDisplay($row['program_studi'] ?? '', $row['jenis_program'] ?? 'Reguler', true),
         htmlspecialchars($row['tahun_ajaran'] ?: '-'),
         htmlspecialchars(ucwords($row['tipe_nilai'] ?? '-')),
         $row['nilai_thaharah'] ?? '-',

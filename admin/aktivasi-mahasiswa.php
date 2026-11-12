@@ -18,7 +18,7 @@ if (empty($token)) {
     $msgType = "danger";
 } else {
     // Cari user berdasarkan token
-    $stmt = $pdo->prepare("SELECT id, username, nim, nama_lengkap, program_studi, no_hp, is_active FROM users WHERE activation_token = ? LIMIT 1");
+    $stmt = $pdo->prepare("SELECT id, username, nim, nama_lengkap, program_studi, jenis_program, no_hp, is_active FROM users WHERE activation_token = ? LIMIT 1");
     $stmt->execute([$token]);
     $userData = $stmt->fetch();
 
@@ -84,7 +84,7 @@ include __DIR__ . '/../includes/header.php';
                 </tr>
                 <tr>
                     <th>Program Studi</th>
-                    <td><?= sanitize($userData['program_studi']) ?: '-' ?></td>
+                    <td><?= formatProdiDisplay($userData['program_studi'] ?? '', $userData['jenis_program'] ?? 'Reguler', true, true) ?></td>
                 </tr>
                 <tr>
                     <th>No. WhatsApp</th>

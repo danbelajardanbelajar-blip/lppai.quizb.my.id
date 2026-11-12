@@ -188,7 +188,7 @@ if ($isAdmin || $isDosen) {
     $whereStudentsStr = !empty($studentsWhere) ? "WHERE " . implode(" AND ", $studentsWhere) : "";
 
     $sql = "
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.semester as class_semester, tc.dosen_pengampu
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.gelombang, tc.semester as class_semester, tc.dosen_pengampu
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -235,13 +235,14 @@ if ($isAdmin || $isDosen) {
         $sheet->setCellValue('D1', 'NIM');
         $sheet->setCellValue('E1', 'Nama Lengkap');
         $sheet->setCellValue('F1', 'Prodi');
-        $sheet->setCellValue('G1', 'Thaharah');
-        $sheet->setCellValue('H1', 'Shalat');
-        $sheet->setCellValue('I1', 'Surat Pendek');
-        $sheet->setCellValue('J1', 'Amaliyah');
-        $sheet->setCellValue('K1', 'Jenazah');
-        $sheet->setCellValue('L1', 'Ujian Tulis');
-        $sheet->setCellValue('M1', 'Nilai Akhir');
+        $sheet->setCellValue('G1', 'Jenis Program');
+        $sheet->setCellValue('H1', 'Thaharah');
+        $sheet->setCellValue('I1', 'Shalat');
+        $sheet->setCellValue('J1', 'Surat Pendek');
+        $sheet->setCellValue('K1', 'Amaliyah');
+        $sheet->setCellValue('L1', 'Jenazah');
+        $sheet->setCellValue('M1', 'Ujian Tulis');
+        $sheet->setCellValue('N1', 'Nilai Akhir');
         
         // Style headers
         $headerStyle = [
@@ -249,7 +250,7 @@ if ($isAdmin || $isDosen) {
             'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2E8F0']],
             'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN]]
         ];
-        $sheet->getStyle('A1:M1')->applyFromArray($headerStyle);
+        $sheet->getStyle('A1:N1')->applyFromArray($headerStyle);
         
         $row = 2;
         $no = 1;
@@ -260,12 +261,13 @@ if ($isAdmin || $isDosen) {
             $sheet->setCellValueExplicit('D'.$row, $s['nim'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             $sheet->setCellValue('E'.$row, $s['nama_lengkap']);
             $sheet->setCellValue('F'.$row, $s['program_studi']);
-            $sheet->setCellValue('G'.$row, $s['nilai_thaharah'] ?? '-');
-            $sheet->setCellValue('H'.$row, $s['nilai_shalat'] ?? '-');
-            $sheet->setCellValue('I'.$row, $s['nilai_surat_pendek'] ?? '-');
-            $sheet->setCellValue('J'.$row, $s['nilai_amaliyah'] ?? '-');
-            $sheet->setCellValue('K'.$row, $s['nilai_jenazah'] ?? '-');
-            $sheet->setCellValue('L'.$row, $s['nilai_ujian_tulis'] ?? '-');
+            $sheet->setCellValue('G'.$row, normalizeJenisProgram($s['jenis_program'] ?? 'Reguler'));
+            $sheet->setCellValue('H'.$row, $s['nilai_thaharah'] ?? '-');
+            $sheet->setCellValue('I'.$row, $s['nilai_shalat'] ?? '-');
+            $sheet->setCellValue('J'.$row, $s['nilai_surat_pendek'] ?? '-');
+            $sheet->setCellValue('K'.$row, $s['nilai_amaliyah'] ?? '-');
+            $sheet->setCellValue('L'.$row, $s['nilai_jenazah'] ?? '-');
+            $sheet->setCellValue('M'.$row, $s['nilai_ujian_tulis'] ?? '-');
             
             $sum = 0; $count = 0;
             if ($s['nilai_thaharah'] !== null) { $sum += (float)$s['nilai_thaharah']; $count++; }
@@ -276,13 +278,13 @@ if ($isAdmin || $isDosen) {
             if ($s['nilai_ujian_tulis'] !== null) { $sum += (float)$s['nilai_ujian_tulis']; $count++; }
             $calc_akhir = $count > 0 ? round($sum / $count, 2) : '-';
             
-            $sheet->setCellValue('M'.$row, $calc_akhir);
+            $sheet->setCellValue('N'.$row, $calc_akhir);
             
-            $sheet->getStyle('A'.$row.':M'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+            $sheet->getStyle('A'.$row.':N'.$row)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
             $row++;
         }
         
-        foreach(range('A','M') as $col) {
+        foreach(range('A','N') as $col) {
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
         
@@ -455,6 +457,7 @@ include __DIR__ . '/includes/header.php';
                                 <th>NIM</th>
                                 <th>Nama Mahasiswa</th>
                                 <th>Prodi</th>
+                                <th>Jenis Program</th>
                                 <th>Thaharah</th>
                                 <th>Shalat</th>
                                 <th>Srt Pdk</th>
@@ -473,6 +476,7 @@ include __DIR__ . '/includes/header.php';
                                 <td><?= sanitize($s['nim']) ?></td>
                                 <td><strong><?= sanitize($s['nama_lengkap']) ?></strong></td>
                                 <td><small><?= sanitize($s['program_studi']) ?></small></td>
+                                <td align="center"><?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td align="center"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>
                                 <td align="center"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>

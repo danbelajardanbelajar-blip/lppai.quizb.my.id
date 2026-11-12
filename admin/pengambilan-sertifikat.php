@@ -96,7 +96,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
                    tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, 
                    tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis,
                    tr.is_sertifikat_diambil, tr.tgl_sertifikat_diambil,
-                   u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.no_hp,
+                   u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program, u.no_hp,
                    u.tempat_lahir, u.tanggal_lahir
             FROM tutorial_registrations tr
             JOIN users u ON tr.user_id = u.id
@@ -137,6 +137,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
                 'nim'              => $cert['nim'],
                 'nama_lengkap'     => $cert['nama_lengkap'],
                 'program_studi'    => $cert['program_studi'] ?: 'Belum Diatur',
+                'jenis_program'    => normalizeJenisProgram($cert['jenis_program'] ?? 'Reguler'),
                 'tahun_ajaran'     => $cert['tahun_ajaran'],
                 'no_hp'            => $cert['no_hp'] ?: '-',
                 'ttl'              => ($cert['tempat_lahir'] ? $cert['tempat_lahir'] . ', ' : '') . ($cert['tanggal_lahir'] ? date('d/m/Y', strtotime($cert['tanggal_lahir'])) : '-')
@@ -260,7 +261,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
 // 3. Ekspor CSV
 if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
     $sqlExport = "
-        SELECT tr.nomor_sertifikat, tr.tahun_ajaran, u.nim, u.nama_lengkap, u.program_studi,
+        SELECT tr.nomor_sertifikat, tr.tahun_ajaran, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program,
                CASE WHEN ps.id IS NOT NULL THEN 'Sudah Diambil' ELSE 'Belum Diambil' END as status_ambil,
                ps.tanggal_pengambilan, ps.nama_penerima, ps.hubungan_penerima, ps.metode_pengambilan, ps.petugas_nama, ps.catatan
         FROM tutorial_registrations tr
@@ -279,7 +280,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
     fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
 
     fputcsv($output, [
-        'No', 'Nomor Sertifikat', 'NIM', 'Nama Mahasiswa', 'Program Studi / Jurusan', 
+        'No', 'Nomor Sertifikat', 'NIM', 'Nama Mahasiswa', 'Program Studi / Jurusan', 'Jenis Program',
         'Tahun Ajaran', 'Status Pengambilan', 'Waktu Pengambilan', 'Nama Penerima', 
         'Hubungan Penerima', 'Metode Scan', 'Petugas LPPAI', 'Catatan'
     ]);
@@ -292,6 +293,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'export_csv') {
             $r['nim'],
             $r['nama_lengkap'],
             $r['program_studi'] ?: '-',
+            normalizeJenisProgram($r['jenis_program'] ?? 'Reguler'),
             $r['tahun_ajaran'] ?: '-',
             $r['status_ambil'],
             $r['tanggal_pengambilan'] ? date('d/m/Y H:i', strtotime($r['tanggal_pengambilan'])) : '-',
@@ -341,7 +343,7 @@ $whereClause = implode(" AND ", $where);
 
 $stmtList = $pdo->prepare("
     SELECT tr.id as reg_id, tr.nomor_sertifikat, tr.tahun_ajaran,
-           u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.no_hp,
+           u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program, u.no_hp,
            ps.id as pengambilan_id, ps.tanggal_pengambilan, ps.metode_pengambilan,
            ps.nama_penerima, ps.hubungan_penerima, ps.petugas_nama, ps.catatan
     FROM tutorial_registrations tr
@@ -358,7 +360,7 @@ $prodiList = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program
 
 // 6. Recent Logs (10 Terakhir)
 $recentLogs = $pdo->query("
-    SELECT ps.*, u.program_studi as jurusan_asli
+    SELECT ps.*, u.program_studi as jurusan_asli, u.jenis_program
     FROM pengambilan_sertifikat ps
     LEFT JOIN users u ON ps.nim = u.nim
     WHERE ps.status_pengambilan = 'Sudah Diambil'
@@ -884,7 +886,7 @@ include __DIR__ . '/../includes/header.php';
                                     <strong><?= sanitize($c['nama_lengkap']) ?></strong><br>
                                     <small class="text-muted">NIM: <?= sanitize($c['nim']) ?></small>
                                 </td>
-                                <td><?= sanitize($c['program_studi'] ?: '-') ?></td>
+                                <td><?= formatProdiDisplay($c['program_studi'] ?? '', $c['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td>
                                     <strong style="color:#1a5632;"><?= sanitize($c['nomor_sertifikat']) ?></strong><br>
                                     <small class="text-muted"><?= sanitize($c['tahun_ajaran'] ?: '-') ?></small>
@@ -980,7 +982,7 @@ include __DIR__ . '/../includes/header.php';
                                     <strong><?= sanitize($log['nama_mahasiswa']) ?></strong><br>
                                     <small class="text-muted"><?= sanitize($log['nim']) ?></small>
                                 </td>
-                                <td><?= sanitize($log['program_studi'] ?: $log['jurusan_asli'] ?: '-') ?></td>
+                                <td><?= formatProdiDisplay($log['program_studi'] ?: ($log['jurusan_asli'] ?? ''), $log['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td><span style="color:#1a5632; font-weight:600;"><?= sanitize($log['nomor_sertifikat']) ?></span></td>
                                 <td>
                                     <?= sanitize($log['nama_penerima']) ?>
@@ -1284,7 +1286,7 @@ function renderCertificateData(res, metode) {
 
     document.getElementById('resNama').innerText = cert.nama_lengkap;
     document.getElementById('resNim').innerText = cert.nim;
-    document.getElementById('resProdi').innerText = cert.program_studi;
+    document.getElementById('resProdi').innerText = (cert.program_studi || '-') + ' (' + (cert.jenis_program || 'Reguler') + ')';
     document.getElementById('resNoSertifikat').innerText = cert.nomor_sertifikat;
     document.getElementById('resTahun').innerText = cert.tahun_ajaran || '-';
     document.getElementById('resTTL').innerText = cert.ttl;
