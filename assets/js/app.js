@@ -490,7 +490,7 @@ var SPA = {
                 }
             });
 
-            contentArea.querySelectorAll('.alert').forEach(function(el) {
+            contentArea.querySelectorAll('.alert:not(#verifStatusAlert):not(.keep-alert)').forEach(function(el) {
                 var type = 'info';
                 if (el.classList.contains('alert-success')) type = 'success';
                 else if (el.classList.contains('alert-danger')) type = 'danger';
@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    document.querySelectorAll('.alert').forEach(function(el) {
+    document.querySelectorAll('.alert:not(#verifStatusAlert):not(.keep-alert)').forEach(function(el) {
         var type = 'info';
         if (el.classList.contains('alert-success')) type = 'success';
         else if (el.classList.contains('alert-danger')) type = 'danger';

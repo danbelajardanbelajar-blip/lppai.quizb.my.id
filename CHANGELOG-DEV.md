@@ -5,6 +5,20 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 06:41:05 +0700 — Perbaikan Elemen Status AI & Resilience Engine Verifikasi Wajah Pretes
+
+**Ringkasan:** Memperbaiki insiden di mana tombol pendaftaran pretes tetap terkunci meskipun pasfoto resmi yang diunggah sudah jelas. Akar masalah teridentifikasi pada skrip global `assets/js/app.js` yang secara otomatis menghapus elemen berkategori `.alert` pada saat DOMContentLoaded, sehingga kontainer status `#verifStatusAlert` terhapus dan menyebabkan JavaScript error saat memproses hasil AI. Dilakukan perbaikan arsitektural: melepas class `.alert` dari `#verifStatusAlert`, menambahkan pengecualian `:not(#verifStatusAlert)` di `app.js`, menyematkan engine `PretesFaceVerifier` secara inline di `pages/pretes-daftar.php` dengan deteksi kulit adaptif untuk jas almamater/busana muslim, safety timeout 450ms pada API eksperimental peramban, serta mekanisme fallback otomatis agar tombol pendaftaran selalu terbuka begitu foto resmi valid dimuat.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-daftar.php` | 460–462 | Kontainer Status Verifikasi | Mengubah elemen `#verifStatusAlert` menjadi independen tanpa class `.alert` agar tidak dihapus oleh pembersih alert global di `app.js`. |
+| `pages/pretes-daftar.php` | 525–760 | Script Verifikasi Wajah Inline & Fallback | Menyematkan mesin `PretesFaceVerifier` langsung di halaman dengan skin threshold adaptif, penanganan error komprehensif (`try/catch`), dan jaminan tombol terbuka saat foto valid. |
+| `assets/js/app.js` | 493, 568 | Global Alert Cleaner Protection | Menambahkan pengecualian `:not(#verifStatusAlert):not(.keep-alert)` pada query selector `document.querySelectorAll('.alert')` agar tidak menghapus alert dinamis halaman. |
+| `assets/js/pretes-face-verifier.js` | 130–240 | Modul Face Verifier Standalone | Menambahkan safety timer 450ms pada `window.FaceDetector` Chrome, memperluas cakupan warna kulit YCbCr/RGB, dan melonggarkan toleransi proporsi pasfoto resmi. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **26/26 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 06:26:13 +0700 — Fitur Unggah & Ambil Pasfoto Resmi Berbasis AI Face Verification pada Pendaftaran Pretes
 
 **Ringkasan:** Membangun sistem wajib pasfoto resmi bagi calon peserta pretes pada `pages/pretes-daftar.php` dengan opsi ganda (unggah file dari galeri/PC atau jepret langsung via webcam/kamera HP dengan panduan oval) disertai engine client-side AI Face Verification (`assets/js/pretes-face-verifier.js`). Sistem secara otomatis mendeteksi keberadaan wajah tunggal, posisi tengah, proporsi pasfoto, dan memastikan tidak ada bagian wajah yang terpotong di tepi. Tombol konfirmasi pendaftaran terkunci secara ketat sampai foto dinyatakan valid oleh AI, file foto disimpan dengan aman ke `uploads/pretes_foto/` berpelindung `.htaccess`, dan otomatis dicetak langsung pada kolom Pasfoto 3×4 Kartu Ujian Pretes (`includes/pretes-card.php`) serta tabel data peserta admin & dosen penguji.
