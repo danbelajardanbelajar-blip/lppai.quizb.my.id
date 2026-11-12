@@ -7,9 +7,11 @@
 
 define('PAGE_TITLE', 'Data Peserta & Credentials Tes Tulis');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireAdmin();
 
 $pdo     = getDBConnection();
+ensurePretesPeriodTargetColumns($pdo);
 $message = '';
 $msgType = '';
 
@@ -94,13 +96,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
 
-        // ── Generate credentials otomatis untuk SEMUA peserta ──────────────
+        // ── Generate credentials otomatis untuk peserta pada periode terpilih ──
         } elseif ($action === 'generate_all' || $action === 'regenerate_all') {
-            $isRegen    = ($action === 'regenerate_all');
-            $userFormat = trim($_POST['user_format'] ?? 'eujian');
-            $prefix     = trim($_POST['prefix'] ?? 'TES');
-            $passType   = trim($_POST['pass_type'] ?? 'angka');
-            $passLen    = (int)($_POST['pass_len'] ?? 4);
+            $isRegen       = ($action === 'regenerate_all');
+            $userFormat    = trim($_POST['user_format'] ?? 'eujian');
+            $prefix        = trim($_POST['prefix'] ?? 'TES');
+            $passType      = trim($_POST['pass_type'] ?? 'angka');
+            $passLen       = (int)($_POST['pass_len'] ?? 4);
+            $targetPeriode = trim((string)($_POST['target_periode'] ?? ''));
 
             if (!in_array($userFormat, ['eujian', 'prefix_nim', 'nim_only'])) {
                 $userFormat = 'eujian';
@@ -112,11 +115,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $passLen = 4;
             }
 
-            $stmt = $pdo->query("
-                SELECT pr.id, u.nim 
-                FROM pretes_registrations pr 
-                JOIN users u ON pr.user_id = u.id
-            ");
+            if ($targetPeriode !== '' && $targetPeriode !== '__all__') {
+                $stmt = $pdo->prepare("
+                    SELECT pr.id, u.nim 
+                    FROM pretes_registrations pr 
+                    JOIN users u ON pr.user_id = u.id
+                    WHERE pr.periode = ?
+                ");
+                $stmt->execute([$targetPeriode]);
+            } else {
+                $stmt = $pdo->query("
+                    SELECT pr.id, u.nim 
+                    FROM pretes_registrations pr 
+                    JOIN users u ON pr.user_id = u.id
+                ");
+            }
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if ($isRegen) {
@@ -274,22 +287,73 @@ if ($autoSyncRes && (!empty($autoSyncRes['updated']) || !empty($autoSyncRes['mat
     $message = "<strong>Sinkronisasi Otomatis E-Ujian:</strong> {$countShow} peserta telah otomatis diselaraskan dengan akun resmi E-Ujian ({NIM}.22205).";
     $msgType = 'success';
 }
-// ── Fetch data ─────────────────────────────────────────────────────────────────
-$participants = $pdo->query("
+// ── Pilih & Filter Periode Pretes ──────────────────────────────────────────────
+$activePretes = getActivePretesPeriod($pdo);
+$masterPeriods = $pdo->query("SELECT id, periode, tahun_ajaran, target_program, status FROM master_pretes ORDER BY (status = 'aktif') DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$extraPeriodNames = $pdo->query("SELECT DISTINCT periode FROM pretes_registrations WHERE periode IS NOT NULL AND periode != '' ORDER BY periode DESC")->fetchAll(PDO::FETCH_COLUMN);
+
+$periodOptions = [];
+$knownPeriodNames = [];
+foreach ($masterPeriods as $mp) {
+    $pName = trim((string)($mp['periode'] ?? ''));
+    if ($pName === '' || isset($knownPeriodNames[$pName])) continue;
+    $knownPeriodNames[$pName] = true;
+    $periodOptions[] = $mp;
+}
+foreach ($extraPeriodNames as $ep) {
+    $epName = trim((string)$ep);
+    if ($epName === '' || isset($knownPeriodNames[$epName])) continue;
+    $knownPeriodNames[$epName] = true;
+    $periodOptions[] = [
+        'periode'        => $epName,
+        'tahun_ajaran'   => '',
+        'target_program' => 'Semua',
+        'status'         => 'arsip',
+    ];
+}
+
+$requestedPeriode = trim((string)($_GET['periode'] ?? ($_POST['target_periode'] ?? '')));
+if ($requestedPeriode !== '') {
+    $selectedPeriode = $requestedPeriode;
+} elseif ($activePretes && !empty($activePretes['periode'])) {
+    $selectedPeriode = (string)$activePretes['periode'];
+} elseif (!empty($periodOptions)) {
+    $selectedPeriode = (string)$periodOptions[0]['periode'];
+} else {
+    $selectedPeriode = '__all__';
+}
+
+$selectedPeriodMeta = null;
+foreach ($periodOptions as $po) {
+    if ($po['periode'] === $selectedPeriode) {
+        $selectedPeriodMeta = $po;
+        break;
+    }
+}
+
+// ── Fetch data peserta (terisolasi sesuai periode terpilih) ───────────────────
+$baseSelect = "
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
            u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas, u.email, u.no_hp
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    ORDER BY u.nama_lengkap ASC
-")->fetchAll();
+";
+if ($selectedPeriode !== '' && $selectedPeriode !== '__all__') {
+    $stmtPart = $pdo->prepare($baseSelect . " WHERE pr.periode = ? ORDER BY u.nama_lengkap ASC");
+    $stmtPart->execute([$selectedPeriode]);
+    $participants = $stmtPart->fetchAll();
+} else {
+    $participants = $pdo->query($baseSelect . " ORDER BY u.nama_lengkap ASC")->fetchAll();
+}
 
 $totalPeserta    = count($participants);
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
 
-// Hitung sebaran hari, prodi, dan status peserta
+// Hitung sebaran hari, prodi, jenis program, dan status peserta
 $dayCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 $prodiCounts = [];
+$jenisCounts = ['Reguler' => 0, 'RPL' => 0];
 $statusCounts = ['terdaftar' => 0, 'hadir' => 0, 'tidak_hadir' => 0];
 
 foreach ($participants as $p) {
@@ -301,6 +365,8 @@ foreach ($participants as $p) {
     if ($prd !== '') {
         $prodiCounts[$prd] = ($prodiCounts[$prd] ?? 0) + 1;
     }
+    $jp = normalizeJenisProgram($p['jenis_program'] ?? 'Reguler');
+    $jenisCounts[$jp] = ($jenisCounts[$jp] ?? 0) + 1;
     $st = strtolower(trim($p['status'] ?? 'terdaftar'));
     if (isset($statusCounts[$st])) {
         $statusCounts[$st]++;
@@ -314,6 +380,53 @@ include __DIR__ . '/../includes/header.php';
 <?php if ($message): ?>
     <div class="alert alert-<?= $msgType ?>"><?= $message ?></div>
 <?php endif; ?>
+
+<!-- ── Pemilih Periode Pretes ─────────────────────────────────────── -->
+<div class="card" style="margin-bottom:20px; border-left:5px solid var(--primary); background:#f8fafc;">
+    <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; padding:16px 20px;">
+        <div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <strong style="font-size:15px; color:#0f172a;">📅 Periode Data Peserta:</strong>
+                <?php if ($selectedPeriode === '__all__'): ?>
+                    <span class="badge badge-secondary" style="font-size:12px;">Semua Periode</span>
+                <?php else: ?>
+                    <span style="font-weight:700; color:var(--primary); font-size:15px;"><?= sanitize($selectedPeriode) ?></span>
+                    <?php if ($selectedPeriodMeta): ?>
+                        <?= renderPretesTargetProgramBadge($selectedPeriodMeta['target_program'] ?? 'Semua') ?>
+                        <?php if (($selectedPeriodMeta['status'] ?? '') === 'aktif'): ?>
+                            <span class="badge badge-success" style="font-size:11px;">Aktif</span>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+            <small style="color:#64748b; display:block; margin-top:4px;">
+                Data peserta, statistik, generate kredensial, dan ekspor disaring sesuai periode yang dipilih agar tidak tercampur antar periode.
+            </small>
+        </div>
+        <form method="GET" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0;">
+            <label for="select-periode-peserta" style="font-size:12.5px; font-weight:700; color:#334155; margin:0;">Ganti Periode:</label>
+            <select name="periode" id="select-periode-peserta" onchange="this.form.submit()"
+                style="padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff; color:#0f172a; min-width:240px; cursor:pointer;">
+                <?php foreach ($periodOptions as $po): ?>
+                    <?php
+                    $optLabel = $po['periode'];
+                    $optTags = [];
+                    if (($po['status'] ?? '') === 'aktif') $optTags[] = 'Aktif';
+                    $tp = normalizePretesTargetProgram($po['target_program'] ?? 'Semua');
+                    if ($tp !== 'Semua') $optTags[] = 'Khusus ' . $tp;
+                    if (!empty($optTags)) $optLabel .= ' (' . implode(', ', $optTags) . ')';
+                    ?>
+                    <option value="<?= sanitize($po['periode']) ?>" <?= $selectedPeriode === $po['periode'] ? 'selected' : '' ?>>
+                        <?= sanitize($optLabel) ?>
+                    </option>
+                <?php endforeach; ?>
+                <option value="__all__" <?= $selectedPeriode === '__all__' ? 'selected' : '' ?>>
+                    Semua Periode (Arsip Gabungan)
+                </option>
+            </select>
+        </form>
+    </div>
+</div>
 
 <!-- ── Statistik Ringkas ─────────────────────────────────────────── -->
 <div class="stat-grid" style="margin-bottom:24px;">
@@ -546,24 +659,26 @@ include __DIR__ . '/../includes/header.php';
         <!-- Tombol Eksekusi Massal -->
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
             <form method="POST" id="form-gen-all" style="display:inline;" onsubmit="syncGenFields(this)">
-                <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
-                <input type="hidden" name="action"      value="generate_all">
-                <input type="hidden" name="user_format" id="user-format-gen" value="eujian">
-                <input type="hidden" name="prefix"      id="prefix-gen"      value="TES">
-                <input type="hidden" name="pass_type"   id="pass-type-gen"   value="angka">
-                <input type="hidden" name="pass_len"    id="pass-len-gen"    value="4">
+                <input type="hidden" name="csrf_token"     value="<?= csrfToken() ?>">
+                <input type="hidden" name="action"         value="generate_all">
+                <input type="hidden" name="target_periode" value="<?= sanitize($selectedPeriode) ?>">
+                <input type="hidden" name="user_format"    id="user-format-gen" value="eujian">
+                <input type="hidden" name="prefix"         id="prefix-gen"      value="TES">
+                <input type="hidden" name="pass_type"      id="pass-type-gen"   value="angka">
+                <input type="hidden" name="pass_len"       id="pass-len-gen"    value="4">
                 <button type="submit" class="btn" style="background:#0f766e;color:#fff;border:none;padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 6px rgba(15,118,110,0.3);">
                     🔑 Generate Credentials Baru
                 </button>
             </form>
             <form method="POST" id="form-regen-all" style="display:inline;"
-                  onsubmit="syncGenFields(this); return confirm('PERINGATAN: Yakin ingin me-regenerate semua credentials? Tindakan ini akan MENIMPA semua username dan password peserta yang sudah ada dengan format yang Anda pilih saat ini!');">
-                <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
-                <input type="hidden" name="action"      value="regenerate_all">
-                <input type="hidden" name="user_format" id="user-format-regen" value="eujian">
-                <input type="hidden" name="prefix"      id="prefix-regen"      value="TES">
-                <input type="hidden" name="pass_type"   id="pass-type-regen"   value="angka">
-                <input type="hidden" name="pass_len"    id="pass-len-regen"    value="4">
+                  onsubmit="syncGenFields(this); return confirm('PERINGATAN: Yakin ingin me-regenerate semua credentials pada <?= htmlspecialchars($selectedPeriode === '__all__' ? 'SEMUA PERIODE' : 'periode ' . $selectedPeriode, ENT_QUOTES, 'UTF-8') ?>? Tindakan ini akan MENIMPA username dan password peserta pada periode terpilih!');">
+                <input type="hidden" name="csrf_token"     value="<?= csrfToken() ?>">
+                <input type="hidden" name="action"         value="regenerate_all">
+                <input type="hidden" name="target_periode" value="<?= sanitize($selectedPeriode) ?>">
+                <input type="hidden" name="user_format"    id="user-format-regen" value="eujian">
+                <input type="hidden" name="prefix"         id="prefix-regen"      value="TES">
+                <input type="hidden" name="pass_type"      id="pass-type-regen"   value="angka">
+                <input type="hidden" name="pass_len"       id="pass-len-regen"    value="4">
                 <button type="submit" class="btn btn-sm btn-danger" style="padding:11px 22px;border-radius:8px;font-weight:700;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
                     🔄 Regenerate Semua (Timpa)
                 </button>
@@ -590,7 +705,7 @@ include __DIR__ . '/../includes/header.php';
                style="background:#0f766e;color:#ffffff;border:1px solid #0d9488;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(15,118,110,0.25);">
                 ⚡ Generate Otomatis
             </button>
-            <a href="pretes-peserta-export.php" class="btn btn-sm"
+            <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>" class="btn btn-sm"
                style="background:#16a34a;color:#ffffff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(22,163,74,0.25);">
                 📗 Halaman Export ke Excel
             </a>
@@ -673,6 +788,19 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
 
+                <!-- Kolom 3b: Jenis Program -->
+                <div>
+                    <label for="filter-jenis-program" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        🏷️ Jenis Program
+                    </label>
+                    <select id="filter-jenis-program"
+                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
+                        <option value="">Semua Program (<?= $totalPeserta ?>)</option>
+                        <option value="RPL">RPL (<?= $jenisCounts['RPL'] ?? 0 ?>)</option>
+                        <option value="Reguler">Reguler (<?= $jenisCounts['Reguler'] ?? 0 ?>)</option>
+                    </select>
+                </div>
+
                 <!-- Kolom 4: Hari / Periode -->
                 <div>
                     <label for="filter-hari" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
@@ -749,11 +877,12 @@ include __DIR__ . '/../includes/header.php';
                 </thead>
                 <tbody>
                     <?php foreach ($participants as $i => $p): ?>
-                    <tr id="row-<?= $p['reg_id'] ?>">
+                    <?php $rowJenis = normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'); ?>
+                    <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>">
                         <td><?= $i + 1 ?></td>
                         <td data-search="<?= sanitize($p['nama_lengkap']) ?>"><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
                         <td data-search="<?= sanitize($p['nim']) ?>"><?= sanitize($p['nim']) ?></td>
-                        <td data-search="<?= sanitize(trim(($p['program_studi'] ?? '') . ' ' . normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'))) ?>"><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
+                        <td data-search="<?= sanitize(trim(($p['program_studi'] ?? '') . ' ' . $rowJenis)) ?>"><?= formatProdiDisplay($p['program_studi'] ?? '', $rowJenis, true) ?></td>
                         <?php 
                         $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
@@ -780,6 +909,9 @@ include __DIR__ . '/../includes/header.php';
                                     (<?= sanitize($p['jam'] ?? '13.00 WIB') ?>)
                                 </span>
                             </form>
+                            <?php if ($selectedPeriode === '__all__' && !empty($p['periode'])): ?>
+                                <div style="font-size:11px;color:#475569;margin-top:3px;"><?= sanitize($p['periode']) ?></div>
+                            <?php endif; ?>
                         </td>
                         <td data-order="<?= sanitize($p['status']) ?>" data-search="<?= sanitize($p['status']) ?>">
                             <!-- Dropdown status hadir -->
@@ -1039,6 +1171,8 @@ function updateDayBadges(activeDay) {
     });
 }
 
+var SELECTED_PRETES_PERIODE = <?= json_encode($selectedPeriode, JSON_UNESCAPED_UNICODE) ?>;
+
 function applyPretesFilters() {
     var dt = getPretesTable();
     if (!dt) return;
@@ -1046,6 +1180,7 @@ function applyPretesFilters() {
     var namaVal   = ($('#filter-nama').val() || '').trim();
     var nimVal    = ($('#filter-nim').val() || '').trim();
     var prodiVal  = $('#filter-prodi').val() || '';
+    var jenisVal  = $('#filter-jenis-program').val() || '';
     var hariVal   = $('#filter-hari').val() || '';
     var statusVal = $('#filter-status').val() || '';
     var credVal   = $('#filter-cred').val() || '';
@@ -1056,12 +1191,8 @@ function applyPretesFilters() {
     // Kolom 2: NIM
     dt.column(2).search(nimVal);
 
-    // Kolom 3: Prodi (Exact match jika dipilih)
-    if (prodiVal) {
-        dt.column(3).search('^' + $.fn.dataTable.util.escapeRegex(prodiVal) + '$', true, false);
-    } else {
-        dt.column(3).search('');
-    }
+    // Kolom 3: Prodi & Jenis Program disaring lewat custom DataTables ext.search agar akurat terhadap badge
+    dt.column(3).search('');
 
     // Kolom 4: Hari (Exact match jika dipilih)
     if (hariVal) {
@@ -1096,6 +1227,7 @@ function applyPretesFilters() {
     if (namaVal) activeCount++;
     if (nimVal) activeCount++;
     if (prodiVal) activeCount++;
+    if (jenisVal) activeCount++;
     if (hariVal) activeCount++;
     if (statusVal) activeCount++;
     if (credVal) activeCount++;
@@ -1115,6 +1247,7 @@ function applyPretesFilters() {
             nama: namaVal,
             nim: nimVal,
             prodi: prodiVal,
+            jenis_program: jenisVal,
             hari: hariVal,
             status: statusVal,
             cred: credVal
@@ -1134,15 +1267,36 @@ function initPretesFilters() {
 }
 
 function setupPretesFilters() {
+    if (window.jQuery && $.fn.dataTable && !window._pretesPesertaExtRegistered) {
+        window._pretesPesertaExtRegistered = true;
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            if (!settings || !settings.nTable || settings.nTable.id !== 'table-peserta-pretes') {
+                return true;
+            }
+            var rowNode = settings.aoData && settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
+            if (!rowNode) return true;
+            var wantProdi = ($('#filter-prodi').val() || '').trim();
+            var wantJenis = ($('#filter-jenis-program').val() || '').trim();
+            if (wantProdi && (rowNode.getAttribute('data-prodi') || '') !== wantProdi) {
+                return false;
+            }
+            if (wantJenis && (rowNode.getAttribute('data-jenis') || '') !== wantJenis) {
+                return false;
+            }
+            return true;
+        });
+    }
+
     // Pulihkan filter dari sessionStorage bila ada
     try {
         var saved = JSON.parse(sessionStorage.getItem('pretes_peserta_filter') || '{}');
-        if (saved.nama)   $('#filter-nama').val(saved.nama);
-        if (saved.nim)    $('#filter-nim').val(saved.nim);
-        if (saved.prodi)  $('#filter-prodi').val(saved.prodi);
-        if (saved.hari)   $('#filter-hari').val(saved.hari);
-        if (saved.status) $('#filter-status').val(saved.status);
-        if (saved.cred)   $('#filter-cred').val(saved.cred);
+        if (saved.nama)          $('#filter-nama').val(saved.nama);
+        if (saved.nim)           $('#filter-nim').val(saved.nim);
+        if (saved.prodi)         $('#filter-prodi').val(saved.prodi);
+        if (saved.jenis_program) $('#filter-jenis-program').val(saved.jenis_program);
+        if (saved.hari)          $('#filter-hari').val(saved.hari);
+        if (saved.status)        $('#filter-status').val(saved.status);
+        if (saved.cred)          $('#filter-cred').val(saved.cred);
     } catch(e) {}
 
     // Event input debounced untuk Nama dan NIM
@@ -1156,7 +1310,7 @@ function setupPretesFilters() {
     $('#filter-nim').on('input', debouncedApply);
 
     // Event change untuk dropdown filter
-    $('#filter-prodi, #filter-hari, #filter-status, #filter-cred').on('change', applyPretesFilters);
+    $('#filter-prodi, #filter-jenis-program, #filter-hari, #filter-status, #filter-cred').on('change', applyPretesFilters);
 
     // Tombol pill shortcut Distribusi Hari
     document.querySelectorAll('.btn-filter-day').forEach(function(btn) {
@@ -1174,6 +1328,7 @@ function setupPretesFilters() {
             $('#filter-nama').val('');
             $('#filter-nim').val('');
             $('#filter-prodi').val('');
+            $('#filter-jenis-program').val('');
             $('#filter-hari').val('');
             $('#filter-status').val('');
             $('#filter-cred').val('');
@@ -1435,20 +1590,20 @@ try {
             </a>
 
             <!-- Pilihan 2: Export Semua Peserta -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx" data-no-spa="true"
+            <a href="pretes-peserta-export.php?download=1&format=xlsx<?= $selectedPeriode !== '__all__' ? '&periode=' . urlencode($selectedPeriode) : '' ?>" data-no-spa="true"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#ffffff;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">👥</span>
                     <div>
-                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Export SEMUA Peserta Pretes</strong>
-                        <span style="font-size:11.5px;color:#64748b;">Mengekspor seluruh <?= $totalPeserta ?> peserta (lengkap dengan username & password)</span>
+                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Export SEMUA Peserta <?= $selectedPeriode !== '__all__' ? sanitize($selectedPeriode) : 'Pretes' ?></strong>
+                        <span style="font-size:11.5px;color:#64748b;">Mengekspor seluruh <?= $totalPeserta ?> peserta pada periode terpilih (lengkap dengan username &amp; password)</span>
                     </div>
                 </div>
                 <span style="background:#0284c7;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.xlsx</span>
             </a>
 
             <!-- Pilihan 3: Buka Halaman Export Lengkap -->
-            <a href="pretes-peserta-export.php"
+            <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">⚙️</span>
@@ -1475,8 +1630,10 @@ function openExportModal() {
     var modal = document.getElementById('modal-export-excel');
     if (modal) {
         var activeDesc = [];
+        if (SELECTED_PRETES_PERIODE && SELECTED_PRETES_PERIODE !== '__all__') activeDesc.push('Periode: ' + SELECTED_PRETES_PERIODE);
         var hariVal   = ($('#filter-hari').val() || '').trim();
         var prodiVal  = ($('#filter-prodi').val() || '').trim();
+        var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
         var statusVal = ($('#filter-status').val() || '').trim();
         var credVal   = ($('#filter-cred').val() || '').trim();
         var namaVal   = ($('#filter-nama').val() || '').trim();
@@ -1484,6 +1641,7 @@ function openExportModal() {
 
         if (hariVal) activeDesc.push('Hari: ' + hariVal);
         if (prodiVal) activeDesc.push('Prodi: ' + prodiVal);
+        if (jenisVal) activeDesc.push('Program: ' + jenisVal);
         if (statusVal) activeDesc.push('Status: ' + statusVal);
         if (credVal) activeDesc.push('Cred: ' + (credVal === 'has_cred' ? 'Sudah Ada' : 'Belum Ada'));
         if (namaVal) activeDesc.push('Nama: ' + namaVal);
@@ -1511,10 +1669,14 @@ function exportCurrentFiltered(format) {
     var params = new URLSearchParams();
     params.set('download', '1');
     params.set('format', format);
+    if (SELECTED_PRETES_PERIODE && SELECTED_PRETES_PERIODE !== '__all__') {
+        params.set('periode', SELECTED_PRETES_PERIODE);
+    }
 
     var namaVal   = ($('#filter-nama').val() || '').trim();
     var nimVal    = ($('#filter-nim').val() || '').trim();
     var prodiVal  = ($('#filter-prodi').val() || '').trim();
+    var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
     var hariVal   = ($('#filter-hari').val() || '').trim();
     var statusVal = ($('#filter-status').val() || '').trim();
     var credVal   = ($('#filter-cred').val() || '').trim();
@@ -1522,6 +1684,7 @@ function exportCurrentFiltered(format) {
     if (namaVal) params.set('nama', namaVal);
     if (nimVal) params.set('nim', nimVal);
     if (prodiVal) params.set('prodi', prodiVal);
+    if (jenisVal) params.set('jenis_program', jenisVal);
     if (hariVal) params.set('hari', hariVal);
     if (statusVal) params.set('status', statusVal);
     if (credVal) params.set('cred', credVal);

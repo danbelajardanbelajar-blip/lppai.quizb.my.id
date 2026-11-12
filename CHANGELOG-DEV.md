@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-12 19:17:15 +0700 — Isolasi Periode, Filter Program RPL/Reguler, & Export per Periode di `Data Peserta Pretes`
+
+**Ringkasan:** Memutakhirkan `admin/pretes-peserta.php` dan `admin/pretes-peserta-export.php` agar halaman Data Peserta Pretes beserta generate/regenerate credentials dan export Excel tidak mencampur peserta periode RPL 2026/2027 dengan periode 2026/2027 sebelumnya, serta memperbaiki bug filter Program Studi exact-match akibat penggabungan teks Prodi dan Jenis Program.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `admin/pretes-peserta.php` | 9–16, 290–370, 384–431 | Backend scoping periode & card pemilih periode | Memuat `includes/pretes-helper.php` (`ensurePretesPeriodTargetColumns`), membaca `?periode=` (default periode aktif `master_pretes`, opsi `__all__` untuk arsip gabungan), menambahkan `$jenisCounts` (`RPL` / `Reguler`), dan memfilter query `$participants` berdasarkan `pr.periode = ?`. |
+| `admin/pretes-peserta.php` | 99–133, 662–708 | Generate/Regenerate All Credentials per periode | Menyisipkan `target_periode` tersembunyi pada `#form-gen-all` & `#form-regen-all` beserta konfirmasi periode spesifik dan klausa `WHERE pr.periode = ?` agar regenerate credentials periode RPL tidak menimpa credentials peserta periode lain. |
+| `admin/pretes-peserta.php` | 791–915, 1174–1332, 1593–1688 | Filter Prodi, Jenis Program, & Export Excel | Menambahkan dropdown `#filter-jenis-program` (`RPL` / `Reguler`), atribut `data-prodi` & `data-jenis` pada baris tabel (beserta sub-label periode saat mode arsip), memperbaiki exact-match `#filter-prodi` via `$.fn.dataTable.ext.search`, dan meneruskan parameter `periode` & `jenis_program` ke `pretes-peserta-export.php` (link header, modal export, dan `exportCurrentFiltered()`). |
+| `admin/pretes-peserta-export.php` | 10–22, 45–79, 148–216 | Query & metadata export per periode/program | Membaca parameter `$_GET['periode']` (default periode aktif, `__all__` = semua periode), menambah kondisi `pr.periode = ?`, memasukkan slug periode pada nama file export, dan menambahkan `Periode` serta `Jenis Program` di sub-header XLSX. |
+| `admin/pretes-peserta-export.php` | 479–544, 603–664 | Ringkasan UI, quick export, & dropdown periode | Mengisolasi statistik jumlah peserta, hari, dan prodi di halaman web export sesuai periode terpilih, meneruskan `&periode=...` ke link kembali & tombol export cepat, serta menambah `<select name="periode">` pada `#form-export`. |
+| `tests/pretes-target-program-test.php` | 105–123 | Regression test `pretes-peserta` & export | Menambahkan assertion bahwa `admin/pretes-peserta.php` dan `admin/pretes-peserta-export.php` mengisolasi query per periode, mendukung filter `jenis_program`, dan meneruskan parameter `periode`. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada ketiga file terubah dan **22/22 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-12 19:04:30 +0700 — Pembatasan Pendaftaran Pretes per Program (`Semua` / `RPL` / `Reguler`), Jadwal Tanggal Dinamis (16–20 Nov 2026), & Isolasi Kuota Periode
 
 **Ringkasan:** Menambahkan kontrol `target_program` (`Semua`, `RPL`, `Reguler`) dan `tanggal_mulai` pada tabel `master_pretes`, memblokir akses & submit pendaftaran pretes bagi program di luar target (termasuk menyembunyikan menu `Daftar Pretes` di sidebar, pengumuman dashboard, dan tombol `Daftar Pretes Sekarang` di halaman hasil pretes), membuat rentang tanggal pelaksanaan Senin–Jumat dinamis (mis. `16–20 November 2026` dari `tanggal_mulai = 2026-11-16`), serta mengisolasi query kuota/plotting pretes agar pembukaan periode RPL di tahun ajaran sama (`2026/2027`) tidak tercampur pendaftar periode sebelumnya.

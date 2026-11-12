@@ -102,6 +102,25 @@ tpAssert(str_contains($dashboardSrc, '$isEligibleActivePretes'), 'pages/dashboar
 $hasilSrc = file_get_contents($root . '/pages/pretes-hasil.php');
 tpAssert(str_contains($hasilSrc, '$isEligibleActivePretes'), 'pages/pretes-hasil.php must hide Daftar Pretes button for ineligible programs.', $errors);
 
+$pesertaSrc = file_get_contents($root . '/admin/pretes-peserta.php');
+tpAssert(
+    str_contains($pesertaSrc, '$selectedPeriode') && str_contains($pesertaSrc, 'name="target_periode"') && str_contains($pesertaSrc, 'pr.periode = ?'),
+    'admin/pretes-peserta.php must scope participants and bulk credential generation by selected periode.',
+    $errors
+);
+tpAssert(
+    str_contains($pesertaSrc, 'id="filter-jenis-program"') && str_contains($pesertaSrc, 'data-prodi=') && str_contains($pesertaSrc, 'data-jenis=') && str_contains($pesertaSrc, 'jenis_program'),
+    'admin/pretes-peserta.php must support Jenis Program filter, exact prodi/jenis attributes, and export forwarding.',
+    $errors
+);
+
+$pesertaExportSrc = file_get_contents($root . '/admin/pretes-peserta-export.php');
+tpAssert(
+    str_contains($pesertaExportSrc, "['periode']") && str_contains($pesertaExportSrc, 'pr.periode = ?') && str_contains($pesertaExportSrc, '<select name="periode"'),
+    'admin/pretes-peserta-export.php must support periode parameter filtering and UI selector.',
+    $errors
+);
+
 if (!empty($errors)) {
     foreach ($errors as $err) {
         fwrite(STDERR, "[FAIL] $err\n");

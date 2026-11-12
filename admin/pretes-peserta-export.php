@@ -8,8 +8,17 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/pretes-helper.php';
+ensurePretesPeriodTargetColumns($pdo);
 require_once __DIR__ . '/../includes/sync_eujian.php';
 checkAutoSyncEujian($pdo);
+
+$exportPeriodOptions = $pdo->query("
+    SELECT periode, status, target_program
+    FROM master_pretes
+    ORDER BY (status = 'aktif') DESC, id DESC
+")->fetchAll(PDO::FETCH_ASSOC);
+$activeExportPretes = getActivePretesPeriod($pdo);
 
 // ── Daftar Kolom yang Tersedia untuk Diexport ───────────────────────────────────
 $availableColumns = [
@@ -33,6 +42,8 @@ $availableColumns = [
 ];
 
 // ── Tangkap Parameter Filter ───────────────────────────────────────────────────
+$rawFilterPeriode = trim($_GET['periode'] ?? ($activeExportPretes['periode'] ?? ''));
+$filterPeriode = ($rawFilterPeriode === '__all__' || strtolower($rawFilterPeriode) === 'all') ? '' : $rawFilterPeriode;
 $filterHari   = trim($_GET['hari'] ?? '');
 $filterProdi  = trim($_GET['prodi'] ?? '');
 $filterJenis  = trim($_GET['jenis_program'] ?? '');
@@ -59,6 +70,11 @@ if (empty($selectedCols)) {
 // ── Buat Kueri Filter Dinamis ──────────────────────────────────────────────────
 $whereConditions = ["1=1"];
 $params = [];
+
+if ($filterPeriode !== '') {
+    $whereConditions[] = "pr.periode = ?";
+    $params[] = $filterPeriode;
+}
 
 if ($filterHari !== '') {
     $whereConditions[] = "LOWER(TRIM(pr.hari_pilihan)) = LOWER(?)";
@@ -129,9 +145,10 @@ if ($isDownload) {
         $headerLabels[] = $availableColumns[$colKey]['label'] ?? $colKey;
     }
 
+    $safePeriode = $filterPeriode ? '_' . preg_replace('/[^a-zA-Z0-9_-]/', '-', $filterPeriode) : '_SemuaPeriode';
     $safeHari = $filterHari ? preg_replace('/[^a-zA-Z0-9]/', '', ucfirst(strtolower($filterHari))) : 'SemuaHari';
     $timestamp = date('Ymd_His');
-    $filenameBase = "Data_Peserta_Pretes_LPPAI_{$safeHari}_{$timestamp}";
+    $filenameBase = "Data_Peserta_Pretes_LPPAI{$safePeriode}_{$safeHari}_{$timestamp}";
 
     // Cari PhpSpreadsheet jika format xlsx
     $autoloadPaths = [
@@ -192,8 +209,10 @@ if ($isDownload) {
 
         // 2. Baris Sub-Judul (Ringkasan Filter & Waktu Unduh)
         $subInfo = [];
+        $subInfo[] = "Periode: " . ($filterPeriode ?: 'Semua Periode');
         $subInfo[] = "Hari: " . ($filterHari ?: 'Semua Hari');
         if ($filterProdi) $subInfo[] = "Prodi: " . $filterProdi;
+        if ($filterJenis) $subInfo[] = "Jenis Program: " . normalizeJenisProgram($filterJenis);
         if ($filterStatus) $subInfo[] = "Status: " . ucfirst(str_replace('_', ' ', $filterStatus));
         if ($filterCred) $subInfo[] = "Credentials: " . ($filterCred === 'has_cred' ? 'Sudah Ada' : 'Belum Ada');
         if ($filterSearch) $subInfo[] = "Pencarian: \"{$filterSearch}\"";
@@ -457,18 +476,30 @@ if ($isDownload) {
 }
 
 // ── Ambil Data Ringkasan untuk Tampilan Halaman Web ───────────────────────────
-$totalPesertaAll = (int)$pdo->query("SELECT COUNT(*) FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id")->fetchColumn();
-$totalWithCred   = (int)$pdo->query("SELECT COUNT(*) FROM pretes_registrations WHERE username_tes IS NOT NULL AND username_tes != ''")->fetchColumn();
+$periodeScopeSql = $filterPeriode !== '' ? " AND pr.periode = ?" : "";
+$periodeScopeParams = $filterPeriode !== '' ? [$filterPeriode] : [];
+$periodeQuery = '&periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
+$backPesertaUrl = 'pretes-peserta.php?periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
+
+$stmtTotalAll = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE 1=1{$periodeScopeSql}");
+$stmtTotalAll->execute($periodeScopeParams);
+$totalPesertaAll = (int)$stmtTotalAll->fetchColumn();
+
+$stmtWithCred = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr WHERE pr.username_tes IS NOT NULL AND pr.username_tes != ''{$periodeScopeSql}");
+$stmtWithCred->execute($periodeScopeParams);
+$totalWithCred   = (int)$stmtWithCred->fetchColumn();
 $totalNoCred     = $totalPesertaAll - $totalWithCred;
 $totalFiltered   = count($rows);
 
 // Daftar Hari & Jumlah masing-masing di database
 $dayStats = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
-$stmtDays = $pdo->query("
-    SELECT TRIM(hari_pilihan) as hari, COUNT(*) as cnt 
-    FROM pretes_registrations 
-    GROUP BY TRIM(hari_pilihan)
+$stmtDays = $pdo->prepare("
+    SELECT TRIM(pr.hari_pilihan) as hari, COUNT(*) as cnt 
+    FROM pretes_registrations pr
+    WHERE 1=1{$periodeScopeSql}
+    GROUP BY TRIM(pr.hari_pilihan)
 ");
+$stmtDays->execute($periodeScopeParams);
 while ($r = $stmtDays->fetch()) {
     $dh = ucfirst(strtolower(trim($r['hari'] ?? '')));
     if (isset($dayStats[$dh])) {
@@ -477,14 +508,16 @@ while ($r = $stmtDays->fetch()) {
 }
 
 // Daftar Semua Program Studi
-$allProdi = $pdo->query("
+$stmtAllProdi = $pdo->prepare("
     SELECT DISTINCT u.program_studi, COUNT(*) as cnt
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    WHERE u.program_studi IS NOT NULL AND u.program_studi != ''
+    WHERE u.program_studi IS NOT NULL AND u.program_studi != ''{$periodeScopeSql}
     GROUP BY u.program_studi
     ORDER BY u.program_studi ASC
-")->fetchAll(PDO::FETCH_ASSOC);
+");
+$stmtAllProdi->execute($periodeScopeParams);
+$allProdi = $stmtAllProdi->fetchAll(PDO::FETCH_ASSOC);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -495,7 +528,7 @@ include __DIR__ . '/../includes/header.php';
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#64748b;margin-bottom:4px;">
             <a href="dashboard.php" style="color:#64748b;text-decoration:none;">Dashboard</a>
             <span>›</span>
-            <a href="pretes-peserta.php" style="color:#64748b;text-decoration:none;">Data Peserta Pretes</a>
+            <a href="<?= sanitize($backPesertaUrl) ?>" style="color:#64748b;text-decoration:none;">Data Peserta Pretes</a>
             <span>›</span>
             <span style="color:#1a5632;font-weight:600;">Export ke Excel</span>
         </div>
@@ -507,7 +540,7 @@ include __DIR__ . '/../includes/header.php';
         </p>
     </div>
     <div style="display:flex;gap:10px;align-items:center;">
-        <a href="pretes-peserta.php" class="btn btn-sm btn-secondary" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;font-weight:600;text-decoration:none;">
+        <a href="<?= sanitize($backPesertaUrl) ?>" class="btn btn-sm btn-secondary" style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;font-weight:600;text-decoration:none;">
             ← Kembali ke Data Peserta
         </a>
     </div>
@@ -567,21 +600,21 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body" style="padding:18px 20px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
             <!-- Unduh Semua -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx" data-no-spa="true"
+            <a href="pretes-peserta-export.php?download=1&format=xlsx<?= sanitize($periodeQuery) ?>" data-no-spa="true"
                class="btn" style="background:#1a5632;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(26,86,50,0.25);transition:all 0.2s;">
                 📥 Unduh SEMUA Peserta (<?= $totalPesertaAll ?>)
             </a>
 
             <!-- Per Hari -->
             <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
-                <a href="pretes-peserta-export.php?download=1&format=xlsx&hari=<?= $day ?>" data-no-spa="true"
+                <a href="pretes-peserta-export.php?download=1&format=xlsx&hari=<?= $day ?><?= sanitize($periodeQuery) ?>" data-no-spa="true"
                    class="btn" style="background:#f8fafc;color:#1e293b;border:1.5px solid #cbd5e1;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.2s;">
                     📅 Khusus Hari <?= $day ?> (<?= $dayStats[$day] ?? 0 ?>)
                 </a>
             <?php endforeach; ?>
 
             <!-- Khusus Yang Sudah Ada Credentials -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx&cred=has_cred" data-no-spa="true"
+            <a href="pretes-peserta-export.php?download=1&format=xlsx&cred=has_cred<?= sanitize($periodeQuery) ?>" data-no-spa="true"
                class="btn" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #bfdbfe;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.2s;">
                 🔑 Khusus Ber-Credentials (<?= $totalWithCred ?>)
             </a>
@@ -612,6 +645,22 @@ include __DIR__ . '/../includes/header.php';
         <form method="GET" action="pretes-peserta-export.php" id="form-export">
             <!-- 1. Grid Filter Data -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:22px;">
+                <!-- Filter Periode Pretes -->
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">
+                        🗓️ Periode Pretes
+                    </label>
+                    <select name="periode" id="filter-periode" style="width:100%;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:13px;background:#fff;outline:none;">
+                        <option value="__all__" <?= ($filterPeriode === '') ? 'selected' : '' ?>>Semua Periode (Arsip Gabungan)</option>
+                        <?php foreach ($exportPeriodOptions as $ep): ?>
+                            <?php $tp = normalizePretesTargetProgram($ep['target_program'] ?? 'Semua'); ?>
+                            <option value="<?= sanitize($ep['periode']) ?>" <?= ($filterPeriode === $ep['periode']) ? 'selected' : '' ?>>
+                                <?= sanitize($ep['periode']) ?> — <?= sanitize($tp) ?><?= $ep['status'] === 'aktif' ? ' (Aktif)' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <!-- Filter Hari -->
                 <div>
                     <label style="display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:6px;">
