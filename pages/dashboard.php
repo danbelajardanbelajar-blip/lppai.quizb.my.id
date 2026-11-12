@@ -118,7 +118,10 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $tutorialRegs = $stmt->fetchAll();
 
-$stmt = $pdo->query("SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 10");
+require_once __DIR__ . '/../includes/announcement-helper.php';
+ensureAnnouncementTargetColumns($pdo);
+
+$stmt = $pdo->query("SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 20");
 $allAnnouncements = $stmt->fetchAll();
 
 // Cek status kelulusan dan gelombang terdaftar
@@ -134,8 +137,19 @@ foreach ($tutorialRegs as $reg) {
     }
 }
 
+$annContext = [
+    'is_pretes_lulus'  => $isPretesLulus,
+    'has_pretes_reg'   => ($pretesRegisteredActive > 0 || $pretesRegistered > 0 || !empty($myPretesReg) || !empty($pretesResult)),
+    'has_tutorial_reg' => !empty($tutorialRegs),
+];
+
 $recentAnnouncements = [];
 foreach ($allAnnouncements as $ann) {
+    // Filter ketat target penerima pengumuman (Program: Semua/RPL/Reguler, dan Sasaran Peserta)
+    if (!isUserEligibleForAnnouncement($user, $ann, $annContext)) {
+        continue;
+    }
+
     $tipe = $ann['tipe'];
     
     // 1. Jika sudah lulus tutorial ATAU sudah lulus pretes, jangan tampilkan pengumuman pendaftaran tutorial

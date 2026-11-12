@@ -7,6 +7,8 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/announcement-helper.php';
+ensureAnnouncementTargetColumns($pdo);
 
 // Auto add link_tujuan column if not exists & ensure tipe is VARCHAR so it supports pretest
 try {
@@ -78,36 +80,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $action = $_POST['action'];
 
         if ($action === 'create') {
-            $judul  = trim($_POST['judul'] ?? '');
-            $konten = trim($_POST['konten'] ?? '');
-            $tipe   = $_POST['tipe'] ?? '';
-            $link   = $_POST['link_tujuan'] ?? '';
+            $judul         = trim($_POST['judul'] ?? '');
+            $konten        = trim($_POST['konten'] ?? '');
+            $tipe          = $_POST['tipe'] ?? '';
+            $link          = $_POST['link_tujuan'] ?? '';
             if ($link === '') $link = null;
+            $targetProgram = normalizeAnnouncementTargetProgram($_POST['target_program'] ?? 'Semua');
+            $targetPeserta = normalizeAnnouncementTargetPeserta($_POST['target_peserta'] ?? 'semua');
 
             if (empty($judul) || empty($konten) || !isset($tipeOptions[$tipe])) {
                 $message = 'Semua field harus diisi dengan benar.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("INSERT INTO announcements (judul, konten, tipe, link_tujuan, created_by) VALUES (?, ?, ?, ?, ?)")
-                    ->execute([$judul, $konten, $tipe, $link, $user['id']]);
+                $pdo->prepare("
+                    INSERT INTO announcements (judul, konten, tipe, link_tujuan, target_program, target_peserta, created_by) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ")->execute([$judul, $konten, $tipe, $link, $targetProgram, $targetPeserta, $user['id']]);
                 $message = 'Pengumuman berhasil ditambahkan!';
                 $msgType = 'success';
             }
 
         } elseif ($action === 'update') {
-            $id     = (int)($_POST['id'] ?? 0);
-            $judul  = trim($_POST['judul'] ?? '');
-            $konten = trim($_POST['konten'] ?? '');
-            $tipe   = $_POST['tipe'] ?? '';
-            $link   = $_POST['link_tujuan'] ?? '';
+            $id            = (int)($_POST['id'] ?? 0);
+            $judul         = trim($_POST['judul'] ?? '');
+            $konten        = trim($_POST['konten'] ?? '');
+            $tipe          = $_POST['tipe'] ?? '';
+            $link          = $_POST['link_tujuan'] ?? '';
             if ($link === '') $link = null;
+            $targetProgram = normalizeAnnouncementTargetProgram($_POST['target_program'] ?? 'Semua');
+            $targetPeserta = normalizeAnnouncementTargetPeserta($_POST['target_peserta'] ?? 'semua');
 
             if ($id <= 0 || empty($judul) || empty($konten) || !isset($tipeOptions[$tipe])) {
                 $message = 'Data tidak valid. Semua field harus diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE announcements SET judul = ?, konten = ?, tipe = ?, link_tujuan = ? WHERE id = ?")
-                    ->execute([$judul, $konten, $tipe, $link, $id]);
+                $pdo->prepare("
+                    UPDATE announcements 
+                    SET judul = ?, konten = ?, tipe = ?, link_tujuan = ?, target_program = ?, target_peserta = ? 
+                    WHERE id = ?
+                ")->execute([$judul, $konten, $tipe, $link, $targetProgram, $targetPeserta, $id]);
                 $message = 'Pengumuman berhasil diperbarui!';
                 $msgType = 'success';
             }
@@ -158,6 +169,26 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>🎯 Target Program Mahasiswa</label>
+                    <select name="target_program" id="create_ann_target_program" required>
+                        <option value="Semua">Semua Program (Reguler & RPL)</option>
+                        <option value="Reguler">Khusus Mahasiswa Reguler</option>
+                        <option value="RPL">Khusus Mahasiswa RPL</option>
+                    </select>
+                    <small style="color:#6b7280; display:block; margin-top:4px;">Batasi pengumuman untuk mahasiswa RPL atau Reguler saja.</small>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>👥 Target Sasaran Peserta</label>
+                    <select name="target_peserta" id="create_ann_target_peserta" required>
+                        <?php foreach (getAllowedAnnouncementTargetPeserta() as $tpVal => $tpLabel): ?>
+                            <option value="<?= $tpVal ?>"><?= $tpLabel ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <small style="color:#6b7280; display:block; margin-top:4px;">Filter penerima berdasarkan status kepesertaan pretes/tutorial.</small>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Judul</label>
                 <input type="text" name="judul" placeholder="Judul pengumuman" required>
@@ -191,6 +222,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th>Judul</th>
                         <th>Tipe</th>
+                        <th>Target Audiens</th>
                         <th>Status</th>
                         <th>Dibuat</th>
                         <th>Aksi</th>
@@ -209,6 +241,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td><span class="badge badge-info"><?= $tipeOptions[$a['tipe']] ?? $a['tipe'] ?></span></td>
+                        <td><?= renderAnnouncementTargetBadges($a['target_program'] ?? 'Semua', $a['target_peserta'] ?? 'semua') ?></td>
                         <td>
                             <?php if ($a['is_active']): ?>
                                 <span class="badge badge-success">Aktif</span>
@@ -225,6 +258,8 @@ include __DIR__ . '/../includes/header.php';
                                 data-konten="<?= htmlspecialchars($a['konten'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-tipe="<?= htmlspecialchars($a['tipe'], ENT_QUOTES, 'UTF-8') ?>"
                                 data-link_tujuan="<?= htmlspecialchars($a['link_tujuan'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                data-target_program="<?= htmlspecialchars($a['target_program'] ?? 'Semua', ENT_QUOTES, 'UTF-8') ?>"
+                                data-target_peserta="<?= htmlspecialchars($a['target_peserta'] ?? 'semua', ENT_QUOTES, 'UTF-8') ?>"
                                 style="margin-right:4px;">
                                 ✏️ Edit
                             </button>
@@ -280,6 +315,24 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>🎯 Target Program Mahasiswa</label>
+                    <select name="target_program" id="edit_ann_target_program" required>
+                        <option value="Semua">Semua Program (Reguler & RPL)</option>
+                        <option value="Reguler">Khusus Mahasiswa Reguler</option>
+                        <option value="RPL">Khusus Mahasiswa RPL</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>👥 Target Sasaran Peserta</label>
+                    <select name="target_peserta" id="edit_ann_target_peserta" required>
+                        <?php foreach (getAllowedAnnouncementTargetPeserta() as $tpVal => $tpLabel): ?>
+                            <option value="<?= $tpVal ?>"><?= $tpLabel ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
             <div class="form-group">
                 <label>Judul</label>
                 <input type="text" name="judul" id="edit_ann_judul" placeholder="Judul pengumuman" required>
@@ -308,12 +361,14 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-function openAnnModal(id, judul, konten, tipe, link) {
-    document.getElementById('edit_ann_id').value    = id;
-    document.getElementById('edit_ann_judul').value = judul;
-    document.getElementById('edit_ann_konten').value= konten;
-    document.getElementById('edit_ann_tipe').value  = tipe;
-    document.getElementById('edit_ann_link').value  = link || '';
+function openAnnModal(id, judul, konten, tipe, link, targetProgram, targetPeserta) {
+    document.getElementById('edit_ann_id').value             = id;
+    document.getElementById('edit_ann_judul').value          = judul;
+    document.getElementById('edit_ann_konten').value         = konten;
+    document.getElementById('edit_ann_tipe').value           = tipe;
+    document.getElementById('edit_ann_link').value           = link || '';
+    document.getElementById('edit_ann_target_program').value = targetProgram || 'Semua';
+    document.getElementById('edit_ann_target_peserta').value = targetPeserta || 'semua';
     document.getElementById('editAnnModal').classList.add('show');
 }
 
@@ -351,7 +406,7 @@ if (!window._editAnnBound) {
         var btn = e.target.closest('.btn-edit-ann');
         if (btn) {
             var d = btn.dataset;
-            openAnnModal(d.id, d.judul, d.konten, d.tipe, d.link_tujuan);
+            openAnnModal(d.id, d.judul, d.konten, d.tipe, d.link_tujuan, d.target_program, d.target_peserta);
             return;
         }
         if (e.target && e.target.id === 'editAnnModal') closeAnnModal();

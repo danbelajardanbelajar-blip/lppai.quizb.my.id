@@ -3,14 +3,222 @@
  * LPPAI Corner - Helper untuk halaman pengumuman tutorial
  */
 
+require_once __DIR__ . '/user-helper.php';
+
+if (!function_exists('getAllowedAnnouncementTargetPrograms')) {
+    /**
+     * Mengembalikan daftar target program mahasiswa yang diizinkan untuk pengumuman.
+     * @return array<int, string>
+     */
+    function getAllowedAnnouncementTargetPrograms(): array {
+        return ['Semua', 'RPL', 'Reguler'];
+    }
+}
+
+if (!function_exists('normalizeAnnouncementTargetProgram')) {
+    /**
+     * Menormalkan nilai target_program pengumuman agar selalu valid ('Semua', 'RPL', atau 'Reguler').
+     */
+    function normalizeAnnouncementTargetProgram($value): string {
+        $val = strtoupper(trim((string)($value ?? '')));
+        if ($val === 'RPL' || str_contains($val, 'RPL')) {
+            return 'RPL';
+        }
+        if ($val === 'REGULER' || str_contains($val, 'REGULER')) {
+            return 'Reguler';
+        }
+        return 'Semua';
+    }
+}
+
+if (!function_exists('getAllowedAnnouncementTargetPeserta')) {
+    /**
+     * Mengembalikan daftar pilihan target sasaran peserta beserta labelnya.
+     * @return array<string, string>
+     */
+    function getAllowedAnnouncementTargetPeserta(): array {
+        return [
+            'semua'              => 'Semua Mahasiswa',
+            'pretes'             => 'Peserta Pretes',
+            'tutorial'           => 'Peserta Tutorial',
+            'belum_lulus_pretes' => 'Khusus Belum Lulus Pretes',
+            'lulus_pretes'       => 'Khusus Sudah Lulus Pretes',
+        ];
+    }
+}
+
+if (!function_exists('normalizeAnnouncementTargetPeserta')) {
+    /**
+     * Menormalkan nilai target_peserta pengumuman.
+     */
+    function normalizeAnnouncementTargetPeserta($value): string {
+        $val = strtolower(trim((string)($value ?? 'semua')));
+        $allowed = array_keys(getAllowedAnnouncementTargetPeserta());
+        return in_array($val, $allowed, true) ? $val : 'semua';
+    }
+}
+
+if (!function_exists('renderAnnouncementTargetBadges')) {
+    /**
+     * Merender badge HTML untuk target program dan target peserta pengumuman.
+     */
+    function renderAnnouncementTargetBadges(string $targetProgram, string $targetPeserta): string {
+        $tp = normalizeAnnouncementTargetProgram($targetProgram);
+        $tPes = normalizeAnnouncementTargetPeserta($targetPeserta);
+
+        // Badge Program
+        if ($tp === 'RPL') {
+            $badgeProg = '<span class="badge" style="background:#f3e8ff; color:#6b21a8; font-weight:700; border:1px solid #d8b4fe;">Khusus RPL</span>';
+        } elseif ($tp === 'Reguler') {
+            $badgeProg = '<span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; border:1px solid #bae6fd;">Khusus Reguler</span>';
+        } else {
+            $badgeProg = '<span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">Semua Program</span>';
+        }
+
+        // Badge Peserta
+        $allLabels = getAllowedAnnouncementTargetPeserta();
+        $pesLabel = $allLabels[$tPes] ?? 'Semua Mahasiswa';
+        if ($tPes === 'pretes') {
+            $badgePes = '<span class="badge" style="background:#fef3c7; color:#92400e; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
+        } elseif ($tPes === 'tutorial') {
+            $badgePes = '<span class="badge" style="background:#dcfce7; color:#166534; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
+        } elseif ($tPes === 'belum_lulus_pretes') {
+            $badgePes = '<span class="badge" style="background:#fee2e2; color:#991b1b; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
+        } elseif ($tPes === 'lulus_pretes') {
+            $badgePes = '<span class="badge" style="background:#d1fae5; color:#065f46; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
+        } else {
+            $badgePes = '<span class="badge" style="background:#f8fafc; color:#64748b; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
+        }
+
+        return '<div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">' . $badgeProg . $badgePes . '</div>';
+    }
+}
+
+if (!function_exists('isUserEligibleForAnnouncement')) {
+    /**
+     * Memeriksa apakah mahasiswa berhak menerima/melihat pengumuman tertentu
+     * berdasarkan Target Program (RPL/Reguler) dan Target Sasaran Peserta.
+     */
+    function isUserEligibleForAnnouncement(array $user, array $ann, ?array $context = null): bool {
+        $userProgram = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
+        $annProgram  = normalizeAnnouncementTargetProgram($ann['target_program'] ?? 'Semua');
+
+        // 1. Filter Program: Jika pengumuman khusus Reguler / RPL dan berbeda dengan user -> TOLAK
+        if ($annProgram !== 'Semua' && $annProgram !== $userProgram) {
+            return false;
+        }
+
+        // Proteksi bawaan untuk RPL: Pengumuman pendaftaran/kelas tutorial umum adalah untuk Reguler
+        $tipe = $ann['tipe'] ?? '';
+        $isTutorialType = (
+            str_starts_with($tipe, 'pendaftaran_gel') ||
+            str_starts_with($tipe, 'pembagian_kelas_') ||
+            str_starts_with($tipe, 'kelulusan_gel') ||
+            $tipe === 'pendaftaran_mandiri'
+        );
+        if ($userProgram === 'RPL' && $isTutorialType && $annProgram !== 'RPL') {
+            return false;
+        }
+
+        // 2. Filter Sasaran Peserta
+        $targetPeserta = normalizeAnnouncementTargetPeserta($ann['target_peserta'] ?? 'semua');
+        if ($targetPeserta === 'semua') {
+            return true;
+        }
+
+        $isPretesLulus   = $context['is_pretes_lulus'] ?? null;
+        $hasPretesReg    = $context['has_pretes_reg'] ?? null;
+        $hasTutorialReg  = $context['has_tutorial_reg'] ?? null;
+
+        if ($targetPeserta === 'lulus_pretes') {
+            return $isPretesLulus === true;
+        }
+        if ($targetPeserta === 'belum_lulus_pretes') {
+            return $isPretesLulus === false;
+        }
+        if ($targetPeserta === 'pretes') {
+            return $hasPretesReg === true;
+        }
+        if ($targetPeserta === 'tutorial') {
+            return $hasTutorialReg === true;
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('ensureAnnouncementTargetColumns')) {
+    /**
+     * Memastikan kolom target_program dan target_peserta tersedia di tabel announcements.
+     */
+    function ensureAnnouncementTargetColumns(PDO $pdo): void {
+        static $checked = false;
+        if ($checked && !empty($_SESSION['_schema_announcement_target_ok'])) {
+            return;
+        }
+
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+            if ($driver === 'sqlite') {
+                $cols = $pdo->query("PRAGMA table_info(announcements)")->fetchAll(PDO::FETCH_ASSOC);
+                if (empty($cols)) return;
+                $colNames = array_map(fn($c) => strtolower((string)($c['name'] ?? '')), $cols);
+                if (!in_array('target_program', $colNames, true)) {
+                    $pdo->exec("ALTER TABLE announcements ADD COLUMN target_program VARCHAR(20) DEFAULT 'Semua'");
+                }
+                if (!in_array('target_peserta', $colNames, true)) {
+                    $pdo->exec("ALTER TABLE announcements ADD COLUMN target_peserta VARCHAR(50) DEFAULT 'semua'");
+                }
+            } else {
+                $tbl = $pdo->query("SHOW TABLES LIKE 'announcements'")->fetch();
+                if (!$tbl) return;
+                $cProg = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'target_program'")->fetch();
+                if (!$cProg) {
+                    $pdo->exec("ALTER TABLE announcements ADD COLUMN target_program VARCHAR(20) NOT NULL DEFAULT 'Semua' AFTER tipe");
+                }
+                $cPes = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'target_peserta'")->fetch();
+                if (!$cPes) {
+                    $pdo->exec("ALTER TABLE announcements ADD COLUMN target_peserta VARCHAR(50) NOT NULL DEFAULT 'semua' AFTER target_program");
+                }
+            }
+
+            // Normalisasi pengumuman lawas agar tidak bocor ke mahasiswa RPL
+            $pdo->exec("
+                UPDATE announcements 
+                SET target_program = 'Reguler', target_peserta = 'tutorial'
+                WHERE (target_program IS NULL OR target_program = '' OR target_program = 'Semua')
+                  AND tipe IN ('pendaftaran_gel1', 'pembagian_kelas_gel1', 'kelulusan_gel1', 'pendaftaran_gel2', 'pembagian_kelas_gel2', 'kelulusan_gel2', 'pendaftaran_mandiri', 'pembagian_kelas_mandiri')
+            ");
+            $pdo->exec("
+                UPDATE announcements 
+                SET target_program = 'Reguler', target_peserta = 'pretes'
+                WHERE (target_program IS NULL OR target_program = '' OR target_program = 'Semua')
+                  AND (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%')
+            ");
+
+            $_SESSION['_schema_announcement_target_ok'] = true;
+            $checked = true;
+        } catch (Throwable $e) {
+            error_log("ensureAnnouncementTargetColumns error: " . $e->getMessage());
+        }
+    }
+}
+
 function renderAnnouncementPage($tipe, $gelombang, $title) {
     $pdo = getDBConnection();
+    ensureAnnouncementTargetColumns($pdo);
     $user = getCurrentUser();
 
     // Get announcements
     $stmt = $pdo->prepare("SELECT * FROM announcements WHERE tipe = ? AND is_active = 1 ORDER BY created_at DESC");
     $stmt->execute([$tipe]);
-    $announcements = $stmt->fetchAll();
+    $rawAnnouncements = $stmt->fetchAll();
+    $announcements = [];
+    foreach ($rawAnnouncements as $ra) {
+        if (isUserEligibleForAnnouncement($user, $ra)) {
+            $announcements[] = $ra;
+        }
+    }
 
     // Get classes if applicable (pembagian kelas)
     $classes = [];

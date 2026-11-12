@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 05:40:59 +0700 — Filter Sasaran Pengumuman per Program (RPL / Reguler) & Kategori Peserta (Pretes / Tutorial)
+
+**Ringkasan:** Menambahkan kontrol target audiens pada sistem pengumuman (`announcements`) melalui kolom `target_program` (`Semua`, `RPL`, `Reguler`) dan `target_peserta` (`semua`, `pretes`, `tutorial`, `belum_lulus_pretes`, `lulus_pretes`), memutakhirkan form tambah & modal edit di `admin/pengumuman.php`, menormalisasi pengumuman tutorial/pretes reguler lama, serta menyaring feed pengumuman di `pages/dashboard.php` sehingga mahasiswa RPL tidak lagi menerima pengumuman pendaftaran tutorial reguler maupun hasil pretes reguler.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/announcement-helper.php` | 6–207, 213–222 | Helper Target Pengumuman & Gating Hak Akses | Menambahkan `ensureAnnouncementTargetColumns()`, `normalizeAnnouncementTargetProgram()`, `normalizeAnnouncementTargetPeserta()`, `renderAnnouncementTargetBadges()`, dan `isUserEligibleForAnnouncement()` untuk menyaring pengumuman berdasarkan program mahasiswa dan status kepesertaan. |
+| `migration_announcement_target.php` | 1–45 | Runner Migrasi Skema (File Baru) | Skrip migrasi CLI (`php migration_announcement_target.php`) dan web admin untuk menambahkan kolom `target_program` & `target_peserta` dan menormalisasi pengumuman lama. |
+| `admin/pengumuman.php` | 10–12, 83–122, 172–192 | CRUD Pengumuman & Target Audiens | Memanggil auto-migration, membaca dan menyimpan `target_program` dan `target_peserta` pada form `create` & `update`, serta menambahkan input pilihan target pengiriman pada form tambah. |
+| `admin/pengumuman.php` | 225, 244, 261, 318–337, 364–410 | Tabel Daftar & Modal Edit Pengumuman | Menambahkan kolom `Target Audiens` dengan badge program & peserta, binding input pada modal edit, serta pembaruan fungsi JS `openAnnModal()` dan saran otomatis `bindAutoLink()`. |
+| `pages/dashboard.php` | 121–155 | Feed Pengumuman Dashboard Mahasiswa | Memanggil `ensureAnnouncementTargetColumns()`, menyiapkan konteks kepesertaan (`$annContext`), dan menyaring pengumuman dengan `isUserEligibleForAnnouncement()` agar mahasiswa RPL tidak terpapar pengumuman reguler. |
+| `tests/announcement-target-filter-test.php` | 1–190 | Unit & Integration Test Suite (File Baru) | Menguji normalisasi input, isolasi ketat pengumuman RPL vs Reguler, target kelulusan/kepesertaan, auto-migration SQLite, dan integrasi UI file PHP. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **24/24 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 05:08:20 +0700 — Fitur Sinkronisasi Nilai Peserta Lulus Pretes ke Kelola Nilai & Siap Cetak Sertifikat
 
 **Ringkasan:** Membangun fitur jembatan sinkronisasi otomatis dari hasil Rekapitulasi Pretes (`admin/pretes-rekap-nilai.php`) langsung ke tabel `tutorial_registrations` pada halaman Kelola Nilai (`admin/kelola-nilai.php`) sehingga peserta pretes yang dinyatakan LULUS (seluruh 12 komponen $\ge 80$) langsung terdaftar dengan `tipe_nilai = 'pretest'`, nilai transkrip 6 komponen terhitung akurat, dan nomor sertifikat resmi serta pencetakan sertifikat (`admin/cetak-sertifikat.php`) dapat langsung diproses tanpa perlu impor manual via Excel.
