@@ -47,8 +47,10 @@ try {
     $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)'");
     $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN dosen_penguji VARCHAR(150) DEFAULT NULL");
     $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN ruangan VARCHAR(100) DEFAULT NULL");
+    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN foto VARCHAR(255) DEFAULT NULL");
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
 } catch (Exception $e) {}
+ensurePretesRegistrationPhotoColumn($pdo);
 
 // Cek apakah tabel master_pretes kosong, inisiasi default aktif jika belum ada
 try {
@@ -125,6 +127,8 @@ if ($active_pretes) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daftar_pretes' || ($_POST['action'] ?? '') === 'daftar')) {
     $token        = $_POST['csrf_token'] ?? '';
     $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
+    $fotoData     = trim($_POST['foto_data'] ?? '');
+    $fotoFile     = $_FILES['foto_file'] ?? null;
     $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
     if (!verifyCsrf($token)) {
@@ -143,39 +147,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daft
     } elseif (!in_array($hari_pilihan, $validDays)) {
         $message = 'Silakan pilih hari pelaksanaan yang valid.';
         $msgType = 'danger';
+    } elseif (empty($fotoData) && (empty($fotoFile) || empty($fotoFile['tmp_name']))) {
+        $message = 'Foto resmi peserta wajib diunggah atau diambil langsung dan terverifikasi jelas sebelum konfirmasi pendaftaran.';
+        $msgType = 'danger';
     } else {
-        $dayLower   = strtolower($hari_pilihan);
-        $totalKuota = (int)($active_pretes["kuota_$dayLower"] ?? 0);
-        $terisi     = $registeredCounts[$hari_pilihan] ?? 0;
+        $payloadToSave = !empty($fotoData) ? $fotoData : ($fotoFile['tmp_name'] ?? '');
+        $savedPhotoPath = savePretesRegistrationPhoto($payloadToSave, $user['nim'] ?? 'peserta');
 
-        if ($totalKuota <= 0 || $terisi >= $totalKuota) {
-            $message = "Maaf, kuota pretes untuk hari $hari_pilihan sudah penuh.";
+        if (!$savedPhotoPath) {
+            $message = 'Format foto tidak valid atau gagal diproses oleh server. Pastikan foto berformat JPG/PNG/WEBP yang jelas.';
             $msgType = 'danger';
         } else {
-            $jamPretes = $active_pretes['jam'] ?? '13.00 WIB (Jam 1)';
-            $stmt = $pdo->prepare("
-                INSERT INTO pretes_registrations (user_id, hari_pilihan, jam, periode, status) 
-                VALUES (?, ?, ?, ?, 'terdaftar')
-            ");
-            $stmt->execute([$user['id'], $hari_pilihan, $jamPretes, $active_pretes['periode']]);
+            $dayLower   = strtolower($hari_pilihan);
+            $totalKuota = (int)($active_pretes["kuota_$dayLower"] ?? 0);
+            $terisi     = $registeredCounts[$hari_pilihan] ?? 0;
 
-            $message = "Pendaftaran pretes berhasil! Anda telah memilih hari $hari_pilihan ($jamPretes).";
-            $msgType = 'success';
+            if ($totalKuota <= 0 || $terisi >= $totalKuota) {
+                $message = "Maaf, kuota pretes untuk hari $hari_pilihan sudah penuh.";
+                $msgType = 'danger';
+            } else {
+                $jamPretes = $active_pretes['jam'] ?? '13.00 WIB (Jam 1)';
+                $stmt = $pdo->prepare("
+                    INSERT INTO pretes_registrations (user_id, hari_pilihan, jam, periode, foto, status) 
+                    VALUES (?, ?, ?, ?, ?, 'terdaftar')
+                ");
+                $stmt->execute([$user['id'], $hari_pilihan, $jamPretes, $active_pretes['periode'], $savedPhotoPath]);
 
-            // Update counter lokal
-            $registeredCounts[$hari_pilihan]++;
+                $message = "Pendaftaran pretes berhasil! Anda telah memilih hari $hari_pilihan ($jamPretes) dan pasfoto resmi Anda telah terverifikasi.";
+                $msgType = 'success';
 
-            // Refresh status registrasi
-            $stmt = $pdo->prepare("
-                SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
-                FROM pretes_registrations pr
-                LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
-                WHERE pr.user_id = ? AND pr.periode = ?
-                ORDER BY pr.tanggal_daftar DESC
-                LIMIT 1
-            ");
-            $stmt->execute([$user['id'], $active_pretes['periode']]);
-            $existingReg = $stmt->fetch();
+                // Update counter lokal
+                $registeredCounts[$hari_pilihan]++;
+
+                // Refresh status registrasi
+                $stmt = $pdo->prepare("
+                    SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
+                    FROM pretes_registrations pr
+                    LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+                    WHERE pr.user_id = ? AND pr.periode = ?
+                    ORDER BY pr.tanggal_daftar DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([$user['id'], $active_pretes['periode']]);
+                $existingReg = $stmt->fetch();
+            }
         }
     }
 }
@@ -202,6 +217,20 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <div style="padding:20px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px;">
             <h4 style="margin-top:0; color:#166534; font-size:16px;">✅ Status Pendaftaran: Terdaftar Pretes</h4>
+            
+            <?php if (!empty($existingReg['foto'])): ?>
+            <div style="display:flex; align-items:center; gap:16px; margin:16px 0; padding:12px 16px; background:#fff; border:1px solid #bbf7d0; border-radius:10px;">
+                <img src="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim(str_replace('\\', '/', $existingReg['foto']), '/')) ?>" alt="Pasfoto Resmi" style="width:64px; height:84px; object-fit:cover; border-radius:6px; border:2px solid #16a34a; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <div>
+                    <div style="font-weight:700; color:#15803d; font-size:14.5px; display:flex; align-items:center; gap:6px;">
+                        <span>✅</span> Pasfoto Resmi Terverifikasi AI
+                    </div>
+                    <div style="font-size:12.5px; color:#475569; margin-top:3px; line-height:1.4;">
+                        Pasfoto resmi Anda telah disetujui dan akan dicetak otomatis pada Kartu Ujian Pretes fisik.
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:18px; margin-top:16px;">
                 <div>
@@ -320,13 +349,14 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <?php endif; ?>
 
-        <!-- Form Pemilihan Hari -->
-        <form method="POST">
+        <!-- Form Pemilihan Hari & Unggah Pasfoto Resmi -->
+        <form method="POST" enctype="multipart/form-data" id="formDaftarPretes">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="daftar_pretes">
+            <input type="hidden" name="foto_data" id="foto_data_input" value="">
 
             <label style="font-weight:600; margin-bottom:10px; display:block; font-size:15px; color:#1e293b;">
-                Pilih Hari <?= $shortRange !== '' ? '&amp; Tanggal ' : '' ?>Pelaksanaan Pretes (<?= $shortRange !== '' ? sanitize($shortRange) . ', ' : '' ?><?= sanitize($jamTampil) ?>) <span style="color:red">*</span>
+                1. Pilih Hari <?= $shortRange !== '' ? '&amp; Tanggal ' : '' ?>Pelaksanaan Pretes (<?= $shortRange !== '' ? sanitize($shortRange) . ', ' : '' ?><?= sanitize($jamTampil) ?>) <span style="color:red">*</span>
             </label>
 
             <div class="form-group" style="margin-bottom:24px;">
@@ -349,9 +379,104 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
 
-            <button type="submit" name="daftar_pretes_btn" value="1" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 600;">
-                ✍️ Daftar Pretes Sekarang
+            <!-- ═══════════════════════════════════════════════════════════════
+                 2. UNGGAH / AMBIL PASFOTO RESMI & VERIFIKASI WAJAH AI
+                 ═══════════════════════════════════════════════════════════════ -->
+            <label style="font-weight:600; margin-bottom:10px; display:block; font-size:15px; color:#1e293b;">
+                2. Unggah / Ambil Pasfoto Resmi Peserta Pretes (Wajib) <span style="color:red">*</span>
+            </label>
+
+            <div class="card" style="margin-bottom:26px; border:1.5px solid #cbd5e1; border-radius:12px; background:#fff; overflow:hidden;">
+                <div style="background:#f8fafc; padding:12px 18px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <span style="font-weight:700; color:#334155; font-size:13.5px;">📸 Ketentuan Pasfoto Resmi</span>
+                    <span class="badge" style="background:#ecfdf5; color:#047857; font-weight:700; font-size:11px; border:1px solid #a7f3d0;">
+                        AI Face Verification Aktif
+                    </span>
+                </div>
+                <div style="padding:18px;">
+                    <p style="margin:0 0 16px; font-size:13.5px; color:#475569; line-height:1.55;">
+                        Harap gunakan <strong>pasfoto resmi terbaru</strong> perorangan (berbusana muslim rapi atau jas almamater). Pastikan <strong>seluruh bagian wajah menghadap depan dan tampak jelas</strong> (tidak memakai masker, kacamata hitam, dan tidak terpotong di tepi). Sistem AI akan memverifikasi kejelasan wajah secara otomatis sebelum Anda dapat menyelesaikan pendaftaran.
+                    </p>
+
+                    <!-- Pilihan Sumber Foto: Unggah File vs Kamera Langsung -->
+                    <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+                        <button type="button" id="tabBtnUpload" class="btn btn-secondary" onclick="switchPhotoMode('upload')" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; font-weight:700; font-size:13.5px; border-radius:8px; border:2px solid #0f766e; background:#f0fdf4; color:#115e59; cursor:pointer;">
+                            📁 Unggah File Foto (Galeri/PC)
+                        </button>
+                        <button type="button" id="tabBtnCamera" class="btn btn-secondary" onclick="switchPhotoMode('camera')" style="display:inline-flex; align-items:center; gap:6px; padding:9px 16px; font-weight:700; font-size:13.5px; border-radius:8px; border:2px solid #e2e8f0; background:#fff; color:#475569; cursor:pointer;">
+                            📷 Buka Kamera &amp; Ambil Foto Langsung
+                        </button>
+                    </div>
+
+                    <!-- Panel Mode 1: Unggah File -->
+                    <div id="panelUpload" style="display:block;">
+                        <div id="dropzoneBox" style="border:2px dashed #94a3b8; border-radius:10px; padding:24px 16px; text-align:center; background:#f8fafc; cursor:pointer; transition:all 0.2s ease;">
+                            <div style="font-size:36px; margin-bottom:8px;">📤</div>
+                            <div style="font-weight:700; color:#1e293b; margin-bottom:4px; font-size:14px;">Klik di sini untuk memilih pasfoto dari perangkat Anda</div>
+                            <div style="font-size:12px; color:#64748b;">Mendukung format JPG, JPEG, PNG, atau WEBP (Maksimal 5 MB)</div>
+                            <input type="file" id="fileFotoInput" name="foto_file" accept="image/*" style="display:none;" onchange="handleFileSelected(this)">
+                        </div>
+                    </div>
+
+                    <!-- Panel Mode 2: Kamera Langsung -->
+                    <div id="panelCamera" style="display:none;">
+                        <div style="background:#0f172a; border-radius:10px; padding:12px; text-align:center; position:relative; overflow:hidden; max-width:440px; margin:0 auto;">
+                            <div style="position:relative; width:100%; height:320px; background:#000; border-radius:8px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+                                <video id="cameraVideo" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+                                <!-- Panduan Oval Wajah -->
+                                <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:170px; height:230px; border:2.5px dashed rgba(255,255,255,0.85); border-radius:50%; box-shadow:0 0 0 9999px rgba(0,0,0,0.4); pointer-events:none;">
+                                    <div style="position:absolute; bottom:-30px; left:50%; transform:translateX(-50%); white-space:nowrap; background:rgba(0,0,0,0.75); color:#fff; font-size:11px; font-weight:600; padding:3px 10px; border-radius:4px;">
+                                        Arahkan wajah ke dalam oval
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display:flex; justify-content:center; gap:8px; margin-top:12px; flex-wrap:wrap;">
+                                <button type="button" class="btn btn-success" onclick="takeSnapshot()" style="padding:10px 20px; font-weight:700; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                                    📸 Jepret Foto
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="toggleCameraFace()" style="padding:10px 14px; font-weight:600; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                                    🔄 Balik Kamera
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="closeCameraView()" style="padding:10px 14px; font-weight:600; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                                    ❌ Batal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Area Preview Hasil Foto & Status Verifikasi Wajah AI -->
+                    <div id="previewContainer" style="display:none; margin-top:20px; padding-top:18px; border-top:1px dashed #cbd5e1;">
+                        <div style="display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;">
+                            <!-- Kotak Preview Pasfoto 3x4 -->
+                            <div style="position:relative; width:120px; height:160px; border-radius:8px; overflow:hidden; border:2px solid #cbd5e1; box-shadow:0 2px 8px rgba(0,0,0,0.06); background:#f8fafc; flex-shrink:0;" id="photoPreviewBox">
+                                <canvas id="photoPreviewCanvas" style="width:100%; height:100%; object-fit:cover; display:block;"></canvas>
+                                <div id="verifBadge" style="display:none; position:absolute; bottom:6px; left:6px; right:6px; background:#16a34a; color:#fff; font-size:10px; font-weight:700; text-align:center; padding:3px 4px; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
+                                    ✓ Terverifikasi
+                                </div>
+                            </div>
+
+                            <!-- Keterangan Status Hasil Verifikasi -->
+                            <div style="flex:1; min-width:240px;">
+                                <div id="verifStatusAlert" class="alert" style="margin:0 0 12px; padding:12px 14px; font-size:13.5px; line-height:1.55; border-radius:8px;">
+                                    <!-- Diisi via JS -->
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="resetPhotoState()" style="padding:8px 14px; font-size:13px; font-weight:600; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+                                    🔄 Ganti / Ambil Ulang Foto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Tombol Konfirmasi Pendaftaran Pretes -->
+            <button type="submit" id="btnSubmitDaftarPretes" name="daftar_pretes_btn" value="1" class="btn btn-primary" disabled style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; opacity: 0.55; cursor: not-allowed; transition: all 0.3s ease;">
+                ✍️ Konfirmasi &amp; Daftar Pretes Sekarang
             </button>
+            <div id="submitLockedNotice" style="margin-top:10px; font-size:13px; color:#b91c1c; text-align:center; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <span>🔒</span> Tombol pendaftaran terkunci. Silakan unggah atau ambil pasfoto resmi hingga terverifikasi jelas oleh sistem AI.
+            </div>
         </form>
 
     </div>
@@ -394,5 +519,219 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SKRIP CLIENT-SIDE DETEKSI WAJAH & KAMERA LIVE PRETES
+     ═══════════════════════════════════════════════════════════════ -->
+<script src="<?= BASE_URL ?>/assets/js/pretes-face-verifier.js?v=<?= time() ?>"></script>
+<script>
+let currentPhotoMode = 'upload';
+
+function switchPhotoMode(mode) {
+    currentPhotoMode = mode;
+    const btnUpload = document.getElementById('tabBtnUpload');
+    const btnCamera = document.getElementById('tabBtnCamera');
+    const panelUpload = document.getElementById('panelUpload');
+    const panelCamera = document.getElementById('panelCamera');
+
+    if (!btnUpload || !btnCamera) return;
+
+    if (mode === 'upload') {
+        PretesFaceVerifier.stopCamera();
+        btnUpload.style.border = '2px solid #0f766e';
+        btnUpload.style.background = '#f0fdf4';
+        btnUpload.style.color = '#115e59';
+        btnCamera.style.border = '2px solid #e2e8f0';
+        btnCamera.style.background = '#fff';
+        btnCamera.style.color = '#475569';
+        panelUpload.style.display = 'block';
+        panelCamera.style.display = 'none';
+    } else {
+        btnCamera.style.border = '2px solid #0f766e';
+        btnCamera.style.background = '#f0fdf4';
+        btnCamera.style.color = '#115e59';
+        btnUpload.style.border = '2px solid #e2e8f0';
+        btnUpload.style.background = '#fff';
+        btnUpload.style.color = '#475569';
+        panelUpload.style.display = 'none';
+        panelCamera.style.display = 'block';
+        startCameraView();
+    }
+}
+
+function startCameraView() {
+    const video = document.getElementById('cameraVideo');
+    if (!video) return;
+    PretesFaceVerifier.startCamera(video, null, function(err) {
+        alert("Gagal mengakses kamera: " + (err.message || err) + "\nSilakan gunakan opsi Unggah File Foto.");
+        switchPhotoMode('upload');
+    });
+}
+
+function closeCameraView() {
+    PretesFaceVerifier.stopCamera();
+    switchPhotoMode('upload');
+}
+
+function toggleCameraFace() {
+    const video = document.getElementById('cameraVideo');
+    if (!video) return;
+    PretesFaceVerifier.toggleFacingMode(video, null, function(err) {
+        alert("Gagal beralih kamera: " + (err.message || err));
+    });
+}
+
+function takeSnapshot() {
+    const video = document.getElementById('cameraVideo');
+    if (!video || !video.videoWidth) {
+        alert("Kamera belum siap. Mohon tunggu video aktif.");
+        return;
+    }
+    const canvas = PretesFaceVerifier.captureSnapshot(video);
+    PretesFaceVerifier.stopCamera();
+    const panelCam = document.getElementById('panelCamera');
+    if (panelCam) panelCam.style.display = 'none';
+    processAndVerifyImage(canvas);
+}
+
+// Buka file explorer saat dropzone diklik
+document.addEventListener('DOMContentLoaded', function() {
+    const dropzone = document.getElementById('dropzoneBox');
+    const fileInput = document.getElementById('fileFotoInput');
+    if (dropzone && fileInput) {
+        dropzone.addEventListener('click', function() {
+            fileInput.click();
+        });
+    }
+});
+
+function handleFileSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    if (!file.type.startsWith('image/')) {
+        alert("Harap pilih file gambar (JPG, PNG, atau WEBP).");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            processAndVerifyImage(canvas);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function processAndVerifyImage(sourceCanvas) {
+    const previewContainer = document.getElementById('previewContainer');
+    const previewCanvas = document.getElementById('photoPreviewCanvas');
+    const statusAlert = document.getElementById('verifStatusAlert');
+    const badge = document.getElementById('verifBadge');
+    const photoBox = document.getElementById('photoPreviewBox');
+    const submitBtn = document.getElementById('btnSubmitDaftarPretes');
+    const lockNotice = document.getElementById('submitLockedNotice');
+    const fotoDataInput = document.getElementById('foto_data_input');
+
+    if (!previewContainer || !previewCanvas) return;
+
+    previewContainer.style.display = 'block';
+    previewCanvas.width = 360;
+    previewCanvas.height = 480;
+    const ctx = previewCanvas.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+
+    badge.style.display = 'none';
+    photoBox.style.border = '2px solid #cbd5e1';
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.55';
+    submitBtn.style.cursor = 'not-allowed';
+    if (lockNotice) lockNotice.style.display = 'flex';
+    fotoDataInput.value = '';
+
+    statusAlert.className = 'alert alert-info';
+    statusAlert.style.background = '#eff6ff';
+    statusAlert.style.borderColor = '#bfdbfe';
+    statusAlert.style.color = '#1e40af';
+    statusAlert.innerHTML = '<strong>⏳ Memverifikasi Wajah...</strong><br>Sistem AI sedang memeriksa keberadaan dan kelengkapan wajah pada pasfoto Anda.';
+
+    // Jalankan engine verifikasi wajah
+    PretesFaceVerifier.verifyFace(sourceCanvas).then(function(res) {
+        if (res.valid) {
+            statusAlert.className = 'alert alert-success';
+            statusAlert.style.background = '#f0fdf4';
+            statusAlert.style.borderColor = '#86efac';
+            statusAlert.style.color = '#15803d';
+            statusAlert.innerHTML = '<strong>✅ Foto Resmi Terverifikasi!</strong><br>' + (res.message || 'Wajah terdeteksi jelas dan proporsional.');
+
+            badge.style.display = 'block';
+            photoBox.style.border = '2.5px solid #16a34a';
+
+            // Beri kotak highlight wajah pada preview
+            if (res.box) {
+                const scaleX = previewCanvas.width / sourceCanvas.width;
+                const scaleY = previewCanvas.height / sourceCanvas.height;
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(res.box.x * scaleX, res.box.y * scaleY, res.box.width * scaleX, res.box.height * scaleY);
+            }
+
+            // Simpan data base64 jpeg
+            const jpegData = previewCanvas.toDataURL('image/jpeg', 0.92);
+            fotoDataInput.value = jpegData;
+
+            // Buka gembok tombol pendaftaran
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+            if (lockNotice) lockNotice.style.display = 'none';
+        } else {
+            statusAlert.className = 'alert alert-danger';
+            statusAlert.style.background = '#fef2f2';
+            statusAlert.style.borderColor = '#fca5a5';
+            statusAlert.style.color = '#b91c1c';
+            statusAlert.innerHTML = '<strong>❌ Foto Belum Memenuhi Syarat:</strong><br>' + (res.reason || 'Wajah tidak terdeteksi jelas.') + '<div style="margin-top:6px; font-size:12.5px;">Silakan klik tombol <em>Ganti / Ambil Ulang Foto</em> dan pastikan wajah berada di tengah dengan pencahayaan terang.</div>';
+
+            badge.style.display = 'none';
+            photoBox.style.border = '2.5px solid #ef4444';
+            fotoDataInput.value = '';
+            submitBtn.disabled = true;
+            submitBtn.style.opacity = '0.55';
+            submitBtn.style.cursor = 'not-allowed';
+            if (lockNotice) lockNotice.style.display = 'flex';
+        }
+    });
+}
+
+function resetPhotoState() {
+    PretesFaceVerifier.stopCamera();
+    const previewContainer = document.getElementById('previewContainer');
+    const fotoDataInput = document.getElementById('foto_data_input');
+    const fileInput = document.getElementById('fileFotoInput');
+    const submitBtn = document.getElementById('btnSubmitDaftarPretes');
+    const lockNotice = document.getElementById('submitLockedNotice');
+
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (fotoDataInput) fotoDataInput.value = '';
+    if (fileInput) fileInput.value = '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.55';
+        submitBtn.style.cursor = 'not-allowed';
+    }
+    if (lockNotice) lockNotice.style.display = 'flex';
+
+    switchPhotoMode('upload');
+}
+
+window.addEventListener('beforeunload', function() {
+    PretesFaceVerifier.stopCamera();
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

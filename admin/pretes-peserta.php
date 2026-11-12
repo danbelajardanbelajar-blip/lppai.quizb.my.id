@@ -334,7 +334,7 @@ foreach ($periodOptions as $po) {
 // ── Fetch data peserta (terisolasi sesuai periode terpilih) ───────────────────
 $baseSelect = "
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
-           pr.status, pr.username_tes, pr.password_tes,
+           pr.status, pr.username_tes, pr.password_tes, pr.foto,
            u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas, u.email, u.no_hp
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
@@ -880,7 +880,18 @@ include __DIR__ . '/../includes/header.php';
                     <?php $rowJenis = normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'); ?>
                     <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>">
                         <td><?= $i + 1 ?></td>
-                        <td data-search="<?= sanitize($p['nama_lengkap']) ?>"><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
+                        <td data-search="<?= sanitize($p['nama_lengkap']) ?>">
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <?php if (!empty($p['foto'])): ?>
+                                    <img src="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim(str_replace('\\', '/', $p['foto']), '/')) ?>" alt="Foto" style="width:34px; height:44px; object-fit:cover; border-radius:4px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open(this.src, '_blank')" title="Klik untuk melihat foto penuh">
+                                <?php else: ?>
+                                    <div style="width:34px; height:44px; border-radius:4px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px; font-weight:700;">3x4</div>
+                                <?php endif; ?>
+                                <div>
+                                    <strong><?= sanitize($p['nama_lengkap']) ?></strong>
+                                </div>
+                            </div>
+                        </td>
                         <td data-search="<?= sanitize($p['nim']) ?>"><?= sanitize($p['nim']) ?></td>
                         <td data-search="<?= sanitize(trim(($p['program_studi'] ?? '') . ' ' . $rowJenis)) ?>"><?= formatProdiDisplay($p['program_studi'] ?? '', $rowJenis, true) ?></td>
                         <?php 

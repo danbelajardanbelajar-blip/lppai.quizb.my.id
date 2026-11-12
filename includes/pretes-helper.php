@@ -284,12 +284,151 @@ if (!function_exists('ensurePretesPeriodTargetColumns')) {
     }
 }
 
+if (!function_exists('ensurePretesRegistrationPhotoColumn')) {
+    /**
+     * Memastikan kolom `foto` tersedia di tabel `pretes_registrations`.
+     */
+    function ensurePretesRegistrationPhotoColumn(PDO $pdo): void {
+        static $verified = false;
+        $driver = '';
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        } catch (Throwable $e) {
+            return;
+        }
+
+        if ($driver === 'mysql' && $verified && !empty($_SESSION['_schema_pretes_photo_ok'])) {
+            return;
+        }
+
+        try {
+            if ($driver === 'sqlite') {
+                $cols = $pdo->query("PRAGMA table_info(pretes_registrations)")->fetchAll(PDO::FETCH_ASSOC);
+                if (empty($cols)) return;
+                $colNames = array_map(fn($c) => strtolower((string)($c['name'] ?? '')), $cols);
+                if (!in_array('foto', $colNames, true)) {
+                    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN foto TEXT DEFAULT NULL");
+                }
+            } else {
+                $tbl = $pdo->query("SHOW TABLES LIKE 'pretes_registrations'")->fetch();
+                if (!$tbl) return;
+
+                $colFoto = $pdo->query("SHOW COLUMNS FROM pretes_registrations LIKE 'foto'")->fetch();
+                if (!$colFoto) {
+                    $pdo->exec("ALTER TABLE pretes_registrations ADD COLUMN foto VARCHAR(255) DEFAULT NULL AFTER jam");
+                }
+                $_SESSION['_schema_pretes_photo_ok'] = true;
+                $verified = true;
+            }
+        } catch (Throwable $e) {
+            error_log('ensurePretesRegistrationPhotoColumn warning: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('savePretesRegistrationPhoto')) {
+    /**
+     * Menyimpan foto resmi pendaftaran pretes (dari base64 data URL atau uploaded file)
+     * ke folder `uploads/pretes_foto/`.
+     * Mengembalikan relative path file tersimpan atau null jika gagal.
+     */
+    function savePretesRegistrationPhoto(string $photoPayload, string $nim): ?string {
+        $cleanPayload = trim($photoPayload);
+        if ($cleanPayload === '') {
+            return null;
+        }
+
+        $baseDir = realpath(__DIR__ . '/..');
+        if (!$baseDir) {
+            $baseDir = dirname(__DIR__);
+        }
+        $targetDir = $baseDir . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'pretes_foto';
+        if (!is_dir($targetDir)) {
+            if (!@mkdir($targetDir, 0755, true)) {
+                return null;
+            }
+        }
+
+        // Amankan folder dengan .htaccess
+        $htaccessFile = $targetDir . DIRECTORY_SEPARATOR . '.htaccess';
+        if (!file_exists($htaccessFile)) {
+            @file_put_contents($htaccessFile, "<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phps)$\">\nOrder Deny,Allow\nDeny from all\n</FilesMatch>\nOptions -ExecCGI\n");
+        }
+
+        $binaryData = null;
+        $extension = 'jpg';
+
+        if (str_starts_with($cleanPayload, 'data:image/')) {
+            $commaPos = strpos($cleanPayload, ',');
+            if ($commaPos === false) {
+                return null;
+            }
+            $meta = substr($cleanPayload, 0, $commaPos);
+            $rawBase64 = substr($cleanPayload, $commaPos + 1);
+            $binaryData = base64_decode($rawBase64, true);
+            if ($binaryData === false) {
+                return null;
+            }
+
+            if (str_contains($meta, 'image/png')) {
+                $extension = 'png';
+            } elseif (str_contains($meta, 'image/webp')) {
+                $extension = 'webp';
+            } else {
+                $extension = 'jpg';
+            }
+        } elseif (file_exists($cleanPayload)) {
+            // Path file temporer
+            $binaryData = @file_get_contents($cleanPayload);
+            $imgInfo = @getimagesize($cleanPayload);
+            if (!$imgInfo) {
+                return null;
+            }
+            $mime = $imgInfo['mime'] ?? '';
+            if ($mime === 'image/png') {
+                $extension = 'png';
+            } elseif ($mime === 'image/webp') {
+                $extension = 'webp';
+            } else {
+                $extension = 'jpg';
+            }
+        }
+
+        if (empty($binaryData) || strlen($binaryData) < 100) {
+            return null;
+        }
+
+        // Simpan file
+        $cleanNim = preg_replace('/[^a-zA-Z0-9_-]/', '', $nim) ?: 'peserta';
+        $fileName = 'pretes_' . $cleanNim . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
+        $filePath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
+
+        if (function_exists('imagecreatefromstring')) {
+            $img = @imagecreatefromstring($binaryData);
+            if (!$img) {
+                return null;
+            }
+            imagejpeg($img, $filePath, 90);
+            imagedestroy($img);
+            return 'uploads/pretes_foto/' . $fileName;
+        } else {
+            $fileName = 'pretes_' . $cleanNim . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+            $filePath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
+            if (@file_put_contents($filePath, $binaryData) === false) {
+                return null;
+            }
+            return 'uploads/pretes_foto/' . $fileName;
+        }
+    }
+}
+
 if (!function_exists('getActivePretesPeriod')) {
     /**
      * Mengambil periode pretes yang berstatus aktif beserta kolom target_program dan tanggal_mulai.
      */
     function getActivePretesPeriod(PDO $pdo): ?array {
         ensurePretesPeriodTargetColumns($pdo);
+        ensurePretesRegistrationPhotoColumn($pdo);
         try {
             $row = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
             return is_array($row) ? $row : null;

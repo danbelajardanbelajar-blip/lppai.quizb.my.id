@@ -336,6 +336,20 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
             padding: 6px;
             text-align: center;
             box-sizing: border-box;
+            overflow: hidden;
+            position: relative;
+        }
+        .photo-box.has-photo {
+            border: 1.5px solid #0f766e;
+            padding: 2px;
+            background: #ffffff;
+        }
+        .photo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+            display: block;
         }
         .photo-box svg {
             color: #94a3b8;
@@ -853,14 +867,28 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
 
                     <!-- Kolom Samping: Pas Foto 3x4 (Barcode Dihilangkan) -->
                     <aside class="photo-column" aria-label="Pas Foto">
-                        <div class="photo-box">
-                            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                            </svg>
-                            <span class="photo-title">Pas Foto</span>
-                            <span class="photo-dim">3 × 4 CM</span>
-                            <span class="photo-hint">Jas Almamater / Busana Muslim Rapi</span>
+                        <?php
+                        $photoCardUrl = null;
+                        if (!empty($registration['foto'])) {
+                            $rawFoto = ltrim(str_replace('\\', '/', (string)$registration['foto']), '/');
+                            $fullPhotoPath = dirname(__DIR__) . '/' . $rawFoto;
+                            if (file_exists($fullPhotoPath)) {
+                                $photoCardUrl = BASE_URL . '/' . htmlspecialchars($rawFoto);
+                            }
+                        }
+                        ?>
+                        <div class="photo-box <?= $photoCardUrl ? 'has-photo' : '' ?>">
+                            <?php if ($photoCardUrl): ?>
+                                <img src="<?= $photoCardUrl ?>" alt="Pas Foto Resmi Mahasiswa">
+                            <?php else: ?>
+                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                <span class="photo-title">Pas Foto</span>
+                                <span class="photo-dim">3 × 4 CM</span>
+                                <span class="photo-hint">Jas Almamater / Busana Muslim Rapi</span>
+                            <?php endif; ?>
                         </div>
                     </aside>
                 </div>

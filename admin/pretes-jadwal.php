@@ -400,7 +400,7 @@ if ($active_pretes) {
 // Ambil daftar seluruh peserta pretes untuk hasil plotting (khusus periode aktif)
 $stmtPart = $pdo->prepare("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
-           pr.status, pr.username_tes, pr.password_tes,
+           pr.status, pr.username_tes, pr.password_tes, pr.foto,
            u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
@@ -854,7 +854,18 @@ function addQETutorRow(day) {
                         data-ruangan="<?= htmlspecialchars($curRuangan, ENT_QUOTES, 'UTF-8') ?>"
                         data-status-jadwal="<?= $statusJadwal ?>">
                         <td><?= $i + 1 ?></td>
-                        <td><strong><?= sanitize($p['nama_lengkap']) ?></strong></td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <?php if (!empty($p['foto'])): ?>
+                                    <img src="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim(str_replace('\\', '/', $p['foto']), '/')) ?>" alt="Foto" style="width:34px; height:44px; object-fit:cover; border-radius:4px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open(this.src, '_blank')" title="Klik untuk memperbesar">
+                                <?php else: ?>
+                                    <div style="width:34px; height:44px; border-radius:4px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px; font-weight:700;">3x4</div>
+                                <?php endif; ?>
+                                <div>
+                                    <strong><?= sanitize($p['nama_lengkap']) ?></strong>
+                                </div>
+                            </div>
+                        </td>
                         <td><?= sanitize($p['nim']) ?></td>
                         <td><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?>">

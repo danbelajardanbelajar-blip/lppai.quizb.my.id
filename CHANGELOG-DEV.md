@@ -5,6 +5,23 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 06:26:13 +0700 — Fitur Unggah & Ambil Pasfoto Resmi Berbasis AI Face Verification pada Pendaftaran Pretes
+
+**Ringkasan:** Membangun sistem wajib pasfoto resmi bagi calon peserta pretes pada `pages/pretes-daftar.php` dengan opsi ganda (unggah file dari galeri/PC atau jepret langsung via webcam/kamera HP dengan panduan oval) disertai engine client-side AI Face Verification (`assets/js/pretes-face-verifier.js`). Sistem secara otomatis mendeteksi keberadaan wajah tunggal, posisi tengah, proporsi pasfoto, dan memastikan tidak ada bagian wajah yang terpotong di tepi. Tombol konfirmasi pendaftaran terkunci secara ketat sampai foto dinyatakan valid oleh AI, file foto disimpan dengan aman ke `uploads/pretes_foto/` berpelindung `.htaccess`, dan otomatis dicetak langsung pada kolom Pasfoto 3×4 Kartu Ujian Pretes (`includes/pretes-card.php`) serta tabel data peserta admin & dosen penguji.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/pretes-face-verifier.js` | 1–280 | Modul AI Face Verification & Kamera (File Baru) | Menangani video stream kamera depan/belakang, snapshot aspek rasio 3:4, integrasi `window.FaceDetector` native browser dan fallback universal Canvas Pixel Skin-Tone Analyzer untuk memeriksa kelengkapan wajah. |
+| `includes/pretes-helper.php` | 287–423 | Auto-Migration Kolom Foto & Storage Engine | Menambahkan `ensurePretesRegistrationPhotoColumn()` (idempoten SQLite/MySQL) dan `savePretesRegistrationPhoto()` untuk memproses base64/file, validasi ekstensi GD, penyimpanan ke `uploads/pretes_foto/`, dan proteksi `.htaccess`. |
+| `pages/pretes-daftar.php` | 49–54, 126–187, 219–233, 355–480, 520–700 | Form Pendaftaran & UI Verifikasi Foto | Mengintegrasikan auto-migration, validasi ketat upload foto pada POST, kartu status terdaftar dengan foto terverifikasi, form selector Unggah vs Kamera, preview hasil verifikasi AI, dan gembok tombol submit sampai foto valid. |
+| `includes/pretes-card.php` | 326–345, 868–890 | Pencetakan Kartu Ujian Pretes | Menambahkan styling `.photo-box.has-photo` dan merender pasfoto resmi mahasiswa dengan `object-fit:cover` di dalam kotak 3×4 kartu peserta ujian jika telah diunggah. |
+| `admin/pretes-peserta.php` | 336–338, 882–895 | Daftar Peserta Pretes Admin | Menyertakan `pr.foto` dalam query SELECT dan menampilkan thumbnail pasfoto peserta 3×4 dengan tautan modal/preview penuh di samping nama mahasiswa. |
+| `admin/pretes-jadwal.php` | 402–404, 856–869 | Lembar Ujian Dosen Penguji | Menyertakan `pr.foto` dan menampilkan thumbnail foto resmi peserta di lembar plotting penguji pretes untuk pencocokan fisik wajah saat ujian praktek. |
+| `tests/pretes-foto-verifikasi-test.php` | 1–95 | Unit & Integration Test Suite (File Baru) | Menguji auto-migration SQLite, helper `savePretesRegistrationPhoto`, keamanan `.htaccess`, integrasi skrip JS, dan integrasi antar file PHP. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **26/26 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 05:50:25 +0700 — Penambahan Opsi Sasaran Pengumuman "Khusus Belum Pernah Pretes" (`belum_pretes`) & Klarifikasi Label
 
 **Ringkasan:** Menambahkan opsi target sasaran baru `belum_pretes` ("Khusus Belum Pernah Pretes") pada form pembuatan/edit pengumuman dan memperjelas label opsi yang telah ada agar admin tidak ambigu saat memilih target (misal: "Peserta Pretes (Sudah Terdaftar/Ikut)" vs "Khusus Belum Lulus Pretes (Sudah Pretes tapi Tidak Lulus)"). Logika penyaringan memastikan pengumuman dengan target ini hanya muncul pada dashboard mahasiswa yang belum pernah mendaftar pretes dan belum lulus pretes.
