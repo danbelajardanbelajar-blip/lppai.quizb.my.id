@@ -157,6 +157,12 @@ function menuActive($page) {
                 <span class="icon">🎓</span> Rekapitulasi Nilai
             </a>
         <?php else: ?>
+            <?php
+            require_once __DIR__ . '/pretes-helper.php';
+            $showDaftarPretesMenu = function_exists('getDBConnection')
+                ? shouldShowDaftarPretesToStudent(getDBConnection(), $currentUser ?? null)
+                : true;
+            ?>
             <!-- MAHASISWA MENU -->
             <div class="menu-label">Dashboard</div>
             <a href="<?= BASE_URL ?>/dashboard.php" class="page-nav <?= menuActive('dashboard.php') ?>">
@@ -164,9 +170,11 @@ function menuActive($page) {
             </a>
 
             <div class="menu-label">Pretes</div>
+            <?php if ($showDaftarPretesMenu): ?>
             <a href="<?= BASE_URL ?>/pretes-daftar.php" class="page-nav <?= menuActive('pretes-daftar.php') ?>">
                 <span class="icon">✍️</span> Daftar Pretes
             </a>
+            <?php endif; ?>
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="page-nav <?= menuActive('pretes-peserta.php') ?>">
                 <span class="icon">📋</span> Peserta & Jadwal Pretes
             </a>

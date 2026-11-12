@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-12 19:04:30 +0700 — Pembatasan Pendaftaran Pretes per Program (`Semua` / `RPL` / `Reguler`), Jadwal Tanggal Dinamis (16–20 Nov 2026), & Isolasi Kuota Periode
+
+**Ringkasan:** Menambahkan kontrol `target_program` (`Semua`, `RPL`, `Reguler`) dan `tanggal_mulai` pada tabel `master_pretes`, memblokir akses & submit pendaftaran pretes bagi program di luar target (termasuk menyembunyikan menu `Daftar Pretes` di sidebar, pengumuman dashboard, dan tombol `Daftar Pretes Sekarang` di halaman hasil pretes), membuat rentang tanggal pelaksanaan Senin–Jumat dinamis (mis. `16–20 November 2026` dari `tanggal_mulai = 2026-11-16`), serta mengisolasi query kuota/plotting pretes agar pembukaan periode RPL di tahun ajaran sama (`2026/2027`) tidak tercampur pendaftar periode sebelumnya.
+
+### 1. Skema, Helper Terpusat, & Migrasi
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-helper.php` | 211–433 | Helper target program & jadwal dinamis | Menambahkan `getAllowedPretesTargetPrograms()`, `normalizePretesTargetProgram()`, `ensurePretesPeriodTargetColumns()` (auto-ALTER `master_pretes` menambah `target_program` & `tanggal_mulai`), `getActivePretesPeriod()`, `isUserEligibleForPretesPeriod()`, `renderPretesTargetProgramBadge()`, `getPretesPeriodDayLabels()`, dan `shouldShowDaftarPretesToStudent()`. |
+| `migration_pretes_target_program.php` | 1–45 | Skrip migrasi standalone (file baru) | Runner CLI (`php migration_pretes_target_program.php`) dan Admin browser untuk memanggil `ensurePretesPeriodTargetColumns()`. |
+
+### 2. Pengaturan Admin, Isolasi Periode 2026/2027, & Akses Mahasiswa
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `admin/pretes-dosen.php` | 6–40, 81–195 | CRUD `master_pretes` | Auto-migrasi kolom, baca/simpan `target_program` dan `tanggal_mulai` pada `create_periode` & `edit_periode`, serta mengisolasi query kuota `$registeredCounts` menjadi `WHERE periode = ?` (menghapus `OR periode LIKE '%2026%'`). |
+| `admin/pretes-dosen.php` | 275–450, 477–519, 557–592, 798–882 | UI Card Aktif, Tabel, Form Tambah, & Modal Edit | Menampilkan badge `target_program` & rentang tanggal pada banner/tabel, menambah `<select name="target_program">` dan `<input type="date" name="tanggal_mulai">` pada form tambah & modal edit beserta binding JS. |
+| `admin/pretes-jadwal.php` | 5–11, 267–274, 348–354, 386–414 | Generate Jadwal, Reset Plotting, & Tabel Peserta | Memanggil `ensurePretesPeriodTargetColumns()` serta mengisolasi 4 query `pretes_registrations` strictly dengan `periode = ?` (mencegah plotting/reset periode RPL menyentuh peserta 2026/2027 sebelumnya). |
+| `pages/pretes-daftar.php` | 5–41, 68–186, 268–377 | Halaman Pendaftaran Pretes Mahasiswa | Mengisolasi cek `$existingReg` & `$registeredCounts` pada periode aktif (`periode = ?`), menolak `POST` bila `!$isEligibleForPretes`, merender tanggal dinamis dari `getPretesPeriodDayLabels()` (menggantikan hardcode `2–6 November 2026`), dan menampilkan panel terkunci khusus program target bagi non-RPL. |
+| `includes/sidebar.php` | 160–177 | Navigasi Sidebar Mahasiswa | Menyembunyikan tautan `Daftar Pretes` menggunakan `shouldShowDaftarPretesToStudent()`. |
+| `pages/dashboard.php` | 34–55, 152–158 | Dashboard & Pengumuman Mahasiswa | Menghitung `$pretesRegisteredActive` per periode aktif dan menyembunyikan pengumuman bertipe `pendaftaran_pretes` bila `!$isEligibleActivePretes`. |
+| `pages/pretes-hasil.php` | 69–108 | Status & CTA `Daftar Pretes` | Menilai `$isEligibleActivePretes` dan tidak menutup pendaftaran periode bertarget khusus (mis. `RPL`) hanya karena gelombang tutorial umum sedang aktif. |
+
+### 3. Pengujian & Verifikasi
+
+| File | Baris | Bagian | Verifikasi |
+|---|---|---|---|
+| `tests/pretes-target-program-test.php` | 1–112 | Test suite baru target program & tanggal | Memverifikasi `normalizePretesTargetProgram()`, SQLite auto-migration, gating `RPL` vs `Reguler`, format tanggal `16–20 November 2026` & lintas bulan, serta tidak adanya query `OR periode LIKE '%2026%'` di endpoint pretes terkait. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` di seluruh 9 file PHP dan **22/22 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-12 18:33:15 +0700 — Sinkronisasi 123 Data Mahasiswa RPL Angkatan 2025 & Perbaikan Impor Excel SIAKAD
 
 **Ringkasan:** Mengekstrak 123 data mahasiswa RPL Angkatan 2025 dari ekspor Excel SIA UNISDA (`laporan_daftarmhs.xls`) ke dataset versi-kontrol dan skrip migrasi idempoten (`migration_rpl_2025.php`), serta memutakhirkan importer pengguna (`admin/ajax-import-users.php` & modal `#modal-import` di `admin/users.php`) agar tahan terhadap perbedaan urutan kolom SIAKAD (termasuk mencegah `NAMA` tertimpa `NAMA IBU`), mengenali kolom `JURUSAN`, format `.xls` berbasis HTML table, tanggal bulan berbahasa Indonesia (`4 April 1997`, `7 Nopember 1983`), dan mode update `jenis_program` bagi NIM yang sudah terdaftar.

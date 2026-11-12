@@ -4,6 +4,7 @@
  */
 define('PAGE_TITLE', 'Dosen Penguji & Kuota Pretes');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireAdmin();
 
 $pdo = getDBConnection();
@@ -15,6 +16,8 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             periode VARCHAR(100) NOT NULL,
             tahun_ajaran VARCHAR(50) NOT NULL,
+            target_program ENUM('Semua','RPL','Reguler') NOT NULL DEFAULT 'Semua',
+            tanggal_mulai DATE DEFAULT NULL,
             status ENUM('aktif','selesai','nonaktif') NOT NULL DEFAULT 'aktif',
             jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)',
             kuota_senin INT DEFAULT 0,
@@ -32,6 +35,7 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 } catch (Exception $e) {}
+ensurePretesPeriodTargetColumns($pdo);
 
 try {
     $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
@@ -75,10 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // 1. TAMBAH PERIODE PRETES BARU
         if ($action === 'create_periode') {
-            $periode      = trim($_POST['periode'] ?? '');
-            $tahun_ajaran = trim($_POST['tahun_ajaran'] ?? '');
-            $jam          = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
-            $status       = $_POST['status'] ?? 'aktif';
+            $periode        = trim($_POST['periode'] ?? '');
+            $tahun_ajaran   = trim($_POST['tahun_ajaran'] ?? '');
+            $targetProgram  = normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
+            $rawTglMulai    = trim((string)($_POST['tanggal_mulai'] ?? ''));
+            $tanggalMulai   = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawTglMulai) === 1) ? $rawTglMulai : null;
+            $jam            = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+            $status         = $_POST['status'] ?? 'aktif';
 
             $kuota_senin  = (int)($_POST['kuota_senin'] ?? 0);
             $kuota_selasa = (int)($_POST['kuota_selasa'] ?? 0);
@@ -102,11 +109,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 $stmt = $pdo->prepare("
                     INSERT INTO master_pretes 
-                    (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat, penguji_senin, penguji_selasa, penguji_rabu, penguji_kamis, penguji_jumat)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (periode, tahun_ajaran, target_program, tanggal_mulai, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat, penguji_senin, penguji_selasa, penguji_rabu, penguji_kamis, penguji_jumat)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
-                    $periode, $tahun_ajaran, $status, $jam,
+                    $periode, $tahun_ajaran, $targetProgram, $tanggalMulai, $status, $jam,
                     $kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat,
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat
                 ]);
@@ -117,11 +124,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // 2. EDIT PERIODE PRETES (SATU PINTU UNTUK METADATA, PENGUJI, DAN KUOTA)
         } elseif ($action === 'edit_periode' || $action === 'update_penguji_kuota') {
-            $id           = (int)($_POST['id'] ?? ($_POST['pretes_id'] ?? 0));
-            $periode      = trim($_POST['periode'] ?? '');
-            $tahun_ajaran = trim($_POST['tahun_ajaran'] ?? '');
-            $jam          = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
-            $status       = $_POST['status'] ?? 'aktif';
+            $id             = (int)($_POST['id'] ?? ($_POST['pretes_id'] ?? 0));
+            $periode        = trim($_POST['periode'] ?? '');
+            $tahun_ajaran   = trim($_POST['tahun_ajaran'] ?? '');
+            $targetProgram  = normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
+            $rawTglMulai    = trim((string)($_POST['tanggal_mulai'] ?? ''));
+            $tanggalMulai   = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawTglMulai) === 1) ? $rawTglMulai : null;
+            $jam            = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
+            $status         = $_POST['status'] ?? 'aktif';
 
             $kuota_senin  = (int)($_POST['kuota_senin'] ?? 0);
             $kuota_selasa = (int)($_POST['kuota_selasa'] ?? 0);
@@ -141,12 +151,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } else {
                 // Jika nama periode & tahun ajaran dikosongkan (misal dari quick submit), pertahankan data lama
                 if (empty($periode) || empty($tahun_ajaran)) {
-                    $old = $pdo->prepare("SELECT periode, tahun_ajaran FROM master_pretes WHERE id = ?");
+                    $old = $pdo->prepare("SELECT periode, tahun_ajaran, target_program, tanggal_mulai FROM master_pretes WHERE id = ?");
                     $old->execute([$id]);
                     $oldRow = $old->fetch();
                     if ($oldRow) {
                         if (empty($periode)) $periode = $oldRow['periode'];
                         if (empty($tahun_ajaran)) $tahun_ajaran = $oldRow['tahun_ajaran'];
+                        if (!isset($_POST['target_program'])) $targetProgram = normalizePretesTargetProgram($oldRow['target_program'] ?? 'Semua');
+                        if (!isset($_POST['tanggal_mulai'])) $tanggalMulai = $oldRow['tanggal_mulai'] ?: null;
                     }
                 }
 
@@ -156,13 +168,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
                 $stmt = $pdo->prepare("
                     UPDATE master_pretes 
-                    SET periode=?, tahun_ajaran=?, status=?, jam=?,
+                    SET periode=?, tahun_ajaran=?, target_program=?, tanggal_mulai=?, status=?, jam=?,
                         kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?,
                         penguji_senin=?, penguji_selasa=?, penguji_rabu=?, penguji_kamis=?, penguji_jumat=?
                     WHERE id=?
                 ");
                 $stmt->execute([
-                    $periode, $tahun_ajaran, $status, $jam,
+                    $periode, $tahun_ajaran, $targetProgram, $tanggalMulai, $status, $jam,
                     $kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat,
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat,
                     $id
@@ -195,18 +207,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Ambil Periode Aktif
-$active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
+$active_pretes = getActivePretesPeriod($pdo);
 
 // Ambil Seluruh Data Master Pretes
 $all_pretes = $pdo->query("SELECT * FROM master_pretes ORDER BY created_at DESC")->fetchAll();
 
-// Hitung Pendaftar Pretes per Hari pada periode aktif
+// Hitung Pendaftar Pretes per Hari khusus untuk periode aktif
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
         FROM pretes_registrations 
-        WHERE (periode = ? OR periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')
+        WHERE periode = ?
         GROUP BY hari_pilihan
     ");
     $stmtCount->execute([$active_pretes['periode']]);
@@ -264,6 +276,7 @@ include __DIR__ . '/../includes/header.php';
      CARD 1: STATUS PERIODE PRETES AKTIF & TOMBOL EDIT SATU PINTU
      ═══════════════════════════════════════════════════════════════ -->
 <?php if ($active_pretes): ?>
+<?php $activeSchedule = getPretesPeriodDayLabels($active_pretes); ?>
 <div class="card" style="margin-bottom: 24px; border-left: 5px solid var(--primary); background: #f8fafc;">
     <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
         <div>
@@ -272,9 +285,13 @@ include __DIR__ . '/../includes/header.php';
                     🌟 Periode Pretes Aktif: <strong><?= sanitize($active_pretes['periode']) ?></strong>
                 </h3>
                 <span class="badge badge-success" style="font-size:12px; padding:3px 10px;">✅ Aktif Menerima Pendaftaran</span>
+                <?= renderPretesTargetProgramBadge($active_pretes['target_program'] ?? 'Semua') ?>
             </div>
             <p style="margin:0 0 12px; color:#64748b; font-size:14px;">
                 Tahun Ajaran: <strong><?= sanitize($active_pretes['tahun_ajaran']) ?></strong> | 
+                <?php if ($activeSchedule['short_range'] !== ''): ?>
+                Tanggal: <strong><?= sanitize($activeSchedule['short_range']) ?></strong> | 
+                <?php endif; ?>
                 Jam Pelaksanaan: <strong><?= sanitize($active_pretes['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
             </p>
 
@@ -307,6 +324,8 @@ include __DIR__ . '/../includes/header.php';
                 data-id="<?= $active_pretes['id'] ?>"
                 data-periode="<?= htmlspecialchars($active_pretes['periode'], ENT_QUOTES, 'UTF-8') ?>"
                 data-tahun="<?= htmlspecialchars($active_pretes['tahun_ajaran'], ENT_QUOTES, 'UTF-8') ?>"
+                data-target-program="<?= htmlspecialchars(normalizePretesTargetProgram($active_pretes['target_program'] ?? 'Semua'), ENT_QUOTES, 'UTF-8') ?>"
+                data-tanggal-mulai="<?= htmlspecialchars($active_pretes['tanggal_mulai'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 data-jam="<?= htmlspecialchars($active_pretes['jam'] ?? '13.00 WIB (Jam 1)', ENT_QUOTES, 'UTF-8') ?>"
                 data-status="<?= htmlspecialchars($active_pretes['status'], ENT_QUOTES, 'UTF-8') ?>"
                 data-kuota-senin="<?= (int)$active_pretes['kuota_senin'] ?>"
@@ -354,6 +373,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th>Periode</th>
                         <th>Tahun Ajaran</th>
+                        <th>Target Program</th>
                         <th>Jam</th>
                         <th>Kuota Hari (Sn-Jm)</th>
                         <th>Status</th>
@@ -363,14 +383,19 @@ include __DIR__ . '/../includes/header.php';
                 </thead>
                 <tbody>
                     <?php foreach ($all_pretes as $p): ?>
+                    <?php $pSchedule = getPretesPeriodDayLabels($p); ?>
                     <tr <?= ($p['status'] === 'aktif') ? 'style="background:#f0fdf4;"' : '' ?>>
                         <td>
                             <strong><?= sanitize($p['periode']) ?></strong>
                             <?php if ($p['status'] === 'aktif'): ?>
                                 <span class="badge badge-success" style="font-size:10px; margin-left:4px;">Aktif</span>
                             <?php endif; ?>
+                            <?php if ($pSchedule['short_range'] !== ''): ?>
+                                <div style="font-size:11.5px; color:#64748b; margin-top:2px;">📅 <?= sanitize($pSchedule['short_range']) ?></div>
+                            <?php endif; ?>
                         </td>
                         <td><?= sanitize($p['tahun_ajaran']) ?></td>
+                        <td><?= renderPretesTargetProgramBadge($p['target_program'] ?? 'Semua') ?></td>
                         <td><span class="badge badge-info"><?= sanitize($p['jam'] ?? '13.00 WIB') ?></span></td>
                         <td>
                             <div style="font-size:12px; color:#475569; display:grid; grid-template-columns:repeat(5, auto); gap:6px;">
@@ -404,6 +429,8 @@ include __DIR__ . '/../includes/header.php';
                                     data-id="<?= $p['id'] ?>"
                                     data-periode="<?= htmlspecialchars($p['periode'], ENT_QUOTES, 'UTF-8') ?>"
                                     data-tahun="<?= htmlspecialchars($p['tahun_ajaran'], ENT_QUOTES, 'UTF-8') ?>"
+                                    data-target-program="<?= htmlspecialchars(normalizePretesTargetProgram($p['target_program'] ?? 'Semua'), ENT_QUOTES, 'UTF-8') ?>"
+                                    data-tanggal-mulai="<?= htmlspecialchars($p['tanggal_mulai'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                     data-jam="<?= htmlspecialchars($p['jam'] ?? '13.00 WIB (Jam 1)', ENT_QUOTES, 'UTF-8') ?>"
                                     data-status="<?= htmlspecialchars($p['status'], ENT_QUOTES, 'UTF-8') ?>"
                                     data-kuota-senin="<?= (int)$p['kuota_senin'] ?>"
@@ -449,10 +476,10 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="create_periode">
 
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px; margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px; margin-bottom:16px;">
                 <div class="form-group">
                     <label>Nama Periode Pretes *</label>
-                    <input type="text" name="periode" placeholder="Contoh: Pretes 2026/2027 Ganjil" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;">
+                    <input type="text" name="periode" placeholder="Contoh: Pretes RPL 2026/2027" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;">
                 </div>
                 <div class="form-group">
                     <label>Tahun Ajaran *</label>
@@ -462,6 +489,19 @@ include __DIR__ . '/../includes/header.php';
                         <option value="<?= $y . ' - ' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
                         <?php endfor; ?>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label>Target Peserta Program *</label>
+                    <select name="target_program" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;font-weight:600;">
+                        <option value="Semua">Semua Program (Reguler &amp; RPL)</option>
+                        <option value="RPL">Khusus RPL</option>
+                        <option value="Reguler">Khusus Reguler</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tanggal Mulai (Senin)</label>
+                    <input type="date" name="tanggal_mulai" style="width:100%;padding:8px 9px;border:1.5px solid #cbd5e1;border-radius:6px;">
+                    <small style="color:#64748b;font-size:11px;">Contoh: 2026-11-16 untuk 16–20 Nov 2026</small>
                 </div>
                 <div class="form-group">
                     <label>Jam Pelaksanaan</label>
@@ -518,7 +558,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="id" id="edit_id">
 
             <!-- Baris Metadata 1 Baris Melebar -->
-            <div style="display:grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr; gap:16px; margin-bottom:18px;">
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap:14px; margin-bottom:18px;">
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Nama Periode *</label>
                     <input type="text" name="periode" id="edit_periode" required style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;">
@@ -530,6 +570,18 @@ include __DIR__ . '/../includes/header.php';
                         <option value="<?= $y . ' - ' . ($y+1) ?>"><?= $y . ' - ' . ($y+1) ?></option>
                         <?php endfor; ?>
                     </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Target Program *</label>
+                    <select name="target_program" id="edit_target_program" required style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;font-weight:600;">
+                        <option value="Semua">Semua Program</option>
+                        <option value="RPL">Khusus RPL</option>
+                        <option value="Reguler">Khusus Reguler</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Tanggal Mulai (Senin)</label>
+                    <input type="date" name="tanggal_mulai" id="edit_tanggal_mulai" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;">
                 </div>
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Jam Pelaksanaan</label>
@@ -771,6 +823,8 @@ window.openPretesModal = function(d) {
         }
     }
     
+    document.getElementById('edit_target_program').value = d.target_program || 'Semua';
+    document.getElementById('edit_tanggal_mulai').value = d.tanggal_mulai || '';
     document.getElementById('edit_jam').value = d.jam || '13.00 WIB (Jam 1)';
     document.getElementById('edit_status').value = d.status || 'aktif';
 
@@ -808,6 +862,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: d.id,
                 periode: d.periode,
                 tahun: d.tahun,
+                target_program: btn.getAttribute('data-target-program') || d.targetProgram || 'Semua',
+                tanggal_mulai: btn.getAttribute('data-tanggal-mulai') || d.tanggalMulai || '',
                 jam: d.jam,
                 status: d.status,
                 kuota_senin: btn.getAttribute('data-kuota-senin') || d.kuotaSenin,

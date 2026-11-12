@@ -67,6 +67,7 @@ $stmtRes->execute([$user['id']]);
 $myResult = $stmtRes->fetch();
 
 // ── Cek Status Periode Pretes & Tutorial Aktif ──────────────────────────────
+ensurePretesPeriodTargetColumns($pdo);
 $activePretes = null;
 try {
     $activePretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
@@ -78,12 +79,15 @@ try {
     $activeGelombang = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
 } catch (Exception $e) {}
 
-// Pretes dinyatakan selesai jika:
+// Pretes dinyatakan selesai / tertutup bagi mahasiswa jika:
 // 1. Tidak ada periode master_pretes yang berstatus 'aktif'
-// 2. ATAU status periode pretes mahasiswa sudah nonaktif/selesai
-// 3. ATAU sistem saat ini sedang aktif menjalankan periode Tutorial (gelombang aktif)
+// 2. ATAU mahasiswa bukan merupakan target program dari periode aktif (mis. periode khusus RPL diakses Reguler)
+// 3. ATAU status periode pretes mahasiswa sudah nonaktif/selesai
+// 4. ATAU sistem saat ini sedang aktif menjalankan Tutorial untuk periode umum ('Semua')
+$isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
+$activeTargetProgram = $activePretes ? normalizePretesTargetProgram($activePretes['target_program'] ?? 'Semua') : 'Semua';
 $isPretesSelesai = false;
-if (!$activePretes) {
+if (!$activePretes || !$isEligibleActivePretes) {
     $isPretesSelesai = true;
 } elseif ($myReg && !empty($myReg['periode'])) {
     try {
@@ -95,8 +99,8 @@ if (!$activePretes) {
         }
     } catch (Exception $e) {}
 }
-if (!$isPretesSelesai && $activeGelombang) {
-    // Jika tutorial sudah aktif berjalan, pendaftaran pretes bagi yang belum terdaftar telah ditutup
+if (!$isPretesSelesai && $activeGelombang && $activeTargetProgram === 'Semua') {
+    // Jika tutorial sudah aktif berjalan, pendaftaran pretes umum bagi yang belum terdaftar telah ditutup
     $isPretesSelesai = true;
 }
 

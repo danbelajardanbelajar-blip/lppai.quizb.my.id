@@ -4,6 +4,7 @@
  */
 define('PAGE_TITLE', 'Daftar Pretes');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireLogin();
 
 $user = getCurrentUser();
@@ -18,6 +19,8 @@ try {
             id INT AUTO_INCREMENT PRIMARY KEY,
             periode VARCHAR(100) NOT NULL,
             tahun_ajaran VARCHAR(50) NOT NULL,
+            target_program ENUM('Semua','RPL','Reguler') NOT NULL DEFAULT 'Semua',
+            tanggal_mulai DATE DEFAULT NULL,
             status ENUM('aktif','selesai','nonaktif') NOT NULL DEFAULT 'aktif',
             jam VARCHAR(50) DEFAULT '13.00 WIB (Jam 1)',
             kuota_senin INT DEFAULT 0,
@@ -35,6 +38,7 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     ");
 } catch (Exception $e) {}
+ensurePretesPeriodTargetColumns($pdo);
 
 try {
     $pdo->exec("SET FOREIGN_KEY_CHECKS=0");
@@ -61,8 +65,10 @@ try {
     }
 } catch (Exception $e) {}
 
-// Ambil Periode Pretes Aktif
-$active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
+// Ambil Periode Pretes Aktif & cek kelayakan program (Semua / RPL / Reguler)
+$active_pretes = getActivePretesPeriod($pdo);
+$isEligibleForPretes = isUserEligibleForPretesPeriod($user, $active_pretes);
+$periodSchedule = getPretesPeriodDayLabels($active_pretes);
 
 // Ambil Pengumuman Pendaftaran Pretes Aktif
 $annPretes = null;
@@ -73,25 +79,37 @@ try {
     }
 } catch (Exception $e) {}
 
-// Cek Registrasi Pretes Mahasiswa Saat Ini
-$stmt = $pdo->prepare("
-    SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
-    FROM pretes_registrations pr
-    LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
-    WHERE pr.user_id = ?
-    ORDER BY pr.tanggal_daftar DESC
-    LIMIT 1
-");
-$stmt->execute([$user['id']]);
+// Cek Registrasi Pretes Mahasiswa Saat Ini (terisolasi pada periode aktif bila sedang ada periode aktif)
+if ($active_pretes) {
+    $stmt = $pdo->prepare("
+        SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+        WHERE pr.user_id = ? AND pr.periode = ?
+        ORDER BY pr.tanggal_daftar DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$user['id'], $active_pretes['periode']]);
+} else {
+    $stmt = $pdo->prepare("
+        SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+        WHERE pr.user_id = ?
+        ORDER BY pr.tanggal_daftar DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$user['id']]);
+}
 $existingReg = $stmt->fetch();
 
-// Hitung Pendaftar per Hari untuk Menghitung Sisa Kuota
+// Hitung Pendaftar per Hari khusus pada periode aktif (mencegah kuota tercampur antar periode di tahun ajaran sama)
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
         FROM pretes_registrations 
-        WHERE (periode = ? OR periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')
+        WHERE periode = ?
         GROUP BY hari_pilihan
     ");
     $stmtCount->execute([$active_pretes['periode']]);
@@ -113,10 +131,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daft
         $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
         $msgType = 'danger';
     } elseif ($existingReg) {
-        $message = 'Anda sudah terdaftar untuk pretes.';
+        $message = 'Anda sudah terdaftar untuk pretes periode ini.';
         $msgType = 'warning';
     } elseif (!$active_pretes) {
         $message = 'Pendaftaran pretes sedang ditutup atau belum dibuka.';
+        $msgType = 'danger';
+    } elseif (!$isEligibleForPretes) {
+        $targetProgramLabel = normalizePretesTargetProgram($active_pretes['target_program'] ?? 'Semua');
+        $message = "Pendaftaran pretes periode ini khusus untuk mahasiswa program {$targetProgramLabel}.";
         $msgType = 'danger';
     } elseif (!in_array($hari_pilihan, $validDays)) {
         $message = 'Silakan pilih hari pelaksanaan yang valid.';
@@ -137,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daft
             ");
             $stmt->execute([$user['id'], $hari_pilihan, $jamPretes, $active_pretes['periode']]);
 
-            $message = "Pendaftaran pretes berhasil! Anda telah memilih hari $hari_pilihan pukul 13.00 WIB (Jam 1).";
+            $message = "Pendaftaran pretes berhasil! Anda telah memilih hari $hari_pilihan ($jamPretes).";
             $msgType = 'success';
 
             // Update counter lokal
@@ -148,11 +170,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daft
                 SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_jadwal
                 FROM pretes_registrations pr
                 LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
-                WHERE pr.user_id = ?
+                WHERE pr.user_id = ? AND pr.periode = ?
                 ORDER BY pr.tanggal_daftar DESC
                 LIMIT 1
             ");
-            $stmt->execute([$user['id']]);
+            $stmt->execute([$user['id'], $active_pretes['periode']]);
             $existingReg = $stmt->fetch();
         }
     }
@@ -241,12 +263,19 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     FORM PENDAFTARAN JIKA BELUM TERDAFTAR
+     FORM PENDAFTARAN JIKA BELUM TERDAFTAR & BERHAK MENGIKUTI PERIODE
      ═══════════════════════════════════════════════════════════════ -->
-<?php elseif ($active_pretes): ?>
+<?php elseif ($active_pretes && $isEligibleForPretes): ?>
+<?php
+    $jamTampil = trim((string)($active_pretes['jam'] ?? '')) ?: '13.00 WIB (Jam 1)';
+    $rangeLabel = $periodSchedule['range_label'];
+    $shortRange = $periodSchedule['short_range'];
+    $dayLabels = $periodSchedule['days'];
+?>
 <div class="card" style="margin-bottom: 30px; border-top: 4px solid var(--primary);">
-    <div class="card-header" style="background:#f8fafc;">
+    <div class="card-header" style="background:#f8fafc; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <h3 style="margin:0; font-size:18px;">Pendaftaran Pretes - <?= sanitize($active_pretes['periode']) ?></h3>
+        <?= renderPretesTargetProgramBadge($active_pretes['target_program'] ?? 'Semua') ?>
     </div>
     <div class="card-body">
         
@@ -263,8 +292,10 @@ include __DIR__ . '/../includes/header.php';
                 <?= nl2br(sanitize($annPretes['konten'])) ?>
             </div>
             <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #bae6fd; font-size:13px; color:#0369a1; line-height:1.6;">
-                📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong>2 sampai 6 November 2026</strong> (Senin s.d. Jumat).<br>
-                🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong>Pukul 13.00 WIB (Jam 1 Siang)</strong>.
+                <?php if ($rangeLabel !== ''): ?>
+                📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (Senin s.d. Jumat).<br>
+                <?php endif; ?>
+                🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong><?= sanitize($jamTampil) ?></strong>.
             </div>
         </div>
         <?php else: ?>
@@ -274,11 +305,13 @@ include __DIR__ . '/../includes/header.php';
                 <span>📢</span> Informasi Pelaksanaan Pre-tes Mahasiswa (Tutorial Ubudiyah Unisda)
             </div>
             <div style="font-size:14px; color:#334155; line-height:1.6;">
+                <?php if ($rangeLabel !== ''): ?>
                 <p style="margin:0 0 8px;">
-                    📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong>2 sampai 6 November 2026</strong> (Senin s.d. Jumat).
+                    📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (Senin s.d. Jumat).
                 </p>
+                <?php endif; ?>
                 <p style="margin:0 0 8px;">
-                    🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong>Pukul 13.00 WIB (Jam 1 Siang)</strong>.
+                    🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong><?= sanitize($jamTampil) ?></strong>.
                 </p>
                 <p style="margin:0;">
                     👥 <strong>Penentuan Kuota:</strong> Kuota pada setiap hari ditentukan langsung berdasarkan <strong>jumlah Dosen Penguji</strong> yang bersedia menguji pada hari tersebut.
@@ -293,21 +326,14 @@ include __DIR__ . '/../includes/header.php';
             <input type="hidden" name="action" value="daftar_pretes">
 
             <label style="font-weight:600; margin-bottom:10px; display:block; font-size:15px; color:#1e293b;">
-                Pilih Hari &amp; Tanggal Pelaksanaan Pretes (2 – 6 November 2026, Pukul 13.00 WIB) <span style="color:red">*</span>
+                Pilih Hari <?= $shortRange !== '' ? '&amp; Tanggal ' : '' ?>Pelaksanaan Pretes (<?= $shortRange !== '' ? sanitize($shortRange) . ', ' : '' ?><?= sanitize($jamTampil) ?>) <span style="color:red">*</span>
             </label>
 
             <div class="form-group" style="margin-bottom:24px;">
                 <select name="hari_pilihan" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
-                    <option value="">-- Pilih Hari &amp; Tanggal Ujian --</option>
+                    <option value="">-- Pilih Hari &amp; Jadwal Ujian --</option>
                     <?php 
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                    $dayLabels = [
-                        'Senin' => 'Senin, 2 November 2026',
-                        'Selasa' => 'Selasa, 3 November 2026',
-                        'Rabu' => 'Rabu, 4 November 2026',
-                        'Kamis' => 'Kamis, 5 November 2026',
-                        'Jumat' => 'Jumat, 6 November 2026',
-                    ];
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
                         $kuota  = (int)($active_pretes["kuota_$dayLower"] ?? 0);
@@ -317,7 +343,7 @@ include __DIR__ . '/../includes/header.php';
                         $labelDay = $dayLabels[$day] ?? $day;
                     ?>
                     <option value="<?= $day ?>" <?= $isFull ? 'disabled style="color:#94a3b8;"' : '' ?>>
-                        <?= $labelDay ?> <?= $isFull ? ($kuota <= 0 ? '(Belum ada dosen penguji/kuota)' : '(Penuh)') : "(Sisa $sisa kursi dari total kuota $kuota)" ?>
+                        <?= sanitize($labelDay) ?> <?= $isFull ? ($kuota <= 0 ? '(Belum ada dosen penguji/kuota)' : '(Penuh)') : "(Sisa $sisa kursi dari total kuota $kuota)" ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
@@ -328,6 +354,25 @@ include __DIR__ . '/../includes/header.php';
             </button>
         </form>
 
+    </div>
+</div>
+
+<?php elseif ($active_pretes && !$isEligibleForPretes): ?>
+<?php $targetLabel = normalizePretesTargetProgram($active_pretes['target_program'] ?? 'Semua'); ?>
+<!-- Halaman tertutup bagi mahasiswa di luar program target periode aktif -->
+<div class="empty-state card" style="padding:40px 20px; text-align:center;">
+    <div class="icon" style="font-size:48px; margin-bottom:12px;">🔒</div>
+    <h3 style="margin-bottom:8px;">Pendaftaran Pretes Periode Ini Khusus Program <?= sanitize($targetLabel) ?></h3>
+    <p style="color:#64748b; max-width:560px; margin:0 auto 18px auto; line-height:1.6;">
+        Pendaftaran pretes <strong><?= sanitize($active_pretes['periode']) ?></strong> yang sedang berlangsung saat ini hanya dibuka untuk mahasiswa program <strong><?= sanitize($targetLabel) ?></strong>. Status program Anda saat ini tercatat sebagai <strong><?= sanitize(normalizeJenisProgram($user['jenis_program'] ?? 'Reguler')) ?></strong>.
+    </p>
+    <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:10px 20px; font-weight:600; border-radius:8px;">
+            📊 Lihat Hasil Pretes
+        </a>
+        <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:10px 20px; font-weight:600; border-radius:8px;">
+            🏠 Kembali ke Dashboard
+        </a>
     </div>
 </div>
 

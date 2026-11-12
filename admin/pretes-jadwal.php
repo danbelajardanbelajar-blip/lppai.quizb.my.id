@@ -4,9 +4,11 @@
  */
 define('PAGE_TITLE', 'Kelola Jadwal Pretes');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+ensurePretesPeriodTargetColumns($pdo);
 $message = '';
 $msgType = '';
 
@@ -263,10 +265,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             continue; // Skip jika hari ini belum ada penguji yang diset
                         }
 
-                        // Ambil mahasiswa yang terdaftar pada hari ini
+                        // Ambil mahasiswa yang terdaftar pada hari ini (khusus periode aktif)
                         $sql = "SELECT id FROM pretes_registrations 
                                 WHERE (LOWER(hari_pilihan) = LOWER(?) OR (hari_pilihan IS NULL AND ? = 'Senin')) 
-                                  AND (periode = ? OR periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')";
+                                  AND periode = ?";
                         if (!$overwrite) {
                             $sql .= " AND (dosen_penguji IS NULL OR dosen_penguji = '')";
                         }
@@ -347,7 +349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $stmt = $pdo->prepare("
                     UPDATE pretes_registrations 
                     SET dosen_penguji = NULL, ruangan = NULL 
-                    WHERE (periode = ? OR periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')
+                    WHERE periode = ?
                 ");
                 $stmt->execute([$active_pretes['periode']]);
                 $message = 'Plotting jadwal pretes berhasil di-reset. Dosen penguji dan ruangan telah dikosongkan.';
@@ -383,7 +385,7 @@ if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
         FROM pretes_registrations 
-        WHERE (periode = ? OR periode LIKE '%2026%' OR periode LIKE '%2027%' OR periode LIKE '%2028%' OR periode LIKE '%2029%' OR periode LIKE '%2030%')
+        WHERE periode = ?
         GROUP BY hari_pilihan
     ");
     $stmtCount->execute([$active_pretes['periode']]);
@@ -395,16 +397,18 @@ if ($active_pretes) {
     }
 }
 
-// Ambil daftar seluruh peserta pretes untuk hasil plotting
-$participants = $pdo->query("
+// Ambil daftar seluruh peserta pretes untuk hasil plotting (khusus periode aktif)
+$stmtPart = $pdo->prepare("
     SELECT pr.id as reg_id, pr.user_id, pr.periode, pr.hari_pilihan, pr.jam, pr.dosen_penguji, pr.ruangan, pr.tanggal_daftar,
            pr.status, pr.username_tes, pr.password_tes,
            u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.fakultas
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    WHERE (pr.periode = " . $pdo->quote($active_pretes['periode']) . " OR pr.periode LIKE '%2026%' OR pr.periode LIKE '%2027%' OR pr.periode LIKE '%2028%' OR pr.periode LIKE '%2029%' OR pr.periode LIKE '%2030%')
+    WHERE pr.periode = ?
     ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), pr.dosen_penguji ASC, u.nama_lengkap ASC
-")->fetchAll();
+");
+$stmtPart->execute([$active_pretes['periode']]);
+$participants = $stmtPart->fetchAll();
 
 $totalPeserta = count($participants);
 $totalPlotted = count(array_filter($participants, fn($p) => !empty($p['dosen_penguji'])));

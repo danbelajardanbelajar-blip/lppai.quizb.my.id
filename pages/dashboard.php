@@ -43,11 +43,15 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $myPretesReg = $stmt->fetch();
 
-// Cek status periode pretes aktif
-$activePretes = null;
-try {
-    $activePretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
-} catch (Exception $e) {}
+// Cek status periode pretes aktif & kelayakan program mahasiswa
+$activePretes = getActivePretesPeriod($pdo);
+$isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
+$pretesRegisteredActive = 0;
+if ($activePretes) {
+    $stmtActiveReg = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations WHERE user_id = ? AND periode = ?");
+    $stmtActiveReg->execute([$user['id'], $activePretes['periode']]);
+    $pretesRegisteredActive = (int)$stmtActiveReg->fetchColumn();
+}
 
 // Pretes dinyatakan selesai jika tidak ada periode master_pretes yang aktif atau status periode mahasiswa sudah nonaktif
 $isPretesSelesai = false;
@@ -145,9 +149,10 @@ foreach ($allAnnouncements as $ann) {
         continue;
     }
     
-    // 1b. Sembunyikan pengumuman pendaftaran pretes jika mahasiswa sudah terdaftar pretes atau sudah lulus pretes
+    // 1b. Sembunyikan pengumuman pendaftaran pretes jika tidak berhak (mis. khusus RPL), sudah terdaftar di periode aktif, atau sudah lulus pretes
     if ($tipe === 'pendaftaran_pretes') {
-        if ($pretesRegistered > 0 || ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus')) {
+        $alreadyRegisteredPretes = $activePretes ? ($pretesRegisteredActive > 0) : ($pretesRegistered > 0);
+        if (!$isEligibleActivePretes || $alreadyRegisteredPretes || ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus')) {
             continue;
         }
     }
