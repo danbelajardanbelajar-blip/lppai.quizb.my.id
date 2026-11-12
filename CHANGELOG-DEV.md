@@ -5,6 +5,20 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 05:50:25 +0700 — Penambahan Opsi Sasaran Pengumuman "Khusus Belum Pernah Pretes" (`belum_pretes`) & Klarifikasi Label
+
+**Ringkasan:** Menambahkan opsi target sasaran baru `belum_pretes` ("Khusus Belum Pernah Pretes") pada form pembuatan/edit pengumuman dan memperjelas label opsi yang telah ada agar admin tidak ambigu saat memilih target (misal: "Peserta Pretes (Sudah Terdaftar/Ikut)" vs "Khusus Belum Lulus Pretes (Sudah Pretes tapi Tidak Lulus)"). Logika penyaringan memastikan pengumuman dengan target ini hanya muncul pada dashboard mahasiswa yang belum pernah mendaftar pretes dan belum lulus pretes.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/announcement-helper.php` | 39–48 | Kamus Pilihan Target Peserta | Menambahkan opsi `'belum_pretes' => 'Khusus Belum Pernah Pretes'` pada `getAllowedAnnouncementTargetPeserta()` serta memperjelas label opsi lainnya. |
+| `includes/announcement-helper.php` | 78–95 | Visualisasi Badge Pengumuman | Menambahkan badge penanda khusus berwarna amber/kuning muda (`#fef9c3` border `#fef08a`) untuk target `belum_pretes` di tabel daftar pengumuman admin. |
+| `includes/announcement-helper.php` | 132–150 | Evaluasi Eligibilitas Pengumuman | Memeriksa kriteria `($hasPretesReg !== true) && ($isPretesLulus !== true)` saat `target_peserta === 'belum_pretes'`, sehingga hanya mahasiswa yang belum terdaftar pretes dan belum lulus yang menerima pengumuman. |
+| `tests/announcement-target-filter-test.php` | 22–24, 134–157 | Unit & Integration Test Suite | Menambahkan pengujian normalisasi `belum_pretes` serta verifikasi kelayakan bagi user belum pretes vs user yang sudah terdaftar pretes / lulus pretes. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **25/25 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 05:40:59 +0700 — Filter Sasaran Pengumuman per Program (RPL / Reguler) & Kategori Peserta (Pretes / Tutorial)
 
 **Ringkasan:** Menambahkan kontrol target audiens pada sistem pengumuman (`announcements`) melalui kolom `target_program` (`Semua`, `RPL`, `Reguler`) dan `target_peserta` (`semua`, `pretes`, `tutorial`, `belum_lulus_pretes`, `lulus_pretes`), memutakhirkan form tambah & modal edit di `admin/pengumuman.php`, menormalisasi pengumuman tutorial/pretes reguler lama, serta menyaring feed pengumuman di `pages/dashboard.php` sehingga mahasiswa RPL tidak lagi menerima pengumuman pendaftaran tutorial reguler maupun hasil pretes reguler.

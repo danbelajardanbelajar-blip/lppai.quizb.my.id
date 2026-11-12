@@ -39,9 +39,10 @@ if (!function_exists('getAllowedAnnouncementTargetPeserta')) {
     function getAllowedAnnouncementTargetPeserta(): array {
         return [
             'semua'              => 'Semua Mahasiswa',
-            'pretes'             => 'Peserta Pretes',
+            'belum_pretes'       => 'Khusus Belum Pernah Pretes',
+            'pretes'             => 'Peserta Pretes (Sudah Terdaftar/Ikut)',
             'tutorial'           => 'Peserta Tutorial',
-            'belum_lulus_pretes' => 'Khusus Belum Lulus Pretes',
+            'belum_lulus_pretes' => 'Khusus Belum Lulus Pretes (Sudah Pretes tapi Tidak Lulus)',
             'lulus_pretes'       => 'Khusus Sudah Lulus Pretes',
         ];
     }
@@ -78,7 +79,9 @@ if (!function_exists('renderAnnouncementTargetBadges')) {
         // Badge Peserta
         $allLabels = getAllowedAnnouncementTargetPeserta();
         $pesLabel = $allLabels[$tPes] ?? 'Semua Mahasiswa';
-        if ($tPes === 'pretes') {
+        if ($tPes === 'belum_pretes') {
+            $badgePes = '<span class="badge" style="background:#fef9c3; color:#854d0e; font-size:11px; font-weight:700; border:1px solid #fef08a;">' . htmlspecialchars($pesLabel) . '</span>';
+        } elseif ($tPes === 'pretes') {
             $badgePes = '<span class="badge" style="background:#fef3c7; color:#92400e; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
         } elseif ($tPes === 'tutorial') {
             $badgePes = '<span class="badge" style="background:#dcfce7; color:#166534; font-size:11px;">' . htmlspecialchars($pesLabel) . '</span>';
@@ -130,6 +133,9 @@ if (!function_exists('isUserEligibleForAnnouncement')) {
         $hasPretesReg    = $context['has_pretes_reg'] ?? null;
         $hasTutorialReg  = $context['has_tutorial_reg'] ?? null;
 
+        if ($targetPeserta === 'belum_pretes') {
+            return ($hasPretesReg !== true) && ($isPretesLulus !== true);
+        }
         if ($targetPeserta === 'lulus_pretes') {
             return $isPretesLulus === true;
         }

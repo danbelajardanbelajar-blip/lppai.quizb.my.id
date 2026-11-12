@@ -20,6 +20,7 @@ annAssert(normalizeAnnouncementTargetProgram('semua') === 'Semua', 'normalizeAnn
 annAssert(normalizeAnnouncementTargetProgram(null) === 'Semua', 'normalizeAnnouncementTargetProgram null harus Semua', $errors);
 
 annAssert(normalizeAnnouncementTargetPeserta('pretes') === 'pretes', 'normalizeAnnouncementTargetPeserta pretes harus pretes', $errors);
+annAssert(normalizeAnnouncementTargetPeserta('belum_pretes') === 'belum_pretes', 'normalizeAnnouncementTargetPeserta belum_pretes harus belum_pretes', $errors);
 annAssert(normalizeAnnouncementTargetPeserta('invalid') === 'semua', 'normalizeAnnouncementTargetPeserta invalid harus default semua', $errors);
 
 // ── 2. Uji Kelayakan Pengumuman (isUserEligibleForAnnouncement) ───────────────
@@ -113,7 +114,7 @@ annAssert(
     $errors
 );
 
-// Uji target sasaran peserta: lulus_pretes vs belum_lulus_pretes
+// Uji target sasaran peserta: lulus_pretes vs belum_lulus_pretes vs belum_pretes
 $annLulusOnly = [
     'id'             => 5,
     'tipe'           => 'umum',
@@ -128,6 +129,29 @@ annAssert(
 annAssert(
     !isUserEligibleForAnnouncement($userReguler, $annLulusOnly, ['is_pretes_lulus' => false]),
     'Mahasiswa yang belum lulus pretes tidak boleh menerima pengumuman target lulus_pretes.',
+    $errors
+);
+
+// Uji target sasaran peserta: belum_pretes (Khusus Belum Pernah Pretes)
+$annBelumPretes = [
+    'id'             => 6,
+    'tipe'           => 'pendaftaran_pretes',
+    'target_program' => 'Semua',
+    'target_peserta' => 'belum_pretes',
+];
+annAssert(
+    isUserEligibleForAnnouncement($userRpl, $annBelumPretes, ['has_pretes_reg' => false, 'is_pretes_lulus' => false]),
+    'Mahasiswa yang belum pernah daftar/lulus pretes harus menerima pengumuman target belum_pretes.',
+    $errors
+);
+annAssert(
+    !isUserEligibleForAnnouncement($userRpl, $annBelumPretes, ['has_pretes_reg' => true, 'is_pretes_lulus' => false]),
+    'Mahasiswa yang sudah terdaftar pretes tidak boleh menerima pengumuman target belum_pretes.',
+    $errors
+);
+annAssert(
+    !isUserEligibleForAnnouncement($userRpl, $annBelumPretes, ['has_pretes_reg' => false, 'is_pretes_lulus' => true]),
+    'Mahasiswa yang sudah lulus pretes tidak boleh menerima pengumuman target belum_pretes.',
     $errors
 );
 
