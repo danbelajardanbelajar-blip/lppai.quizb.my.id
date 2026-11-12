@@ -258,20 +258,33 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Modal Import -->
 <div id="modal-import" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:16px;padding:32px;width:100%;max-width:480px;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
+    <div style="background:#fff;border-radius:16px;padding:32px;width:100%;max-width:500px;box-shadow:0 8px 40px rgba(0,0,0,0.2);">
         <h3 style="margin-bottom:16px;">📤 Import Pengguna dari Excel</h3>
         <p style="margin-bottom:16px;color:#666;font-size:14px;">
-            Upload file Excel (.xlsx) sesuai template. Kolom wajib: <strong>NIM, Nama Lengkap, Tanggal Lahir</strong>.<br>
-            Kolom opsional: Tempat Lahir, Email, No. HP, Program Studi, Role.<br>
-            Username otomatis = NIM. Password otomatis = tanggal lahir format <strong>ddmmyyyy</strong>.<br>
-            NIM yang sudah terdaftar akan dilewati.
+            Upload file Excel (<code>.xlsx</code>, <code>.xls</code>, atau export HTML SIAKAD). Kolom wajib: <strong>NIM, Nama Lengkap, Tanggal Lahir</strong> (atau cukup NIM &amp; Nama saat mode update program).<br>
+            Mendukung format tanggal Excel, <strong>ddmmyyyy</strong>, maupun bulan Indonesia. Username = NIM, password = tanggal lahir <strong>ddmmyyyy</strong>.
         </p>
         <form id="form-import">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <div class="form-group">
-                <label>Pilih File CSV</label>
-                <input type="file" name="csv_file" id="csv_file" accept=".xlsx,.xls" required
+                <label>Pilih File Excel (.xlsx / .xls SIAKAD)</label>
+                <input type="file" name="csv_file" id="csv_file" accept=".xlsx,.xls,.html,.htm" required
                     style="padding:10px;border:2px dashed #ccc;border-radius:10px;width:100%;cursor:pointer;">
+            </div>
+            <div class="form-group">
+                <label>Default Program (jika file tidak memiliki kolom Jenis Program)</label>
+                <select name="default_jenis_program" class="form-control">
+                    <option value="">Sesuai Kolom File / Auto Deteksi (Default Reguler)</option>
+                    <option value="RPL">RPL</option>
+                    <option value="Reguler">Reguler</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Jika NIM Sudah Terdaftar</label>
+                <select name="duplicate_mode" class="form-control">
+                    <option value="skip">Lewati jika NIM sudah terdaftar</option>
+                    <option value="update_jenis_program">Update Jenis Program (RPL/Reguler) jika NIM sudah ada</option>
+                </select>
             </div>
             <div id="import-result" style="display:none;margin-bottom:16px;padding:12px;border-radius:10px;font-size:14px;"></div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">

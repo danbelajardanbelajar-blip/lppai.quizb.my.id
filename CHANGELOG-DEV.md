@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-12 18:33:15 +0700 — Sinkronisasi 123 Data Mahasiswa RPL Angkatan 2025 & Perbaikan Impor Excel SIAKAD
+
+**Ringkasan:** Mengekstrak 123 data mahasiswa RPL Angkatan 2025 dari ekspor Excel SIA UNISDA (`laporan_daftarmhs.xls`) ke dataset versi-kontrol dan skrip migrasi idempoten (`migration_rpl_2025.php`), serta memutakhirkan importer pengguna (`admin/ajax-import-users.php` & modal `#modal-import` di `admin/users.php`) agar tahan terhadap perbedaan urutan kolom SIAKAD (termasuk mencegah `NAMA` tertimpa `NAMA IBU`), mengenali kolom `JURUSAN`, format `.xls` berbasis HTML table, tanggal bulan berbahasa Indonesia (`4 April 1997`, `7 Nopember 1983`), dan mode update `jenis_program` bagi NIM yang sudah terdaftar.
+
+### 1. Helper Impor SIAKAD, Dataset 123 RPL 2025, & Skrip Migrasi
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/user-helper.php` | 135–190 | `parseFlexibleDateToYmd()` | Menambahkan parser tanggal fleksibel ke `YYYY-MM-DD` (dukungan serial Excel, `ddmmyyyy`, `d/m/Y`, `Y-m-d`, dan nama bulan Indonesia termasuk variasi ejaan `Pebruari`/`Nopember`). |
+| `includes/user-helper.php` | 192–272 | `detectUserImportHeaderAndMap()` | Deteksi otomatis baris header (scan 25 baris teratas) dan pemetaan kolom tahan urutan SIAKAD: mengabaikan `NAMA IBU`/`NAMA AYAH`, membedakan `jenis_program` sebelum `program_studi`/`jurusan`, serta mendeteksi kolom `kelas`. |
+| `includes/user-helper.php` | 274–396 | `upsertRplUserRecords()` | Helper transaksional idempoten: mencocokkan NIM/username eksisting (skip jika sudah `RPL`, update **hanya** `jenis_program = 'RPL'` tanpa menimpa data lain jika non-RPL) serta insert akun mahasiswa baru (`angkatan = '2025'`, `jenis_program = 'RPL'`, password `ddmmyyyy` BCRYPT cost 8, `is_active = 0`). |
+| `data/rpl-angkatan-2025.php` | 1–131 | Dataset RPL 2025 (file baru) | Menyimpan seluruh 123 mahasiswa RPL Angkatan 2025 unik dari `laporan_daftarmhs.xls` (`2501101046` s.d. `25071002`) lengkap dengan NIM, nama, prodi, tempat/tanggal lahir, no HP, dan email. |
+| `migration_rpl_2025.php` | 1–65 | Runner migrasi (file baru) | Skrip CLI (`php migration_rpl_2025.php`) maupun browser Admin (`requireAdmin()`) yang mengeksekusi `upsertRplUserRecords()` terhadap `data/rpl-angkatan-2025.php` dan mencetak ringkasan `Total`, `Inserted`, `Updated`, `Skipped`. |
+
+### 2. Impor Pengguna Fleksibel (`admin/ajax-import-users.php` & `admin/users.php`)
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `admin/ajax-import-users.php` | 10–13, 40–117 | Pembacaan file & HTML `.xls` | Menambahkan `PhpOffice\PhpSpreadsheet\Reader\Html`, dukungan ekstensi `.html`/`.htm`, serta auto-deteksi dan fallback `HtmlReader` (dg `libxml_use_internal_errors`) saat ekspor `.xls` SIAKAD ternyata berformat HTML table. |
+| `admin/ajax-import-users.php` | 124–278 | Pemetaan dinamis, tanggal ID, & mode duplikat | Menggunakan `detectUserImportHeaderAndMap()` + `parseFlexibleDateToYmd()`, dukungan `default_jenis_program` & auto-deteksi kolom `kelas` berisi `RPL`, serta `duplicate_mode = 'update_jenis_program'` untuk memperbarui `jenis_program` berdasarkan `nim`/`username` pada data duplikat. |
+| `admin/users.php` | 259–297 | Modal `#modal-import` | Memperbarui `accept=".xlsx,.xls,.html,.htm"`, teks panduan format SIAKAD, serta menambahkan dropdown `default_jenis_program` dan `duplicate_mode`. |
+
+### 3. Pengujian & Verifikasi
+
+| File | Baris | Bagian | Verifikasi |
+|---|---|---|---|
+| `tests/rpl-2025-import-test.php` | 1–143 | Test baru RPL 2025 & SIAKAD | Verifikasi 123 NIM unik dataset, parsing tanggal Indonesia (`4 April 1997`, `7 Nopember 1983`), header SIAKAD 15+ kolom (`NAMA` vs `NAMA IBU`, `JURUSAN`), update `jenis_program` non-destruktif, serta idempotensi run ke-2 di SQLite (`OK`). |
+| `tests/user-jenis-program-test.php` | 85–95 | Penyesuaian test importer | Memverifikasi integrasi `detectUserImportHeaderAndMap()`, `parseFlexibleDateToYmd()`, dan `update_jenis_program` pada `admin/ajax-import-users.php`. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` di seluruh 7 file PHP dan **21/21 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-12 16:44:25 +0700 — Tambah kolom `jenis_program` (`RPL` / `Reguler`) di database, Kelola Pengguna, dan seluruh halaman prodi
 
 **Ringkasan:** Menambahkan kolom `jenis_program` (`ENUM('RPL', 'Reguler') NOT NULL DEFAULT 'Reguler' AFTER program_studi`) pada tabel `users`, auto-migrasi skema saat runtime, pengelolaan penuh (CRUD, filter, DataTables, import & template Excel) di Kelola Pengguna, propagasi sesi login/impersonasi, serta tampilan indikator `RPL` / `Reguler` pada seluruh halaman, laporan, kartu, dan ekspor yang menampilkan Program Studi / Jurusan.

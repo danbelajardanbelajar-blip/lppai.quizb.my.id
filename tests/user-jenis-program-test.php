@@ -83,9 +83,14 @@ assertTrue(str_contains($ajaxUsersPhp, "7 => 'u.jenis_program'"), 'admin/ajax-us
 assertTrue(str_contains($ajaxUsersPhp, 'data-jenis-program='), 'admin/ajax-users.php edit button must expose data-jenis-program.', $errors);
 
 $importUsersPhp = file_get_contents($root . '/admin/ajax-import-users.php');
-$posJenis = strpos($importUsersPhp, "colMap['jenis_program']");
-$posProdi = strpos($importUsersPhp, "colMap['program_studi']");
-assertTrue($posJenis !== false && $posProdi !== false && $posJenis < $posProdi, 'admin/ajax-import-users.php must match jenis_program header before program_studi.', $errors);
+assertTrue(str_contains($importUsersPhp, 'detectUserImportHeaderAndMap('), 'admin/ajax-import-users.php must use detectUserImportHeaderAndMap().', $errors);
+assertTrue(str_contains($importUsersPhp, 'parseFlexibleDateToYmd('), 'admin/ajax-import-users.php must use parseFlexibleDateToYmd().', $errors);
+assertTrue(str_contains($importUsersPhp, 'update_jenis_program'), 'admin/ajax-import-users.php must support duplicate_mode = update_jenis_program.', $errors);
+
+$mappedTemplate = detectUserImportHeaderAndMap([
+    ['NIM', 'Nama Lengkap', 'Jenis Program (RPL/Reguler)', 'Program Studi'],
+]);
+assertTrue(($mappedTemplate['col_map']['jenis_program'] ?? null) === 2 && ($mappedTemplate['col_map']['program_studi'] ?? null) === 3, 'detectUserImportHeaderAndMap must distinguish jenis_program from program_studi.', $errors);
 
 $templateUsersPhp = file_get_contents($root . '/admin/download-template-users.php');
 assertTrue(str_contains($templateUsersPhp, 'Jenis Program (RPL/Reguler)'), 'Template download must include Jenis Program (RPL/Reguler) column.', $errors);
