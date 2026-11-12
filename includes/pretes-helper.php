@@ -431,3 +431,283 @@ if (!function_exists('shouldShowDaftarPretesToStudent')) {
         return isUserEligibleForPretesPeriod($user, $period);
     }
 }
+
+if (!function_exists('mapPretesScoresToCertificate')) {
+    /**
+     * Memetakan 12 nilai komponen pretes ke dalam 6 komponen nilai transkrip sertifikat (tutorial_registrations).
+     *
+     * 1. Thaharah     : Rata-rata dari (praktik_wudlu, doa_setelah_wudlu, praktik_tayammum, niat_mandi_besar)
+     * 2. Shalat       : Rata-rata dari (niat_jamak_qashar, bacaan_shalat_subuh)
+     * 3. Surat Pendek : Rata-rata dari (al_bayyinah, al_alaq, al_dluha)
+     * 4. Amaliyah     : Nilai istighasah
+     * 5. Jenazah      : Nilai shalat_jenazah
+     * 6. Ujian Tulis  : Nilai ujian_tulis
+     *
+     * @param array $scores Associative array [key => float|int]
+     * @return array [
+     *   'thaharah'     => float,
+     *   'shalat'       => float,
+     *   'surat_pendek' => float,
+     *   'amaliyah'     => float,
+     *   'jenazah'      => float,
+     *   'ujian_tulis'  => float,
+     *   'rata_rata'    => float,
+     * ]
+     */
+    function mapPretesScoresToCertificate(array $scores): array {
+        $thaharah = round((
+            (float)($scores['praktik_wudlu'] ?? 0) +
+            (float)($scores['doa_setelah_wudlu'] ?? 0) +
+            (float)($scores['praktik_tayammum'] ?? 0) +
+            (float)($scores['niat_mandi_besar'] ?? 0)
+        ) / 4, 2);
+
+        $shalat = round((
+            (float)($scores['niat_jamak_qashar'] ?? 0) +
+            (float)($scores['bacaan_shalat_subuh'] ?? 0)
+        ) / 2, 2);
+
+        $suratPendek = round((
+            (float)($scores['al_bayyinah'] ?? 0) +
+            (float)($scores['al_alaq'] ?? 0) +
+            (float)($scores['al_dluha'] ?? 0)
+        ) / 3, 2);
+
+        $amaliyah   = round((float)($scores['istighasah'] ?? 0), 2);
+        $jenazah    = round((float)($scores['shalat_jenazah'] ?? 0), 2);
+        $ujianTulis = round((float)($scores['ujian_tulis'] ?? 0), 2);
+
+        $rataRata = round(($thaharah + $shalat + $suratPendek + $amaliyah + $jenazah + $ujianTulis) / 6, 2);
+
+        return [
+            'thaharah'     => $thaharah,
+            'shalat'       => $shalat,
+            'surat_pendek' => $suratPendek,
+            'amaliyah'     => $amaliyah,
+            'jenazah'      => $jenazah,
+            'ujian_tulis'  => $ujianTulis,
+            'rata_rata'    => $rataRata,
+        ];
+    }
+}
+
+if (!function_exists('syncPretesToKelolaNilai')) {
+    /**
+     * Mensinkronkan nilai peserta pretes yang LULUS ke tabel tutorial_registrations
+     * agar tampil di halaman Kelola Nilai (admin/kelola-nilai.php) dan siap dicetak sertifikatnya.
+     *
+     * @param PDO $pdo
+     * @param string $periodeName Nama periode pretes (misal "2026/2027 RPL")
+     * @param string|null $tahunAjaran Tahun ajaran (opsional, jika null diambil dari master_pretes)
+     * @return array Ringkasan hasil sinkronisasi
+     */
+    function syncPretesToKelolaNilai(PDO $pdo, string $periodeName, ?string $tahunAjaran = null): array {
+        $periodeName = trim($periodeName);
+        if ($periodeName === '') {
+            throw new InvalidArgumentException("Nama periode pretes tidak boleh kosong.");
+        }
+
+        // Resolusi tahun ajaran jika belum diberikan
+        if (empty($tahunAjaran)) {
+            try {
+                $stmtTa = $pdo->prepare("SELECT tahun_ajaran FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
+                $stmtTa->execute([$periodeName]);
+                $tahunAjaran = trim((string)$stmtTa->fetchColumn());
+            } catch (Throwable $e) {
+                $tahunAjaran = '';
+            }
+        }
+        if (empty($tahunAjaran)) {
+            $tahunAjaran = $periodeName;
+        }
+
+        // Pastikan kolom tahun_ajaran & tipe_nilai tersedia di tutorial_registrations
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+            if ($driver === 'sqlite') {
+                $cols = $pdo->query("PRAGMA table_info(tutorial_registrations)")->fetchAll(PDO::FETCH_ASSOC);
+                $colNames = array_map(fn($c) => strtolower((string)($c['name'] ?? '')), $cols);
+                if (!in_array('tahun_ajaran', $colNames, true)) {
+                    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL");
+                }
+                if (!in_array('tipe_nilai', $colNames, true)) {
+                    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tipe_nilai VARCHAR(50) DEFAULT NULL");
+                }
+                $hasNilaiAkhir = in_array('nilai_akhir', $colNames, true);
+            } else {
+                $cTa = $pdo->query("SHOW COLUMNS FROM tutorial_registrations LIKE 'tahun_ajaran'")->fetch();
+                if (!$cTa) {
+                    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tahun_ajaran VARCHAR(50) DEFAULT NULL AFTER status");
+                }
+                $cTipe = $pdo->query("SHOW COLUMNS FROM tutorial_registrations LIKE 'tipe_nilai'")->fetch();
+                if (!$cTipe) {
+                    $pdo->exec("ALTER TABLE tutorial_registrations ADD COLUMN tipe_nilai VARCHAR(50) DEFAULT NULL AFTER tahun_ajaran");
+                }
+                $cNa = $pdo->query("SHOW COLUMNS FROM tutorial_registrations LIKE 'nilai_akhir'")->fetch();
+                $hasNilaiAkhir = (bool)$cNa;
+            }
+        } catch (Throwable $e) {
+            $hasNilaiAkhir = false;
+        }
+
+        // Ambil semua pendaftar pretes pada periode ini yang memiliki data asesmen
+        $stmtCandidates = $pdo->prepare("
+            SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json,
+                   u.nama_lengkap, u.nim
+            FROM pretes_registrations pr
+            JOIN users u ON pr.user_id = u.id
+            JOIN pretes_assessments pa ON pa.registration_id = pr.id
+            WHERE pr.periode = ?
+        ");
+        $stmtCandidates->execute([$periodeName]);
+        $candidates = $stmtCandidates->fetchAll(PDO::FETCH_ASSOC);
+
+        $syncedCount   = 0;
+        $insertedCount = 0;
+        $updatedCount  = 0;
+        $skippedCount  = 0;
+
+        $findRegStmt = $pdo->prepare("
+            SELECT id, nomor_sertifikat FROM tutorial_registrations 
+            WHERE user_id = ? 
+            ORDER BY (LOWER(COALESCE(tipe_nilai, '')) = 'pretest') DESC, id DESC 
+            LIMIT 1
+        ");
+
+        if ($hasNilaiAkhir) {
+            $updateStmt = $pdo->prepare("
+                UPDATE tutorial_registrations 
+                SET status = 'lulus',
+                    gelombang = COALESCE(NULLIF(gelombang, ''), 'pretest'),
+                    tahun_ajaran = ?,
+                    tipe_nilai = 'pretest',
+                    nilai_thaharah = ?,
+                    nilai_shalat = ?,
+                    nilai_surat_pendek = ?,
+                    nilai_amaliyah = ?,
+                    nilai_jenazah = ?,
+                    nilai_ujian_tulis = ?,
+                    nilai_akhir = ?
+                WHERE id = ?
+            ");
+            $insertStmt = $pdo->prepare("
+                INSERT INTO tutorial_registrations 
+                (user_id, status, gelombang, tahun_ajaran, tipe_nilai, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis, nilai_akhir)
+                VALUES (?, 'lulus', 'pretest', ?, 'pretest', ?, ?, ?, ?, ?, ?, ?)
+            ");
+        } else {
+            $updateStmt = $pdo->prepare("
+                UPDATE tutorial_registrations 
+                SET status = 'lulus',
+                    gelombang = COALESCE(NULLIF(gelombang, ''), 'pretest'),
+                    tahun_ajaran = ?,
+                    tipe_nilai = 'pretest',
+                    nilai_thaharah = ?,
+                    nilai_shalat = ?,
+                    nilai_surat_pendek = ?,
+                    nilai_amaliyah = ?,
+                    nilai_jenazah = ?,
+                    nilai_ujian_tulis = ?
+                WHERE id = ?
+            ");
+            $insertStmt = $pdo->prepare("
+                INSERT INTO tutorial_registrations 
+                (user_id, status, gelombang, tahun_ajaran, tipe_nilai, nilai_thaharah, nilai_shalat, nilai_surat_pendek, nilai_amaliyah, nilai_jenazah, nilai_ujian_tulis)
+                VALUES (?, 'lulus', 'pretest', ?, 'pretest', ?, ?, ?, ?, ?, ?)
+            ");
+        }
+
+        $pdo->beginTransaction();
+        try {
+            foreach ($candidates as $cand) {
+                $scores = json_decode($cand['scores_json'] ?? '{}', true);
+                $statusLulus = getPretesStatusLulus($scores);
+
+                // Syarat mutlak masuk ke Kelola Nilai & Cetak Sertifikat: seluruh 12 komponen lengkap & >= 80 (status LULUS)
+                if ($statusLulus !== 'lulus') {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $mapped = mapPretesScoresToCertificate($scores);
+                $userId = (int)$cand['user_id'];
+
+                $findRegStmt->execute([$userId]);
+                $existingReg = $findRegStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existingReg && !empty($existingReg['id'])) {
+                    $regId = (int)$existingReg['id'];
+                    if ($hasNilaiAkhir) {
+                        $updateStmt->execute([
+                            $tahunAjaran,
+                            $mapped['thaharah'],
+                            $mapped['shalat'],
+                            $mapped['surat_pendek'],
+                            $mapped['amaliyah'],
+                            $mapped['jenazah'],
+                            $mapped['ujian_tulis'],
+                            $mapped['rata_rata'],
+                            $regId,
+                        ]);
+                    } else {
+                        $updateStmt->execute([
+                            $tahunAjaran,
+                            $mapped['thaharah'],
+                            $mapped['shalat'],
+                            $mapped['surat_pendek'],
+                            $mapped['amaliyah'],
+                            $mapped['jenazah'],
+                            $mapped['ujian_tulis'],
+                            $regId,
+                        ]);
+                    }
+                    $updatedCount++;
+                } else {
+                    if ($hasNilaiAkhir) {
+                        $insertStmt->execute([
+                            $userId,
+                            $tahunAjaran,
+                            $mapped['thaharah'],
+                            $mapped['shalat'],
+                            $mapped['surat_pendek'],
+                            $mapped['amaliyah'],
+                            $mapped['jenazah'],
+                            $mapped['ujian_tulis'],
+                            $mapped['rata_rata'],
+                        ]);
+                    } else {
+                        $insertStmt->execute([
+                            $userId,
+                            $tahunAjaran,
+                            $mapped['thaharah'],
+                            $mapped['shalat'],
+                            $mapped['surat_pendek'],
+                            $mapped['amaliyah'],
+                            $mapped['jenazah'],
+                            $mapped['ujian_tulis'],
+                        ]);
+                    }
+                    $insertedCount++;
+                }
+                $syncedCount++;
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return [
+            'success'          => true,
+            'synced'           => $syncedCount,
+            'inserted'         => $insertedCount,
+            'updated'          => $updatedCount,
+            'skipped'          => $skippedCount,
+            'total_candidates' => count($candidates),
+            'tahun_ajaran'     => $tahunAjaran,
+            'periode'          => $periodeName,
+        ];
+    }
+}

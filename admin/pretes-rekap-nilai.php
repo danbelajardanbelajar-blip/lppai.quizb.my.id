@@ -25,7 +25,7 @@ ensurePretesFeatures($pdo);
 
 // ── Ambil Daftar Periode Pretes ───────────────────────────────────────────────
 $periods = $pdo->query("SELECT * FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC")->fetchAll();
-$selectedPeriodId = filter_var($_GET['pretes_id'] ?? 0, FILTER_VALIDATE_INT);
+$selectedPeriodId = filter_var($_GET['pretes_id'] ?? ($_POST['pretes_id'] ?? 0), FILTER_VALIDATE_INT);
 $selectedMaster = null;
 
 if ($selectedPeriodId > 0) {
@@ -173,6 +173,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 error_log('[pretes-rekap-nilai sync] ' . $e->getMessage());
                 $message = 'Sinkronisasi gagal: ' . $e->getMessage();
+                $msgType = 'danger';
+            }
+        }
+    } elseif ($action === 'sync_to_kelola_nilai') {
+        if (!$isAdmin) {
+            $message = 'Hanya Administrator yang berwenang melakukan sinkronisasi ke Kelola Nilai.';
+            $msgType = 'danger';
+        } elseif (empty($periodeName)) {
+            $message = 'Periode pretes belum dipilih.';
+            $msgType = 'danger';
+        } else {
+            try {
+                $syncRes = syncPretesToKelolaNilai($pdo, $periodeName, $tahunAjaran);
+                $linkKelola = "kelola-nilai.php?tahun_ajaran=" . urlencode($syncRes['tahun_ajaran']) . "&tipe=pretest";
+                $message = "Berhasil mensinkronkan <strong>{$syncRes['synced']}</strong> mahasiswa LULUS ke <strong>Kelola Nilai (Sertifikat)</strong> ({$syncRes['inserted']} data baru, {$syncRes['updated']} diperbarui). " .
+                    ($syncRes['skipped'] > 0 ? "Sebanyak {$syncRes['skipped']} peserta dilewati karena belum lulus / nilai belum lengkap. " : "") .
+                    "<br><a href='{$linkKelola}' class='btn btn-sm btn-primary' style='margin-top:8px; display:inline-flex; align-items:center; gap:6px; font-weight:700; text-decoration:none;'>👉 Buka Halaman Kelola Nilai & Cetak Sertifikat</a>";
+                $msgType = 'success';
+            } catch (Throwable $e) {
+                error_log('[pretes-rekap-nilai sync kelola-nilai] ' . $e->getMessage());
+                $message = 'Sinkronisasi ke Kelola Nilai gagal: ' . $e->getMessage();
                 $msgType = 'danger';
             }
         }
@@ -1195,7 +1216,7 @@ include __DIR__ . '/../includes/header.php';
 
 <?php if ($message): ?>
 <div class="alert alert-<?= $msgType ?>" style="border-radius:12px; margin-bottom:20px; font-weight:600;">
-    <?= $msgType === 'success' ? '✅' : '⚠️' ?> <?= sanitize($message) ?>
+    <?= $msgType === 'success' ? '✅' : '⚠️' ?> <?= $message ?>
 </div>
 <?php endif; ?>
 
@@ -1230,9 +1251,19 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($isAdmin): ?>
         <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin mensinkronkan seluruh nilai rata-rata dan status kelulusan peserta periode ini ke tabel Hasil Pretes resmi?')">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="pretes_id" value="<?= (int)$selectedPeriodId ?>">
             <input type="hidden" name="action" value="sync_to_results">
-            <button type="submit" class="btn" style="background:#f59e0b; color:#fff; font-weight:700; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+            <button type="submit" class="btn" style="background:#f59e0b; color:#fff; font-weight:700; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;" title="Update status kelulusan di tabel pretes_results untuk pengumuman di dashboard mahasiswa">
                 🔄 Sinkronkan ke Hasil
+            </button>
+        </form>
+
+        <form method="POST" data-no-spa style="margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin mensinkronkan seluruh nilai peserta yang LULUS periode ini ke halaman Kelola Nilai agar nomor sertifikat dan cetak sertifikat dapat diproses?')">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="pretes_id" value="<?= (int)$selectedPeriodId ?>">
+            <input type="hidden" name="action" value="sync_to_kelola_nilai">
+            <button type="submit" class="btn" style="background:#10b981; color:#fff; font-weight:700; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(16,185,129,0.3);" title="Kirim nilai 6 komponen kelulusan ke Kelola Nilai untuk penerbitan nomor dan cetak sertifikat">
+                🎓 Sinkronkan ke Kelola Nilai (Sertifikat)
             </button>
         </form>
         <?php endif; ?>

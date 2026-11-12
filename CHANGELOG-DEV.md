@@ -5,6 +5,21 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 05:08:20 +0700 — Fitur Sinkronisasi Nilai Peserta Lulus Pretes ke Kelola Nilai & Siap Cetak Sertifikat
+
+**Ringkasan:** Membangun fitur jembatan sinkronisasi otomatis dari hasil Rekapitulasi Pretes (`admin/pretes-rekap-nilai.php`) langsung ke tabel `tutorial_registrations` pada halaman Kelola Nilai (`admin/kelola-nilai.php`) sehingga peserta pretes yang dinyatakan LULUS (seluruh 12 komponen $\ge 80$) langsung terdaftar dengan `tipe_nilai = 'pretest'`, nilai transkrip 6 komponen terhitung akurat, dan nomor sertifikat resmi serta pencetakan sertifikat (`admin/cetak-sertifikat.php`) dapat langsung diproses tanpa perlu impor manual via Excel.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-helper.php` | 434–485 | Pemetaan 12 ke 6 Komponen | Menambahkan fungsi `mapPretesScoresToCertificate($scores)` yang mengelompokkan 12 komponen pretes secara tepat: Thaharah (4 komponen wudlu/tayammum/mandi), Shalat (2 komponen jamak/subuh), Surat Pendek (3 surat pendek), Amaliyah (istighasah), Jenazah (shalat jenazah), dan Ujian Tulis (CBT). |
+| `includes/pretes-helper.php` | 487–713 | Mesin Sinkronisasi Database | Menambahkan `syncPretesToKelolaNilai($pdo, $periodeName, $tahunAjaran)` berbasis transaksi database atomik: memastikan kelulusan ketat ($\ge 80$), menginsert peserta baru atau mengupdate nilai peserta yang sudah ada secara idempoten, dan menjaga integritas `nomor_sertifikat` yang sudah pernah di-lock. |
+| `admin/pretes-rekap-nilai.php` | 28, 179–200, 1219, 1254–1268 | Handler POST & Tombol Toolbar Admin | Menambahkan tombol aksi hijau `🎓 Sinkronkan ke Kelola Nilai (Sertifikat)` di toolbar rekapitulasi, menangani `action === 'sync_to_kelola_nilai'`, merender alert hasil sinkronisasi dengan link langsung ke halaman `kelola-nilai.php`, serta memastikan `$selectedPeriodId` membaca fallback POST. |
+| `admin/kelola-nilai.php` | 102, 114, 149–203 | UI Header, Filter Dinamis, & Pre-selection URL | Membaca parameter `$_GET['tahun_ajaran']` & `$_GET['tipe']`, menyajikan daftar Tahun Ajaran dinamis dari database dan rentang tahun berjalan (termasuk format `2026/2027`), serta memperjelas deskripsi bahwa halaman melayani transkrip kelulusan resmi Pretest maupun Tutorial. |
+| `tests/pretes-sync-kelola-nilai-test.php` | 1–178 | Unit & Integration Test Suite (File Baru) | Menguji akurasi pemetaan 12->6 komponen, transaksi SQLite sync (insert lulus, skip tidak lulus/belum lengkap, update idempoten mempertahankan lock sertifikat), dan integrasi komponen UI. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh 4 file terubah dan **23/23 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-12 19:17:15 +0700 — Isolasi Periode, Filter Program RPL/Reguler, & Export per Periode di `Data Peserta Pretes`
 
 **Ringkasan:** Memutakhirkan `admin/pretes-peserta.php` dan `admin/pretes-peserta-export.php` agar halaman Data Peserta Pretes beserta generate/regenerate credentials dan export Excel tidak mencampur peserta periode RPL 2026/2027 dengan periode 2026/2027 sebelumnya, serta memperbaiki bug filter Program Studi exact-match akibat penggabungan teks Prodi dan Jenis Program.

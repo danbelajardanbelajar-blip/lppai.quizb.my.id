@@ -99,7 +99,7 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="background-color: #3b82f6; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span>📊 Data Nilai Lama (Di bawah 2026)</span>
+        <span>📊 Data Nilai & Transkrip Kelulusan (Pretest, Tutorial & Rekap Sertifikat)</span>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn btn-sm btn-info" id="btnCetakTerpilih" style="display:none; font-weight: 600; background-color: #0ea5e9; border-color: #0ea5e9; color: white;">🎓 Cetak Terpilih</button>
             <button type="button" class="btn btn-sm btn-success" id="btnCetakSignedTerpilih" style="display:none; font-weight: 600; background-color: #10b981; border-color: #10b981; color: white;">✍️ Signed Terpilih</button>
@@ -111,7 +111,7 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         <p style="margin-top: 0; color: #64748b; font-size: 14px; margin-bottom: 20px;">
-            Halaman ini khusus menampilkan <strong>mahasiswa dengan periode lama (di bawah 2026/2027)</strong>.
+            Halaman ini menampilkan seluruh data nilai mahasiswa yang telah dinyatakan <strong>LULUS (Pretest & Tutorial)</strong> untuk pengelolaan nilai, penomoran resmi (lock), dan pencetakan sertifikat.
         </p>
 
         <style>
@@ -146,30 +146,56 @@ require_once __DIR__ . '/../includes/header.php';
             }
         </style>
 
+        <?php
+        $getTa   = trim($_GET['tahun_ajaran'] ?? '');
+        $getTipe = strtolower(trim($_GET['tipe'] ?? ''));
+
+        // Kumpulkan Tahun Ajaran unik dari database + rentang tahun berjalan
+        $dbTahunAjaran = $pdo->query("
+            SELECT DISTINCT tahun_ajaran 
+            FROM tutorial_registrations 
+            WHERE tahun_ajaran IS NOT NULL AND tahun_ajaran != ''
+            ORDER BY tahun_ajaran DESC
+        ")->fetchAll(PDO::FETCH_COLUMN);
+
+        $allTaList = [];
+        if (!empty($getTa)) {
+            $allTaList[] = $getTa;
+        }
+        foreach ($dbTahunAjaran as $t) {
+            $t = trim((string)$t);
+            if ($t !== '' && !in_array($t, $allTaList, true)) {
+                $allTaList[] = $t;
+            }
+        }
+        $currY = (int)date('Y') + 1;
+        for ($y = $currY; $y >= 2017; $y--) {
+            $slashFmt = $y . '/' . ($y + 1);
+            $dashFmt  = $y . '-' . ($y + 1);
+            if (!in_array($slashFmt, $allTaList, true)) $allTaList[] = $slashFmt;
+            if (!in_array($dashFmt, $allTaList, true)) $allTaList[] = $dashFmt;
+        }
+        ?>
+
         <div style="background-color: #f1f5f9; padding: 16px; border-radius: 8px; margin-bottom: 24px; border: 1px solid #e2e8f0;">
             <div style="display: flex; gap: 16px; flex-wrap: wrap;">
                 <div style="flex: 1; min-width: 180px;">
                     <label class="filter-label">📅 Tahun Ajaran</label>
                     <select id="filterTahunAjaran" class="premium-filter">
                         <option value="">Semua Tahun</option>
-                        <?php
-                        $startYear = 2017;
-                        $endYear = 2025;
-                        for ($y = $startYear; $y <= $endYear; $y++) {
-                            $label = $y . '-' . ($y + 1);
-                            echo "<option value=\"$label\">$label</option>";
-                        }
-                        ?>
+                        <?php foreach ($allTaList as $taOpt): ?>
+                            <option value="<?= htmlspecialchars($taOpt) ?>" <?= ($getTa === $taOpt) ? 'selected' : '' ?>><?= htmlspecialchars($taOpt) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div style="flex: 1; min-width: 180px;">
                     <label class="filter-label">📋 Type Nilai</label>
                     <select id="filterTipeNilai" class="premium-filter">
                         <option value="">Semua Type</option>
-                        <option value="pretest">Pretest</option>
-                        <option value="gel 1">Gel 1</option>
-                        <option value="gel 2">Gel 2</option>
-                        <option value="mandiri">Mandiri</option>
+                        <option value="pretest" <?= ($getTipe === 'pretest') ? 'selected' : '' ?>>Pretest</option>
+                        <option value="gel 1" <?= ($getTipe === 'gel 1') ? 'selected' : '' ?>>Gel 1</option>
+                        <option value="gel 2" <?= ($getTipe === 'gel 2') ? 'selected' : '' ?>>Gel 2</option>
+                        <option value="mandiri" <?= ($getTipe === 'mandiri') ? 'selected' : '' ?>>Mandiri</option>
                     </select>
                 </div>
                 <div style="flex: 1; min-width: 180px;">
