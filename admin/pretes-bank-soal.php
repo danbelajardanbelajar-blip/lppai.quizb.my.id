@@ -30,6 +30,28 @@ if (isset($_GET['ajax'])) {
         echo json_encode(['categories' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
+    if ($_GET['ajax'] === 'package_questions') {
+        $pkgId = (int)($_GET['package_id'] ?? 0);
+        $pkg = $pkgId > 0 ? pretesCbtGetPackage($pdo, $pkgId) : null;
+        $qList = pretesCbtGetPackageQuestions($pdo, $pkgId);
+        echo json_encode([
+            'success' => true,
+            'package' => $pkg,
+            'questions' => $qList
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($_GET['ajax'] === 'get_question') {
+        $qId = (int)($_GET['question_id'] ?? 0);
+        $q = pretesCbtGetQuestion($pdo, $qId);
+        if (!$q) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Soal tidak ditemukan.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'question' => $q], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
 
 $expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? ORDER BY deadline_at DESC LIMIT 100');
@@ -50,8 +72,13 @@ if (isset($_GET['download'])) {
 }
 
 $message = ''; $errors = []; $form = null; $pkgForm = null; $sesForm = null;
-$allowedTabs = ['sessions', 'packages', 'bank', 'form', 'import', 'results'];
-$activeTab = in_array($_GET['tab'] ?? '', $allowedTabs, true) ? $_GET['tab'] : 'bank';
+$allowedTabs = ['sessions', 'packages', 'import', 'results'];
+$rawTab = $_GET['tab'] ?? '';
+if ($rawTab === 'bank' || $rawTab === 'form') {
+    $activeTab = 'packages';
+} else {
+    $activeTab = in_array($rawTab, $allowedTabs, true) ? $rawTab : 'sessions';
+}
 $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
 
@@ -195,7 +222,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
             $_SESSION['cbt_bank_flash'] = $flashMsg;
-            $targetRedirectTab = in_array($_POST['current_tab'] ?? '', ['packages', 'bank'], true) ? $_POST['current_tab'] : 'bank';
+            $targetRedirectTab = in_array($_POST['current_tab'] ?? '', $allowedTabs, true) ? $_POST['current_tab'] : 'packages';
+            header('Location: ' . $bankUrl . '&tab=' . $targetRedirectTab); exit;
+        } elseif ($action === 'delete_question') {
+            $questionId = (int)($_POST['question_id'] ?? 0);
+            if ($questionId <= 0) throw new InvalidArgumentException('ID butir soal tidak valid.');
+            if (pretesCbtDeleteQuestion($pdo, $questionId)) {
+                $flashMsg = 'Butir soal berhasil dihapus.';
+            } else {
+                $flashMsg = 'Butir soal tidak ditemukan atau sudah dihapus.';
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            $targetRedirectTab = in_array($_POST['current_tab'] ?? '', $allowedTabs, true) ? $_POST['current_tab'] : 'packages';
             header('Location: ' . $bankUrl . '&tab=' . $targetRedirectTab); exit;
         } elseif ($action === 'delete_attempt') {
             $activeTab = 'results';

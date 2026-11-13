@@ -56,8 +56,6 @@
         <?php foreach ([
             'sessions' => 'Sesi Ujian',
             'packages' => 'Paket Soal',
-            'bank' => 'Bank Soal',
-            'form' => 'Tambah / Edit Soal',
             'import' => 'Impor Excel',
             'results' => 'Hasil Ujian'
         ] as $tab => $label): ?>
@@ -65,7 +63,6 @@
                 <?= $label ?>
                 <?php if ($tab === 'sessions'): ?><span class="bank-tab-count"><?= count($sessions) ?></span><?php endif; ?>
                 <?php if ($tab === 'packages'): ?><span class="bank-tab-count"><?= count($packages) ?></span><?php endif; ?>
-                <?php if ($tab === 'bank'): ?><span class="bank-tab-count"><?= count($questions) ?></span><?php endif; ?>
             </a>
         <?php endforeach; ?>
     </nav>
@@ -261,8 +258,8 @@
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan paket ini aktif untuk ujian peserta">Jadikan Aktif</button>
                                 </form>
                             <?php endif; ?>
-                            <button type="button" class="bank-button gold" style="min-height:28px;padding:4px 8px;font-size:11px" onclick="openQuickQuestionModal(<?= (int)$pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>')">＋ Soal</button>
-                            <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;tab=bank&amp;filter_pkg=<?= (int)$pkg['id'] ?>" style="min-height:28px;padding:4px 8px;font-size:11px" title="Lihat semua soal di paket ini">Lihat Soal</a>
+                            <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars(addslashes($pkg['code']), ENT_QUOTES, 'UTF-8') ?>')" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
+                            <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" onclick="openQuestionFormModal(false, null, <?= (int)$pkg['id'] ?>)" title="Tambah soal baru ke paket ini">＋ Soal</button>
                             <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" onclick='openPackageModal(true, <?= htmlspecialchars(json_encode($pkg, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 0 0 4px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Paket Soal \'<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>\'?\n\nSemua butir soal (<?= (int)$pkg['total_questions'] ?> butir) di dalam paket ini juga akan dihapus!')">
                                 <input type="hidden" name="action" value="delete_package">
@@ -276,182 +273,6 @@
                 <?php endif; ?>
                 </tbody>
             </table>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         TAB 3: BANK SOAL
-         ═══════════════════════════════════════════════════════════════════ -->
-    <?php elseif ($activeTab === 'bank'): ?>
-    <section class="bank-panel">
-        <div class="bank-panel-head">
-            <div>
-                <h3>Koleksi soal</h3>
-                <p>Kelola butir pertanyaan, kunci jawaban, dan alokasi paket soal.</p>
-            </div>
-            <div class="bank-actions">
-                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=template">↓ Template .xlsx</a>
-                <a data-no-spa class="bank-button primary" href="<?= $bankUrl ?>&amp;download=bank">Ekspor Semua Soal .xlsx</a>
-            </div>
-        </div>
-        <div class="bank-filters">
-            <input id="bankSearch" class="bank-input" type="search" placeholder="Cari pertanyaan, kode, atau kategori…" aria-label="Cari soal">
-            <select id="bankPackageFilter" class="bank-input" aria-label="Filter paket soal">
-                <option value="">Semua paket soal</option>
-                <?php foreach ($packages as $pkg): ?>
-                    <option value="<?= (int)$pkg['id'] ?>" <?= ((int)($_GET['filter_pkg'] ?? 0) === (int)$pkg['id']) ? 'selected' : '' ?>>
-                        <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['question_count_actual'] ?> aktif)<?= $pkg['is_active'] ? ' ★' : '' ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <select id="bankCategory" class="bank-input" aria-label="Filter kategori">
-                <option value="">Semua kategori</option>
-                <?php foreach ($categories as $category): ?>
-                    <option value="<?= sanitize($category) ?>"><?= sanitize($category) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <select id="bankStatus" class="bank-input" aria-label="Filter status">
-                <option value="">Semua status</option>
-                <option value="aktif">Aktif</option>
-                <option value="nonaktif">Nonaktif</option>
-            </select>
-        </div>
-        <p class="bank-scroll-hint">Geser tabel untuk melihat paket, kategori, kunci, status, dan tombol edit.</p>
-        <div class="bank-table-scroll">
-            <table class="bank-table">
-                <thead>
-                    <tr>
-                        <th style="width:40px">No.</th>
-                        <th>Pertanyaan</th>
-                        <th>Paket Soal</th>
-                        <th>Kategori</th>
-                        <th>Kunci</th>
-                        <th>Status</th>
-                        <th>Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($questions as $i => $question): ?>
-                    <tr data-bank-row data-package-id="<?= (int)($question['package_id'] ?? 1) ?>" data-category="<?= sanitize($question['category']) ?>" data-status="<?= $question['is_active'] ? 'aktif' : 'nonaktif' ?>">
-                        <td style="color:#8b978e"><?= $i + 1 ?></td>
-                        <td>
-                            <div class="bank-question"><?= sanitize($question['question_text']) ?></div>
-                            <span class="bank-code"><?= sanitize($question['code']) ?></span>
-                            <details>
-                                <summary>Lihat pilihan A–E</summary>
-                                <?php foreach (json_decode($question['options_json'], true) as $letter => $text): ?>
-                                    <div class="bank-choice <?= $letter === $question['correct_answer'] ? 'correct' : '' ?>">
-                                        <b><?= $letter ?>.</b> <?= sanitize($text) ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </details>
-                        </td>
-                        <td><span class="bank-badge package"><?= sanitize($question['package_name'] ?? ('Paket #' . ($question['package_id'] ?? 1))) ?></span></td>
-                        <td><span class="bank-badge"><?= sanitize($question['category']) ?></span></td>
-                        <td><span class="bank-key"><?= sanitize($question['correct_answer']) ?></span></td>
-                        <td><span class="bank-badge <?= $question['is_active'] ? 'active' : 'inactive' ?>"><?= $question['is_active'] ? 'Aktif' : 'Nonaktif' ?></span></td>
-                        <td><a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;edit=<?= (int)$question['id'] ?>">Edit</a></td>
-                    </tr>
-                <?php endforeach; ?>
-                <tr id="bankEmpty" hidden><td colspan="7" class="bank-empty">Tidak ada soal yang cocok dengan pencarian / filter.</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="bank-footer">
-            <span id="bankCount">Menampilkan <?= count($questions) ?> soal</span>
-            <div class="bank-pager">
-                <label>Per halaman <select id="bankPageSize" class="bank-input" style="width:auto;padding:6px"><option>10</option><option>20</option><option>50</option></select></label>
-                <button id="bankPrevious" class="bank-button" type="button">←</button>
-                <span id="bankPage"></span>
-                <button id="bankNext" class="bank-button" type="button">→</button>
-            </div>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         TAB 4: FORM TAMBAH / EDIT SOAL
-         ═══════════════════════════════════════════════════════════════════ -->
-    <?php elseif ($activeTab === 'form'): ?>
-    <section class="bank-panel">
-        <div class="bank-panel-head">
-            <div>
-                <h3><?= empty($form['id']) ? 'Buat Soal Baru' : 'Edit Soal #' . (int)$form['id'] ?></h3>
-                <p>Tulis pertanyaan, tentukan paket soal tujuan, isi 5 pilihan jawaban, dan tetapkan kunci.</p>
-            </div>
-            <span class="bank-badge">Pilihan ganda A–E</span>
-        </div>
-        <div class="bank-panel-body">
-            <?php if (empty($packages)): ?>
-                <div class="bank-empty-state">
-                    <span class="bank-empty-state-icon">⚠️</span>
-                    <h3>Buat Paket Soal Terlebih Dahulu</h3>
-                    <p>Sebelum Anda dapat memasukkan butir pertanyaan, sistem mewajibkan minimal satu <strong>Paket Soal</strong> telah dibuat agar butir soal memiliki wadah kurikulum dan durasi ujian.</p>
-                    <button type="button" class="bank-button primary" onclick="openPackageModal(false)">📦 Buat Paket Soal Sekarang</button>
-                </div>
-            <?php else: ?>
-                <form method="post" action="<?= $bankUrl ?>&amp;tab=form">
-                    <input type="hidden" name="action" value="save_question">
-                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                    <input type="hidden" name="id" value="<?= (int)($form['id'] ?? 0) ?>">
-                    <div class="bank-form-grid">
-                        <div>
-                            <div class="bank-field">
-                                <label class="bank-label" for="bankFormPackage">Paket Soal *</label>
-                                <select id="bankFormPackage" class="bank-input" name="package_id" required>
-                                    <?php 
-                                    $selectedPkgId = (int)($form['package_id'] ?? ($_GET['pkg_id'] ?? ($activePackage['id'] ?? ($packages[0]['id'] ?? 1))));
-                                    foreach ($packages as $pkg): 
-                                    ?>
-                                        <option value="<?= (int)$pkg['id'] ?>" <?= $selectedPkgId === (int)$pkg['id'] ? 'selected' : '' ?>>
-                                            [<?= sanitize($pkg['code']) ?>] <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['question_count_actual'] ?> soal aktif / target <?= (int)$pkg['question_count'] ?>)<?= $pkg['is_active'] ? ' — AKTIF' : '' ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="bank-field">
-                                <label class="bank-label" for="bankQuestion">Pertanyaan *</label>
-                                <textarea id="bankQuestion" class="bank-input" name="question_text" rows="4" maxlength="10000" required placeholder="Tulis pertanyaan secara jelas dan spesifik…"><?= sanitize($form['question_text'] ?? '') ?></textarea>
-                            </div>
-                            <div class="bank-options">
-                                <?php foreach (range('A', 'E') as $letter): ?>
-                                    <label>
-                                        <span class="bank-option-label"><span class="bank-letter"><?= $letter ?></span>Pilihan <?= $letter ?></span>
-                                        <textarea class="bank-input" name="option_<?= $letter ?>" maxlength="2000" rows="2" required placeholder="Isi pilihan <?= $letter ?>"><?= sanitize($form['option_' . $letter] ?? '') ?></textarea>
-                                    </label>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <aside class="bank-form-aside">
-                            <h4>Pengaturan Soal</h4>
-                            <div class="bank-field">
-                                <label class="bank-label" for="bankFormCategory">Kategori Materi *</label>
-                                <input id="bankFormCategory" list="bankCategories" class="bank-input" name="category" maxlength="80" required value="<?= sanitize($form['category'] ?? 'Umum') ?>">
-                                <datalist id="bankCategories">
-                                    <?php foreach ($categories as $category): ?><option value="<?= sanitize($category) ?>"><?php endforeach; ?>
-                                </datalist>
-                            </div>
-                            <div class="bank-field">
-                                <label class="bank-label" for="bankCorrect">Kunci Jawaban *</label>
-                                <select id="bankCorrect" class="bank-input" name="correct_answer" required>
-                                    <option value="">Pilih kunci A–E</option>
-                                    <?php foreach (range('A', 'E') as $letter): ?>
-                                        <option value="<?= $letter ?>" <?= ($form['correct_answer'] ?? '') === $letter ? 'selected' : '' ?>>Pilihan <?= $letter ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <label class="bank-toggle">
-                                <input type="checkbox" name="is_active" value="1" <?= !empty($form['is_active']) ? 'checked' : '' ?>>
-                                Aktifkan untuk paket ujian baru
-                            </label>
-                            <p style="margin-top:6px;font-size:11px;color:#6d7f72">Soal nonaktif disimpan di bank namun tidak diikutkan saat sesi ujian diacak untuk peserta.</p>
-                        </aside>
-                    </div>
-                    <div class="bank-form-actions">
-                        <button class="bank-button primary" type="submit">Simpan Soal</button>
-                        <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;tab=bank">Kembali ke bank soal</a>
-                    </div>
-                </form>
-            <?php endif; ?>
         </div>
     </section>
 
@@ -550,7 +371,7 @@
                         <th>Status</th>
                         <th>Benar</th>
                         <th>Nilai</th>
-                        <th style="text-align:center;width:90px">Aksi</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -767,69 +588,121 @@
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════
-     MODAL 3: QUICK ADD SOAL KE PAKET (TANPA PINDAH HALAMAN)
-     ═══════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="modalQuickQuestion" role="dialog" aria-modal="true" aria-labelledby="modalQuickQuestionTitle">
+<!-- ===================================================================
+     MODAL 3: KELOLA & KOLEKSI SOAL PAKET (MODAL CANTIK & LENGKAP)
+     =================================================================== -->
+<div class="bank-modal-backdrop" id="modalPackageQuestions" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
+    <div class="bank-modal extra-large">
+        <div class="modal-header-banner">
+            <div>
+                <h3>📋 Koleksi Soal — <span id="pkgQuestionsTitle">Paket Soal</span></h3>
+                <div style="font-size:12px;opacity:0.9;margin-top:3px;display:flex;align-items:center;gap:8px">
+                    <span id="pkgQuestionsCodeBadge" class="bank-code" style="background:rgba(255,255,255,0.2);color:#fff"></span>
+                    <span id="pkgQuestionsCountBadge" style="font-weight:600"></span>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <button type="button" class="bank-button gold" id="btnModalAddQuestion" style="min-height:34px;font-size:12px;font-weight:700">＋ Tambah Soal Baru</button>
+                <a class="bank-button" id="btnModalImportExcel" href="<?= $bankUrl ?>&amp;tab=import" style="min-height:34px;font-size:12px;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">📥 Impor Excel</a>
+                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=bank" style="min-height:34px;font-size:12px;background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.3)">📤 Ekspor .xlsx</a>
+                <button type="button" class="bank-modal-close" data-close-modal aria-label="Tutup">✕</button>
+            </div>
+        </div>
+
+        <div class="modal-q-toolbar">
+            <div class="modal-q-toolbar-left">
+                <input id="modalQSearch" class="bank-input" type="search" placeholder="🔍 Cari butir pertanyaan, kode, kategori…" style="max-width:320px;padding:7px 12px">
+                <select id="modalQCategory" class="bank-input" style="max-width:200px;padding:7px 12px">
+                    <option value="">Semua Kategori</option>
+                </select>
+                <select id="modalQStatus" class="bank-input" style="max-width:140px;padding:7px 12px">
+                    <option value="">Semua Status</option>
+                    <option value="aktif">Aktif</option>
+                    <option value="nonaktif">Nonaktif</option>
+                </select>
+            </div>
+            <span id="modalQCountBadge" style="font-size:12px;color:#64748b;font-weight:600"></span>
+        </div>
+
+        <div class="modal-q-list" id="modalQListContainer">
+            <!-- Dynamic question cards rendered by JS -->
+        </div>
+
+        <div class="bank-modal-foot" style="justify-content:space-between">
+            <div style="font-size:12px;color:#64748b">
+                💡 <em>Pilihan jawaban yang berlatar hijau adalah <strong>Kunci Jawaban</strong> yang benar.</em>
+            </div>
+            <button type="button" class="bank-button" data-close-modal>Tutup Jendela</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================================================================
+     MODAL 4: TAMBAH / EDIT BUTIR SOAL (MODAL CANTIK & LENGKAP)
+     =================================================================== -->
+<div class="bank-modal-backdrop" id="modalQuestionForm" role="dialog" aria-modal="true" aria-labelledby="modalQuestionFormTitle">
     <div class="bank-modal large">
         <div class="bank-modal-head">
             <div>
-                <h3 id="modalQuickQuestionTitle">＋ Tambah Soal ke Paket</h3>
-                <span id="quickQuestionSubtitle" style="font-size:12px;color:#557063"></span>
+                <h3 id="modalQuestionFormTitle">＋ Tambah Butir Soal Baru</h3>
+                <span id="modalQuestionFormSubtitle" style="font-size:12px;color:#557063">Masukkan butir pertanyaan dan 5 pilihan jawaban A–E</span>
             </div>
             <button type="button" class="bank-modal-close" data-close-modal aria-label="Tutup">✕</button>
         </div>
-        <form method="post" action="<?= $bankUrl ?>" id="formQuickQuestionModal">
+        <form method="post" action="<?= $bankUrl ?>" id="formQuestionModal">
             <input type="hidden" name="action" value="save_question">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="current_tab" value="<?= sanitize($activeTab) ?>">
+            <input type="hidden" name="id" id="qFormId" value="0">
             <div class="bank-modal-body">
-                <div class="bank-field">
-                    <label class="bank-label" for="quickQuestionPackageId">Paket Soal Tujuan *</label>
-                    <select id="quickQuestionPackageId" class="bank-input" name="package_id" required>
-                        <?php foreach ($packages as $pkg): ?>
-                            <option value="<?= (int)$pkg['id'] ?>">[<?= sanitize($pkg['code']) ?>] <?= sanitize($pkg['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="bank-field">
-                    <label class="bank-label" for="quickQuestionText">Pertanyaan *</label>
-                    <textarea id="quickQuestionText" class="bank-input" name="question_text" rows="3" maxlength="10000" required placeholder="Tuliskan butir soal…"></textarea>
-                </div>
-                <div class="bank-options" style="margin-bottom:14px">
-                    <?php foreach (range('A', 'E') as $letter): ?>
-                        <label>
-                            <span class="bank-option-label"><span class="bank-letter"><?= $letter ?></span>Pilihan <?= $letter ?> *</span>
-                            <textarea class="bank-input" name="option_<?= $letter ?>" maxlength="2000" rows="2" required placeholder="Jawaban pilihan <?= $letter ?>…"></textarea>
-                        </label>
-                    <?php endforeach; ?>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-                    <div class="bank-field">
-                        <label class="bank-label" for="quickQuestionCategory">Kategori Materi *</label>
-                        <input id="quickQuestionCategory" list="bankCategoriesQuick" class="bank-input" name="category" maxlength="80" required value="Umum" placeholder="Misal: Fiqih, Al-Qur'an, Ubudiyah">
-                        <datalist id="bankCategoriesQuick">
-                            <?php foreach ($categories as $category): ?><option value="<?= sanitize($category) ?>"><?php endforeach; ?>
-                        </datalist>
-                    </div>
-                    <div class="bank-field">
-                        <label class="bank-label" for="quickQuestionCorrect">Kunci Jawaban *</label>
-                        <select id="quickQuestionCorrect" class="bank-input" name="correct_answer" required>
-                            <option value="">Pilih Kunci A–E</option>
-                            <?php foreach (range('A', 'E') as $letter): ?>
-                                <option value="<?= $letter ?>">Pilihan <?= $letter ?></option>
+                <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px">
+                    <div class="bank-field" style="margin:0">
+                        <label class="bank-label" for="qFormPackageId">Paket Soal Tujuan *</label>
+                        <select id="qFormPackageId" class="bank-input" name="package_id" required>
+                            <?php foreach ($packages as $pkg): ?>
+                                <option value="<?= (int)$pkg['id'] ?>">[<?= sanitize($pkg['code']) ?>] <?= sanitize($pkg['name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    <div class="bank-field" style="margin:0">
+                        <label class="bank-label" for="qFormCategory">Kategori Materi *</label>
+                        <input id="qFormCategory" list="bankCategoriesList" class="bank-input" name="category" maxlength="80" required value="Umum" placeholder="Misal: Fiqih, Al-Qur'an, Ubudiyah">
+                        <datalist id="bankCategoriesList">
+                            <?php foreach ($categories as $category): ?><option value="<?= sanitize($category) ?>"><?php endforeach; ?>
+                        </datalist>
+                    </div>
                 </div>
-                <label class="bank-toggle">
-                    <input type="checkbox" name="is_active" value="1" checked>
-                    Aktifkan soal ini untuk ujian peserta
+
+                <div class="bank-field" style="margin-bottom:16px">
+                    <label class="bank-label" for="qFormText">Teks Pertanyaan *</label>
+                    <textarea id="qFormText" class="bank-input" name="question_text" rows="3" maxlength="10000" required placeholder="Tuliskan pertanyaan secara jelas dan terstruktur…"></textarea>
+                </div>
+
+                <div style="margin-bottom:14px">
+                    <label class="bank-label" style="margin-bottom:4px">Pilihan Jawaban (A – E) &amp; Kunci Jawaban *</label>
+                    <p style="font-size:11.5px;color:#64748b;margin:0 0 10px 0">Pilih radio button pada pilihan yang merupakan <strong>kunci jawaban yang benar</strong>:</p>
+                    
+                    <?php foreach (range('A', 'E') as $letter): ?>
+                        <div class="question-opt-row <?= $letter === 'A' ? 'selected-key' : '' ?>" id="qFormRow_<?= $letter ?>">
+                            <label class="question-opt-radio-label" title="Jadikan pilihan <?= $letter ?> sebagai kunci jawaban">
+                                <input type="radio" name="correct_answer" value="<?= $letter ?>" id="qFormRadio_<?= $letter ?>" <?= $letter === 'A' ? 'checked' : '' ?> required>
+                                <span class="question-opt-letter-tag">Pilihan <?= $letter ?></span>
+                            </label>
+                            <div style="flex:1">
+                                <textarea id="qFormOpt_<?= $letter ?>" class="bank-input" name="option_<?= $letter ?>" rows="2" maxlength="2000" required placeholder="Teks pilihan jawaban <?= $letter ?>…" style="margin:0;font-size:13px"></textarea>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <label class="bank-toggle" style="margin-top:8px">
+                    <input type="checkbox" name="is_active" id="qFormActive" value="1" checked>
+                    <strong>Aktifkan butir soal ini</strong> (Diikutkan dalam undian paket ujian peserta)
                 </label>
             </div>
             <div class="bank-modal-foot">
                 <button type="button" class="bank-button" data-close-modal>Batal</button>
-                <button type="submit" class="bank-button primary">Simpan Soal</button>
+                <button type="submit" class="bank-button primary" id="btnSaveQuestionModal">✓ Simpan Butir Soal</button>
             </div>
         </form>
     </div>

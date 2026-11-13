@@ -437,6 +437,41 @@ function pretesCbtSaveQuestion(PDO $pdo, array $input): int {
     return (int)$pdo->lastInsertId();
 }
 
+function pretesCbtGetQuestion(PDO $pdo, int $questionId): ?array {
+    if ($questionId <= 0) return null;
+    ensurePretesCbtTables($pdo);
+    $stmt = $pdo->prepare('SELECT q.*, p.name AS package_name, p.code AS package_code FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id WHERE q.id = ?');
+    $stmt->execute([$questionId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return null;
+    $row['options'] = json_decode($row['options_json'], true) ?: [];
+    return $row;
+}
+
+function pretesCbtDeleteQuestion(PDO $pdo, int $questionId): bool {
+    if ($questionId <= 0) return false;
+    ensurePretesCbtTables($pdo);
+    $stmt = $pdo->prepare('DELETE FROM pretes_cbt_questions WHERE id = ?');
+    $stmt->execute([$questionId]);
+    return $stmt->rowCount() > 0;
+}
+
+function pretesCbtGetPackageQuestions(PDO $pdo, int $packageId = 0): array {
+    ensurePretesCbtTables($pdo);
+    if ($packageId > 0) {
+        $stmt = $pdo->prepare('SELECT q.*, p.name AS package_name, p.code AS package_code FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id WHERE q.package_id = ? ORDER BY q.id DESC');
+        $stmt->execute([$packageId]);
+    } else {
+        $stmt = $pdo->query('SELECT q.*, p.name AS package_name, p.code AS package_code FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id ORDER BY q.id DESC');
+    }
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$row) {
+        $row['options'] = json_decode($row['options_json'], true) ?: [];
+    }
+    unset($row);
+    return $rows;
+}
+
 function pretesCbtGetPackages(PDO $pdo): array {
     ensurePretesCbtTables($pdo);
     return $pdo->query('SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p ORDER BY p.is_active DESC, p.id DESC')->fetchAll(PDO::FETCH_ASSOC);

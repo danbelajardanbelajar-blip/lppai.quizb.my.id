@@ -296,4 +296,300 @@
             });
         }
     }
+
+    // ── Package Questions Manager Modal ──────────────────────────────────────
+    window._currentPackageQuestions = [];
+    window._currentPackageId = 0;
+    window._currentPackageName = '';
+    window._currentPackageCode = '';
+
+    window.renderModalQuestions = function (query, catFilter, statusFilter) {
+        const container = get('modalQListContainer');
+        const countBadge = get('modalQCountBadge');
+        if (!container) return;
+
+        query = (query || '').toLowerCase().trim();
+        catFilter = catFilter || '';
+        statusFilter = statusFilter || '';
+
+        const list = window._currentPackageQuestions || [];
+        const filtered = list.filter(q => {
+            const matchQ = !query ||
+                (q.question_text || '').toLowerCase().includes(query) ||
+                (q.code || '').toLowerCase().includes(query) ||
+                (q.category || '').toLowerCase().includes(query);
+            const matchCat = !catFilter || q.category === catFilter;
+            const matchStat = !statusFilter || (statusFilter === 'aktif' ? Number(q.is_active) === 1 : Number(q.is_active) === 0);
+            return matchQ && matchCat && matchStat;
+        });
+
+        if (countBadge) {
+            countBadge.textContent = filtered.length + ' dari ' + list.length + ' soal';
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#64748b;background:#f8fafc;border-radius:12px;border:1.5px dashed #cbd5e1;">' +
+                '<div style="font-size:32px;margin-bottom:8px">📭</div>' +
+                '<strong style="font-size:15px;color:#334155;display:block;margin-bottom:4px">Tidak Ada Butir Soal Ditemukan</strong>' +
+                '<p style="font-size:13px;margin:0 0 14px 0">Belum ada butir soal atau tidak cocok dengan filter pencarian.</p>' +
+                '<button type="button" class="bank-button primary" onclick="openQuestionFormModal(false, null, window._currentPackageId)">＋ Tambah Soal Pertama Sekarang</button>' +
+                '</div>';
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((q, idx) => {
+            const isActive = Number(q.is_active) === 1;
+            const options = q.options || {};
+            const qJson = JSON.stringify(q).replace(/"/g, '&quot;');
+
+            html += '<div class="bank-qcard" id="qcard_' + q.id + '">';
+            html += '<div class="bank-qcard-head">';
+            html += '<div class="bank-qcard-meta">';
+            html += '<span class="bank-qcard-num">#' + (idx + 1) + '</span>';
+            html += '<span class="bank-code">' + String(q.code || '').replace(/</g, '&lt;') + '</span>';
+            html += '<span class="bank-badge package">' + String(q.category || 'Umum').replace(/</g, '&lt;') + '</span>';
+            if (isActive) {
+                html += '<span class="bank-badge active">● Aktif</span>';
+            } else {
+                html += '<span class="bank-badge inactive">Nonaktif</span>';
+            }
+            html += '</div>';
+            html += '<div style="display:flex;gap:6px">';
+            html += '<button type="button" class="bank-button" style="min-height:26px;padding:3px 8px;font-size:11px" onclick="openQuestionFormModal(true, ' + qJson + ', window._currentPackageId)">✏️ Edit</button>';
+            html += '<button type="button" class="bank-button danger-sm" style="min-height:26px;padding:3px 8px;font-size:11px" onclick="deleteQuestion(' + q.id + ', window._currentPackageId)">🗑️ Hapus</button>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '<div class="bank-qcard-text">' + String(q.question_text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+
+            html += '<div class="bank-qcard-options">';
+            ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
+                const optText = options[letter] || q['option_' + letter] || '—';
+                const isCorrect = q.correct_answer === letter;
+                html += '<div class="bank-qcard-opt' + (isCorrect ? ' is-key' : '') + '">';
+                html += '<span class="bank-qcard-opt-letter">' + letter + '</span>';
+                html += '<span style="flex:1">' + String(optText).replace(/</g, '&lt;') + '</span>';
+                if (isCorrect) {
+                    html += '<span style="font-size:11px;font-weight:700;color:#059669;margin-left:auto">✓ Kunci</span>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+    };
+
+    window.openPackageQuestionsModal = function (packageId, packageName, packageCode) {
+        window._currentPackageId = packageId;
+        window._currentPackageName = packageName || 'Semua Bank Soal';
+        window._currentPackageCode = packageCode || 'SEMUA';
+
+        const titleEl = get('pkgQuestionsTitle');
+        const codeBadge = get('pkgQuestionsCodeBadge');
+        const countBadge = get('pkgQuestionsCountBadge');
+        const container = get('modalQListContainer');
+
+        if (titleEl) titleEl.textContent = window._currentPackageName;
+        if (codeBadge) codeBadge.textContent = window._currentPackageCode;
+        if (countBadge) countBadge.textContent = 'Memuat soal…';
+
+        const btnAdd = get('btnModalAddQuestion');
+        if (btnAdd) {
+            btnAdd.onclick = () => window.openQuestionFormModal(false, null, packageId);
+        }
+
+        const btnImport = get('btnModalImportExcel');
+        if (btnImport) {
+            btnImport.href = (window.location.pathname || '') + '?cbt_bank=1&tab=import' + (packageId > 0 ? ('&target_pkg=' + packageId) : '');
+        }
+
+        if (container) {
+            container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;"><div style="font-size:24px;margin-bottom:8px">⏳</div>Memuat butir pertanyaan…</div>';
+        }
+
+        window.openModal('modalPackageQuestions');
+
+        // Fetch questions from AJAX endpoint
+        const fetchUrl = (window.location.pathname || '') + '?cbt_bank=1&ajax=package_questions&package_id=' + (packageId || 0);
+        fetch(fetchUrl)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.success) {
+                    window._currentPackageQuestions = data.questions || [];
+                    if (countBadge) {
+                        countBadge.textContent = window._currentPackageQuestions.length + ' butir soal';
+                    }
+
+                    // Populate categories dropdown in modal filter
+                    const catSelect = get('modalQCategory');
+                    if (catSelect) {
+                        const cats = Array.from(new Set(window._currentPackageQuestions.map(q => q.category).filter(Boolean))).sort();
+                        let catHtml = '<option value="">Semua Kategori</option>';
+                        cats.forEach(c => {
+                            catHtml += '<option value="' + String(c).replace(/"/g, '&quot;') + '">' + String(c).replace(/</g, '&lt;') + '</option>';
+                        });
+                        catSelect.innerHTML = catHtml;
+                    }
+
+                    window.renderModalQuestions('', '', '');
+                } else {
+                    if (container) container.innerHTML = '<div style="padding:30px;color:#b91c1c;text-align:center;">Gagal memuat soal: ' + (data.message || 'Terjadi kesalahan.') + '</div>';
+                }
+            })
+            .catch(err => {
+                if (container) container.innerHTML = '<div style="padding:30px;color:#b91c1c;text-align:center;">Gagal memuat soal: ' + err.message + '</div>';
+            });
+    };
+
+    // Listen to search and filter events in Question Manager Modal
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.id === 'modalQSearch') {
+            const cat = get('modalQCategory') ? get('modalQCategory').value : '';
+            const stat = get('modalQStatus') ? get('modalQStatus').value : '';
+            window.renderModalQuestions(e.target.value, cat, stat);
+        }
+    });
+    document.addEventListener('change', function (e) {
+        if (e.target && (e.target.id === 'modalQCategory' || e.target.id === 'modalQStatus')) {
+            const query = get('modalQSearch') ? get('modalQSearch').value : '';
+            const cat = get('modalQCategory') ? get('modalQCategory').value : '';
+            const stat = get('modalQStatus') ? get('modalQStatus').value : '';
+            window.renderModalQuestions(query, cat, stat);
+        }
+    });
+
+    // ── Question Form Modal (Add / Edit) ──────────────────────────────────────
+    window.openQuestionFormModal = function (isEdit, data, defaultPackageId) {
+        const titleEl = get('modalQuestionFormTitle');
+        const subtitleEl = get('modalQuestionFormSubtitle');
+        const form = get('formQuestionModal');
+        if (!form) return;
+        form.reset();
+
+        const pkgSelect = get('qFormPackageId');
+        if (pkgSelect) {
+            const targetPkg = isEdit ? (data.package_id || defaultPackageId || 1) : (defaultPackageId || 1);
+            pkgSelect.value = String(targetPkg);
+        }
+
+        if (isEdit && data) {
+            if (titleEl) titleEl.textContent = '✏️ Edit Butir Soal #' + (data.id || '');
+            if (subtitleEl) subtitleEl.textContent = 'Kode: ' + (data.code || '-') + ' · Mengubah butir soal pada paket';
+            get('qFormId').value = data.id || 0;
+            get('qFormCategory').value = data.category || 'Umum';
+            get('qFormText').value = data.question_text || '';
+            get('qFormActive').checked = Number(data.is_active) === 1;
+
+            const options = data.options || {};
+            const key = data.correct_answer || 'A';
+            ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
+                const optInput = get('qFormOpt_' + letter);
+                if (optInput) optInput.value = options[letter] || data['option_' + letter] || '';
+                const radio = get('qFormRadio_' + letter);
+                if (radio) radio.checked = (key === letter);
+                const row = get('qFormRow_' + letter);
+                if (row) {
+                    if (key === letter) row.classList.add('selected-key');
+                    else row.classList.remove('selected-key');
+                }
+            });
+        } else {
+            if (titleEl) titleEl.textContent = '＋ Tambah Butir Soal Baru';
+            if (subtitleEl) subtitleEl.textContent = 'Masukkan pertanyaan dan 5 pilihan jawaban A–E';
+            get('qFormId').value = 0;
+            get('qFormCategory').value = 'Umum';
+            get('qFormText').value = '';
+            get('qFormActive').checked = true;
+
+            ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
+                const optInput = get('qFormOpt_' + letter);
+                if (optInput) optInput.value = '';
+                const radio = get('qFormRadio_' + letter);
+                if (radio) radio.checked = (letter === 'A');
+                const row = get('qFormRow_' + letter);
+                if (row) {
+                    if (letter === 'A') row.classList.add('selected-key');
+                    else row.classList.remove('selected-key');
+                }
+            });
+        }
+
+        window.openModal('modalQuestionForm');
+    };
+
+    // Radio button changes to highlight correct answer in Question Form Modal
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.name === 'correct_answer') {
+            ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
+                const row = get('qFormRow_' + letter);
+                if (row) {
+                    if (e.target.value === letter) row.classList.add('selected-key');
+                    else row.classList.remove('selected-key');
+                }
+            });
+        }
+    });
+
+    // ── Delete Question Handler ──────────────────────────────────────────────
+    window.deleteQuestion = function (questionId, packageId) {
+        if (!confirm('PERINGATAN: Yakin ingin menghapus butir soal ini secara permanen?')) {
+            return;
+        }
+
+        const formData = new URLSearchParams();
+        formData.append('action', 'delete_question');
+        formData.append('csrf_token', (document.querySelector('input[name=csrf_token]') || {}).value || '');
+        formData.append('question_id', String(questionId));
+
+        const card = get('qcard_' + questionId);
+        if (card) {
+            card.style.opacity = '0.5';
+            card.style.pointerEvents = 'none';
+        }
+
+        fetch((window.location.pathname || '') + '?cbt_bank=1', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData.toString()
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data && data.success) {
+                // Remove from local list
+                window._currentPackageQuestions = (window._currentPackageQuestions || []).filter(q => Number(q.id) !== Number(questionId));
+                if (card) {
+                    card.style.transition = 'all 0.3s ease';
+                    card.style.transform = 'scale(0.9)';
+                    card.style.opacity = '0';
+                    setTimeout(() => {
+                        if (card.parentNode) card.parentNode.removeChild(card);
+                        const countBadge = get('modalQCountBadge');
+                        if (countBadge) {
+                            countBadge.textContent = window._currentPackageQuestions.length + ' butir soal';
+                        }
+                    }, 300);
+                }
+            } else {
+                alert('Gagal menghapus soal: ' + (data.message || 'Terjadi kesalahan.'));
+                if (card) {
+                    card.style.opacity = '1';
+                    card.style.pointerEvents = '';
+                }
+            }
+        })
+        .catch(err => {
+            alert('Gagal menghapus soal: ' + err.message);
+            if (card) {
+                card.style.opacity = '1';
+                card.style.pointerEvents = '';
+            }
+        });
+    };
+
 })();

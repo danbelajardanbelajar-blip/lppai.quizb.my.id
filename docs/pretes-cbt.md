@@ -26,7 +26,15 @@ Bagian kredensial dan tautan E-Ujian di halaman tersebut telah dihapus.
 ## Admin & Manajemen Paket Soal
 
 Menu **Bank Soal & Hasil CBT**, atau `pretes-ujian.php?cbt_bank=1`, hanya untuk admin.
-Admin kini dapat mengelola **Paket Soal** (`tab=packages`), menyusun butir pertanyaan per paket (`tab=form`), mengimpor dari Excel ke paket target (`tab=import`), dan melihat hasil ujian (`tab=results`).
+Navigasi tab utama kini disederhanakan dan difokuskan pada:
+1. **Sesi Ujian** (`tab=sessions`): Pengatur parameter sesi aktif mahasiswa.
+2. **Paket Soal** (`tab=packages`): Manajemen wadah kurikulum soal ujian.
+3. **Impor Excel** (`tab=import`): Fasilitas impor massal butir soal ke paket terpilih.
+4. **Hasil Ujian** (`tab=results`): Rekapitulasi pengerjaan CBT mahasiswa.
+
+Tab lama **Bank Soal** dan **Tambah / Edit Soal** kini dihilangkan dari bilah navigasi dan digantikan dengan **Modal Interaktif In-Place**:
+- **Modal Kelola & Koleksi Soal (`#modalPackageQuestions`):** Dibuka dengan menekan tombol **"📋 Kelola Soal (X)"** pada baris paket soal atau **"📚 Koleksi Soal"** di hero banner. Modal ini menampilkan daftar butir soal paket lengkap dengan filter pencarian instan, filter kategori materi, status keaktifan, highlight kunci jawaban berwarna hijau, serta tombol Edit dan Hapus tiap butir soal.
+- **Modal Tambah / Edit Butir Soal (`#modalQuestionForm`):** Dibuka dengan menekan tombol **"＋ Tambah Soal"** atau **"✏️ Edit"** pada butir soal. Memungkinkan input/edit butir soal dengan 5 opsi pilihan A–E, radio button pemilihan kunci jawaban interaktif, dan status aktif tanpa berpindah halaman.
 
 ### Arsitektur Paket Soal & Prasyarat Penginputan
 - **Wadah Paket Soal:** Sebelum butir soal dimasukkan, sistem mewajibkan minimal 1 Paket Soal telah dibuat. Tab Tambah Soal dan Impor Excel akan memblokir penginputan jika belum ada paket yang terdaftar.

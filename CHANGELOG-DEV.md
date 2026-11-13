@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 21:57:30 +0700 — Eliminasi Tab Bank Soal & Form Soal, Transformasi ke Modal Kelola & Edit Soal Cantik
+
+**Ringkasan:** Memenuhi instruksi user untuk menyederhanakan navigasi dengan menghilangkan tab berdiri sendiri "Bank Soal" dan "Tambah / Edit Soal", lalu mentransformasikannya ke dalam modal interaktif modern (*in-place modal*) yang elegan:
+1. **Penyederhanaan Tab Bilah Atas:** Hanya menyisakan tab esensial: `Sesi Ujian`, `Paket Soal`, `Impor Excel`, dan `Hasil Ujian`. Tab `bank` dan `form` dihapus dari bilah tab.
+2. **Modal Kelola & Koleksi Soal (`#modalPackageQuestions`):** Dapat diakses melalui tombol **"📋 Kelola Soal (X)"** pada tiap baris paket soal atau tombol hero **"📚 Koleksi Soal"**. Dilengkapi bilah pencarian real-time, filter kategori materi, filter status aktif/nonaktif, badge kunci jawaban hijau elegan pada pilihan yang benar, serta tombol aksi Edit dan Hapus per butir soal.
+3. **Modal Tambah / Edit Butir Soal (`#modalQuestionForm`):** Menggantikan form statis halaman dengan modal pop-up yang nyaman dan terstruktur: dropdown target paket, datalist kategori materi, textarea pertanyaan, 5 kartu opsi A–E dengan selector radio button kunci jawaban interaktif, dan switch status aktif.
+4. **Backend Helpers & Endpoint AJAX:** Menambahkan `pretesCbtGetQuestion`, `pretesCbtDeleteQuestion`, `pretesCbtGetPackageQuestions`, penanganan aksi POST `delete_question`, dan endpoint AJAX `package_questions` serta `get_question`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `admin/pretes-bank-soal.php` | 20–50 | Endpoint AJAX | Menambahkan endpoint `ajax=package_questions` dan `ajax=get_question`. |
+| `admin/pretes-bank-soal.php` | 55–65 | Filter Tab Aktif | Menghapus `bank` dan `form` dari `$allowedTabs`, mapping akses lama ke `packages`. |
+| `admin/pretes-bank-soal.php` | 185–225 | Action Handler | Menambahkan penanganan `delete_question` dan penyesuaian redirect `save_question` ke `packages`. |
+| `includes/pretes-cbt.php` | 430–485 | Helper Soal Baru | Menambahkan fungsi `pretesCbtGetQuestion`, `pretesCbtDeleteQuestion`, dan `pretesCbtGetPackageQuestions`. |
+| `includes/pretes-cbt-admin-view.php` | 10–25 | Hero Action Buttons | Menambahkan tombol hero `📚 Koleksi Soal`. |
+| `includes/pretes-cbt-admin-view.php` | 55–70 | Bilah Tab Navigasi | Menghapus tab `bank` dan `form`, menyisakan `sessions`, `packages`, `import`, `results`. |
+| `includes/pretes-cbt-admin-view.php` | 240–270 | Tabel Paket Soal | Memperbarui tombol aksi menjadi `📋 Kelola Soal (X)`, `＋ Soal`, `✏️ Edit`, dan `🗑️ Hapus`. |
+| `includes/pretes-cbt-admin-view.php` | 550–710 | Markup Modal Baru | Menambahkan `#modalPackageQuestions` (extra-large) dan `#modalQuestionForm` (large). |
+| `assets/css/pretes-cbt-admin.css` | 38–180 | Styling Modal Baru | Menambahkan styling modal extra-large, header banner hijau, toolbar filter, kartu butir soal (`.bank-qcard`), opsi kartu A–E, dan highlight kunci jawaban. |
+| `assets/js/pretes-cbt-admin.js` | 290–490 | Controller Modal JS | Menambahkan fungsi `openPackageQuestionsModal`, `renderModalQuestions`, `openQuestionFormModal`, dan `deleteQuestion`. |
+| `docs/pretes-cbt.md` | 28–45 | Dokumentasi Teknis | Memperbarui panduan alur kerja manajemen soal berbasis modal. |
+| `tests/pretes-cbt-session-test.php` | 195–218 | Test Suite | Menambahkan validasi keberadaan modal baru dan uji fungsi helper `pretesCbtGetQuestion`, `pretesCbtDeleteQuestion`. |
+
+---
+
 ## 2026-11-13 21:26:00 +0700 — Pengatur Sesi Ujian (Exam Sessions), Kuota Kategori, Mode Kamera, Window Jadwal, Token, & Modal In-Place
 
 **Ringkasan:** Mengimplementasikan fitur komprehensif Pengatur Sesi Ujian (`tab=sessions`) dan transisi antarmuka Tambah/Edit Paket Soal serta Sesi Ujian ke dialog modal *in-place* tanpa reload/pindah halaman, memenuhi seluruh kebutuhan manajemen CBT:

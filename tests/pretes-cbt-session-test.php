@@ -195,11 +195,23 @@ function runSessionTests(): void {
     $viewContent = file_get_contents(__DIR__ . '/../includes/pretes-cbt-admin-view.php');
     assert(strpos($viewContent, 'id="modalPackageForm"') !== false, "Markup modalPackageForm harus ada.");
     assert(strpos($viewContent, 'id="modalSessionForm"') !== false, "Markup modalSessionForm harus ada.");
-    assert(strpos($viewContent, 'id="modalQuickQuestion"') !== false, "Markup modalQuickQuestion harus ada.");
+    assert(strpos($viewContent, 'id="modalQuestionForm"') !== false, "Markup modalQuestionForm harus ada.");
+    assert(strpos($viewContent, 'id="modalPackageQuestions"') !== false, "Markup modalPackageQuestions harus ada.");
     assert(strpos($viewContent, 'openSessionModal') !== false, "Handler JS openSessionModal harus ada.");
     assert(strpos($viewContent, 'openPackageModal') !== false, "Handler JS openPackageModal harus ada.");
     assert(strpos($viewContent, 'generateRandomToken') !== false, "Handler JS generateRandomToken harus ada.");
     echo "✓ Test 7 Passed: Verifikasi kelengkapan komponen modal in-place dan controller JS pada view.\n";
+
+    // 8. Test Question Retrieval & Deletion Helpers
+    $sampleQs = pretesCbtGetPackageQuestions($pdo, $pkg1Id);
+    assert(!empty($sampleQs), "Harus ada soal di paket 1");
+    $firstQ = $sampleQs[0];
+    $fetchedQ = pretesCbtGetQuestion($pdo, (int)$firstQ['id']);
+    assert($fetchedQ && (int)$fetchedQ['id'] === (int)$firstQ['id'], "pretesCbtGetQuestion harus mengembalikan detail soal");
+    $delQOk = pretesCbtDeleteQuestion($pdo, (int)$firstQ['id']);
+    assert($delQOk === true, "pretesCbtDeleteQuestion harus mengembalikan true");
+    assert(pretesCbtGetQuestion($pdo, (int)$firstQ['id']) === null, "Soal yang terhapus harus null");
+    echo "✓ Test 8 Passed: Fungsi helper modal soal (get, package_questions, delete) berfungsi presisi.\n";
 
     echo "\n=== SEMUA TEST SUITE CBT SESI UJIAN BERHASIL 100% ===\n";
 }
