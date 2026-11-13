@@ -20,6 +20,8 @@ if (isAdmin()) {
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/tutorial-membership.php';
+$hidePretesMenus = studentHasActiveTutorialRegistration($pdo, $user);
 
 // Get pretes status
 $stmt = $pdo->prepare("SELECT pr.*, ps.tanggal, ps.ruangan FROM pretes_results pr LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id WHERE pr.user_id = ? ORDER BY pr.created_at DESC LIMIT 1");
@@ -159,6 +161,10 @@ foreach ($allAnnouncements as $ann) {
     }
 
     $tipe = $ann['tipe'];
+    if ($hidePretesMenus && (stripos($tipe, 'pretes') !== false
+        || preg_match('~(?:^|/)(?:pretes[^/?]*|absensi-pretes)\.php(?:[?#]|$)~i', (string)($ann['link_tujuan'] ?? '')))) {
+        continue;
+    }
     
     // 1. Jika sudah lulus tutorial ATAU sudah lulus pretes, jangan tampilkan pengumuman pendaftaran tutorial
     $isTutorialRegAnnouncement = (
@@ -174,7 +180,7 @@ foreach ($allAnnouncements as $ann) {
     // 1b. Sembunyikan pengumuman pendaftaran pretes jika tidak berhak (mis. khusus RPL), sudah terdaftar di periode aktif, atau sudah lulus pretes
     if ($tipe === 'pendaftaran_pretes') {
         $alreadyRegisteredPretes = $activePretes ? ($pretesRegisteredActive > 0) : ($pretesRegistered > 0);
-        if (!$isEligibleActivePretes || $alreadyRegisteredPretes || ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus')) {
+        if ($hidePretesMenus || !$isEligibleActivePretes || $alreadyRegisteredPretes || ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus')) {
             continue;
         }
     }
@@ -240,6 +246,7 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Stats -->
 <div class="stat-grid">
+    <?php if (!$hidePretesMenus): ?>
     <div class="stat-card">
         <div class="stat-icon green">✍️</div>
         <div class="stat-info">
@@ -256,6 +263,7 @@ include __DIR__ . '/../includes/header.php';
             <p>Status Pretes</p>
         </div>
     </div>
+    <?php endif; ?>
     <div class="stat-card">
         <div class="stat-icon orange">📚</div>
         <div class="stat-info">
@@ -277,7 +285,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Pretes Registration & Schedule (Disembunyikan jika pretes dinyatakan selesai) -->
-<?php if ($myPretesReg && !$isPretesSelesai): ?>
+<?php if (!$hidePretesMenus && $myPretesReg && !$isPretesSelesai): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary); box-shadow: var(--shadow);">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc;">
         <div style="display:flex; align-items:center; gap:10px;">
@@ -495,7 +503,7 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Banner Ringkasan Hasil Pretes (Tampil jika pretes dinyatakan selesai) -->
-<?php if ($myPretesReg && $isPretesSelesai): ?>
+<?php if (!$hidePretesMenus && $myPretesReg && $isPretesSelesai): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid <?= $isPretesLulus ? '#10b981' : '#ef4444' ?>; box-shadow: var(--shadow);">
     <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:18px 22px;">
         <div style="display:flex; align-items:center; gap:14px;">

@@ -6,12 +6,14 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 $isAdmin = isset($currentUser) && $currentUser['role'] === 'admin';
 $isDosen = isset($currentUser) && $currentUser['role'] === 'dosen';
 
-function menuActive($page) {
-    global $currentPage;
-    if ($page === 'pretes-peserta.php' && $currentPage === 'pretes-peserta-export.php') {
-        return 'active';
+if (!function_exists('menuActive')) {
+    function menuActive($page) {
+        global $currentPage;
+        if ($page === 'pretes-peserta.php' && $currentPage === 'pretes-peserta-export.php') {
+            return 'active';
+        }
+        return $currentPage === $page ? 'active' : '';
     }
-    return $currentPage === $page ? 'active' : '';
 }
 ?>
 <aside class="sidebar">
@@ -162,9 +164,14 @@ function menuActive($page) {
         <?php else: ?>
             <?php
             require_once __DIR__ . '/pretes-helper.php';
+            require_once __DIR__ . '/tutorial-membership.php';
+            $hidePretesMenus = function_exists('getDBConnection')
+                && studentHasActiveTutorialRegistration(getDBConnection(), $currentUser ?? null);
             $showDaftarPretesMenu = function_exists('getDBConnection')
                 ? shouldShowDaftarPretesToStudent(getDBConnection(), $currentUser ?? null)
                 : true;
+            $isMahasiswaPretesAktif = !$hidePretesMenus && function_exists('getDBConnection')
+                && isMahasiswaPretesAktif(getDBConnection(), $currentUser ?? null);
             ?>
             <!-- MAHASISWA MENU -->
             <div class="menu-label">Dashboard</div>
@@ -172,6 +179,7 @@ function menuActive($page) {
                 <span class="icon">🏠</span> Dashboard
             </a>
 
+            <?php if (!$hidePretesMenus): ?>
             <div class="menu-label">Pretes</div>
             <?php if ($showDaftarPretesMenu): ?>
             <a href="<?= BASE_URL ?>/pretes-daftar.php" class="page-nav <?= menuActive('pretes-daftar.php') ?>">
@@ -184,7 +192,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/pretes-hasil.php" class="page-nav <?= menuActive('pretes-hasil.php') ?>">
                 <span class="icon">📊</span> Hasil Pretes
             </a>
+            <?php endif; ?>
 
+            <?php if (!$isMahasiswaPretesAktif): ?>
             <div class="menu-label">Tutorial</div>
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">
                 <span class="icon">📝</span> Pendaftaran Tutorial
@@ -208,9 +218,11 @@ function menuActive($page) {
                     <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
                 </a>
                 <div class="submenu" style="display: <?= in_array($currentPage, ['absensi-pretes.php', 'absensi-tutorial.php', 'absensi-alkhidmah.php']) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
+                    <?php if (!$hidePretesMenus): ?>
                     <a href="<?= BASE_URL ?>/absensi-pretes.php" class="page-nav <?= menuActive('absensi-pretes.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi Pretes
                     </a>
+                    <?php endif; ?>
                     <a href="<?= BASE_URL ?>/absensi-tutorial.php" class="page-nav <?= menuActive('absensi-tutorial.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi Tutorial
                     </a>
@@ -219,6 +231,7 @@ function menuActive($page) {
                     </a>
                 </div>
             </div>
+            <?php endif; ?>
         <?php endif; ?>
 
         <div class="menu-label">Informasi</div>

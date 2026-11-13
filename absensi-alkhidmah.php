@@ -17,6 +17,10 @@ if (isAdmin()) {
 $user = getCurrentUser();
 $pdo = getDBConnection();
 
+require_once __DIR__ . '/includes/pretes-helper.php';
+require_once __DIR__ . '/includes/pretes-stage.php';
+pretesStageGate($pdo, $user, 'Presensi Al Khidmah dilakukan setelah Anda dinyatakan lulus pretes atau sedang mengikuti program tutorial.');
+
 // Load Config
 $configFile = __DIR__ . '/config_alkhidmah.json';
 $config = [];

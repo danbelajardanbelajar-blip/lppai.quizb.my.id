@@ -14,6 +14,9 @@ if (isAdmin()) {
 $user = getCurrentUser();
 $pdo  = getDBConnection();
 
+require_once __DIR__ . '/../includes/pretes-stage.php';
+pretesStageGate($pdo, $user, 'Pembagian kelas tutorial hanya diperuntukkan bagi mahasiswa yang mengikuti program Tutorial.');
+
 $gelombangs = [
     'gel1'    => 'Gelombang 1 (Ganjil)',
     'gel2'    => 'Gelombang 2 (Genap)',

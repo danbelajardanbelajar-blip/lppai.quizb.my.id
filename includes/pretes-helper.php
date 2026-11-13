@@ -571,6 +571,80 @@ if (!function_exists('shouldShowDaftarPretesToStudent')) {
     }
 }
 
+
+if (!function_exists('isMahasiswaPretesAktif')) {
+    /**
+     * Menentukan apakah mahasiswa sedang dalam keadaan pretes aktif:
+     * - Role pengguna adalah mahasiswa
+     * - Belum dinyatakan lulus pretes
+     * - Periode pretes aktif yang eligible untuk mahasiswa tersedia,
+     *   ATAU mahasiswa memiliki pendaftaran pada periode pretes yang berstatus aktif.
+     *
+     * @param PDO $pdo
+     * @param array|null $user
+     * @return bool
+     */
+    function isMahasiswaPretesAktif(PDO $pdo, ?array $user): bool {
+        if (!$user) {
+            return false;
+        }
+        $role = strtolower(trim((string)($user['role'] ?? 'mahasiswa')));
+        if ($role !== 'mahasiswa') {
+            return false;
+        }
+
+        $userId = (int)($user['id'] ?? 0);
+        if ($userId <= 0) {
+            return false;
+        }
+
+        // 1. Jika sudah lulus pretes, maka tidak lagi dalam keadaan pretes aktif
+        if (isUserLulusPretes($pdo, $userId)) {
+            return false;
+        }
+
+        // 2. Ambil periode pretes aktif yang eligible untuk mahasiswa
+        ensurePretesPeriodTargetColumns($pdo);
+        $activeEligiblePeriod = null;
+        try {
+            $stmt = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC");
+            $periods = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($periods as $period) {
+                if (isUserEligibleForPretesPeriod($user, $period)) {
+                    $activeEligiblePeriod = $period;
+                    break;
+                }
+            }
+        } catch (Throwable $e) {}
+
+        // 3. Cek pendaftaran pretes terbaru mahasiswa
+        $latestReg = null;
+        try {
+            $stmtReg = $pdo->prepare("
+                SELECT pr.*, mp.status as periode_status 
+                FROM pretes_registrations pr 
+                LEFT JOIN master_pretes mp ON pr.periode = mp.periode 
+                WHERE pr.user_id = ? 
+                ORDER BY pr.id DESC LIMIT 1
+            ");
+            $stmtReg->execute([$userId]);
+            $latestReg = $stmtReg->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Throwable $e) {}
+
+        // Mahasiswa terdaftar pada periode pretes yang berstatus aktif
+        if ($latestReg && strtolower(trim((string)($latestReg['periode_status'] ?? ''))) === 'aktif') {
+            return true;
+        }
+
+        // Ada periode pretes aktif yang eligible bagi mahasiswa dan mahasiswa belum lulus
+        if ($activeEligiblePeriod !== null) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
 if (!function_exists('mapPretesScoresToCertificate')) {
     /**
      * Memetakan 12 nilai komponen pretes ke dalam 6 komponen nilai transkrip sertifikat (tutorial_registrations).

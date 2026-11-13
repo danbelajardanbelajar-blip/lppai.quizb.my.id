@@ -5,6 +5,59 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 23:36:00 +0700 — Sembunyikan Seluruh Menu Tutorial & Absensi Saat Mahasiswa Berada Dalam Keadaan Pretes Aktif
+
+**Akar Masalah:**
+Mahasiswa yang sedang berada dalam periode pretes aktif (baik yang sudah terdaftar maupun yang belum menyelesaikan pendaftaran pretes) masih melihat kelompok menu navigasi "Tutorial" (Pendaftaran Tutorial, Info Tutorial, Rincian Nilai, Kelulusan Tutorial, Scan Pengambilan Sertifikat) serta kelompok menu "Absensi" (Absensi Tutorial, Absensi al Khidmah) di bilah navigasi (sidebar). Hal ini menimbulkan kerancuan berkepanjangan bagi mahasiswa baru yang mengira mereka harus langsung mengikuti kelas tutorial atau mengisi presensi kelas tutorial padahal mereka sedang dalam tahapan ujian pretes.
+
+**Solusi & Perubahan:**
+1. **`includes/pretes-helper.php`**:
+   - Menambahkan fungsi helper `isMahasiswaPretesAktif(PDO $pdo, ?array $user): bool`.
+   - Mengembalikan `true` jika:
+     - Role pengguna adalah `mahasiswa`.
+     - Mahasiswa belum berstatus lulus pretes (`!isUserLulusPretes`).
+     - Terdapat periode pretes aktif yang eligible untuk programnya (`isUserEligibleForPretesPeriod`), ATAU mahasiswa memiliki riwayat pendaftaran pada periode pretes yang berstatus `'aktif'`.
+   - Mengembalikan `false` jika: pengguna adalah admin/dosen, mahasiswa sudah dinyatakan lulus pretes resmi, atau seluruh periode pretes sudah berstatus `'selesai'` (sehingga mahasiswa yang tidak lulus dapat masuk ke alur pendaftaran tutorial).
+2. **`includes/sidebar.php`**:
+   - Menghitung status `$isMahasiswaPretesAktif = function_exists('getDBConnection') && isMahasiswaPretesAktif(getDBConnection(), $currentUser ?? null);`.
+   - Membungkus kelompok menu `<div class="menu-label">Tutorial</div>` (dan kelima tautan halamannya) serta kelompok `<div class="menu-label">Absensi</div>` (dan seluruh submenunya) ke dalam kondisional `<?php if (!$isMahasiswaPretesAktif): ?> ... <?php endif; ?>`.
+   - Menambahkan proteksi `if (!function_exists('menuActive'))` pada deklarasi fungsi helper penanda menu aktif agar aman dari fatal error saat sidebar dimuat berulang.
+3. **`includes/pretes-stage.php`**:
+   - Memperbarui `pretesStageGate(PDO $pdo, ?array $user, string $note = '')` agar mengecek `isMahasiswaPretesAktif($pdo, $user)`. Bila mahasiswa dalam keadaan pretes aktif mengakses halaman tutorial secara langsung (direct URL), sistem menyajikan kartu "TAHAP PRETES: Anda Sedang Mengikuti Pretes" dan menolak akses tutorial.
+4. **`absensi-tutorial.php`, `absensi-alkhidmah.php`, `pages/tutorial-pembagian.php`**:
+   - Memasang `pretesStageGate` di awal proses halaman mahasiswa agar akses via URL langsung terproteksi dan terarah ke pretes.
+5. **`tests/pretes-aktif-hide-tutorial-menu-test.php` (baru)**:
+   - Pengujian komprehensif untuk validasi logika `isMahasiswaPretesAktif()` pada berbagai status mahasiswa (terdaftar aktif, belum daftar, lulus pretes, periode selesai, role admin/dosen) serta verifikasi rendering HTML sidebar (tersembunyinya menu Tutorial dan Absensi saat pretes aktif, dan kemunculan normalnya saat periode pretes selesai).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-helper.php` | 574–648 | Helper Function | Menambahkan fungsi `isMahasiswaPretesAktif(PDO $pdo, ?array $user): bool`. |
+| `includes/sidebar.php` | 9–17, 168–174, 196, 233 | Sidebar Mahasiswa | Membungkus menu Tutorial & Absensi dalam `if (!$isMahasiswaPretesAktif)`, serta membungkus `menuActive()` dengan guard `function_exists`. |
+| `includes/pretes-stage.php` | 186–191 | Stage Gate | Memperbarui `pretesStageGate()` agar memeriksa `isMahasiswaPretesAktif()`. |
+| `absensi-tutorial.php` | 19–23 | Access Gate | Memasang `pretesStageGate` sebelum render halaman absensi tutorial. |
+| `absensi-alkhidmah.php` | 19–23 | Access Gate | Memasang `pretesStageGate` sebelum render halaman absensi al khidmah. |
+| `pages/tutorial-pembagian.php` | 16–19 | Access Gate | Memasang `pretesStageGate` sebelum render pembagian kelas tutorial. |
+| `tests/pretes-aktif-hide-tutorial-menu-test.php` (baru) | 1–142 | Automated Test Suite | Test suite validasi `isMahasiswaPretesAktif` dan integritas rendering sidebar. |
+
+**Verifikasi:**
+1. `php -l includes/pretes-helper.php` → No syntax errors detected.
+2. `php -l includes/sidebar.php` → No syntax errors detected.
+3. `php -l includes/pretes-stage.php` → No syntax errors detected.
+4. `php -l absensi-tutorial.php` → No syntax errors detected.
+5. `php -l absensi-alkhidmah.php` → No syntax errors detected.
+6. `php -l pages/tutorial-pembagian.php` → No syntax errors detected.
+7. `php tests/pretes-aktif-hide-tutorial-menu-test.php` → PASS (100%).
+8. `python tests/pretes-hasil-preparation-test.py` → PASS (11 skenario).
+9. `php tests/pretes-stage-test.php` → PASS (7 skenario).
+10. `php tests/absensi-pretes-integration-test.php` → PASS (100%).
+11. `php tests/tutorial-waiting-test.php` → PASS (100%).
+12. `php tests/tutorial-info-test.php` → PASS (100%).
+13. `php tests/pretes-hasil-active-period-test.php` → PASS (100%).
+14. `php tests/pretes-peserta-aktif-test.php` → PASS (100%).
+15. `php tests/pretes-cbt-admin-buttons-test.php` → PASS (100%).
+
+---
+
 ## 2026-11-13 23:17:15 +0700 — Eliminasi Informasi Berulang "Menunggu Pembagian Kelas dan Penguji" pada Pretes Peserta & Hasil
 
 **Akar Masalah:**

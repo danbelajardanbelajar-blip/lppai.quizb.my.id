@@ -184,7 +184,10 @@ if (!function_exists('pretesStageGate')) {
     {
         if (!$user || ($user['role'] ?? 'mahasiswa') !== 'mahasiswa') return;
         $stage = getStudentPretesStage($pdo, $user);
-        if (empty($stage['showOngoing'])) return;
+        $isPretesAktif = function_exists('isMahasiswaPretesAktif')
+            ? isMahasiswaPretesAktif($pdo, $user)
+            : !empty($stage['showOngoing']);
+        if (!$isPretesAktif && empty($stage['showOngoing'])) return;
 
         if (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' || stripos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false) {
             http_response_code(403);
