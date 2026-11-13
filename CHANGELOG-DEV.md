@@ -5,6 +5,49 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 16:28:00 +0700 — Penambahan Modul Manajemen Paket Soal CBT & Prasyarat Penginputan Soal (pretes-ujian.php?cbt_bank=1&tab=packages)
+
+**Ringkasan:** Mengimplementasikan fitur pembuatan dan pengelolaan **Paket Soal** pada Bank Soal CBT (pretes-ujian.php?cbt_bank=1), di mana sistem mewajibkan pembuatan Paket Soal terlebih dahulu sebelum butir pertanyaan dapat dimasukkan:
+1. **Skema Basis Data & Migration Otomatis (includes/pretes-cbt.php):**
+   - Menambahkan tabel pretes_cbt_packages (id, code, name, description, duration_minutes, question_count, is_active, created_at).
+   - Menambahkan kolom package_id pada tabel pretes_cbt_questions (auto-migration via SQLite PRAGMA / MySQL SHOW COLUMNS).
+   - Melakukan inisialisasi awal (seeding) otomatis default package Paket Pretes Utama (durasi 30 menit, kuota 25 butir) untuk menjaga kelancaran data yang sudah berjalan.
+   - Menyediakan fungsi CRUD paket: pretesCbtGetPackages(), pretesCbtGetPackage(), pretesCbtGetActivePackage(), pretesCbtSavePackage(), pretesCbtActivatePackage(), dan pretesCbtDeletePackage().
+   - Mengintegrasikan fungsi ujian mahasiswa (pretesCbtStart()) agar secara dinamis mengambil durasi ujian dan butir pertanyaan dari Paket Soal yang berstatus aktif.
+   - Menyesuaikan kalkulasi skor pada pretesCbtFinalize() agar proporsional terhadap jumlah item aktual dalam paket soal ujian.
+2. **Impor Excel dengan Target Paket (includes/pretes-cbt-xlsx.php):**
+   - Memperbarui cbtImportQuestions(PDO , array , bool , int  = 1) agar setiap baris soal yang diimpor dialokasikan langsung ke Paket Soal yang dipilih admin.
+3. **Controller Admin Bank Soal (dmin/pretes-bank-soal.php):**
+   - Menambahkan tab 'packages' ke dalam $allowedTabs.
+   - Menangani aksi POST save_package, ctivate_package, dan delete_package dengan proteksi CSRF dan pesan flash session.
+   - Menerapkan aturan prasyarat pada aksi save_question dan import_xlsx: jika belum ada paket soal dibuat di sistem, operasi ditolak dengan pesan peringatan yang jelas dan mengarahkan admin membuat paket soal terlebih dahulu.
+4. **Antarmuka UI & Filter Paket (includes/pretes-cbt-admin-view.php):**
+   - Menambahkan tombol shortcut 📦 Kelola Paket Soal pada header hero aplikasi.
+   - Menambahkan tab navigasi Paket Soal lengkap dengan badge jumlah paket terdaftar.
+   - Menambahkan antarmuka Form Buat/Edit Paket Soal dan Tabel Daftar Paket Soal lengkap dengan tombol Set Aktif, Edit, Tambah Soal, dan Hapus Paket.
+   - Pada Tab Tambah Soal (tab=form) dan Impor Excel (tab=import): jika belum ada paket soal, form disembunyikan dan digantikan komponen *Empty State Alert* yang memblokir penambahan soal dan mengarahkan admin membuat paket terlebih dahulu. Jika paket sudah ada, dropdown pemilihan Paket Soal wajib dipilih.
+   - Pada Tab Bank Soal (tab=bank): menambahkan filter dropdown Paket Soal dan badge nama paket pada setiap baris soal.
+5. **Penyempurnaan Styling & Filter Client-Side (ssets/css/pretes-cbt-admin.css, ssets/js/pretes-cbt-admin.js):**
+   - Menambahkan styling badge paket .bank-badge.package dan kotak peringatan .bank-empty-state.
+   - Mengintegrasikan filter ankPackageFilter pada logika JavaScript pagination dan pencarian tabel soal.
+6. **Dokumentasi & Test Suite Lengkap (docs/pretes-cbt.md, tests/pretes-cbt-package-test.php):**
+   - Membuat test suite tests/pretes-cbt-package-test.php yang menguji siklus lengkap CRUD paket, pengalihan paket aktif, alokasi soal, dinamisme pengerjaan ujian peserta terhadap paket aktif, cascade deletion, dan validasi input.
+   - Seluruh test suite (PHP, Node.js, Python HTTP) lulus 100%.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| includes/pretes-cbt.php | 8–45, 100–120, 160–200, 340–445 | Core CBT Backend | Skema tabel pretes_cbt_packages, kolom package_id, fungsi CRUD paket, dan ujian dinamis berbasis paket aktif. |
+| includes/pretes-cbt-xlsx.php | 90–95, 138–155 | XLSX Importer | Penambahan parameter $packageId pada cbtImportQuestions(). |
+| dmin/pretes-bank-soal.php | 28–88, 120–135 | Controller Admin | Penanganan tab & aksi paket soal, validasi prasyarat sebelum simpan/impor soal. |
+| includes/pretes-cbt-admin-view.php | 3–140, 150–225 | UI View Admin | Tab Paket Soal, empty state blocker, dropdown paket, dan filter paket soal. |
+| ssets/css/pretes-cbt-admin.css | 6–12 | Styling CSS | Kelas .bank-badge.package, .bank-empty-state, dan penyesuaian 4 kolom filter. |
+| ssets/js/pretes-cbt-admin.js | 10–26 | Script Filter JS | Dukungan filter ankPackageFilter pada pencarian instan. |
+| docs/pretes-cbt.md | 26–36 | Dokumentasi | Dokumentasi fitur arsitektur paket soal CBT dan prasyarat penginputan. |
+| tests/pretes-cbt-package-test.php | 1–118 | Test Suite Baru | Validasi komprehensif lifecycle paket soal dan keterkaitan bank soal. |
+| CHANGELOG-DEV.md | 8–50 | Catatan Rilis | Dokumentasi sistematis fitur paket soal CBT. |
+
+---
+
 ## 2026-11-13 14:50:00 +0700 — Penambahan Fitur Hapus Hasil Sesi CBT Pretes (pretes-ujian.php?cbt_bank=1&tab=results)
 
 **Ringkasan:** Menambahkan menu dan tombol penghapusan sesi hasil CBT peserta pada tab Hasil Ujian (`pretes-ujian.php?cbt_bank=1&tab=results`):

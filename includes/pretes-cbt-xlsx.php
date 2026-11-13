@@ -87,7 +87,8 @@ function cbtQuestionIdentity(string $text): string {
 }
 function cbtTextLength(string $text): int { return function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text); }
 
-function cbtImportQuestions(PDO $pdo, array $rows, bool $overwrite): array {
+function cbtImportQuestions(PDO $pdo, array $rows, bool $overwrite, int $packageId = 1): array {
+    $packageId = max(1, $packageId);
     $result = ['added' => 0, 'updated' => 0, 'skipped' => 0, 'errors' => []];
     if (count($rows) < 2 || count($rows) > 1001) throw new InvalidArgumentException('Isi 1–1.000 soal pada lembar Bank Soal.');
     $header = array_shift($rows);
@@ -134,19 +135,19 @@ function cbtImportQuestions(PDO $pdo, array $rows, bool $overwrite): array {
             $knownText[cbtQuestionIdentity($entry['question_text'])] = (int)$entry['id'];
             $oldText[(int)$entry['id']] = cbtQuestionIdentity($entry['question_text']);
         }
-        $insert = $pdo->prepare('INSERT INTO pretes_cbt_questions (code, category, question_text, options_json, correct_answer, is_active) VALUES (?, ?, ?, ?, ?, ?)');
-        $update = $pdo->prepare('UPDATE pretes_cbt_questions SET category = ?, question_text = ?, options_json = ?, correct_answer = ?, is_active = ? WHERE id = ?');
+        $insert = $pdo->prepare('INSERT INTO pretes_cbt_questions (code, package_id, category, question_text, options_json, correct_answer, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        $update = $pdo->prepare('UPDATE pretes_cbt_questions SET package_id = ?, category = ?, question_text = ?, options_json = ?, correct_answer = ?, is_active = ? WHERE id = ?');
         foreach ($clean as $entry) {
             $id = $entry[0] !== '' ? ($known[strtolower($entry[0])] ?? null) : null;
             $textId = $knownText[cbtQuestionIdentity($entry[2])] ?? null;
             if (($id && !$overwrite) || ($textId && $textId !== $id)) { $result['skipped']++; continue; }
             if ($id) {
                 if (isset($oldText[$id]) && ($knownText[$oldText[$id]] ?? null) === $id) unset($knownText[$oldText[$id]]);
-                $update->execute(array_merge(array_slice($entry, 1), [$id]));
+                $update->execute(array_merge([$packageId], array_slice($entry, 1), [$id]));
                 $result['updated']++;
             } else {
                 if ($entry[0] === '') $entry[0] = 'custom-' . bin2hex(random_bytes(12));
-                $insert->execute($entry);
+                $insert->execute([$entry[0], $packageId, $entry[1], $entry[2], $entry[3], $entry[4], $entry[5]]);
                 $id = (int)$pdo->lastInsertId();
                 $known[strtolower($entry[0])] = $id;
                 $result['added']++;

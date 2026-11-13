@@ -8,7 +8,8 @@
             if (reset) page = 0;
             const query = get('bankSearch').value.trim().toLocaleLowerCase();
             const category = get('bankCategory').value, status = get('bankStatus').value;
-            const matches = rows.filter(row => (!query || row.textContent.toLocaleLowerCase().includes(query)) && (!category || row.dataset.category === category) && (!status || row.dataset.status === status));
+            const pkg = get('bankPackageFilter') ? get('bankPackageFilter').value : '';
+            const matches = rows.filter(row => (!query || row.textContent.toLocaleLowerCase().includes(query)) && (!category || row.dataset.category === category) && (!status || row.dataset.status === status) && (!pkg || row.dataset.packageId === pkg));
             const size = Number(get('bankPageSize').value);
             const pages = Math.max(1, Math.ceil(matches.length / size));
             page = Math.min(page, pages - 1);
@@ -21,7 +22,10 @@
             get('bankNext').disabled = page + 1 >= pages;
         }
         get('bankSearch').addEventListener('input', () => filter(true));
-        ['bankCategory', 'bankStatus', 'bankPageSize'].forEach(id => get(id).addEventListener('change', () => filter(true)));
+        ['bankCategory', 'bankStatus', 'bankPackageFilter', 'bankPageSize'].forEach(id => {
+            const el = get(id);
+            if (el) el.addEventListener('change', () => filter(true));
+        });
         get('bankPrevious').onclick = () => { page--; filter(false); };
         get('bankNext').onclick = () => { page++; filter(false); };
         filter(true);

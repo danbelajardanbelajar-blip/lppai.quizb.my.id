@@ -23,14 +23,16 @@ Bagian kredensial dan tautan E-Ujian di halaman tersebut telah dihapus.
 - Metadata dicatat per pemeriksaan. Foto cocok disimpan maksimal sekali per lima menit (termasuk foto check-in); foto tidak sesuai tetap disimpan untuk audit. Ini bukan pelacakan tatapan mata.
 - Hasil CBT disimpan terpisah; nilai praktik dan nilai impor lama tidak ditimpa.
 
-## Admin
+## Admin & Manajemen Paket Soal
 
 Menu **Bank Soal & Hasil CBT**, atau `pretes-ujian.php?cbt_bank=1`, hanya untuk admin.
-Admin dapat menambah/mengedit pertanyaan, pilihan, kategori, kunci, dan status aktif.
-Minimal 25 soal aktif diperlukan untuk memulai paket baru. Bank contoh di source
-Git tersedia publik; buat/ubah bank resmi melalui admin dan tinjau materi serta
-kuncinya sebelum digunakan untuk penilaian resmi. Daftar admin menampilkan 100
-upaya terbaru beserta nilai, jumlah benar, dan waktu mulai WIB.
+Admin kini dapat mengelola **Paket Soal** (`tab=packages`), menyusun butir pertanyaan per paket (`tab=form`), mengimpor dari Excel ke paket target (`tab=import`), dan melihat hasil ujian (`tab=results`).
+
+### Arsitektur Paket Soal & Prasyarat Penginputan
+- **Wadah Paket Soal:** Sebelum butir soal dimasukkan, sistem mewajibkan minimal 1 Paket Soal telah dibuat. Tab Tambah Soal dan Impor Excel akan memblokir penginputan jika belum ada paket yang terdaftar.
+- **Parameter Paket:** Setiap paket memiliki Nama, Kode Unik, Deskripsi, Durasi Ujian (menit), dan Target Soal Acak per Sesi Peserta.
+- **Paket Aktif:** Satu paket dapat ditetapkan sebagai paket aktif. Saat peserta menekan mulai ujian CBT di portal mahasiswa, server otomatis mengambil soal aktif dari paket yang sedang aktif dan menggunakan durasi serta kuota soal paket tersebut.
+- **Filter & Alokasi:** Pada tab Bank Soal, butir pertanyaan dapat difilter berdasarkan paket soal. Menghapus paket soal akan menghapus seluruh butir soal yang dialokasikan di dalamnya secara berantai.
 
 ### Excel .xlsx
 

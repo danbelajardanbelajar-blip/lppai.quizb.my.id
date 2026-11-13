@@ -24,24 +24,63 @@ if (isset($_GET['download'])) {
         exit;
     }
 }
-$message = ''; $errors = []; $form = null;
-$allowedTabs = ['bank','form','import','results'];
+$message = ''; $errors = []; $form = null; $pkgForm = null;
+$allowedTabs = ['packages', 'bank', 'form', 'import', 'results'];
 $activeTab = in_array($_GET['tab'] ?? '', $allowedTabs, true) ? $_GET['tab'] : 'bank';
 $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
+
+$packages = pretesCbtGetPackages($pdo);
+$activePackage = pretesCbtGetActivePackage($pdo);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
-    $activeTab = ($action === 'import_xlsx') ? 'import' : (($action === 'delete_attempt' || $action === 'delete_all_attempts') ? 'results' : 'form');
+    if ($action === 'import_xlsx') {
+        $activeTab = 'import';
+    } elseif ($action === 'save_package' || $action === 'activate_package' || $action === 'delete_package') {
+        $activeTab = 'packages';
+    } elseif ($action === 'delete_attempt' || $action === 'delete_all_attempts') {
+        $activeTab = 'results';
+    } else {
+        $activeTab = 'form';
+    }
     try {
         if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) {
             http_response_code(403);
             throw new InvalidArgumentException('Sesi tidak valid. Muat ulang halaman.');
         }
-        if ($action === 'import_xlsx') {
+        if ($action === 'save_package') {
+            pretesCbtSavePackage($pdo, $_POST);
+            $_SESSION['cbt_bank_flash'] = 'Paket soal berhasil disimpan.';
+            header('Location: ' . $bankUrl . '&tab=packages'); exit;
+        } elseif ($action === 'activate_package') {
+            $pkgId = (int)($_POST['package_id'] ?? 0);
+            if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
+            if (pretesCbtActivatePackage($pdo, $pkgId)) {
+                $_SESSION['cbt_bank_flash'] = 'Paket soal aktif berhasil diubah. Peserta yang memulai ujian berikutnya akan diarahkan ke paket ini.';
+            } else {
+                $_SESSION['cbt_bank_flash'] = 'Paket soal tidak ditemukan.';
+            }
+            header('Location: ' . $bankUrl . '&tab=packages'); exit;
+        } elseif ($action === 'delete_package') {
+            $pkgId = (int)($_POST['package_id'] ?? 0);
+            if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
+            if (pretesCbtDeletePackage($pdo, $pkgId)) {
+                $_SESSION['cbt_bank_flash'] = 'Paket soal beserta butir soal di dalamnya berhasil dihapus.';
+            } else {
+                $_SESSION['cbt_bank_flash'] = 'Paket soal gagal dihapus atau sudah dihapus sebelumnya.';
+            }
+            header('Location: ' . $bankUrl . '&tab=packages'); exit;
+        } elseif ($action === 'import_xlsx') {
+            $packageId = (int)($_POST['package_id'] ?? 0);
+            if ($packageId <= 0) {
+                $packageId = (int)($activePackage['id'] ?? ($packages[0]['id'] ?? 0));
+            }
+            if ($packageId <= 0) throw new InvalidArgumentException('Belum ada paket soal. Buat paket soal terlebih dahulu sebelum mengimpor soal.');
             $file = $_FILES['question_file'] ?? null;
             if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new InvalidArgumentException('Pilih file .xlsx. Batas unggahan server: ' . ini_get('upload_max_filesize') . '.');
             if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'xlsx' || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Gunakan file Excel .xlsx dari template bank soal.');
-            $result = cbtImportQuestions($pdo, cbtReadQuestionXlsx($file['tmp_name']), isset($_POST['update_existing']));
+            $result = cbtImportQuestions($pdo, cbtReadQuestionXlsx($file['tmp_name']), isset($_POST['update_existing']), $packageId);
             if ($result['errors']) {
                 http_response_code(422);
                 $message = 'Impor dibatalkan. Tidak ada soal ditambahkan atau diperbarui. Perbaiki baris berikut dan unggah kembali.';
@@ -51,6 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ' . $bankUrl . '&tab=bank'); exit;
             }
         } elseif ($action === 'save_question') {
+            $packageId = (int)($_POST['package_id'] ?? 0);
+            if ($packageId <= 0) {
+                $packageId = (int)($activePackage['id'] ?? ($packages[0]['id'] ?? 0));
+            }
+            if ($packageId <= 0) throw new InvalidArgumentException('Belum ada paket soal. Buat paket soal terlebih dahulu sebelum menambahkan soal.');
+            $_POST['package_id'] = $packageId;
             pretesCbtSaveQuestion($pdo, $_POST);
             $_SESSION['cbt_bank_flash'] = 'Soal berhasil disimpan. Paket ujian yang sudah dimulai tidak berubah.';
             header('Location: ' . $bankUrl . '&tab=bank'); exit;
@@ -79,10 +124,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (http_response_code() !== 403) http_response_code(422);
         $message = $error->getMessage();
         if ($action === 'save_question') $form = $_POST;
+        if ($action === 'save_package') $pkgForm = $_POST;
     } catch (Throwable $error) {
         error_log('CBT bank update: ' . $error->getMessage()); http_response_code(503);
         $message = 'Perubahan belum tersimpan. ' . ($error instanceof RuntimeException && !($error instanceof PDOException) ? $error->getMessage() : 'Coba lagi atau hubungi admin.');
         if ($action === 'save_question') $form = $_POST;
+        if ($action === 'save_package') $pkgForm = $_POST;
+    }
+    // Refresh packages list after mutations
+    $packages = pretesCbtGetPackages($pdo);
+    $activePackage = pretesCbtGetActivePackage($pdo);
+}
+
+if ($pkgForm === null && !empty($_GET['edit_pkg'])) {
+    $pkgForm = pretesCbtGetPackage($pdo, (int)$_GET['edit_pkg']);
+    if ($pkgForm) {
+        $activeTab = 'packages';
     }
 }
 if ($form === null && !empty($_GET['edit'])) {
@@ -90,8 +147,8 @@ if ($form === null && !empty($_GET['edit'])) {
     $form = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     if ($form) { $activeTab = 'form'; foreach (json_decode($form['options_json'], true) as $letter => $text) $form['option_' . $letter] = $text; }
 }
-$form ??= ['is_active'=>1,'category'=>'Umum'];
-$questions = $pdo->query('SELECT * FROM pretes_cbt_questions ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
+$form ??= ['is_active'=>1,'category'=>'Umum','package_id'=>$activePackage['id'] ?? ($packages[0]['id'] ?? 1)];
+$questions = $pdo->query('SELECT q.*, p.name AS package_name FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id ORDER BY q.id DESC')->fetchAll(PDO::FETCH_ASSOC);
 $active = count(array_filter($questions, static fn($question) => (bool)$question['is_active']));
 $categories = array_values(array_unique(array_column($questions, 'category'))); sort($categories);
 $stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC);
