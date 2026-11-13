@@ -226,6 +226,7 @@ if ($action === 'initial_checkin') {
     exit;
 
 } elseif ($action === 'periodic_check') {
+    if ($match) $_SESSION['pretes_cbt_attention_' . $regId] = time();
     // ═════════════════════════════════════════════════════════════════════════
     // SKENARIO B: PENGAWASAN BERKALA SETIAP 5 MENIT SEKALI SAAT PENGERJAAN
     // ═════════════════════════════════════════════════════════════════════════

@@ -1,10 +1,12 @@
 <?php
 const PRETES_CBT_COUNT = 25;
 const PRETES_CBT_SECONDS = 1800;
+require_once __DIR__ . '/pretes-cbt-interruption.php';
 
 function ensurePretesCbtTables(PDO $pdo): void {
     $id = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INTEGER PRIMARY KEY AUTO_INCREMENT';
     $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+    pretesCbtInterruptionTables($pdo, $engine);
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_packages (
         id $id,
@@ -139,7 +141,8 @@ function pretesCbtLock(PDO $pdo, int $userId, int $registrationId): ?array {
     $suffix = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
     $stmt = $pdo->prepare('SELECT * FROM pretes_cbt_attempts WHERE user_id = ? AND registration_id = ?' . $suffix);
     $stmt->execute([$userId, $registrationId]);
-    return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    $attempt = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $attempt ? pretesCbtTiming($pdo, $attempt) : null;
 }
 
 function pretesCbtFinalize(PDO $pdo, array $attempt, int $now): array {
@@ -199,7 +202,9 @@ function pretesCbtPublic(PDO $pdo, ?array $attempt, int $now): array {
     $answered = count(array_filter($items, static fn($item) => $item['answer'] !== null));
     return ['attempt' => [
         'id' => (int)$attempt['id'], 'submitted' => $submitted,
-        'remaining_seconds' => max(0, (int)$attempt['deadline_at'] - $now),
+        'remaining_seconds' => max(0, (int)$attempt['deadline_at'] - pretesCbtClock($attempt, $now)),
+        'paused' => $attempt['paused_at'] !== null, 'revision' => (int)$attempt['revision'],
+        'resume_position' => (int)$attempt['resume_position'], 'pause_reason' => $attempt['pause_reason'],
         'total' => count($items) ?: PRETES_CBT_COUNT, 'answered' => $answered,
         'correct' => $submitted ? (int)$attempt['correct_count'] : null,
         'score' => $submitted ? (float)$attempt['score'] : null,
@@ -212,7 +217,7 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
     $pdo->beginTransaction();
     try {
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
-        if ($attempt && $attempt['submitted_at'] === null && $now >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
+        if ($attempt && $attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
         $result = pretesCbtPublic($pdo, $attempt, $now);
         $pdo->commit();
         return $result;
@@ -340,7 +345,7 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
             }
             $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         }
-        if ($attempt['submitted_at'] === null && $now >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
+        if ($attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
         $result = pretesCbtPublic($pdo, $attempt, $now);
         $pdo->commit();
         return $result;
@@ -357,7 +362,15 @@ function pretesCbtChange(PDO $pdo, int $userId, int $registrationId, string $act
     try {
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if (!$attempt) throw new RuntimeException('Mulai ujian terlebih dahulu.');
-        if ($attempt['submitted_at'] === null && $now >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
+        if ($attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
+        if ($attempt['submitted_at'] === null && $action === 'interrupt') {
+            $attempt = pretesCbtInterrupt($pdo, $attempt, $input, $now);
+        } elseif ($attempt['submitted_at'] === null && $action === 'resume') {
+            $attempt = pretesCbtResume($pdo, $attempt, $now);
+        } elseif ($attempt['submitted_at'] === null) {
+            if ($attempt['paused_at'] !== null) throw new RuntimeException('Ujian dijeda. Tutup popup melalui tombol Lanjutkan Ujian.');
+            if ((int)($input['revision'] ?? 0) !== (int)$attempt['revision']) throw new RuntimeException('Urutan soal berubah. Muat ulang halaman.');
+        }
         if ($attempt['submitted_at'] === null && $action === 'save') {
             $itemCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = ' . (int)$attempt['id'])->fetchColumn() ?: PRETES_CBT_COUNT;
             $position = filter_var($input['position'] ?? null, FILTER_VALIDATE_INT);
@@ -797,6 +810,9 @@ function pretesCbtDeleteAttempt(PDO $pdo, int $attemptId): bool {
     try {
         $stmtItems = $pdo->prepare('DELETE FROM pretes_cbt_items WHERE attempt_id = ?');
         $stmtItems->execute([$attemptId]);
+        foreach (['pretes_cbt_interruptions', 'pretes_cbt_interruption_events'] as $table) {
+            $pdo->prepare("DELETE FROM $table WHERE attempt_id = ?")->execute([$attemptId]);
+        }
 
         $stmtAttempt = $pdo->prepare('DELETE FROM pretes_cbt_attempts WHERE id = ?');
         $stmtAttempt->execute([$attemptId]);
@@ -818,6 +834,8 @@ function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int {
     }
     try {
         if ($attemptIds === null) {
+            $pdo->exec('DELETE FROM pretes_cbt_interruptions');
+            $pdo->exec('DELETE FROM pretes_cbt_interruption_events');
             $pdo->exec('DELETE FROM pretes_cbt_items');
             $count = (int)$pdo->exec('DELETE FROM pretes_cbt_attempts');
         } else {
@@ -829,6 +847,9 @@ function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int {
             $inClause = implode(',', array_fill(0, count($cleanIds), '?'));
             $stmtItems = $pdo->prepare("DELETE FROM pretes_cbt_items WHERE attempt_id IN ($inClause)");
             $stmtItems->execute($cleanIds);
+            foreach (['pretes_cbt_interruptions', 'pretes_cbt_interruption_events'] as $table) {
+                $pdo->prepare("DELETE FROM $table WHERE attempt_id IN ($inClause)")->execute($cleanIds);
+            }
 
             $stmtAttempts = $pdo->prepare("DELETE FROM pretes_cbt_attempts WHERE id IN ($inClause)");
             $stmtAttempts->execute($cleanIds);

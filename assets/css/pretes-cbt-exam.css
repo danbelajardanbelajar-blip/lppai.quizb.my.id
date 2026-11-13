@@ -8,3 +8,13 @@
 #cbtIntro h4{font-size:19px;color:#294b36;letter-spacing:-.3px;margin:0 0 13px}#cbtIntro p{font-size:13px;line-height:1.8;color:#75846b;max-width:720px}#cbtStart{margin-top:14px;padding:12px 25px;min-height:46px}.cbt-intro-facts{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap}.cbt-intro-facts span{border:1px solid #e0ead8;border-radius:9px;padding:9px 14px;color:#637a54;font-size:12px;background:#fbfdf8}
 @media(max-width:760px){.cbt-layout{grid-template-columns:1fr}.cbt-body{padding:20px}.cbt-heading{padding:23px 20px}.cbt-heading h3{font-size:22px}.cbt-completion{padding:14px 20px}.cbt-sidebar{padding:20px}.cbt-nav{grid-template-columns:repeat(10,minmax(0,1fr))}}
 @media(max-width:460px){.cbt-heading{gap:18px}.cbt-time-box{padding:9px 14px;min-width:115px}.cbt-timer{font-size:26px}.cbt-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.cbt-question{font-size:17px}.cbt-body{padding:18px}.cbt-heading p{max-width:250px;line-height:1.7}.cbt-option{font-size:13px;padding:13px}.cbt-completion{padding:13px 18px}}
+.cbt-interruption{display:none;position:fixed;inset:0;width:100vw;max-width:none;height:100dvh;max-height:none;box-sizing:border-box;margin:0;padding:24px;border:0;background:#0b1726;color:#e2e8f0;align-items:center;justify-content:center;overflow:auto;z-index:2147483647}
+.cbt-interruption::backdrop{background:#0b1726}
+.cbt-interruption-card{max-width:580px;width:100%;padding:32px;border:1px solid #334155;border-radius:24px;background:#122237;box-shadow:0 24px 80px #0006}
+.cbt-interruption-card h2{color:#fff;font-size:30px;margin:12px 0}
+.cbt-interruption-card p{line-height:1.7;color:#cbd5e1}
+.cbt-interruption-card .cbt-eyebrow{color:#fbbf24}
+.cbt-interruption-card button{width:100%;min-height:48px;margin-top:16px;border:1px solid #34d399;border-radius:10px;background:#059669;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.cbt-interruption-card button:disabled{opacity:.55;cursor:wait}
+.cbt-interruption-card button:focus-visible{outline:3px solid #fbbf24;outline-offset:4px}
+@media(max-width:600px){.cbt-interruption{padding:16px}.cbt-interruption-card{padding:24px}}

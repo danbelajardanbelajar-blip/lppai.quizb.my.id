@@ -35,7 +35,7 @@ if ($cameraRequired) {
 }
 
 $action = $input['action'] ?? '';
-if (!in_array($action, ['state', 'start', 'save', 'submit'], true)) cbtReply(400, ['success' => false, 'message' => 'Aksi CBT tidak valid.']);
+if (!in_array($action, ['state', 'start', 'save', 'submit', 'interrupt', 'resume'], true)) cbtReply(400, ['success' => false, 'message' => 'Aksi CBT tidak valid.']);
 try {
     if ($action === 'state') {
         $data = pretesCbtState($pdo, $userId, $regId);
@@ -43,6 +43,16 @@ try {
         $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
         $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput);
     } else {
+        if ($action === 'resume' && $cameraRequired) {
+            $state = pretesCbtState($pdo, $userId, $regId);
+            if (!empty($state['attempt']['paused'])) {
+                $checkedAt = (int)($_SESSION['pretes_cbt_attention_' . $regId] ?? 0);
+                $guard = $pdo->prepare('SELECT paused_at FROM pretes_cbt_interruptions WHERE attempt_id = ?');
+                $guard->execute([$state['attempt']['id']]);
+                $pausedAt = (int)$guard->fetchColumn();
+                if (!$checkedAt || time() - $checkedAt > 30 || $checkedAt < $pausedAt) throw new RuntimeException('Periksa kembali wajah di kamera sebelum melanjutkan ujian.');
+            }
+        }
         $data = pretesCbtChange($pdo, $userId, $regId, $action, $input);
     }
     cbtReply(200, ['success' => true] + $data);

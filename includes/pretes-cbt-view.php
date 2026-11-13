@@ -10,7 +10,7 @@
         <div id="cbtIntro">
             <h4 style="margin-top:0">Ujian berlangsung di halaman ini</h4>
             <div class="cbt-intro-facts"><span>Soal pilihan ganda A–E</span><span>Durasi terhitung server</span><span>Satu kali pengumpulan</span></div>
-            <p>Anda mendapat butir soal dari bank soal terdaftar dengan urutan soal dan pilihan jawaban yang diacak. Waktu pengerjaan dimulai setelah tombol Mulai Ujian ditekan. Waktu tetap berjalan jika halaman ditutup.</p>
+            <p>Anda mendapat soal dan pilihan jawaban acak. Saat meninggalkan halaman atau pemeriksaan kamera tidak sesuai, popup menutup soal dan waktu dijeda setelah dikonfirmasi server. Soal yang sedang terbuka dikosongkan, dipindahkan ke posisi acak di antara soal yang belum dijawab, dan pilihannya diacak ulang. Jawaban soal lain tetap tersimpan.</p>
             <p>Gunakan nomor soal untuk berpindah dan tandai soal yang ingin diperiksa kembali. Setelah dikumpulkan, jawaban tidak dapat diubah.</p>
             <div id="cbtTokenBox" style="display:none;margin:16px auto;background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px;max-width:380px;text-align:left">
                 <label for="cbtInputToken" style="display:block;font-size:12px;font-weight:700;color:#854d0e;margin-bottom:6px">🔑 Masukkan Token Ujian *</label>
@@ -43,3 +43,13 @@
         <div id="cbtResult" class="cbt-result" style="display:none" aria-live="polite"></div>
     </div>
 </section>
+<dialog id="cbtInterruption" class="cbt-interruption" aria-labelledby="cbtInterruptionTitle" aria-describedby="cbtInterruptionReason cbtInterruptionStatus">
+    <div class="cbt-interruption-card">
+        <div class="cbt-eyebrow">Pengawasan ujian</div>
+        <h2 id="cbtInterruptionTitle">Ujian dijeda</h2>
+        <p id="cbtInterruptionReason"></p>
+        <p>Kembali ke halaman ujian. Jika sesi mewajibkan kamera, hadapkan wajah ke kamera. Soal tertutup selama popup tampil.</p>
+        <p id="cbtInterruptionStatus" role="status" aria-live="polite"></p>
+        <button type="button" id="cbtResume" class="btn btn-success">Lanjutkan Ujian</button>
+    </div>
+</dialog>

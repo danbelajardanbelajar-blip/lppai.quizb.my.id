@@ -563,6 +563,7 @@ function requestProctoringCheck(payload, endpoint) {
     const request = Promise.resolve().then(function() {
         return fetch(endpoint || API_URL, {
             method: 'POST',
+            keepalive: payload.action === 'interrupt',
             credentials: 'same-origin',
             signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
@@ -1005,8 +1006,26 @@ function initProctoringExamRoom() {
     if (window.PretesCbt) {
         window.PretesCbt.init({
             request: function(payload) { return requestProctoringCheck(payload, CBT_API_URL); },
+            verifyAttention: async function() {
+                if (!IS_CAMERA_REQUIRED) return;
+                const camera = document.getElementById('proctorVideo');
+                if (!camera) throw new Error('Kamera ujian tidak tersedia. Muat ulang halaman.');
+                if (!camera.videoWidth || !activeStream || activeStream.getVideoTracks?.().some(track => track.readyState === 'ended')) {
+                    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Aktifkan izin kamera untuk melanjutkan ujian.');
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+                    if (activeStream) activeStream.getTracks().forEach(track => track.stop());
+                    activeStream = stream;
+                    camera.srcObject = stream;
+                    await camera.play();
+                }
+                const result = await requestProctoringCheck({ action: 'periodic_check', live_photo: captureFaceFrame(camera) });
+                if (!result.verified) throw new Error(result.message || 'Hadapkan wajah ke kamera untuk melanjutkan ujian.');
+            },
             onStarted: function() {
                 if (IS_CAMERA_REQUIRED) {
+                    activeStream?.getVideoTracks?.().forEach(track => track.addEventListener?.('ended', function() {
+                        if (!cbtCompleted) recordProctoringViolation('Kamera terputus saat ujian berlangsung.');
+                    }));
                     const title = document.getElementById('proctorStatusTitle');
                     if (title) title.textContent = 'Pengawas Kamera Aktif';
                     const info = document.getElementById('lastCheckInfo');
@@ -1078,7 +1097,7 @@ function updateTimerDisplay() {
  * ── Eksekusi Skenario B: Pengambilan Snapshot Berkala Tiap 30 Detik ──
  */
 function runPeriodicProctoringCheck() {
-    if (cbtCompleted || periodicCheckPending) return;
+    if (cbtCompleted || periodicCheckPending || window.PretesCbt?.isPaused?.()) return;
     const video = document.getElementById('proctorVideo') || document.getElementById('checkinVideo');
     if (!video || !video.videoWidth) {
         recordProctoringViolation("Kamera terputus atau belum aktif. Nyalakan kembali kamera agar pemeriksaan dapat berjalan.");
@@ -1119,6 +1138,9 @@ function runPeriodicProctoringCheck() {
             if (lastInfo) {
                 lastInfo.textContent = 'Pemeriksaan terakhir: ' + (data.checked_at || 'Baru saja') + ' · Wajah perlu diperiksa kembali.';
             }
+            if (data && ['NO_FACE', 'MISMATCH', 'MULTIPLE_FACES'].includes(data.status)) {
+                window.PretesCbt?.interrupt?.(data.status === 'MISMATCH' ? 'face_mismatch' : 'face_missing');
+            }
             if (alertBox && alertMsg) {
                 alertBox.style.display = 'block';
                 alertMsg.textContent = (data.message || 'Wajah belum terdeteksi atau belum sesuai pasfoto.') + ' Hadapkan wajah ke kamera dengan pencahayaan yang cukup.';
@@ -1136,6 +1158,7 @@ function runPeriodicProctoringCheck() {
 }
 
 function recordProctoringViolation(msg) {
+    window.PretesCbt?.interrupt?.('camera_unavailable');
     const alertBox = document.getElementById('proctorViolationAlert');
     const alertMsg = document.getElementById('proctorViolationMsg');
     if (alertBox && alertMsg) {

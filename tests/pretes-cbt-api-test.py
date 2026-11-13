@@ -14,11 +14,12 @@ with tempfile.TemporaryDirectory(prefix='lppai-cbt-api-') as temp:
     root = Path(temp)
     for folder in ['api', 'includes', 'data']:
         (root / folder).mkdir()
-    for name in ['api/pretes-cbt.php', 'includes/pretes-cbt.php', 'data/pretes-cbt-bank.php']:
+    for name in ['api/pretes-cbt.php', 'includes/pretes-cbt.php', 'includes/pretes-cbt-interruption.php', 'data/pretes-cbt-bank.php']:
         shutil.copy(repo / name, root / name)
     (root / 'includes/auth.php').write_text('''<?php
 $_SESSION = [];
 if (($_SERVER['HTTP_X_TEST_VERIFIED'] ?? '') === '1') $_SESSION['pretes_cbt_verified_v2_42'] = time();
+if (($_SERVER['HTTP_X_TEST_ATTENTION'] ?? '') === '1') $_SESSION['pretes_cbt_attention_42'] = time();
 function isLoggedIn() { return ($_SERVER['HTTP_X_TEST_LOGIN'] ?? '') === '1'; }
 function verifyCsrf($token) { return $token === 'test-csrf'; }
 function getCurrentUser() { return ['id' => 7, 'username' => 'student', 'nim' => '2300007']; }
@@ -41,8 +42,8 @@ function getDBConnection() {
                     break
             except OSError:
                 time.sleep(0.05)
-        def request(payload, login=True, verified=True):
-            headers = {'Content-Type': 'application/json', 'X-Test-Login': '1' if login else '0', 'X-Test-Verified': '1' if verified else '0'}
+        def request(payload, login=True, verified=True, attention=False):
+            headers = {'Content-Type': 'application/json', 'X-Test-Login': '1' if login else '0', 'X-Test-Verified': '1' if verified else '0', 'X-Test-Attention': '1' if attention else '0'}
             req = urllib.request.Request(f'http://127.0.0.1:{port}/api/pretes-cbt.php', data=json.dumps(payload).encode(), headers=headers)
             try:
                 with urllib.request.urlopen(req, timeout=5) as response:
@@ -64,7 +65,18 @@ function getDBConnection() {
         saved = request({**base, 'action': 'save', 'position': 1, 'answer': 'B', 'flagged': True})[1]
         assert saved['attempt']['questions'][0]['answer'] == 'B'
         assert saved['attempt']['questions'][0]['flagged'] is True
-        final = request({**base, 'action': 'submit', 'score': 999})[1]
+        pause = {**base, 'action': 'interrupt', 'position': 2, 'reason': 'page_hidden', 'event_id': 'http_pause_test', 'revision': 0}
+        assert request({**pause, 'csrf_token': 'forged'})[0] == 403
+        paused = request(pause)[1]['attempt']
+        assert paused['paused'] and paused['revision'] == 1
+        assert paused['questions'][0]['answer'] == 'B'
+        assert request({**base, 'action': 'state'})[1]['attempt']['paused']
+        assert request({**base, 'action': 'save', 'position': 2, 'answer': 'C', 'revision': 1})[0] == 409
+        assert request({**base, 'action': 'resume'})[0] == 409, 'Fresh camera check required'
+        resumed = request({**base, 'action': 'resume'}, attention=True)[1]['attempt']
+        assert not resumed['paused']
+        assert request({**base, 'action': 'save', 'position': 2, 'answer': 'C', 'revision': 0})[0] == 409
+        final = request({**base, 'action': 'submit', 'score': 999, 'revision': 1})[1]
         assert final['attempt']['submitted'] and final['attempt']['score'] in (0, 4)
         assert final['attempt']['questions'] == []
         assert request({**base, 'action': 'submit'})[1]['attempt']['score'] == final['attempt']['score']

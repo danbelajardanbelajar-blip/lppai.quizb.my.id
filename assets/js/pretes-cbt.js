@@ -2,6 +2,7 @@
     'use strict';
     let config, attempt = null, position = 0, target = 0, ticker = null, savePromise = null, finishing = false, needsSubmit = false, monitoringStarted = false;
     const pending = new Map();
+    let interruption = null, interruptionRequest = null, resuming = false;
     const el = id => document.getElementById(id);
     const message = (text, error) => {
         el('cbtMessage').textContent = text;
@@ -24,7 +25,7 @@
             button.className = (question.answer ? 'answered ' : '') + (question.flagged ? 'flagged ' : '') + (index === position ? 'current' : '');
             button.setAttribute('aria-label', 'Soal ' + (index + 1) + (question.answer ? ', dijawab' : ', belum dijawab') + (question.flagged ? ', ditandai' : ''));
             if (index === position) button.setAttribute('aria-current', 'step');
-            button.onclick = () => { position = index; renderQuestion(); };
+            button.onclick = () => { if (!interruption) { position = index; renderQuestion(); } };
             nav.appendChild(button);
         });
         el('cbtProgress').textContent = answered() + '/' + attempt.total + ' dijawab · ' + pending.size + ' perubahan belum tersimpan';
@@ -32,7 +33,7 @@
     }
 
     function edit(answer, flagged) {
-        if (!attempt || attempt.submitted || finishing || Date.now() >= target) return;
+        if (!attempt || attempt.submitted || finishing || interruption || Date.now() >= target) return;
         const question = attempt.questions[position];
         question.answer = answer;
         question.flagged = flagged;
@@ -59,7 +60,7 @@
             const radio = document.createElement('input');
             radio.type = 'radio'; radio.name = 'cbtAnswer'; radio.value = letter;
             radio.checked = question.answer === letter;
-            radio.disabled = Date.now() >= target || finishing;
+            radio.disabled = Date.now() >= target || finishing || !!interruption;
             radio.onchange = () => {
                 if (attempt.questions[position] !== question || !edit(letter, question.flagged)) return;
                 if (position < attempt.questions.length - 1) position++;
@@ -71,13 +72,14 @@
             options.appendChild(label);
         });
         el('cbtFlag').checked = question.flagged;
-        el('cbtFlag').disabled = Date.now() >= target || finishing;
+        el('cbtFlag').disabled = Date.now() >= target || finishing || !!interruption;
         el('cbtPrevious').disabled = position === 0;
         el('cbtNext').disabled = position === attempt.questions.length - 1;
         navigation();
     }
 
     function showResult(result) {
+        hideInterruption();
         attempt = result;
         progress(result.answered, result.total);
         needsSubmit = false;
@@ -109,6 +111,11 @@
         if (data.attempt.submitted) { showResult(data.attempt); return; }
         attempt = data.attempt;
         target = Date.now() + attempt.remaining_seconds * 1000;
+        if (attempt.paused) {
+            position = Math.max(0, (attempt.resume_position || 1) - 1);
+            interruption = { confirmed: true };
+            showInterruption(attempt.pause_reason);
+        }
         el('cbtIntro').style.display = 'none';
         el('cbtWorkspace').style.display = 'grid';
         message('Paket soal tersimpan. Pilih jawaban; tunggu status tersimpan sebelum menutup halaman.');
@@ -117,16 +124,18 @@
         ticker = setInterval(tick, 1000);
         if (!monitoringStarted && config.onStarted) { monitoringStarted = true; config.onStarted(); }
         tick();
+        if (document.hidden || (document.hasFocus && !document.hasFocus())) interrupt('page_hidden');
     }
 
     function flush() {
         if (savePromise) return savePromise;
         savePromise = (async () => {
-            while (pending.size && !attempt.submitted) {
+            while (pending.size && !attempt.submitted && !interruption) {
                 const [key, value] = pending.entries().next().value;
                 message('Menyimpan jawaban…');
-                const data = await config.request(Object.assign({ action: 'save' }, value));
+                const data = await config.request(Object.assign({ action: 'save', revision: attempt.revision || 0 }, value));
                 if (data.attempt.submitted) { showResult(data.attempt); return; }
+                if (interruption) return;
                 if (pending.get(key) === value) pending.delete(key);
                 target = Math.min(target, Date.now() + data.attempt.remaining_seconds * 1000);
                 navigation();
@@ -134,6 +143,7 @@
             el('cbtRetry').style.display = 'none';
             message('Semua perubahan jawaban tersimpan di server.');
         })().catch(error => {
+            if (interruption) return;
             message('Belum tersimpan: ' + error.message + ' Jangan tutup halaman. Tekan Coba Simpan Lagi.', true);
             el('cbtRetry').style.display = 'block';
             throw error;
@@ -142,16 +152,19 @@
     }
 
     async function finish(expired) {
-        if (finishing || !attempt || attempt.submitted) return;
-        if (!expired && !needsSubmit && !window.confirm('Kumpulkan ujian? ' + (attempt.total - answered()) + ' soal belum dijawab. Jawaban tidak dapat diubah setelah dikumpulkan.')) return;
+        if (finishing || interruption || !attempt || attempt.submitted) return;
         finishing = true;
+        if (!expired && !needsSubmit && !window.confirm('Kumpulkan ujian? ' + (attempt.total - answered()) + ' soal belum dijawab. Jawaban tidak dapat diubah setelah dikumpulkan.')) {
+            finishing = false;
+            return;
+        }
         el('cbtSubmit').disabled = true;
         renderQuestion();
         try {
             try { await flush(); } catch (error) { if (!expired) throw error; }
             if (attempt.submitted) return;
             message(expired ? 'Waktu habis. Mengumpulkan jawaban yang tersimpan…' : 'Mengumpulkan ujian…');
-            apply(await config.request({ action: 'submit' }));
+            apply(await config.request({ action: 'submit', revision: attempt.revision || 0 }));
         } catch (error) {
             needsSubmit = true;
             message('Pengumpulan belum terkonfirmasi: ' + error.message + ' Tekan Coba Simpan Lagi.', true);
@@ -164,7 +177,7 @@
     }
 
     function tick() {
-        if (!attempt || attempt.submitted) return;
+        if (!attempt || attempt.submitted || interruption) return;
         const seconds = Math.max(0, Math.ceil((target - Date.now()) / 1000));
         el('cbtTimer').textContent = String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
         if (seconds === 0) {
@@ -173,10 +186,101 @@
         }
     }
 
+    function showInterruption(reason) {
+        const descriptions = {
+            page_hidden: 'Halaman ujian ditinggalkan atau jendelanya tidak aktif.',
+            face_missing: 'Wajah tidak terdeteksi dengan jelas di kamera.',
+            face_mismatch: 'Wajah di kamera belum sesuai dengan peserta terdaftar.',
+            camera_unavailable: 'Kamera terputus atau tidak dapat dibaca.'
+        };
+        const dialog = el('cbtInterruption');
+        el('cbtInterruptionReason').textContent = descriptions[reason] || 'Pengawasan memerlukan perhatian Anda.';
+        el('cbtInterruptionStatus').textContent = interruption.confirmed
+            ? 'Waktu dijeda di server. Soal yang sedang terbuka dikosongkan dan diacak ulang; jawaban soal lain tetap tersimpan.'
+            : 'Mengonfirmasi jeda ke server… Jangan tutup halaman.';
+        el('cbtWorkspace').inert = true;
+        if (dialog.showModal && !dialog.open) dialog.showModal();
+        dialog.style.display = 'flex';
+        el('cbtResume').focus?.();
+    }
+
+    function hideInterruption() {
+        interruption = null;
+        const dialog = el('cbtInterruption');
+        if (dialog.close && dialog.open) dialog.close();
+        dialog.style.display = 'none';
+        el('cbtWorkspace').inert = false;
+    }
+
+    function confirmInterruption() {
+        if (interruptionRequest) return interruptionRequest;
+        if (!interruption || interruption.confirmed) return Promise.resolve();
+        const current = interruption;
+        interruptionRequest = config.request(current.payload).then(data => {
+            if (!data.success || !data.attempt) throw new Error(data.message || 'Jeda belum tersimpan.');
+            if (data.attempt.submitted) { showResult(data.attempt); return; }
+            attempt = data.attempt;
+            pending.clear();
+            position = Math.max(0, (attempt.resume_position || 1) - 1);
+            target = Date.now() + attempt.remaining_seconds * 1000;
+            current.confirmed = true;
+            showInterruption(attempt.pause_reason);
+            renderQuestion();
+        }).catch(error => {
+            el('cbtInterruptionStatus').textContent = 'Jeda server belum terkonfirmasi: ' + error.message + ' Sambungkan internet, lalu tekan Lanjutkan Ujian untuk mencoba lagi.';
+            throw error;
+        }).finally(() => { interruptionRequest = null; });
+        return interruptionRequest;
+    }
+
+    function interrupt(reason) {
+        if (!attempt || attempt.submitted || finishing || interruption) return;
+        if (Date.now() >= target) { tick(); return; }
+        const eventId = window.crypto?.randomUUID?.() || ('event_' + Date.now() + '_' + Math.random().toString(36).slice(2));
+        interruption = { confirmed: false, payload: {
+            action: 'interrupt', event_id: eventId, reason, position: attempt.questions[position].position,
+            revision: attempt.revision || 0, pending: [...pending.values()]
+        } };
+        showInterruption(reason);
+        renderQuestion();
+        confirmInterruption().catch(() => {});
+    }
+
+    async function resumeInterruption() {
+        if (!interruption || resuming || document.hidden || (document.hasFocus && !document.hasFocus())) return;
+        resuming = true;
+        el('cbtResume').disabled = true;
+        try {
+            await confirmInterruption();
+            if (!interruption) return;
+            if (savePromise) await savePromise.catch(() => {});
+            el('cbtInterruptionStatus').textContent = 'Memeriksa kesiapan kamera dan halaman…';
+            if (config.verifyAttention) await config.verifyAttention();
+            if (document.hidden || (document.hasFocus && !document.hasFocus())) throw new Error('Kembali ke halaman ujian terlebih dahulu.');
+            const data = await config.request({ action: 'resume' });
+            if (!data.success) throw new Error(data.message || 'Ujian belum dapat dilanjutkan.');
+            hideInterruption();
+            apply(data);
+            if (document.hidden) interrupt('page_hidden');
+        } catch (error) {
+            el('cbtInterruptionStatus').textContent = error.message;
+        } finally {
+            resuming = false;
+            el('cbtResume').disabled = false;
+        }
+    }
+
     window.PretesCbt = {
+        interrupt,
+        isPaused: () => !!interruption,
         init(settings) {
             if (config || !el('pretesCbt')) return;
             config = settings;
+            el('cbtResume').onclick = resumeInterruption;
+            el('cbtInterruption').addEventListener('cancel', event => event.preventDefault());
+            document.addEventListener('visibilitychange', () => { if (document.hidden) interrupt('page_hidden'); });
+            window.addEventListener('pagehide', () => interrupt('page_hidden'));
+            window.addEventListener('blur', () => interrupt('page_hidden'));
             if (window.TOKEN_REQUIRED && el('cbtTokenBox')) {
                 el('cbtTokenBox').style.display = 'block';
             }
@@ -204,8 +308,8 @@
                     }
                 }
             };
-            el('cbtPrevious').onclick = () => { if (position > 0) { position--; renderQuestion(); } };
-            el('cbtNext').onclick = () => { if (position < attempt.questions.length - 1) { position++; renderQuestion(); } };
+            el('cbtPrevious').onclick = () => { if (!interruption && position > 0) { position--; renderQuestion(); } };
+            el('cbtNext').onclick = () => { if (!interruption && position < attempt.questions.length - 1) { position++; renderQuestion(); } };
             el('cbtFlag').onchange = () => edit(attempt.questions[position].answer, el('cbtFlag').checked);
             el('cbtClear').onclick = () => { edit(null, attempt.questions[position].flagged); renderQuestion(); };
             el('cbtSubmit').onclick = () => finish(false);
@@ -213,7 +317,10 @@
                 if (needsSubmit || Date.now() >= target) finish(Date.now() >= target);
                 else flush().catch(() => {});
             };
-            window.addEventListener('online', () => { if (attempt && !attempt.submitted) el('cbtRetry').onclick(); });
+            window.addEventListener('online', () => {
+                if (interruption) confirmInterruption().catch(() => {});
+                else if (attempt && !attempt.submitted) el('cbtRetry').onclick();
+            });
             window.addEventListener('beforeunload', event => {
                 if (pending.size) { event.preventDefault(); event.returnValue = ''; }
             });

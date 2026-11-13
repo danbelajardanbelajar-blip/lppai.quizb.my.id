@@ -112,6 +112,34 @@ sebagai kiri peserta; model VPS dan nonce tetap memvalidasi arah raw semula.
 
 ## Pemeriksaan
 
+### Popup pengawasan dan jeda ujian
+
+Selama upaya CBT aktif, meninggalkan tab/halaman atau jendela kehilangan fokus
+memicu dialog layar penuh. Kamera yang terputus serta hasil pemeriksaan berkala
+`NO_FACE`/`MISMATCH` juga memicu dialog. Gangguan koneksi/mesin verifikasi bukan
+pelanggaran kamera. Pemeriksaan wajah masih setiap 30 detik, bukan pelacakan
+tatapan mata atau deteksi langsung setiap gerakan kepala.
+
+Server mencatat jeda pada `pretes_cbt_interruptions` dan audit pada
+`pretes_cbt_interruption_events`. Waktu dibekukan sejak server menerima jeda,
+termasuk setelah refresh; melanjutkan menambah deadline sebesar durasi jeda server.
+Dialog menutup soal, memblokir input dan tidak dapat ditutup dengan Escape.
+Tombol Lanjutkan Ujian memerlukan halaman aktif dan pemeriksaan wajah baru untuk
+sesi kamera wajib. Jika koneksi putus, dialog tetap menghalangi soal dan menyatakan
+bahwa jeda server belum terkonfirmasi; durasi sebelum server menerima jeda belum
+dapat dijamin berhenti. Browser yang dimatikan paksa tidak menjamin pengiriman
+peristiwa meninggalkan halaman.
+
+Hanya soal yang terbuka dikosongkan dan diacak ulang pilihan A–E-nya. Soal itu
+ditukar dengan soal belum dijawab yang dipilih acak, sehingga posisi yang terbuka
+menampilkan soal lain. Jika tidak ada soal kosong lain, soal tetap di posisinya
+dengan pilihan baru. Jawaban dan tanda soal lain dipertahankan, termasuk antrean
+autosave. Kunci jawaban mengikuti pilihan baru di server. Revisi urutan menolak
+autosave lama dan event ID membuat pengiriman ulang tidak menghukum dua kali.
+
+Uji khusus: `php tests/pretes-cbt-interruption-test.php` dan
+`node tests/pretes-cbt-ui-test.cjs`, ditambah uji HTTP `python tests/pretes-cbt-api-test.py`.
+
 ```sh
 php tests/pretes-cbt-test.php
 python tests/pretes-cbt-api-test.py

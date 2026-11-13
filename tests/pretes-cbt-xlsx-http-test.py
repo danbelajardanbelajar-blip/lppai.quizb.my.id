@@ -23,7 +23,7 @@ def fixture():
         root = Path(temp)
         assert root.resolve().parent == Path(tempfile.gettempdir()).resolve() and root.name.startswith('lppai-cbt-excel-')
         files = ['admin/pretes-bank-soal.php', 'api/pretes-cbt.php', 'pages/pretes-ujian.php',
-                 'includes/pretes-cbt.php', 'includes/pretes-cbt-xlsx.php', 'includes/pretes-cbt-admin-view.php',
+                 'includes/pretes-cbt.php', 'includes/pretes-cbt-interruption.php', 'includes/pretes-cbt-xlsx.php', 'includes/pretes-cbt-admin-view.php',
                  'includes/pretes-cbt-view.php', 'data/pretes-cbt-bank.php', 'downloads/template-bank-soal-cbt.xlsx',
                  'assets/css/style.css', 'assets/css/pretes-cbt-admin.css', 'assets/css/pretes-cbt-exam.css',
                  'assets/js/pretes-cbt-admin.js', 'assets/js/pretes-cbt.js']
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         assert headers['Content-Type'] == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         assert len(zipfile.ZipFile(io.BytesIO(template)).namelist()) > 5
         status, _, content = request(bank)
-        assert status == 200 and b'Koleksi soal' in content
+        assert status == 200 and b'class="bank-app"' in content
         status, _, exported = request(bank + '&download=bank')
         assert status == 200 and exported[:2] == b'PK'
         assert upload(bank, exported, csrf='forged')[0] == 403
