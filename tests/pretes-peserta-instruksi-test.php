@@ -33,8 +33,8 @@ $asserts = [
     'Tombol Kerjakan Soal Pretes Tersedia Saat Buka' => function() use ($fileContent) {
         return strpos($fileContent, 'Kerjakan Soal Pretes') !== false;
     },
-    'Link dikosongkan sementara' => function() use ($fileContent) {
-        return strpos($fileContent, '$linkSoalPretes = \'\'') !== false;
+    'Link pengerjaan soal mengarah ke portal ujian pretes-ujian.php' => function() use ($fileContent) {
+        return strpos($fileContent, 'pretes-ujian.php') !== false;
     }
 ];
 

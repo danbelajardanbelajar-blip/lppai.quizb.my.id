@@ -30,7 +30,7 @@ $myReg = $stmtMyReg->fetch();
 $tglSekarang    = date('Y-m-d');
 $tglBukaUjian   = '2026-11-16';
 $isUjianDibuka  = ($tglSekarang >= $tglBukaUjian);
-$linkSoalPretes = ''; // Kosongkan dulu sesuai instruksi, nanti diisi link CBT
+$linkSoalPretes = BASE_URL . '/pretes-ujian.php'; // Mengarahkan ke Portal Ujian Pretes & Pengawas AI (Skenario A & B)
 
 // ── Ambil jadwal pretes aktif untuk informasi sesi ─────────────────────────────
 $schedules = $pdo->query(

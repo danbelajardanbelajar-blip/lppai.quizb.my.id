@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 09:02:16 +0700 — Implementasi Sistem Pengawas AI Pretes: Skenario A (Check-in Awal) & Skenario B (Pengecekan Berkala 5 Menit Sekali)
+
+**Ringkasan:** Mengimplementasikan sistem pengawasan ujian daring (*AI Proctoring*) lengkap yang menggabungkan Skenario A dan Skenario B secara bersamaan untuk memastikan integritas pengerjaan ujian pretes:
+1. **Skenario A (Check-in Verifikasi Wajah di Awal):**
+   - Sebelum lembar soal/portal CBT dapat diakses, sistem mengaktifkan kamera live peserta di halaman `pages/pretes-ujian.php`.
+   - Mengambil snapshot dan mencocokkannya (*1-to-1 Face Matching*) terhadap pasfoto resmi yang tersimpan saat pendaftaran (`pretes_registrations.foto`).
+   - Akses pengerjaan soal hanya terbuka jika verifikasi identik dinyatakan valid ($\ge 70\%$). Jika tidak cocok (terindikasi joki) atau kamera ditutupi, akses tetap terkunci.
+2. **Skenario B (Pengawasan Berkala 5 Menit Sekali Selama Ujian):**
+   - Selama mahasiswa berada di ruang ujian, background proctoring timer berjalan otomatis setiap 5 menit (300 detik).
+   - Mengambil frame snapshot berkala secara hening, memverifikasi kontinuitas kehadiran peserta di depan layar, dan mencatat log audit ke tabel `pretes_proctoring_logs`.
+   - Jika terdeteksi peserta meninggalkan kursi atau digantikan orang lain, sistem membunyikan dan menampilkan peringatan visual merah di atas layar ujian serta mencatat bukti pelanggaran.
+3. **Backend API & Log Audit Pengawas:**
+   - Membuat endpoint `api/pretes-proctoring-check.php` untuk melayani aksi `initial_checkin`, `periodic_5min`, dan `fetch_logs`.
+   - Menyimpan bukti foto snapshot ke folder `uploads/pretes_proctoring/` yang dilindungi `.htaccess`.
+   - Menambahkan tombol `🛡️ AI Log` dan modal visualizer riwayat proctoring pada `admin/pretes-peserta.php`.
+4. **Integrasi Halaman Peserta:**
+   - Menghubungkan tombol "Kerjakan Soal Pretes" di `pages/pretes-peserta.php` langsung ke `pages/pretes-ujian.php`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-helper.php` | 850–1170 | Helper Proctoring & Komparasi Wajah | Menambahkan `ensurePretesProctoringTables()`, `saveProctoringSnapshot()`, `compareFacesGD()`, dan `getStudentProctoringLogs()`. |
+| `api/pretes-proctoring-check.php` | 1–200 | Endpoint API Pengawas AI (File Baru) | Menangani verifikasi check-in awal (Skenario A) dan pencatatan audit berkala 5 menit (Skenario B). |
+| `pages/pretes-ujian.php` | 1–450 | Portal Ujian & Proctoring AI (File Baru) | Halaman terpadu pengawas AI pretes (Gatekeeper Check-in Awal + Background Periodic 5-Min Timer). |
+| `pages/pretes-peserta.php` | 33, 309–315 | Akses Soal Pretes | Menghubungkan tombol "Kerjakan Soal Pretes" ke `pretes-ujian.php`. |
+| `admin/pretes-peserta.php` | 980–990, 1715–1790 | Panel Admin & Log Audit | Menambahkan tombol aksi `🛡️ AI Log` dan modal viewer riwayat snapshot proctoring. |
+| `tests/pretes-proctoring-scenarios-test.php` | 1–135 | Unit & Integration Test Baru | Menguji auto-migrasi tabel log, perbandingan wajah identik vs non-wajah, penyimpanan snapshot, dan routing. |
+| `tests/pretes-peserta-instruksi-test.php` | 36–38 | Asersi Link Soal | Memperbarui pengujian link soal mengarah ke `pretes-ujian.php`. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 08:32:56 +0700 — Pembaruan Halaman Peserta Pretes: 4 Poin Tata Tertib & Gating Link Pengerjaan Soal (16 November 2026)
 
 **Ringkasan:** Memperbarui konten halaman `pages/pretes-peserta.php` (`https://lppai.quizb.my.id/pretes-peserta.php`) secara komprehensif sesuai instruksi pengguna:

@@ -978,6 +978,14 @@ include __DIR__ . '/../includes/header.php';
                         <!-- Aksi -->
                         <td style="white-space:nowrap;">
                             <div style="display:flex;gap:6px;align-items:center;">
+                                <!-- Tombol Log Pengawas AI (Proctoring) -->
+                                <button type="button"
+                                    class="btn btn-sm"
+                                    style="background:#0f766e;color:#fff;border-radius:6px;padding:5px 9px;font-size:11.5px;font-weight:700;"
+                                    onclick="viewProctoringLog(<?= $p['reg_id'] ?>, '<?= htmlspecialchars(addslashes($p['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?>')"
+                                    title="Lihat Log Audit Pengawas AI (Check-in & Berkala 5 Menit)">
+                                    🛡️ AI Log
+                                </button>
                                 <!-- Tombol Edit Data & Credentials -->
                                 <button type="button"
                                     class="btn btn-sm btn-warning btn-edit-cred"
@@ -1710,7 +1718,88 @@ document.addEventListener('click', function(e) {
     if (e.target === modal) {
         closeExportModal();
     }
+    var procModal = document.getElementById('modal-proctoring-log');
+    if (e.target === procModal) {
+        closeProctoringModal();
+    }
 });
+
+function viewProctoringLog(regId, nama) {
+    var modal = document.getElementById('modal-proctoring-log');
+    var modalTitle = document.getElementById('procModalTitle');
+    var modalBody = document.getElementById('procModalBody');
+    if (!modal || !modalBody) return;
+
+    if (modalTitle) modalTitle.textContent = 'Log Audit Pengawas AI: ' + nama;
+    modalBody.innerHTML = '<div style="text-align:center;padding:24px;color:#64748b;">⏳ Memuat riwayat log proctoring...</div>';
+    modal.style.display = 'flex';
+
+    var formData = new FormData();
+    formData.append('csrf_token', <?= json_encode(csrfToken()) ?>);
+    formData.append('action', 'fetch_logs');
+    formData.append('registration_id', regId);
+
+    fetch('<?= BASE_URL ?>/api/pretes-proctoring-check.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data || !data.success || !data.logs || data.logs.length === 0) {
+            modalBody.innerHTML = '<div style="text-align:center;padding:26px;color:#64748b;"><span style="font-size:32px;display:block;margin-bottom:8px;">📭</span>Belum ada catatan log proctoring untuk peserta ini (peserta belum masuk ke ruang ujian).</div>';
+            return;
+        }
+
+        var html = '<div style="display:flex;flex-direction:column;gap:10px;max-height:480px;overflow-y:auto;padding-right:6px;">';
+        data.logs.forEach(function(l) {
+            var isMatch = (l.status === 'MATCH');
+            var badgeColor = isMatch ? '#15803d' : '#b91c1c';
+            var badgeBg = isMatch ? '#f0fdf4' : '#fef2f2';
+            var badgeBorder = isMatch ? '#86efac' : '#fca5a5';
+            var eventLabel = (l.event_type === 'initial_checkin') ? 'Check-in Awal (Skenario A)' : 'Berkala 5 Menit (Skenario B)';
+
+            html += '<div style="background:' + badgeBg + ';border:1.5px solid ' + badgeBorder + ';border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">';
+            if (l.snapshot_path) {
+                html += '<img src="<?= BASE_URL ?>/' + l.snapshot_path + '" style="width:54px;height:72px;object-fit:cover;border-radius:6px;border:1px solid ' + badgeBorder + ';flex-shrink:0;">';
+            }
+            html += '<div style="flex:1;min-width:0;">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+            html += '<strong style="font-size:12.5px;color:#0f172a;">' + eventLabel + '</strong>';
+            html += '<span style="font-size:11px;font-weight:700;color:' + badgeColor + ';background:#fff;padding:2px 8px;border-radius:12px;border:1px solid ' + badgeBorder + ';">' + l.status + ' (' + l.similarity_score + '%)</span>';
+            html += '</div>';
+            html += '<div style="font-size:12px;color:#475569;margin-bottom:4px;">' + (l.notes || '-') + '</div>';
+            html += '<div style="font-size:11px;color:#94a3b8;">🕒 ' + l.created_at + '</div>';
+            html += '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        modalBody.innerHTML = html;
+    })
+    .catch(err => {
+        modalBody.innerHTML = '<div style="text-align:center;padding:20px;color:#b91c1c;">Gagal memuat log: ' + err.message + '</div>';
+    });
+}
+
+function closeProctoringModal() {
+    var modal = document.getElementById('modal-proctoring-log');
+    if (modal) modal.style.display = 'none';
+}
+</script>
+
+<!-- Modal Proctoring Log Viewer -->
+<div id="modal-proctoring-log" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:580px;box-shadow:0 8px 40px rgba(0,0,0,0.25);overflow:hidden;box-sizing:border-box;">
+        <div style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <h4 id="procModalTitle" style="margin:0;font-size:15px;font-weight:800;color:#fff;">Log Pengawas AI</h4>
+            <button type="button" onclick="closeProctoringModal()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;line-height:1;">&times;</button>
+        </div>
+        <div id="procModalBody" style="padding:20px;">
+        </div>
+        <div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:12px 20px;text-align:right;">
+            <button type="button" onclick="closeProctoringModal()" class="btn btn-secondary btn-sm" style="padding:7px 18px;border-radius:8px;font-weight:700;">Tutup</button>
+        </div>
+    </div>
+</div>
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
