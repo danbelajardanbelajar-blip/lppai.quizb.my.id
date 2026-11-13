@@ -5,6 +5,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:23:00 +0700 — Peningkatan Antarmuka Mahasiswa Menunggu Plotting & Banner Edukasi Diktat (tutorial-info.php)
+
+**Ringkasan:** Memperbarui antarmuka halaman Info Tutorial Mahasiswa (`pages/tutorial-info.php`) saat status masih "Menunggu Plotting" agar jauh lebih informatif, transparan, dan edukatif:
+1. **Penjelasan Status Terperinci:** Menggantikan kotak kosong/minimalis dengan penjelasan ramah bahwa pendaftaran telah resmi diterima dan saat ini pihak TU LPPAI sedang memproses pembagian rombel, tutor pengampu, serta alokasi ruangan.
+2. **Visual Stepper Progress:** Menampilkan 4 tahapan alur tutorial (1. Pendaftaran [Selesai], 2. Plotting Kelas [Sedang Diproses], 3. Perkuliahan [Tatap Muka], 4. Kelulusan [Ujian & Sertifikat]).
+3. **Banner Edukasi Belajar Mandiri Diktat:** Panel gradien hijau-emas eksklusif yang mengajak mahasiswa memanfaatkan waktu tunggu untuk mempelajari Diktat LPPAI 2026, lengkap dengan cuplikan materi pokok (Thaharah, Shalat, Dzikir, Tajwid) dan tombol Call-To-Action **"📖 Buka & Pelajari Diktat Sekarang →"** yang langsung mengalihkan tab ke reader PDF.js secara instan.
+4. **Bantuan & FAQ:** Menambahkan informasi estimasi pengumuman jadwal dan tautan WhatsApp resmi ke Bu Umami (`wa.me/6281515726827`).
+5. **Navigasi Tab Interaktif:** Menambahkan fungsi global `window.openTab` dan event delegation `[data-open-tab="diktat"]`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/tutorial-info.php` | 75–140 | CSS Styling | Menambahkan gaya `.ti-waiting-card`, `.ti-waiting-header`, `.ti-stepper`, `.ti-diktat-prompt`, `.btn-diktat-cta`, visual buku 3D, dan responsivitas mobile. |
+| `pages/tutorial-info.php` | 170–260 | Tampilan Menunggu Plotting | Struktur HTML kartu tunggu: header info, timeline stepper, banner prompt diktat dengan tombol aksi, dan footer FAQ/bantuan. |
+| `pages/tutorial-info.php` | 315–335 | Controller Tab JS | Mengekspos `window.openTab = openTab` dan mendaftarkan event listener `[data-open-tab]` untuk perpindahan tab mulus dari tombol banner. |
+| `tests/tutorial-info-test.php` | 1–55 (baru) | Unit Test Suite | Validasi 16 asersi: pengecekan sintaks PHP, teks penjelasan plotting, stepper, CTA diktat, materi pokok, tautan WA Bu Umami, dan handler JS. |
+
+---
+
 ## 2026-11-13 21:57:30 +0700 — Eliminasi Tab Bank Soal & Form Soal, Transformasi ke Modal Kelola & Edit Soal Cantik
 
 **Ringkasan:** Memenuhi instruksi user untuk menyederhanakan navigasi dengan menghilangkan tab berdiri sendiri "Bank Soal" dan "Tambah / Edit Soal", lalu mentransformasikannya ke dalam modal interaktif modern (*in-place modal*) yang elegan:
