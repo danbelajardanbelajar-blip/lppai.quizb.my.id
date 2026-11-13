@@ -47,6 +47,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 23:24:04 +0700 — Modal Tambah/Edit Sesi & Tambah/Edit Soal bisa di-scroll
+
+**Akar masalah (diukur di harness lokal, viewport 1280×640):**
+1. `.content-area` memiliki `transform` (animasi masuk halaman), sehingga `position:fixed` pada `.bank-modal-backdrop` mengacu ke content-area, bukan viewport: backdrop setinggi konten (±840px), modal tergeser (top 125px, bottom 733px > 640px), sementara scroll halaman dikunci (`body{overflow:hidden}`) → bagian bawah form dan tombol Simpan tidak terjangkau.
+2. `<form>` membungkus `.bank-modal-body` + `.bank-modal-foot` di dalam `.bank-modal` (flex column, overflow hidden) tanpa ikut menyusut, sehingga `overflow-y:auto` pada body tidak pernah aktif.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/pretes-cbt-admin.js` | 8–11 | `sanitizeBackdrops()` | Memindahkan setiap `.bank-modal-backdrop` ke `<body>` saat halaman siap (form ikut pindah, tetap berfungsi). |
+| `assets/css/pretes-cbt-admin.css` | 237–258 (baru) | Blok "MODAL SCROLL LAYOUT" | `.bank-modal > form` flex column `min-height:0`; `.bank-modal-body` `flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain`; head/foot/banner/toolbar `flex-shrink:0`; `max-height` berbasis `100dvh`; `.modal-q-list` mengikuti tinggi modal; scrollbar tipis; penyesuaian ≤640px. |
+| `tests/pretes-cbt-admin-buttons-test.php` | 39–46 | Assertion baru | Wajib pemindahan backdrop ke `<body>` dan aturan flex/scroll modal. |
+
+**Verifikasi (harness lokal):** desktop 1280×640 & mobile 375×812 — Tambah Sesi, Edit Sesi, Tambah Soal, Edit Soal: backdrop = viewport, modal di dalam layar, body bisa di-scroll sampai akhir, tombol Simpan terlihat & bisa diklik; modal Paket tetap normal. `node --check` OK; `pretes-cbt-admin-buttons`, `pretes-cbt-package`, `pretes-cbt-session` PASS.
+
+---
+
 ## 2026-11-13 23:04:22 +0700 — Perbaikan akar masalah: tombol & tab Bank Soal CBT tidak bisa diklik
 
 **Akar masalah (direproduksi dengan harness lokal + browser):** `assets/js/app.js` dimuat di footer **setelah** `pretes-cbt-admin.js` dan mendeklarasikan `function openModal(id)` / `function closeModal(id)` global (hanya menambah/menghapus kelas `.show`). Deklarasi ini **menimpa** `window.openModal`/`window.closeModal` milik CBT, sehingga semua tombol yang membuka modal (Buat Paket, Buat Sesi, Tambah Soal, Kelola Soal, Edit Paket/Sesi) tidak memunculkan apa pun, dan tombol tutup/Esc/klik backdrop gagal. Masalah kedua: handler `submit` global di `app.js` mengubah tombol menjadi "Memproses..." + `disabled` meskipun `onsubmit="return confirm(...)"` dibatalkan, sehingga tombol Hapus/Set Aktif/Jadikan Aktif terkunci setelah klik Batal. Perbaikan sebelumnya (22:51:40) hanya menambah `!important`/inline style dan tidak menyentuh bentrokan nama ini.

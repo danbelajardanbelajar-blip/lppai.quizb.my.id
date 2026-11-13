@@ -5,6 +5,10 @@
     // ── Global Modal Controller ──────────────────────────────────────────────
     function sanitizeBackdrops() {
         document.querySelectorAll('.bank-modal-backdrop').forEach(el => {
+            // .content-area memakai transform (animasi masuk halaman) sehingga position:fixed
+            // di dalamnya mengacu ke content-area, bukan viewport: backdrop setinggi konten,
+            // modal tergeser ke bawah layar dan tidak bisa di-scroll. Pindahkan ke <body>.
+            if (el.parentElement !== document.body) document.body.appendChild(el);
             if (!el.classList.contains('open')) {
                 el.style.display = 'none';
                 el.style.pointerEvents = 'none';

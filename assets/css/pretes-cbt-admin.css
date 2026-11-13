@@ -234,3 +234,25 @@
 .question-opt-row.selected-key .question-opt-letter-tag {
     color: #047857;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODAL SCROLL LAYOUT (Tambah/Edit Sesi, Tambah/Edit Soal, Paket, Kelola Soal)
+   <form> membungkus .bank-modal-body + .bank-modal-foot di dalam .bank-modal
+   (flex column, overflow hidden). Tanpa aturan ini form tidak menyusut sehingga
+   body tidak bisa di-scroll dan footer (tombol Simpan) terpotong.
+   ═══════════════════════════════════════════════════════════════════════ */
+.bank-modal{max-height:90vh;max-height:calc(100dvh - 32px)}
+.bank-modal.extra-large{max-height:92vh;max-height:calc(100dvh - 24px)}
+.bank-modal > form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;margin:0}
+.bank-modal-head,.bank-modal-foot,.modal-header-banner,.modal-q-toolbar{flex-shrink:0}
+.bank-modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable}
+.modal-q-list{flex:1 1 auto;min-height:0;max-height:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.bank-modal-body::-webkit-scrollbar,.modal-q-list::-webkit-scrollbar{width:10px}
+.bank-modal-body::-webkit-scrollbar-thumb,.modal-q-list::-webkit-scrollbar-thumb{background:#c7d6cd;border-radius:999px;border:2px solid #fff}
+.bank-modal-body::-webkit-scrollbar-thumb:hover,.modal-q-list::-webkit-scrollbar-thumb:hover{background:#9fb8aa}
+@media (max-width:640px){
+    .bank-modal-backdrop{padding:8px}
+    .bank-modal,.bank-modal.extra-large{max-height:calc(100dvh - 16px);width:100%}
+    .bank-modal-body{padding:16px}
+    .bank-modal-foot{padding:12px 16px;flex-wrap:wrap}
+}

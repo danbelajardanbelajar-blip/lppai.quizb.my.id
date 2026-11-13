@@ -36,7 +36,14 @@ foreach (['create-package', 'create-session', 'add-question', 'manage-questions'
 // 3. Submit yang dibatalkan (confirm → Batal) tidak boleh mengunci tombol
 $check(preg_match("/addEventListener\('submit'[\s\S]{0,400}if \(e\.defaultPrevented\) return;/", $app) === 1, 'app.js harus mengabaikan submit yang sudah dibatalkan (e.defaultPrevented)');
 
-// 4. Tab navigasi berupa tautan biasa ke 4 tab
+// 4. Modal bisa di-scroll: backdrop dipindah ke <body> (lepas dari .content-area ber-transform)
+//    dan <form> di dalam .bank-modal ikut menyusut sehingga .bank-modal-body bisa overflow-y:auto
+$css = file_get_contents("$root/assets/css/pretes-cbt-admin.css");
+$check(strpos($js, 'document.body.appendChild(el)') !== false, 'Backdrop modal harus dipindah ke <body> agar position:fixed mengacu viewport');
+$check(strpos($css, '.bank-modal > form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0') !== false, 'Form di dalam modal harus flex column min-height:0');
+$check(preg_match('/\.bank-modal-body\{flex:1 1 auto;min-height:0;overflow-y:auto/', $css) === 1, 'Body modal harus flex:1, min-height:0, overflow-y:auto');
+
+// 5. Tab navigasi berupa tautan biasa ke 4 tab
 foreach (['packages', 'sessions', 'import', 'results'] as $tab) {
     $check(strpos($view, "'$tab' =>") !== false, "Tab $tab harus ada di navigasi");
 }
