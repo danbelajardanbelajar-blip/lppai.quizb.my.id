@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 11:30:31 +0700 — Penanganan Tombol Kamera Tidak Merespon: Penghapusan Auto-Call Pending, Binding Interaktif Ganda, & Penanganan Izin Terblokir (pages/pretes-ujian.php)
+
+**Ringkasan:** Memperbaiki secara tuntas kendala tombol "Aktifkan Kamera" yang tidak merespon (*unresponsive button*) pada portal ujian pretes (`pages/pretes-ujian.php`):
+1. **Akar Masalah Tombol Tidak Merespon:**
+   - Pemanggilan `startCheckinCamera(false)` secara otomatis pada `DOMContentLoaded` memicu `getUserMedia` tanpa interaksi pengguna (*user gesture*). Pada peramban Chromium (Chrome/Edge), hal ini menyebabkan permintaan izin masuk ke antrean *pending* atau disupresi peramban, sementara atribut `btnActivate.disabled = true` telah dieksekusi, sehingga tombol menjadi mati (*disabled*) dan tidak dapat menerima klik fisik.
+   - Bila peramban pengguna sebelumnya pernah menandai izin kamera sebagai "Ditolak / Blokir", pemanggilan `getUserMedia` ditolak secara instan tanpa dialog pop-up dari peramban, sehingga pengguna mengira tombol tidak bereaksi.
+2. **Solusi Komprehensif yang Diterapkan:**
+   - **Meniadakan Auto-Call Menggantung pada Page Load:** Menghapus eksekusi otomatis `startCheckinCamera(false)` di awal pemuatan halaman; pemanggilan kamera murni dipicu oleh klik sadar pengguna (*pure user gesture*) sesuai standar keamanan WebRTC modern.
+   - **Tombol Selalu Interaktif & Bebas `disabled`:** Menghilangkan penonaktifan tombol (`disabled = true`). Tombol tetap aktif dan responsif menerima klik, dengan pembaruan visual instan `⏳ Sedang Menghubungkan Kamera...` dan banner panduan biru seketika.
+   - **Deteksi Dini Status Izin (*Permissions API*):** Menambahkan fungsi `inspectCameraPermissions()` saat halaman dimuat. Jika izin kamera berstatus `denied`, sistem langsung menampilkan banner panduan kuning/merah jelas di layar sebelum pengguna mengklik tombol.
+   - **Binding Event Ganda (*Dual Binding*):** Menghubungkan fungsi `window.startCheckinCamera` baik melalui atribut `onclick` maupun `addEventListener('click')` eksplisit pada tombol serta seluruh area kotak placeholder kamera.
+   - **Fitur Diagnosa Kamera Pengembang:** Menambahkan tombol `🔍 Diagnosa Kamera` pada Toolbar Pengembang akun `12345` untuk memeriksa perangkat webcam fisik (`enumerateDevices`), status URL HTTPS, dan status izin peramban secara mendalam.
+3. **Verifikasi:**
+   - `php -l pages/pretes-ujian.php` (**No syntax errors**).
+   - Validasi JavaScript Node.js valid (returncode=0).
+   - **27/27 test suites lulus 100%**.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-ujian.php` | 200–218, 480–660 | Toolbar Pengembang & Engine WebRTC Kamera | Meniadakan auto-call yang menonaktifkan tombol, menambahkan Permissions API inspection, dual click binding, dan tombol diagnosa kamera WebRTC. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 11:14:49 +0700 — Optimalisasi Eksekusi Kamera WebRTC Ujian Pretes & Feedback Responsif (pages/pretes-ujian.php)
 
 **Ringkasan:** Memperbaiki interaktivitas kamera web pada portal ujian pretes (`pages/pretes-ujian.php`) agar memberikan respon visual seketika saat tombol "Aktifkan Kamera" diklik, meniadakan kesan kamera pasif/pajangan:

@@ -210,6 +210,9 @@ include __DIR__ . '/../includes/header.php';
                 <button type="button" onclick="runPeriodicProctoringCheck()" class="btn btn-sm btn-success" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
                     📸 Test Snapshot Sekarang
                 </button>
+                <button type="button" onclick="testWebcamDiagnostics()" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0284c7;color:#fff;border:none;">
+                    🔍 Diagnosa Kamera
+                </button>
             </div>
         </div>
     </div>
@@ -473,133 +476,105 @@ let secondsRemaining = 300; // 5 menit = 300 detik
 let activeStream = null;
 let currentFacingMode = 'user';
 
-// Self-contained PretesFaceVerifier fallback jika script eksternal belum siap
-if (typeof window.PretesFaceVerifier === 'undefined') {
-    window.PretesFaceVerifier = {
-        stream: null,
-        facingMode: 'user',
-        startCamera: function(videoEl, onStarted, onError) {
-            var self = this;
-            if (self.stream) self.stopCamera();
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                if (onError) onError(new Error("Perangkat atau peramban tidak mendukung kamera langsung (getUserMedia). Pastikan menggunakan Google Chrome / Edge terbaru dengan koneksi HTTPS."));
-                return;
-            }
-            var c1 = { audio: false, video: { facingMode: self.facingMode, width: { ideal: 640 }, height: { ideal: 480 } } };
-            navigator.mediaDevices.getUserMedia(c1)
-                .then(function(s) {
-                    self.stream = s;
-                    videoEl.srcObject = s;
-                    videoEl.setAttribute('playsinline', 'true');
-                    videoEl.setAttribute('autoplay', 'true');
-                    videoEl.muted = true;
-                    videoEl.play().catch(function(e){ console.warn("Video play:", e); });
-                    if (onStarted) onStarted(s);
-                })
-                .catch(function(err1) {
-                    console.warn("[Camera] Constraint c1 gagal, mencoba fallback universal...", err1);
-                    navigator.mediaDevices.getUserMedia({ audio: false, video: true })
-                        .then(function(s2) {
-                            self.stream = s2;
-                            videoEl.srcObject = s2;
-                            videoEl.setAttribute('playsinline', 'true');
-                            videoEl.setAttribute('autoplay', 'true');
-                            videoEl.muted = true;
-                            videoEl.play().catch(function(e){ console.warn("Video play fallback:", e); });
-                            if (onStarted) onStarted(s2);
-                        })
-                        .catch(function(err2) {
-                            if (onError) onError(err2);
-                        });
-                });
-        },
-        stopCamera: function() {
-            if (this.stream) {
-                try { this.stream.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
-                this.stream = null;
-            }
-        },
-        toggleFacingMode: function(videoEl, onStarted, onError) {
-            this.facingMode = (this.facingMode === 'user') ? 'environment' : 'user';
-            this.startCamera(videoEl, onStarted, onError);
-        }
-    };
-}
+// ── Global Webcam Handler & Engine Skenario A & B ──
+window.startCheckinCamera = function(isUserAction) {
+    console.log("[Webcam] startCheckinCamera dipanggil, userAction:", isUserAction);
 
-function autoStartCameraIfPossible() {
-    const isAlreadyVerified = <?= $isVerified ? 'true' : 'false' ?>;
-    if (!isAlreadyVerified) {
-        startCheckinCamera(false);
-    } else {
-        initProctoringExamRoom();
-    }
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', autoStartCameraIfPossible);
-} else {
-    autoStartCameraIfPossible();
-}
-
-/**
- * ── Inisialisasi & Pengaktifan Kamera Skenario A (Check-in Awal) ──
- */
-function startCheckinCamera(isUserAction) {
     const video = document.getElementById('checkinVideo');
     const placeholder = document.getElementById('checkinCameraPlaceholder');
     const ovalGuide = document.getElementById('checkinOvalGuide');
     const cameraBadge = document.getElementById('checkinCameraBadge');
     const alertBox = document.getElementById('checkinAlert');
-    const btnActivate = document.getElementById('btnActivateCamera');
     const btnText = document.getElementById('btnActivateCameraText');
 
-    if (!video) return;
-
+    // Respon visual instan agar pengguna tahu sistem langsung bereaksi
+    if (btnText) btnText.textContent = '⏳ Membuka Kamera...';
     if (alertBox) {
-        alertBox.style.display = 'none';
-        alertBox.innerHTML = '';
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.border = '1.5px solid #bfdbfe';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = '<strong>⏳ Sedang Menghubungkan Kamera...</strong><div style="font-size:11.5px;margin-top:3px;color:#2563eb;">Jika peramban Anda memunculkan pop-up izin, harap klik <strong>"Allow / Izinkan"</strong>.</div>';
     }
 
-    if (btnActivate && btnText) {
-        btnActivate.disabled = true;
-        btnText.textContent = 'Menghubungkan Kamera...';
+    if (!video) {
+        alert("Elemen video kamera tidak ditemukan pada halaman.");
+        return;
     }
 
-    PretesFaceVerifier.startCamera(video, function(mediaStream) {
-        activeStream = mediaStream;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const notSupportedMsg = "Peramban ini tidak mendukung akses kamera WebRTC atau halaman tidak diakses via HTTPS aman.";
+        if (alertBox) {
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '1.5px solid #fca5a5';
+            alertBox.style.color = '#991b1b';
+            alertBox.innerHTML = '<strong>❌ Tidak Mendukung Kamera:</strong> ' + notSupportedMsg;
+        }
+        alert(notSupportedMsg);
+        if (btnText) btnText.textContent = 'Aktifkan Kamera';
+        return;
+    }
+
+    // Bersihkan stream aktif sebelumnya bila ada
+    if (activeStream) {
+        try {
+            activeStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch(e) {}
+        activeStream = null;
+    }
+
+    function onStreamSuccess(stream) {
+        console.log("[Webcam] Stream berhasil didapatkan:", stream);
+        activeStream = stream;
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
+
+        var playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(function(e) {
+                console.warn("[Webcam] video.play() warning:", e);
+            });
+        }
+
         if (placeholder) placeholder.style.display = 'none';
         if (ovalGuide) ovalGuide.style.display = 'block';
         if (cameraBadge) cameraBadge.style.display = 'block';
-        if (btnActivate && btnText) {
-            btnActivate.disabled = false;
-            btnText.textContent = 'Aktifkan Kamera';
+        if (btnText) btnText.textContent = 'Aktifkan Kamera';
+
+        if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#f0fdf4';
+            alertBox.style.border = '1.5px solid #86efac';
+            alertBox.style.color = '#15803d';
+            alertBox.innerHTML = '<strong>🟢 Kamera Aktif & Siap Verifikasi!</strong><div style="font-size:11.5px;margin-top:2px;">Posisikan wajah Anda tegak di dalam oval, lalu klik tombol <strong>"Verifikasi Wajah & Buka Ujian"</strong> di bawah.</div>';
         }
-    }, function(err) {
-        console.error("[Camera] Error accessing camera:", err);
+    }
+
+    function onStreamError(err) {
+        console.error("[Webcam] getUserMedia error:", err);
         if (placeholder) placeholder.style.display = 'flex';
         if (ovalGuide) ovalGuide.style.display = 'none';
         if (cameraBadge) cameraBadge.style.display = 'none';
-        if (btnActivate && btnText) {
-            btnActivate.disabled = false;
-            btnText.textContent = 'Coba Aktifkan Lagi';
-        }
+        if (btnText) btnText.textContent = 'Coba Aktifkan Lagi';
 
-        let errTitle = "Gagal Mengakses Kamera";
-        let errMsg = err.message || "Akses kamera ditolak atau perangkat tidak terhubung.";
+        let errTitle = "Akses Kamera Ditolak / Gagal";
+        let errMsg = err.message || "Akses kamera tidak diizinkan oleh peramban.";
         let errTip = "Pastikan Anda memilih <strong>'Izinkan / Allow'</strong> saat peramban meminta izin kamera.";
 
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            errTitle = "Izin Kamera Ditolak / Diblokir";
-            errMsg = "Peramban Anda memblokir izin akses kamera ke situs ini.";
-            errTip = "Klik ikon <strong>Gembok (🔒)</strong> atau ikon kamera pada bilah alamat peramban Anda di atas, ubah Kamera menjadi <strong>Izinkan (Allow)</strong>, lalu klik tombol Nyalakan lagi.";
+            errTitle = "Izin Kamera Terblokir di Browser";
+            errMsg = "Peramban Anda saat ini memblokir izin akses kamera untuk https://lppai.quizb.my.id.";
+            errTip = "Klik ikon <strong>Gembok (🔒)</strong> atau ikon kamera di bilah alamat URL peramban Anda (kiri atas), ubah Kamera menjadi <strong>Izinkan (Allow)</strong>, lalu klik tombol ini lagi.";
         } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-            errTitle = "Kamera Tidak Ditemukan";
-            errMsg = "Tidak ada webcam yang terdeteksi pada laptop/komputer Anda.";
-            errTip = "Pastikan webcam terpasang dengan baik atau driver kamera internal aktif di Pengaturan Windows.";
+            errTitle = "Perangkat Kamera Tidak Ditemukan";
+            errMsg = "Tidak ada webcam yang terdeteksi di laptop atau komputer Anda.";
+            errTip = "Pastikan webcam tercolok dengan baik atau driver kamera internal aktif di Pengaturan Windows.";
         } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-            errTitle = "Kamera Sedang Dipakai Aplikasi Lain";
-            errMsg = "Kamera perangkat Anda sedang terkunci oleh aplikasi lain.";
-            errTip = "Tutup aplikasi seperti Zoom, Google Meet, OBS, atau tab peramban lain yang sedang memakai webcam.";
+            errTitle = "Kamera Sedang Digunakan Aplikasi Lain";
+            errMsg = "Kamera terkunci oleh aplikasi lain (misal Zoom, Google Meet, Skype, atau tab lain).";
+            errTip = "Tutup aplikasi yang sedang menggunakan kamera, lalu coba klik aktifkan kembali.";
         }
 
         if (alertBox) {
@@ -615,23 +590,125 @@ function startCheckinCamera(isUserAction) {
         if (isUserAction) {
             alert(errTitle + ":\n" + errMsg + "\n\n" + errTip.replace(/<[^>]*>/g, ''));
         }
+    }
+
+    // Strategi 1: Constraints resolusi ideal
+    const c1 = { audio: false, video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } };
+    // Strategi 2: Constraints universal
+    const c2 = { audio: false, video: true };
+
+    navigator.mediaDevices.getUserMedia(c1)
+        .then(onStreamSuccess)
+        .catch(function(e1) {
+            console.warn("[Webcam] Constraint c1 gagal, mencoba fallback c2 universal...", e1);
+            navigator.mediaDevices.getUserMedia(c2)
+                .then(onStreamSuccess)
+                .catch(onStreamError);
+        });
+};
+
+window.toggleCameraFace = function() {
+    currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+    window.startCheckinCamera(true);
+};
+
+// ── Diagnosa Kamera Lengkap Khusus Pengembang / Tester ──
+window.testWebcamDiagnostics = function() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        alert("Diagnosa: navigator.mediaDevices tidak didukung di peramban ini.");
+        return;
+    }
+    navigator.mediaDevices.enumerateDevices().then(function(devices) {
+        var videoDevices = devices.filter(d => d.kind === 'videoinput');
+        var report = "=== HASIL DIAGNOSA KAMERA WEBRTC ===\n";
+        report += "• Jumlah Kamera Terdeteksi: " + videoDevices.length + "\n";
+        videoDevices.forEach(function(d, idx) {
+            report += "  " + (idx + 1) + ". Label: " + (d.label || '(Nama belum diizinkan oleh browser)') + " (ID: " + d.deviceId.substring(0, 10) + "...)\n";
+        });
+        report += "• Protokol URL: " + window.location.protocol + " (Wajib HTTPS)\n";
+        report += "• Status Stream Aktif: " + (activeStream ? "Aktif" : "Belum Aktif") + "\n";
+
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'camera' }).then(function(p) {
+                report += "• Izin Browser (Permissions API): " + p.state.toUpperCase() + "\n\n";
+                if (p.state === 'denied') {
+                    report += "⚠️ PERHATIAN: Akses kamera saat ini berstatus DENIED (Diblokir). Klik ikon Gembok di bilah URL Chrome untuk mengizinkan!";
+                } else {
+                    report += "Klik 'OK' untuk langsung mencoba membuka kamera.";
+                }
+                alert(report);
+                if (p.state !== 'denied') {
+                    window.startCheckinCamera(true);
+                }
+            });
+        } else {
+            alert(report);
+            window.startCheckinCamera(true);
+        }
+    }).catch(function(err) {
+        alert("Diagnosa Gagal: " + err.message);
     });
+};
+
+// Deteksi awal izin kamera di peramban saat halaman dimuat
+function inspectCameraPermissions() {
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'camera' }).then(function(p) {
+            console.log("[Webcam] Initial permission state:", p.state);
+            if (p.state === 'denied') {
+                const alertBox = document.getElementById('checkinAlert');
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#fef2f2';
+                    alertBox.style.border = '1.5px solid #fca5a5';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.innerHTML = '<strong style="display:block;margin-bottom:3px;font-size:13px;">⚠️ Izin Kamera Terblokir di Pengaturan Browser</strong>' +
+                        '<div style="font-size:12px;color:#b91c1c;">Peramban Anda sebelumnya menandai izin kamera sebagai "Ditolak / Blokir".</div>' +
+                        '<div style="margin-top:8px;font-size:11.5px;color:#7f1d1d;line-height:1.45;background:#fff;padding:8px 10px;border-radius:6px;border:1px dashed #fca5a5;">' +
+                        '👉 <strong>Cara Mengaktifkan:</strong> Klik ikon <strong>Gembok (🔒)</strong> di sebelah kiri alamat URL peramban di atas, ubah izin <strong>Kamera</strong> menjadi <strong>Izinkan (Allow)</strong>, lalu klik tombol Aktifkan Kamera di bawah.</div>';
+                }
+            } else if (p.state === 'granted') {
+                // Jika sudah diizinkan, buka kamera otomatis
+                window.startCheckinCamera(false);
+            }
+        }).catch(function(e) {});
+    }
 }
 
-function toggleCameraFace() {
-    const video = document.getElementById('checkinVideo');
-    if (!video) return;
-    PretesFaceVerifier.toggleFacingMode(video, function(mediaStream) {
-        activeStream = mediaStream;
-        const placeholder = document.getElementById('checkinCameraPlaceholder');
-        if (placeholder) placeholder.style.display = 'none';
-        const ovalGuide = document.getElementById('checkinOvalGuide');
-        if (ovalGuide) ovalGuide.style.display = 'block';
-        const cameraBadge = document.getElementById('checkinCameraBadge');
-        if (cameraBadge) cameraBadge.style.display = 'block';
-    }, function(err) {
-        alert("Gagal beralih kamera: " + (err.message || err));
-    });
+// Inisialisasi binding event listener eksplisit
+function initCameraBindings() {
+    const isAlreadyVerified = <?= $isVerified ? 'true' : 'false' ?>;
+    if (isAlreadyVerified) {
+        initProctoringExamRoom();
+        return;
+    }
+
+    inspectCameraPermissions();
+
+    const btnActivate = document.getElementById('btnActivateCamera');
+    if (btnActivate) {
+        btnActivate.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.startCheckinCamera(true);
+        });
+    }
+
+    const placeholder = document.getElementById('checkinCameraPlaceholder');
+    if (placeholder) {
+        placeholder.style.cursor = 'pointer';
+        placeholder.addEventListener('click', function(e) {
+            // Jika mengklik area box selain tombol, tetap aktifkan kamera
+            if (e.target !== btnActivate && !btnActivate.contains(e.target)) {
+                window.startCheckinCamera(true);
+            }
+        });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCameraBindings);
+} else {
+    initCameraBindings();
 }
 
 /**
@@ -643,8 +720,8 @@ function runInitialCheckin() {
     const btn = document.getElementById('btnRunCheckin');
 
     if (!video || !video.videoWidth || !activeStream) {
-        alert("Kamera belum aktif. Klik 'Aktifkan Kamera' terlebih dahulu dan pastikan wajah Anda tampak di layar.");
-        startCheckinCamera(true);
+        alert("Kamera belum aktif. Klik tombol 'Aktifkan Kamera' terlebih dahulu dan pastikan wajah Anda tampak di layar.");
+        window.startCheckinCamera(true);
         return;
     }
 
