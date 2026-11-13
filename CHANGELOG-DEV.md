@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 11:52:50 +0700 — Diferensiasi Periode Pretes Aktif vs Tidak Aktif & Pencegahan Vonis Prematur (pages/pretes-hasil.php)
+
+**Ringkasan:** Memperbaiki sistem pengumuman hasil pretes pada portal (`pages/pretes-hasil.php`) agar membedakan secara tegas antara Periode Pretes yang berstatus AKTIF dan Periode Pretes yang TIDAK AKTIF / SELESAI:
+1. **Pencegahan Vonis Prematur 'TIDAK LULUS' pada Periode Aktif:**
+   - Menghapus asumsi hardcoded lama yang memaksakan status hanya 'LULUS' atau 'TIDAK LULUS' dengan menganggap seluruh periode telah selesai.
+   - Mengimplementasikan deteksi status periode pendaftaran `$isRegPeriodeAktif` berbasis tabel `master_pretes`.
+   - Jika pendaftaran berada pada **Periode Aktif** dan penilaian belum lengkap (`$filledCount < 12`), status peserta ditetapkan secara presisi sebagai **`menunggu`** (*Sedang Berlangsung / Menunggu Penilaian*), bukan divonis 'tidak lulus' dengan nilai 0.00.
+2. **Pengalaman Pengguna Mahasiswa yang Proporsional:**
+   - Menampilkan badge status periode (`🟢 Aktif` vs `⚪ Selesai`) pada card ringkasan nilai.
+   - Menambahkan box panduan informatif khusus status menunggu (*"Pretes Periode Aktif Sedang Berlangsung"*), menampilkan informasi jadwal ujian (hari, jam, ruangan, dosen penguji) dan tombol langsung menuju halaman instruksi ujian pretes (`pages/pretes-peserta.php`).
+   - Pada tabel 12 komponen materi, komponen yang belum dinilai ditandai dengan badge `⏳ Menunggu Pengujian` (bukan tanda merah keliru `❌ Tidak Terpenuhi (0)`).
+   - Tombol navigasi bawah mengarahkan mahasiswa ke halaman jadwal pretes, bukan ke pendaftaran tutorial selama periode pretes aktif masih berlangsung.
+3. **Filter Periode Multi-Tahun untuk Admin & Dosen:**
+   - Menambahkan dropdown form `Filter Periode:` pada tabel rekapitulasi Admin/Dosen untuk memisahkan hasil peserta berdasarkan periode aktif maupun arsip periode selesai.
+   - Menambahkan kolom `Periode Pretes` beserta badge status `🟢 Aktif` / `⚪ Selesai` pada setiap baris peserta.
+4. **Verifikasi:**
+   - `php -l pages/pretes-hasil.php` (**No syntax errors detected**).
+   - Penambahan test suite baru `tests/pretes-hasil-active-period-test.php` (**Lulus 100%**).
+   - Seluruh **28 test suites lulus 100%** (`TOTAL_FAILED=0`).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-hasil.php` | 82–180, 360–375, 510–545, 665–715, 800–855, 870–930 | Evaluasi Status Kelulusan, UI Mahasiswa, & Filter Admin/Dosen | Mengimplementasikan pemisahan logika periode aktif vs selesai, status menunggu pengujian, box panduan pretes aktif, dan filter periode admin/dosen. |
+| `tests/pretes-hasil-active-period-test.php` | 1–55 | Test Suite Baru | Validasi otomatis diferensiasi periode aktif vs selesai dan pencegahan vonis prematur. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **28/28 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 11:37:30 +0700 — Penyembunyian Menu & Tombol "Cetak Kartu Pretes" Seiring Transisi Penuh ke Sistem Ujian Scan Wajah (pages/pretes-peserta.php, pages/pretes-daftar.php)
 
 **Ringkasan:** Menyembunyikan dan membersihkan menu, tombol, serta teks instruksi fisik "Cetak Kartu Pretes" pada seluruh antarmuka portal mahasiswa (`pages/pretes-peserta.php` dan `pages/pretes-daftar.php`) karena sistem ujian pretes kini telah bertransisi penuh menggunakan Verifikasi Scan Wajah (Face Recognition & Proctoring AI) langsung di peramban, sehingga pencetakan kartu fisik E-Ujian tidak lagi diperlukan:

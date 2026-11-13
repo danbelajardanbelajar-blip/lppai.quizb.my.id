@@ -27,7 +27,7 @@ function environment(getUserMedia) {
     const elements = new Map();
     function element(id) {
         if (!elements.has(id)) elements.set(id, {
-            style: {}, listeners: {}, textContent: '', innerHTML: '', videoWidth: 640,
+            style: {}, listeners: {}, textContent: '', innerHTML: '', videoWidth: 640, videoHeight: 480,
             addEventListener(name, callback) { this.listeners[name] = callback; },
             contains(target) { return target === this; },
             setAttribute() {}, play() { return Promise.resolve(); }
@@ -53,8 +53,12 @@ function environment(getUserMedia) {
         setTimeout(callback, delay) { timers.set(++timerId, { callback, delay }); return timerId; },
         clearTimeout(id) { timers.delete(id); },
         fetch(url, options) {
-            requests.push(JSON.parse(options.body));
-            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: false, score: 0, message: 'Tidak cocok' }) });
+            const payload = JSON.parse(options.body);
+            requests.push(payload);
+            const data = payload.action === 'challenge'
+                ? { success: true, challenge_id: 'nonce-from-server', direction: 'left' }
+                : { verified: false, score: 0, message: 'Tidak cocok' };
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
         }
     };
     sandbox.window = sandbox;
@@ -70,6 +74,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     const env = environment(() => { calls++; return Promise.resolve(stream); });
     const script = renderScript();
     vm.runInContext(script, env.sandbox);
+    env.sandbox.waitForFacePose = () => Promise.resolve();
     for (const name of ['startCheckinCamera', 'toggleCameraFace', 'runInitialCheckin']) {
         assert.equal(typeof env.sandbox[name], 'function', name);
     }
@@ -87,9 +92,12 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(calls, 2);
     env.sandbox.runInitialCheckin();
     await settle();
-    assert.equal(env.requests[0].action, 'initial_checkin');
+    assert.equal(env.requests[0].action, 'challenge');
     assert.match(env.requests[0].csrf_token, /^[a-f0-9]{64}$/);
     assert.equal(env.requests[0].registration_id, 42);
+    const checkin = env.requests.find(request => request.action === 'initial_checkin');
+    assert.equal(checkin.challenge_id, 'nonce-from-server');
+    assert.equal(checkin.frames.length, 3);
     assert.equal(env.element('btnRunCheckin').disabled, false);
     assert.equal(env.timers.size, 0, 'Timer dibersihkan setelah respons');
 
@@ -116,6 +124,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     await settle();
     assert.match(env.element('checkinAlert').textContent, /Sesi login telah berakhir/);
 
+    env.sandbox.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ challenge_id: 'test', direction: 'right' }) });
     env.sandbox.document.createElement = () => { throw new Error('Snapshot gagal'); };
     env.sandbox.runInitialCheckin();
     await settle();

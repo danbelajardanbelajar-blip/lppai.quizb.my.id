@@ -79,25 +79,37 @@ try {
     $activeGelombang = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
 } catch (Exception $e) {}
 
+// Deteksi status aktif periode pendaftaran mahasiswa ($isRegPeriodeAktif):
+$isRegPeriodeAktif = false;
+$regPeriodeStatus = 'tidak_aktif';
+if ($myReg) {
+    if (!empty($myReg['periode'])) {
+        try {
+            $stmtPer = $pdo->prepare("SELECT status FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
+            $stmtPer->execute([$myReg['periode']]);
+            $perStatus = $stmtPer->fetchColumn();
+            if ($perStatus !== false) {
+                $regPeriodeStatus = strtolower(trim((string)$perStatus));
+            }
+        } catch (Exception $e) {}
+    } elseif ($activePretes) {
+        $regPeriodeStatus = strtolower(trim((string)($activePretes['status'] ?? 'aktif')));
+    }
+    $isRegPeriodeAktif = ($regPeriodeStatus === 'aktif');
+}
+
 // Pretes dinyatakan selesai / tertutup bagi mahasiswa jika:
 // 1. Tidak ada periode master_pretes yang berstatus 'aktif'
 // 2. ATAU mahasiswa bukan merupakan target program dari periode aktif (mis. periode khusus RPL diakses Reguler)
-// 3. ATAU status periode pretes mahasiswa sudah nonaktif/selesai
+// 3. ATAU status periode pretes pendaftaran mahasiswa sudah nonaktif/selesai
 // 4. ATAU sistem saat ini sedang aktif menjalankan Tutorial untuk periode umum ('Semua')
 $isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
 $activeTargetProgram = $activePretes ? normalizePretesTargetProgram($activePretes['target_program'] ?? 'Semua') : 'Semua';
 $isPretesSelesai = false;
 if (!$activePretes || !$isEligibleActivePretes) {
     $isPretesSelesai = true;
-} elseif ($myReg && !empty($myReg['periode'])) {
-    try {
-        $stmtPer = $pdo->prepare("SELECT status FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
-        $stmtPer->execute([$myReg['periode']]);
-        $perStatus = $stmtPer->fetchColumn();
-        if ($perStatus !== false && $perStatus !== 'aktif') {
-            $isPretesSelesai = true;
-        }
-    } catch (Exception $e) {}
+} elseif ($myReg && !$isRegPeriodeAktif) {
+    $isPretesSelesai = true;
 }
 if (!$isPretesSelesai && $activeGelombang && $activeTargetProgram === 'Semua') {
     // Jika tutorial sudah aktif berjalan, pendaftaran pretes umum bagi yang belum terdaftar telah ditutup
@@ -139,47 +151,80 @@ foreach ($components as $key => $label) {
     ];
 }
 
-// ── Perhitungan Rata-Rata Keseluruhan ─────────────────────────────────────────
-// Karena seluruh 12 komponen bersifat WAJIB dan periode pretes telah selesai,
-// maka nilai rata-rata adalah pembagian dari total 12 komponen (komponen kosong bernilai 0).
-if ($filledCount > 0) {
-    $avgScore = round($sum / $totalComponents, 2);
-} elseif ($myResult && $myResult['nilai'] !== null) {
-    // Jika tidak ada asesmen JSON tetapi ada record pretes_results lama
-    $avgScore = round((float)$myResult['nilai'], 2);
+// ── Perhitungan Rata-Rata & Status Kelulusan Berdasarkan Status Periode ─────────
+// Aturan Akademik:
+// 1. Pada PERIODE AKTIF ($isRegPeriodeAktif === true):
+//    - Jika penilaian belum lengkap ($filledCount < $totalComponents), status adalah 'menunggu'.
+//      Sistem tidak boleh langsung memvonis 'tidak_lulus' karena ujian masih/akan berlangsung.
+//    - Jika seluruh 12 komponen terisi lengkap ($filledCount === $totalComponents):
+//      Lulus jika seluruhnya >= 80, Tidak Lulus jika ada nilai < 80.
+// 2. Pada PERIODE TIDAK AKTIF / SELESAI ($isRegPeriodeAktif === false):
+//    - Seluruh komponen kosong dihitung 0, sehingga jika belum lengkap atau < 80, status 'tidak_lulus'.
+
+if ($isRegPeriodeAktif && $filledCount < $totalComponents) {
+    $statusLulus = 'menunggu';
+    $avgScore = ($filledCount > 0) ? round($sum / $filledCount, 2) : 0.00;
 } else {
-    $avgScore = 0.00;
+    if ($filledCount > 0) {
+        $avgScore = round($sum / $totalComponents, 2);
+    } elseif ($myResult && $myResult['nilai'] !== null) {
+        $avgScore = round((float)$myResult['nilai'], 2);
+    } else {
+        $avgScore = 0.00;
+    }
+
+    $isLulus = ($filledCount === $totalComponents);
+    if ($isLulus) {
+        foreach ($componentDetails as $ck => $detail) {
+            if ($detail['value'] === null || $detail['value'] < 80) {
+                $isLulus = false;
+                break;
+            }
+        }
+    }
+    $statusLulus = $isLulus ? 'lulus' : 'tidak_lulus';
 }
 
 $predikat = getPretesPredikat($avgScore);
-
-// ── Status Kelulusan (Hanya LULUS atau TIDAK LULUS) ──────────────────────────
-// Karena periode pretes sudah selesai, status hanya LULUS atau TIDAK LULUS (tidak ada menunggu).
-// Syarat LULUS: seluruh 12 komponen wajib terisi dan seluruhnya bernilai minimal 80.
-$isLulus = ($filledCount === $totalComponents);
-if ($isLulus) {
-    foreach ($componentDetails as $ck => $detail) {
-        if ($detail['value'] === null || $detail['value'] < 80) {
-            $isLulus = false;
-            break;
-        }
-    }
-}
-$statusLulus = $isLulus ? 'lulus' : 'tidak_lulus';
 $hasPretesRecord = (!empty($myResult) || !empty($myReg) || $filledCount > 0);
 
 $periodeDisplay = !empty($myReg['periode']) ? $myReg['periode'] : (!empty($myResult['schedule_periode']) ? $myResult['schedule_periode'] : 'Pretes 2026/2027');
 
-// Get all published results (public announcement) - hanya dimuat untuk Admin dan Dosen
+// Get all published results (public announcement) - hanya dimuat untuk Admin dan Dosen dengan Filter Periode
 $allResults = [];
+$allPeriods = [];
+$filterPeriode = trim((string)($_GET['periode'] ?? ''));
 if (isAdmin() || isDosen()) {
-    $allResults = $pdo->query("
-        SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
+    try {
+        $allPeriods = $pdo->query("SELECT id, nama_pretes, periode, status FROM master_pretes ORDER BY id DESC")->fetchAll();
+    } catch (Exception $e) {}
+
+    // Default ke periode aktif jika filter kosong dan periode aktif ada
+    if ($filterPeriode === '' && $activePretes && !empty($activePretes['periode'])) {
+        $filterPeriode = $activePretes['periode'];
+    }
+
+    $sqlResults = "
+        SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program,
+               ps.periode as schedule_periode,
+               COALESCE(mp.status, 'selesai') as periode_status,
+               COALESCE(mp.nama_pretes, ps.periode, 'Pretes') as nama_pretes
         FROM pretes_results pr
         JOIN users u ON pr.user_id = u.id
+        LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
+        LEFT JOIN master_pretes mp ON COALESCE(ps.periode, '') = mp.periode
         WHERE pr.status_lulus != 'belum_diumumkan'
-        ORDER BY pr.nilai DESC
-    ")->fetchAll();
+    ";
+    $paramsResults = [];
+    if ($filterPeriode !== '' && $filterPeriode !== 'semua') {
+        $sqlResults .= " AND (ps.periode = ? OR mp.periode = ?)";
+        $paramsResults[] = $filterPeriode;
+        $paramsResults[] = $filterPeriode;
+    }
+    $sqlResults .= " ORDER BY pr.nilai DESC";
+    $stmtAllRes = $pdo->prepare($sqlResults);
+    $stmtAllRes->execute($paramsResults);
+    $allResults = $stmtAllRes->fetchAll();
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -312,9 +357,19 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <span style="font-weight:700; font-size:16px;">📊 Pengumuman Hasil Kelulusan Pretes</span>
         <?php if ($hasPretesRecord): ?>
-            <span class="badge <?= $statusLulus === 'lulus' ? 'badge-success' : 'badge-danger' ?>" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
-                Status Akhir: <?= $statusLulus === 'lulus' ? 'LULUS' : 'TIDAK LULUS' ?>
-            </span>
+            <?php if ($statusLulus === 'lulus'): ?>
+                <span class="badge badge-success" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
+                    Status Akhir: LULUS
+                </span>
+            <?php elseif ($statusLulus === 'menunggu'): ?>
+                <span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:12.5px; padding:5px 12px; font-weight:700;">
+                    Status: SEDANG BERLANGSUNG / MENUNGGU PENILAIAN
+                </span>
+            <?php else: ?>
+                <span class="badge badge-danger" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
+                    Status Akhir: TIDAK LULUS <?= !$isRegPeriodeAktif ? '(Periode Selesai)' : '' ?>
+                </span>
+            <?php endif; ?>
         <?php else: ?>
             <span class="badge" style="background:<?= $isPretesSelesai ? '#fee2e2' : '#f1f5f9' ?>; color:<?= $isPretesSelesai ? '#991b1b' : '#475569' ?>; border:1px solid <?= $isPretesSelesai ? '#fecaca' : '#cbd5e1' ?>; font-size:12.5px; padding:5px 12px; font-weight:700;">
                 Status: <?= $isPretesSelesai ? 'BELUM MENGIKUTI PRETES' : 'BELUM TERDAFTAR' ?>
@@ -455,29 +510,47 @@ include __DIR__ . '/../includes/header.php';
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px; align-items:center;">
                     <div>
                         <strong style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Periode Pretes</strong>
-                        <p style="font-size:18px; font-weight:700; color:#1e293b; margin:4px 0 0 0;"><?= sanitize($periodeDisplay) ?></p>
+                        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                            <p style="font-size:18px; font-weight:700; color:#1e293b; margin:0;"><?= sanitize($periodeDisplay) ?></p>
+                            <?php if ($isRegPeriodeAktif): ?>
+                                <span class="badge badge-success" style="font-size:11px; padding:2px 8px;">🟢 Aktif</span>
+                            <?php else: ?>
+                                <span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; font-size:11px; padding:2px 8px;">⚪ Selesai</span>
+                            <?php endif; ?>
+                        </div>
                         <?php if (!empty($myReg['hari_pilihan']) || !empty($myReg['ruangan'])): ?>
-                            <small style="color:var(--text-muted); display:block; margin-top:2px;">
+                            <small style="color:var(--text-muted); display:block; margin-top:4px;">
                                 <?= sanitize($myReg['hari_pilihan'] ?: 'Reguler') ?> <?= !empty($myReg['ruangan']) ? ' - Ruang ' . sanitize($myReg['ruangan']) : '' ?>
                             </small>
                         <?php endif; ?>
                     </div>
                     <div>
                         <strong style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Nilai Rata-rata Keseluruhan</strong>
-                        <p style="font-size:32px; font-weight:800; color:<?= $statusLulus === 'lulus' ? '#16a34a' : '#dc2626' ?>; margin:2px 0 0 0; line-height:1.2;">
-                            <?= number_format($avgScore, 2) ?>
-                        </p>
-                        <small style="color:var(--text-muted); display:block; margin-top:2px;">
-                            Predikat: <strong><?= $predikat ?></strong> | Total: <strong><?= number_format($sum, 1) ?> ÷ <?= $totalComponents ?> komponen wajib</strong>
-                        </small>
+                        <?php if ($statusLulus === 'menunggu'): ?>
+                            <p style="font-size:26px; font-weight:800; color:#0284c7; margin:2px 0 0 0; line-height:1.2;">
+                                <?= $filledCount > 0 ? number_format($avgScore, 2) : '—' ?>
+                            </p>
+                            <small style="color:var(--text-muted); display:block; margin-top:2px;">
+                                Terisi <strong><?= $filledCount ?> dari <?= $totalComponents ?></strong> komponen wajib (Proses Penilaian)
+                            </small>
+                        <?php else: ?>
+                            <p style="font-size:32px; font-weight:800; color:<?= $statusLulus === 'lulus' ? '#16a34a' : '#dc2626' ?>; margin:2px 0 0 0; line-height:1.2;">
+                                <?= number_format($avgScore, 2) ?>
+                            </p>
+                            <small style="color:var(--text-muted); display:block; margin-top:2px;">
+                                Predikat: <strong><?= $predikat ?></strong> | Total: <strong><?= number_format($sum, 1) ?> ÷ <?= $totalComponents ?> komponen wajib</strong>
+                            </small>
+                        <?php endif; ?>
                     </div>
                     <div>
                         <strong style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Status Kelulusan</strong>
                         <p style="margin:6px 0 0 0;">
                             <?php if ($statusLulus === 'lulus'): ?>
-                                <span class="badge badge-success" style="font-size:16px; padding:8px 20px; font-weight:700;">✅ LULUS</span>
+                                <span class="badge badge-success" style="font-size:15px; padding:8px 18px; font-weight:700;">✅ LULUS</span>
+                            <?php elseif ($statusLulus === 'menunggu'): ?>
+                                <span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; font-size:13.5px; padding:8px 16px; font-weight:700;">⏳ MENUNGGU PENILAIAN</span>
                             <?php else: ?>
-                                <span class="badge badge-danger" style="font-size:16px; padding:8px 20px; font-weight:700;">❌ TIDAK LULUS</span>
+                                <span class="badge badge-danger" style="font-size:15px; padding:8px 18px; font-weight:700;">❌ TIDAK LULUS</span>
                             <?php endif; ?>
                         </p>
                     </div>
@@ -592,6 +665,49 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
 
+            <?php elseif ($statusLulus === 'menunggu'): ?>
+                <div class="pretes-ann-box" style="border-color:#bae6fd; background:#f0f9ff;">
+                    <div class="pretes-ann-header" style="border-bottom-color:#e0f2fe;">
+                        <span class="pretes-ann-icon-bubble" style="background:#e0f2fe; color:#0284c7;">⏳</span>
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <h3 class="pretes-ann-title" style="color:#0369a1;">
+                                    Pretes Periode Aktif Sedang Berlangsung
+                                </h3>
+                                <span class="badge" style="background:#0284c7; color:#ffffff; font-size:11.5px; padding:4px 10px;">
+                                    Penilaian: <?= $filledCount ?>/<?= $totalComponents ?> Terisi
+                                </span>
+                            </div>
+                            <p class="pretes-ann-subtitle" style="color:#075985;">
+                                Anda terdaftar pada periode pretes aktif <strong><?= sanitize($periodeDisplay) ?></strong>. Pelaksanaan ujian sedang berlangsung dan dosen penguji sedang melakukan proses penginputan nilai. Hasil akhir kelulusan resmi akan diumumkan setelah seluruh 12 komponen ujian selesai dinilai.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Kotak Informasi Jadwal & Halaman Ujian -->
+                    <div style="background:#ffffff; border:1px solid #bae6fd; border-radius:12px; padding:18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div style="max-width:640px;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; background:#e0f2fe; color:#0284c7; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:8px; text-transform:uppercase;">
+                                📅 Informasi Pelaksanaan Ujian Anda
+                            </div>
+                            <h4 style="margin:0 0 6px 0; font-size:15px; font-weight:800; color:#0f172a;">
+                                <?= sanitize($myReg['hari_pilihan'] ?: 'Jadwal Reguler') ?> <?= !empty($myReg['jam']) ? ' - Pukul ' . sanitize($myReg['jam']) : '' ?>
+                            </h4>
+                            <p style="margin:0; font-size:13.5px; color:#475569; line-height:1.55;">
+                                Ruangan: <strong><?= sanitize($myReg['ruangan'] ?: 'Menunggu pembagian') ?></strong> | 
+                                Dosen Penguji: <strong><?= sanitize($myReg['dosen_penguji'] ?: 'Menunggu pembagian') ?></strong>.
+                                Pastikan Anda membaca instruksi resmi ujian dan mempersiapkan diri dengan baik.
+                            </p>
+                        </div>
+                        <div>
+                            <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 20px; font-weight:700; font-size:13.5px; border-radius:10px; white-space:nowrap;">
+                                <span>🚀</span>
+                                <span>Buka Halaman Jadwal & Ujian Pretes &rarr;</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
             <?php else: ?>
                 <div class="pretes-ann-box tidak-lulus">
                     <div class="pretes-ann-header" style="border-bottom-color:#fee2e2;">
@@ -683,8 +799,13 @@ include __DIR__ . '/../includes/header.php';
                                             <?= number_format($detail['value'], 1) ?>
                                         </strong>
                                     <?php else: ?>
-                                        <strong style="font-size:14px; color:#dc2626;">0.0</strong>
-                                        <small style="color:#94a3b8; display:block; font-size:11px;">(Kosong)</small>
+                                        <?php if ($statusLulus === 'menunggu'): ?>
+                                            <span style="color:#94a3b8; font-size:13px; font-weight:600;">—</span>
+                                            <small style="color:#94a3b8; display:block; font-size:11px;">(Belum Diuji)</small>
+                                        <?php else: ?>
+                                            <strong style="font-size:14px; color:#dc2626;">0.0</strong>
+                                            <small style="color:#94a3b8; display:block; font-size:11px;">(Kosong)</small>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                                 <td align="center" style="padding:10px;">
@@ -693,7 +814,11 @@ include __DIR__ . '/../includes/header.php';
                                     <?php elseif ($detail['value'] !== null): ?>
                                         <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Memenuhi (&lt;80)</span>
                                     <?php else: ?>
-                                        <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Terpenuhi (0)</span>
+                                        <?php if ($statusLulus === 'menunggu'): ?>
+                                            <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:11.5px;">⏳ Menunggu Pengujian</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Terpenuhi (0)</span>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -704,12 +829,14 @@ include __DIR__ . '/../includes/header.php';
                                 <td colspan="4" style="text-align:right; padding:14px; font-size:14px; color:#1e293b;">
                                     RATA-RATA NILAI KESELURUHAN (Total Nilai: <?= number_format($sum, 1) ?> ÷ <?= $totalComponents ?> Komponen):
                                 </td>
-                                <td align="center" style="padding:14px; font-size:18px; color:<?= $statusLulus === 'lulus' ? '#16a34a' : '#dc2626' ?>; font-weight:800;">
-                                    <?= number_format($avgScore, 2) ?>
+                                <td align="center" style="padding:14px; font-size:18px; color:<?= $statusLulus === 'lulus' ? '#16a34a' : ($statusLulus === 'menunggu' ? '#0284c7' : '#dc2626') ?>; font-weight:800;">
+                                    <?= ($statusLulus === 'menunggu' && $filledCount === 0) ? '—' : number_format($avgScore, 2) ?>
                                 </td>
                                 <td align="center" style="padding:14px;">
                                     <?php if ($statusLulus === 'lulus'): ?>
                                         <span class="badge badge-success" style="font-size:13px; padding:6px 14px;">✅ LULUS</span>
+                                    <?php elseif ($statusLulus === 'menunggu'): ?>
+                                        <span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; font-size:12.5px; padding:6px 14px;">⏳ MENUNGGU PENILAIAN</span>
                                     <?php else: ?>
                                         <span class="badge badge-danger" style="font-size:13px; padding:6px 14px;">❌ TIDAK LULUS</span>
                                     <?php endif; ?>
@@ -726,6 +853,8 @@ include __DIR__ . '/../includes/header.php';
                 <?php if ($statusLulus === 'lulus'): ?>
                     <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-outline-success" style="text-decoration:none;">🕌 Presensi Al Khidmah</a>
                     <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="text-decoration:none;">📷 Ambil Sertifikat</a>
+                <?php elseif ($statusLulus === 'menunggu'): ?>
+                    <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="text-decoration:none;">📅 Buka Halaman Jadwal & Ujian Pretes</a>
                 <?php else: ?>
                     <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none;">📝 Daftar Program Tutorial Gelombang 1</a>
                 <?php endif; ?>
@@ -737,13 +866,28 @@ include __DIR__ . '/../includes/header.php';
 <?php if (isAdmin() || isDosen()): ?>
 <!-- All Results (Hanya untuk Admin / Dosen) -->
 <div class="card">
-    <div class="card-header">📋 Daftar Hasil Pretes (Semua Peserta)</div>
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <span style="font-weight:700;">📋 Daftar Hasil Pretes (Semua Peserta)</span>
+        <?php if (!empty($allPeriods)): ?>
+        <form method="GET" action="" style="display:inline-flex; align-items:center; gap:8px; margin:0;">
+            <label for="filter_periode" style="font-size:12.5px; font-weight:600; color:#475569; margin:0;">Filter Periode:</label>
+            <select name="periode" id="filter_periode" onchange="this.form.submit()" style="padding:6px 12px; border-radius:8px; border:1px solid #cbd5e1; font-size:12.5px; background:#fff; font-weight:600; cursor:pointer;">
+                <option value="semua" <?= $filterPeriode === 'semua' ? 'selected' : '' ?>>Semua Periode</option>
+                <?php foreach ($allPeriods as $p): ?>
+                    <option value="<?= htmlspecialchars($p['periode']) ?>" <?= $filterPeriode === $p['periode'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($p['nama_pretes'] ?: $p['periode']) ?> (<?= $p['status'] === 'aktif' ? '🟢 Aktif' : '⚪ Selesai' ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <?php endif; ?>
+    </div>
     <div class="card-body">
         <?php if (empty($allResults)): ?>
             <div class="empty-state">
                 <div class="icon">📋</div>
                 <h3>Hasil pretes belum diumumkan</h3>
-                <p>Silakan cek kembali nanti.</p>
+                <p>Silakan pilih periode lain atau cek kembali nanti.</p>
             </div>
         <?php else: ?>
         <div class="table-responsive">
@@ -754,6 +898,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama</th>
                         <th>NIM</th>
                         <th>Program Studi</th>
+                        <th>Periode Pretes</th>
                         <th>Nilai</th>
                         <th>Status</th>
                     </tr>
@@ -765,6 +910,14 @@ include __DIR__ . '/../includes/header.php';
                         <td><?= sanitize($r['nama_lengkap']) ?></td>
                         <td><?= sanitize($r['nim']) ?></td>
                         <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
+                        <td>
+                            <span style="font-weight:600; font-size:12.5px;"><?= sanitize($r['schedule_periode'] ?: $r['nama_pretes']) ?></span>
+                            <?php if (($r['periode_status'] ?? '') === 'aktif'): ?>
+                                <span class="badge badge-success" style="font-size:10px; padding:2px 6px; margin-left:4px;">🟢 Aktif</span>
+                            <?php else: ?>
+                                <span class="badge" style="background:#f1f5f9; color:#64748b; font-size:10px; padding:2px 6px; margin-left:4px;">⚪ Selesai</span>
+                            <?php endif; ?>
+                        </td>
                         <td><strong><?= $r['nilai'] !== null ? number_format($r['nilai'], 2) : '-' ?></strong></td>
                         <td>
                             <?php if ($r['status_lulus'] === 'lulus'): ?>

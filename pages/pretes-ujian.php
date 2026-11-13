@@ -39,12 +39,15 @@ $regId = $myReg ? (int)$myReg['id'] : 0;
 if ($isTesterPrivileged && isset($_GET['action'])) {
     if ($_GET['action'] === 'reset_session') {
         unset($_SESSION['pretes_cbt_verified_' . $regId]);
+        unset($_SESSION['pretes_cbt_verified_v2_' . $regId]);
         unset($_SESSION['pretes_cbt_verified_999999']);
+        unset($_SESSION['pretes_cbt_verified_v2_999999']);
         header('Location: ' . BASE_URL . '/pretes-ujian.php');
         exit;
-    } elseif ($_GET['action'] === 'bypass_checkin') {
+    } elseif ($_GET['action'] === 'bypass_checkin' && getenv('PRETES_ALLOW_TEST_BYPASS') === '1') {
         $bypassId = $regId ?: 999999;
         $_SESSION['pretes_cbt_verified_' . $bypassId] = time();
+        $_SESSION['pretes_cbt_verified_v2_' . $bypassId] = time();
         header('Location: ' . BASE_URL . '/pretes-ujian.php');
         exit;
     }
@@ -69,16 +72,9 @@ if (!$myReg && $isTesterPrivileged) {
 
 $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
 
-// Jika foto pendaftaran masih kosong pada tester 12345, ambil sampel foto di server agar bisa langsung coba
-if (empty($refPhoto) && $isTesterPrivileged) {
-    $photos = glob(__DIR__ . '/../uploads/pretes_foto/*.{jpg,png,jpeg,webp}', GLOB_BRACE);
-    if (!empty($photos)) {
-        $refPhoto = 'uploads/pretes_foto/' . basename($photos[0]);
-        $myReg['foto'] = $refPhoto;
-    }
-}
-
-$isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_' . $regId]));
+// Sesi dari mesin lama harus diverifikasi ulang menggunakan model baru.
+$isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_v2_' . $regId])
+    && time() - (int)$_SESSION['pretes_cbt_verified_v2_' . $regId] <= 14400);
 
 // Portal E-Ujian resmi
 $eUjianUrl = 'https://www.e-ujian.com/lppai/gologin';
@@ -201,9 +197,11 @@ include __DIR__ . '/../includes/header.php';
                 <a href="?action=reset_session" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
                     🔄 Reset Sesi (Ulang Skenario A)
                 </a>
+                <?php if (getenv('PRETES_ALLOW_TEST_BYPASS') === '1'): ?>
                 <a href="?action=bypass_checkin" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0f766e;color:#fff;">
                     ⚡ Buka Skenario B (Ruang Ujian)
                 </a>
+                <?php endif; ?>
                 <button type="button" onclick="testFastPeriodicTimer()" class="btn btn-sm btn-warning" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
                     ⏱️ Set Timer 15 Detik
                 </button>
@@ -269,7 +267,7 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="card" style="border:1.5px solid #cbd5e1; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.04);">
             <div style="background:#f8fafc; border-bottom:1.5px solid #e2e8f0; padding:14px 18px; font-size:13px; color:#334155;">
-                <strong>Petunjuk:</strong> Posisikan wajah Anda tepat di dalam bingkai oval kamera dengan kedua mata terbuka dan pencahayaan terang. Klik tombol <strong>Verifikasi Wajah & Buka Ujian</strong> untuk melanjutkan.
+                <strong>Petunjuk:</strong> Pastikan hanya wajah Anda berada di kamera dengan pencahayaan terang. Klik <strong>Verifikasi Wajah & Buka Ujian</strong>, ikuti panah untuk menggerakkan kepala, lalu kembali menghadap lurus. Tiga foto akan diperiksa oleh mesin pengenal wajah.
             </div>
 
             <div class="card-body" style="padding:20px;">
@@ -464,7 +462,6 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════
      CLIENT SCRIPT SKENARIO A & B PROCTORING ENGINE
      ═══════════════════════════════════════════════════════════════════ -->
-<script src="<?= BASE_URL ?>/assets/js/pretes-face-verifier.js?v=<?= time() ?>"></script>
 <script>
 const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 const REGISTRATION_ID = <?= (int)$regId ?>;
@@ -508,6 +505,20 @@ function requestProctoringCheck(payload) {
         return data;
     });
     return Promise.race([request, timeout]).finally(function() { clearTimeout(timeoutId); });
+}
+
+function waitForFacePose(milliseconds) {
+    return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+}
+
+function captureFaceFrame(video) {
+    if (!video.videoWidth || !video.videoHeight) throw new Error('Kamera belum siap. Silakan nyalakan ulang kamera.');
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85);
 }
 
 // ── Global Webcam Handler & Engine Skenario A & B ──
@@ -769,19 +780,27 @@ function runInitialCheckin() {
     }
 
     // Sertakan kegagalan snapshot dalam jalur penanganan error yang sama.
-    Promise.resolve().then(function() {
-        // Ambil snapshot 3:4 portrait
-        const snapCanvas = document.createElement('canvas');
-        snapCanvas.width = 360;
-        snapCanvas.height = 480;
-        const ctx = snapCanvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
-        const livePhotoData = snapCanvas.toDataURL('image/jpeg', 0.88);
-
-        // Kirim ke backend API
+    Promise.resolve().then(async function() {
+        const challenge = await requestProctoringCheck({ action: 'challenge' });
+        if (!challenge.challenge_id || !['left', 'right'].includes(challenge.direction)) {
+            throw new Error('Tantangan wajah tidak valid. Silakan ulangi.');
+        }
+        if (alertBox) alertBox.textContent = '1/3 — Hadapkan wajah lurus ke kamera dan tahan sebentar.';
+        await waitForFacePose(1500);
+        const frames = [captureFaceFrame(video)];
+        const arrow = challenge.direction === 'left' ? '← kiri layar' : '→ kanan layar';
+        if (alertBox) alertBox.textContent = '2/3 — Putar kepala sedikit sehingga hidung mengarah ke ' + arrow + '. Tahan posisi.';
+        await waitForFacePose(2500);
+        frames.push(captureFaceFrame(video));
+        if (alertBox) alertBox.textContent = '3/3 — Kembali menghadap lurus ke kamera. Tahan posisi.';
+        await waitForFacePose(2000);
+        frames.push(captureFaceFrame(video));
+        if (alertBox) alertBox.textContent = 'Sedang memeriksa ciri wajah dan gerakan di server…';
         return requestProctoringCheck({
             action: 'initial_checkin',
-            live_photo: livePhotoData
+            challenge_id: challenge.challenge_id,
+            frames: frames,
+            live_photo: frames[0]
         });
     })
     .then(data => {
@@ -796,13 +815,13 @@ function runInitialCheckin() {
                 alertBox.style.background = '#f0fdf4';
                 alertBox.style.border = '1px solid #86efac';
                 alertBox.style.color = '#15803d';
-                alertBox.innerHTML = '<strong>✅ Verifikasi Berhasil! (' + data.score + '% Cocok)</strong><br>' + data.message;
+                alertBox.textContent = 'Verifikasi berhasil. Indeks kemiripan: ' + data.score + '/100. ' + data.message;
             }
 
             const badge = document.getElementById('badgeCheckinStatus');
             if (badge) {
                 badge.className = 'proctoring-badge badge-active';
-                badge.innerHTML = '✓ Terverifikasi Identik';
+                badge.textContent = '✓ Ciri Wajah Sesuai';
             }
 
             // Transisi ke Skenario B (Ruang Ujian) dalam 1.2 detik
@@ -820,8 +839,7 @@ function runInitialCheckin() {
                 alertBox.style.background = '#fef2f2';
                 alertBox.style.border = '1px solid #fca5a5';
                 alertBox.style.color = '#991b1b';
-                alertBox.innerHTML = '<strong>❌ Verifikasi Gagal (' + (data.score || 0) + '% Kemiripan):</strong><br>' + 
-                    (data.message || 'Wajah tidak cocok dengan pasfoto pendaftaran resmi.');
+                alertBox.textContent = 'Verifikasi belum lolos. ' + (data.message || 'Wajah belum sesuai dengan pasfoto pendaftaran.');
             }
         }
     })
@@ -900,12 +918,13 @@ function runPeriodicProctoringCheck() {
         return;
     }
 
-    const snapCanvas = document.createElement('canvas');
-    snapCanvas.width = 320;
-    snapCanvas.height = 420;
-    const ctx = snapCanvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
-    const livePhotoData = snapCanvas.toDataURL('image/jpeg', 0.85);
+    let livePhotoData;
+    try {
+        livePhotoData = captureFaceFrame(video);
+    } catch (error) {
+        recordProctoringViolation(error.message);
+        return;
+    }
 
     requestProctoringCheck({
         action: 'periodic_5min',

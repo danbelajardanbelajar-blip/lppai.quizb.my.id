@@ -32,7 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Baca JSON atau Form Payload
-$rawInput = file_get_contents('php://input');
+$rawInput = file_get_contents('php://input', false, null, 0, 2200001);
+if (strlen($rawInput) > 2200000) {
+    http_response_code(413);
+    echo json_encode(['success' => false, 'verified' => false, 'message' => 'Foto terlalu besar. Silakan ulangi.']);
+    exit;
+}
 $jsonBody = json_decode($rawInput, true);
 
 $csrfToken = $_POST['csrf_token'] ?? ($jsonBody['csrf_token'] ?? '');
@@ -84,13 +89,7 @@ if (!$myReg) {
 $regId = (int)$myReg['id'];
 $refPhoto = trim((string)($myReg['foto'] ?? ''));
 
-// Jika foto masih kosong untuk akun tester 12345, cari foto pasfoto sample di server
-if (empty($refPhoto) && $isTesterPrivileged) {
-    $photos = glob(__DIR__ . '/../uploads/pretes_foto/*.{jpg,png,jpeg,webp}', GLOB_BRACE);
-    if (!empty($photos)) {
-        $refPhoto = 'uploads/pretes_foto/' . basename($photos[0]);
-    }
-}
+// Foto acuan harus milik peserta; jangan mengambil foto peserta lain sebagai sampel.
 
 if ($action === 'fetch_logs') {
     $logs = getStudentProctoringLogs($pdo, $regId);
@@ -113,6 +112,40 @@ if (empty($refPhoto)) {
     exit;
 }
 
+if (!in_array($action, ['challenge', 'initial_checkin', 'periodic_5min'], true)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'verified' => false, 'message' => 'Aksi verifikasi tidak valid.']);
+    exit;
+}
+
+if ($action === 'challenge') {
+    $config = pretesFaceEngineConfig();
+    if ($config['url'] === '' || strlen($config['token']) < 32) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'verified' => false, 'message' => 'Mesin verifikasi wajah belum siap. Hubungi admin.']);
+        exit;
+    }
+    $challenge = pretesFaceChallenge($pdo, $regId, (int)$user['id']);
+    echo json_encode(['success' => true, 'challenge_id' => $challenge['id'],
+        'direction' => $challenge['direction'], 'expires_at' => $challenge['expires_at']]);
+    exit;
+}
+
+$challenge = null;
+if ($action === 'initial_checkin') {
+    $challenge = pretesConsumeFaceChallenge($pdo, $regId, (int)$user['id'], (string)($jsonBody['challenge_id'] ?? ''));
+    if (!$challenge) {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'verified' => false, 'message' => 'Tantangan kedaluwarsa atau sudah dipakai. Silakan ulangi verifikasi.']);
+        exit;
+    }
+} elseif (empty($_SESSION['pretes_cbt_verified_v2_' . $regId])
+    || time() - (int)$_SESSION['pretes_cbt_verified_v2_' . $regId] > 14400) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'verified' => false, 'message' => 'Lakukan verifikasi awal kembali sebelum pemeriksaan berkala.']);
+    exit;
+}
+
 if (empty($livePhoto)) {
     echo json_encode([
         'success' => false,
@@ -123,11 +156,18 @@ if (empty($livePhoto)) {
 }
 
 // ── Eksekusi Komparasi Wajah (Face Comparison) ──
-$compResult = compareFacesGD($refPhoto, $livePhoto);
+$frames = $action === 'initial_checkin' ? ($jsonBody['frames'] ?? []) : [$livePhoto];
+if (!is_array($frames)) $frames = [];
+$compResult = comparePretesFaces($refPhoto, $frames, $challenge);
 $score = (float)($compResult['similarity'] ?? 0.0);
 $status = (string)($compResult['status'] ?? 'NO_FACE');
 $match = !empty($compResult['match']);
 $reason = (string)($compResult['reason'] ?? '');
+if ($status === 'ERROR') {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'verified' => false, 'message' => $reason]);
+    exit;
+}
 
 if ($action === 'initial_checkin') {
     // ═════════════════════════════════════════════════════════════════════════
@@ -137,6 +177,7 @@ if ($action === 'initial_checkin') {
     if ($match) {
         $snapshotPath = saveProctoringSnapshot($livePhoto, $user['nim'] ?? 'peserta', 'checkin_match');
         $_SESSION['pretes_cbt_verified_' . $regId] = time();
+        $_SESSION['pretes_cbt_verified_v2_' . $regId] = time();
     } else {
         $snapshotPath = saveProctoringSnapshot($livePhoto, $user['nim'] ?? 'peserta', 'checkin_fail');
     }

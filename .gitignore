@@ -36,3 +36,5 @@ uploads/
 .env.*
 
 scratch/
+services/face-engine/models/
+**/__pycache__/

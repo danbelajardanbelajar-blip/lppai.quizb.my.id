@@ -79,13 +79,15 @@ imagedestroy($refIm);
 
 $relRefPath = 'uploads/pretes_foto/' . basename($tempRefPath);
 
-// A. Test Wajah Identik / Sangat Mirip
+// A. Tanpa konfigurasi mesin model, gambar identik sekalipun tidak boleh meloloskan ujian.
+putenv('PRETES_FACE_ENGINE_URL');
+putenv('PRETES_FACE_ENGINE_TOKEN');
 $liveIdentical = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($tempRefPath));
 $resIdentical = compareFacesGD($relRefPath, $liveIdentical);
 
-procAssert(!empty($resIdentical['match']), "Wajah identik harus dinyatakan MATCH.", $errors);
-procAssert($resIdentical['status'] === 'MATCH', "Status wajah identik harus 'MATCH'.", $errors);
-procAssert($resIdentical['similarity'] >= 70.0, "Skor kemiripan wajah identik harus >= 70%, didapat: " . $resIdentical['similarity'], $errors);
+procAssert(empty($resIdentical['match']), "Mesin yang belum dikonfigurasi tidak boleh menyatakan MATCH.", $errors);
+procAssert($resIdentical['status'] === 'ERROR', "Mesin belum tersedia harus mengembalikan ERROR.", $errors);
+procAssert($resIdentical['similarity'] === 0.0, "Tidak boleh ada skor kemiripan fiktif.", $errors);
 
 // B. Test Blank Wall (Dinding Polos Tanpa Wajah)
 $blankIm = imagecreatetruecolor(240, 320);
@@ -99,7 +101,7 @@ $liveBlank = 'data:image/jpeg;base64,' . base64_encode($blankBytes);
 $resBlank = compareFacesGD($relRefPath, $liveBlank);
 
 procAssert(empty($resBlank['match']), "Dinding polos/tanpa wajah TIDAK boleh MATCH.", $errors);
-procAssert($resBlank['status'] === 'NO_FACE', "Status dinding polos harus 'NO_FACE', didapat: " . $resBlank['status'], $errors);
+procAssert($resBlank['status'] === 'ERROR', "Mesin tidak tersedia tidak boleh menebak hasil analisis gambar.", $errors);
 
 // Cleanup file temp ref
 if (file_exists($tempRefPath)) {
