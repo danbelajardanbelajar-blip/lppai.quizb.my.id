@@ -5,6 +5,17 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 21:23:37 +0700 — Diktat PDF dimasukkan ke repo (atas permintaan user)
+
+| File | Baris | Bagian | Perubahan |
+|---|---|---|---|
+| `storage/diktat/diktat-lppai-2026.pdf` | — | Berkas diktat (3,58 MB) | Di-commit agar ter-deploy via git. |
+| `.gitignore` | 43–44 (dihapus) | Ignore PDF | Aturan `storage/diktat/*.pdf` dihapus. |
+
+**Catatan risiko:** repo GitHub berstatus **PUBLIK** → PDF dapat diunduh langsung dari GitHub dan tetap ada di riwayat git meski kelak dihapus. User sudah diberi tahu dan memilih tetap push. Proteksi reader di situs (`storage/.htaccess`, `diktat-stream.php`) tetap berlaku untuk akses via web.
+
+---
+
 ## 2026-11-13 18:30:10 +0700 — Menu "Info Tutorial" Mahasiswa (Jadwal/Tutor/Ruangan) & Reader Diktat LPPAI 2026 Tanpa Unduh
 
 **Ringkasan:** Menambahkan halaman `Info Tutorial` di panel mahasiswa yang menampilkan kelas, tutor, jadwal, dan ruangan tutorial, serta tab `Diktat Tutorial` berisi reader PDF.js modern (scroll kontinu, zoom, fit-width, layar penuh, progress bar, watermark nama+NIM) yang tidak menyediakan unduh/cetak.
