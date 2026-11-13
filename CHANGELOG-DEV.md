@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 07:42:50 +0700 — Penambahan Fitur Eye Openness & Anti-Blink Detection (Wajib Mata Terbuka)
+
+**Ringkasan:** Menambahkan modul pendeteksi mata terbuka (*Eye Openness & Anti-Blink Detection*) pada verifikasi pasfoto resmi pretes di `assets/js/pretes-face-verifier.js` dan fallback inline `pages/pretes-daftar.php`. Fitur ini memastikan bahwa foto mahasiswa yang sedang memejamkan mata, mengantuk, atau berkedip saat pengambilan foto kamera langsung maupun unggah pasfoto ditolak secara otomatis, dan tombol pendaftaran tetap terkunci sampai foto diambil ulang dengan kedua mata terbuka memandang lurus ke kamera.
+1. Menambahkan fungsi `checkEyeOpenness(pixels, width, height, r, c, s)` yang menghitung rasio kontras sklera (bagian putih mata) dan pupil/iris pada koordinat anatomis mata kiri dan mata kanan.
+2. Pada mata terbuka, perbedaan kontras pupil terhadap sklera dan pipi mencapai $> 60$ unit dengan kepadatan pupil $> 5\%$, sedangkan pada mata terpejam nilai kontras anjlok $< 30$ unit karena pupil tertutup kelopak mata.
+3. Menolak foto mata terpejam dengan pesan interaktif: *"Mata Anda terpejam/tertutup saat pengambilan foto. Harap buka kedua mata dan menghadap lurus ke kamera."* (mode kamera) atau *"Mata terpejam/tertutup pada pasfoto. Harap gunakan pasfoto dengan kedua mata terbuka jelas menghadap lurus ke kamera."* (mode upload).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/pretes-face-verifier.js` | 288–355, 480–495, 705–720 | Modul Deteksi Mata Terbuka | Menambahkan fungsi `checkEyeOpenness()`, mengintegrasikan validasi anti-blink pada deteksi Pico ML dan fallback canvas. |
+| `pages/pretes-daftar.php` | 588–650, 815–830 | Inline Fallback Eye Verifier | Menyelaraskan verifikator inline dengan fungsi `checkEyeOpenness()` dan penolakan mata terpejam. |
+| `tests/pretes-foto-verifikasi-test.php` | 100–120 | Unit & Regression Tests | Menambahkan pengujian integrasi untuk fungsi `checkEyeOpenness` dan pesan penolakan mata terpejam. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **25/25 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 07:27:10 +0700 — Integrasi Pico Machine Learning Face Detection & Eliminasi False Positive Foto Tanpa Wajah
 
 **Ringkasan:** Memperbaiki insiden fatal di mana foto tanpa wajah (ruangan kosong, tembok polos, langit-langit, meja) terverifikasi secara keliru (*false positive*) dan membuka tombol pendaftaran. Akar masalah teridentifikasi pada aturan heuristik lama di mana tembok berwarna krem/kuning memiliki spektrum warna YCbCr/RGB yang identik dengan warna kulit manusia (mencapai 74% kecocokan), serta adanya bypass pada mode kamera yang mengasumsikan keberadaan wajah tanpa klasifikasi fitur wajah sesungguhnya. Solusi menyeluruh yang diterapkan:

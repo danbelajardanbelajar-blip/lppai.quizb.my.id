@@ -584,6 +584,64 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
             ctx.drawImage(videoEl, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
             return canvas;
         },
+        checkEyeOpenness: function(pixels, width, height, r, c, s) {
+            var eyeY = Math.round(r + 0.29 * s);
+            var pupilDist = Math.round(0.14 * s);
+            var leftEyeX = Math.round(c - pupilDist);
+            var rightEyeX = Math.round(c + pupilDist);
+
+            var boxRadX = Math.max(3, Math.round(s * 0.08));
+            var boxRadY = Math.max(3, Math.round(s * 0.05));
+
+            var skinSum = 0, skinCount = 0;
+            var cheekY1 = Math.min(height - 1, Math.round(r + 0.65 * s));
+            var cheekY2 = Math.min(height - 1, Math.round(r + 0.85 * s));
+            var cheekX1 = Math.max(0, Math.round(c - 0.20 * s));
+            var cheekX2 = Math.min(width - 1, Math.round(c + 0.20 * s));
+            for (var y = cheekY1; y <= cheekY2; y++) {
+                for (var x = cheekX1; x <= cheekX2; x++) {
+                    skinSum += pixels[y * width + x];
+                    skinCount++;
+                }
+            }
+            var skinLum = skinCount > 0 ? (skinSum / skinCount) : 150;
+            var pupilThreshold = Math.max(30, skinLum - 25);
+
+            function inspectEye(centerX, centerY) {
+                var minVal = 255, maxVal = 0, darkCount = 0, totalCount = 0;
+                for (var iy = Math.max(0, centerY - boxRadY); iy <= Math.min(height - 1, centerY + boxRadY); iy++) {
+                    for (var ix = Math.max(0, centerX - boxRadX); ix <= Math.min(width - 1, centerX + boxRadX); ix++) {
+                        var val = pixels[iy * width + ix];
+                        if (val < minVal) minVal = val;
+                        if (val > maxVal) maxVal = val;
+                        totalCount++;
+                        if (val <= pupilThreshold) {
+                            darkCount++;
+                        }
+                    }
+                }
+                var contrast = maxVal - minVal;
+                var darkRatio = totalCount > 0 ? (darkCount / totalCount) : 0;
+                var isOpen = (contrast >= 28 && (darkRatio >= 0.05 || minVal <= skinLum - 30));
+                return {
+                    contrast: contrast,
+                    darkRatio: darkRatio,
+                    isOpen: isOpen
+                };
+            }
+
+            var left = inspectEye(leftEyeX, eyeY);
+            var right = inspectEye(rightEyeX, eyeY);
+
+            var eyesOpen = (left.isOpen && right.isOpen) || 
+                           ((left.isOpen || right.isOpen) && (left.contrast + right.contrast >= 65));
+
+            return {
+                isOpen: eyesOpen,
+                leftEye: left,
+                rightEye: right
+            };
+        },
         verifyFace: function(canvasOrImage, mode) {
             var self = this;
             mode = mode || 'upload';
@@ -701,6 +759,18 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
                 width: Math.round((fMaxX - fMinX) * scaleX),
                 height: Math.round((fMaxY - fMinY) * scaleY)
             };
+
+            // Validasi Keterbukaan Mata (Anti-Blink Check)
+            var eyeCheck = this.checkEyeOpenness(lumArray, sampleW, sampleH, fMinY + headH * 0.15, midX, headH);
+            if (!eyeCheck.isOpen) {
+                return {
+                    valid: false,
+                    faces: [box],
+                    reason: mode === 'camera'
+                        ? "Mata Anda terpejam/tertutup saat pengambilan foto. Harap buka kedua mata dan menghadap lurus ke kamera."
+                        : "Mata terpejam/tertutup pada pasfoto. Harap gunakan pasfoto dengan kedua mata terbuka jelas menghadap lurus ke kamera."
+                };
+            }
 
             return {
                 valid: true,

@@ -101,6 +101,8 @@ if (file_exists($jsFile)) {
     fotoAssert(str_contains($jsContent, 'unpack_cascade'), 'Modul JS harus mengintegrasikan engine cascade classifier Pico ML.', $errors);
     fotoAssert(str_contains($jsContent, 'facefinder.bin'), 'Modul JS harus memuat model facefinder.bin.', $errors);
     fotoAssert(str_contains($jsContent, 'cluster_detections'), 'Modul JS harus mendukung clustering deteksi wajah.', $errors);
+    fotoAssert(str_contains($jsContent, 'checkEyeOpenness'), 'Modul JS harus mendukung verifikasi mata terbuka (checkEyeOpenness).', $errors);
+    fotoAssert(str_contains($jsContent, 'Mata Anda terpejam/tertutup'), 'Modul JS harus menolak foto saat mata terpejam/tertutup.', $errors);
 }
 
 // Verifikasi integrasi di pages/pretes-daftar.php
@@ -112,6 +114,7 @@ fotoAssert(str_contains($daftarSrc, 'id="cameraVideo"'), 'pretes-daftar.php haru
 fotoAssert(str_contains($daftarSrc, 'id="btnSubmitDaftarPretes"'), 'pretes-daftar.php harus memiliki tombol submit dengan gembok.', $errors);
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'camera')"), 'pretes-daftar.php harus meneruskan mode kamera saat jepret foto.', $errors);
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'upload')"), 'pretes-daftar.php harus meneruskan mode upload saat pilih file.', $errors);
+fotoAssert(str_contains($daftarSrc, 'checkEyeOpenness'), 'pretes-daftar.php fallback harus mendukung verifikasi mata terbuka.', $errors);
 fotoAssert(!str_contains($daftarSrc, 'submitBtn.disabled = false;\n            if (lockNotice) lockNotice.style.display = \'none\';\n        });'), 'pretes-daftar.php tidak boleh membuka submit lock pada catch error.', $errors);
 
 // Verifikasi integrasi di includes/pretes-card.php
