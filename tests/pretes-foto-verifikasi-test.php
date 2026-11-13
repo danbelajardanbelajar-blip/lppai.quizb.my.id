@@ -93,6 +93,8 @@ if (file_exists($jsFile)) {
     fotoAssert(str_contains($jsContent, 'startCamera'), 'Modul JS harus mendukung startCamera.', $errors);
     fotoAssert(str_contains($jsContent, 'verifyFace'), 'Modul JS harus mendukung verifyFace.', $errors);
     fotoAssert(str_contains($jsContent, 'captureSnapshot'), 'Modul JS harus mendukung captureSnapshot 3:4.', $errors);
+    fotoAssert(str_contains($jsContent, "mode === 'camera'"), 'Modul JS harus menangani mode kamera langsung secara adaptif.', $errors);
+    fotoAssert(str_contains($jsContent, "colCounts"), 'Modul JS harus menggunakan histogram densitas untuk eliminasi noise latar ruangan.', $errors);
 }
 
 // Verifikasi integrasi di pages/pretes-daftar.php
@@ -102,6 +104,8 @@ fotoAssert(str_contains($daftarSrc, 'savePretesRegistrationPhoto('), 'pretes-daf
 fotoAssert(str_contains($daftarSrc, 'pretes-face-verifier.js'), 'pretes-daftar.php harus memuat skrip pretes-face-verifier.js.', $errors);
 fotoAssert(str_contains($daftarSrc, 'id="cameraVideo"'), 'pretes-daftar.php harus memiliki elemen cameraVideo.', $errors);
 fotoAssert(str_contains($daftarSrc, 'id="btnSubmitDaftarPretes"'), 'pretes-daftar.php harus memiliki tombol submit dengan gembok.', $errors);
+fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'camera')"), 'pretes-daftar.php harus meneruskan mode kamera saat jepret foto.', $errors);
+fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'upload')"), 'pretes-daftar.php harus meneruskan mode upload saat pilih file.', $errors);
 
 // Verifikasi integrasi di includes/pretes-card.php
 $cardSrc = file_get_contents($root . '/includes/pretes-card.php');

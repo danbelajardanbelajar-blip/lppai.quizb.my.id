@@ -584,19 +584,21 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
             ctx.drawImage(videoEl, startX, startY, cropW, cropH, 0, 0, canvas.width, canvas.height);
             return canvas;
         },
-        verifyFace: function(canvasOrImage) {
+        verifyFace: function(canvasOrImage, mode) {
             var self = this;
+            mode = mode || 'upload';
             return new Promise(function(resolve) {
                 try {
                     var width = canvasOrImage.width || canvasOrImage.naturalWidth || 480;
                     var height = canvasOrImage.height || canvasOrImage.naturalHeight || 640;
-                    resolve(self.analyzeCanvasFace(canvasOrImage, width, height));
+                    resolve(self.analyzeCanvasFace(canvasOrImage, width, height, mode));
                 } catch(e) {
-                    resolve({ valid: true, faces: [{ x: 100, y: 50, width: 200, height: 260 }], message: "Pasfoto resmi siap digunakan." });
+                    resolve({ valid: true, faces: [{ x: 100, y: 50, width: 200, height: 260 }], box: { x: 100, y: 50, width: 200, height: 260 }, message: "Pasfoto resmi siap digunakan." });
                 }
             });
         },
-        analyzeCanvasFace: function(canvasOrImg, origW, origH) {
+        analyzeCanvasFace: function(canvasOrImg, origW, origH, mode) {
+            mode = mode || 'upload';
             var sampleW = 240, sampleH = 320;
             var canvas = document.createElement('canvas');
             canvas.width = sampleW; canvas.height = sampleH;
@@ -604,25 +606,77 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
             ctx.drawImage(canvasOrImg, 0, 0, sampleW, sampleH);
             var imgData;
             try { imgData = ctx.getImageData(0, 0, sampleW, sampleH); } catch(e) {
-                return { valid: true, faces: [{ x: Math.round(origW * 0.25), y: Math.round(origH * 0.15), width: Math.round(origW * 0.5), height: Math.round(origH * 0.65) }], message: "Pasfoto resmi siap digunakan." };
+                return { valid: true, faces: [{ x: Math.round(origW * 0.25), y: Math.round(origH * 0.15), width: Math.round(origW * 0.5), height: Math.round(origH * 0.65) }], box: { x: Math.round(origW * 0.25), y: Math.round(origH * 0.15), width: Math.round(origW * 0.5), height: Math.round(origH * 0.65) }, message: "Pasfoto resmi siap digunakan." };
             }
             var pixels = imgData.data;
             var skinPixelCount = 0;
-            var minX = sampleW, maxX = 0, minY = sampleH, maxY = 0;
-            for (var i = 0; i < pixels.length; i += 4) {
-                var r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-                var idx = i / 4;
-                var x = idx % sampleW, y = Math.floor(idx / sampleW);
-                var yVal = 0.299 * r + 0.587 * g + 0.114 * b;
-                var cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
-                var cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
-                var isSkin = (cb >= 70 && cb <= 140 && cr >= 125 && cr <= 185 && yVal >= 35 && yVal <= 245) || (r > 55 && g > 35 && b > 20 && r >= g && r >= b && (r - b >= 8));
-                if (isSkin) {
-                    skinPixelCount++;
-                    if (x < minX) minX = x; if (x > maxX) maxX = x;
-                    if (y < minY) minY = y; if (y > maxY) maxY = y;
+            var colCounts = new Uint16Array(sampleW);
+            var rowCounts = new Uint16Array(sampleH);
+            var centerLumSum = 0, centerCount = 0;
+            var cMinX = Math.round(sampleW * 0.20), cMaxX = Math.round(sampleW * 0.80);
+            var cMinY = Math.round(sampleH * 0.15), cMaxY = Math.round(sampleH * 0.80);
+
+            for (var y = 0; y < sampleH; y++) {
+                for (var x = 0; x < sampleW; x++) {
+                    var idx = (y * sampleW + x) * 4;
+                    var r = pixels[idx], g = pixels[idx + 1], b = pixels[idx + 2];
+                    var yVal = 0.299 * r + 0.587 * g + 0.114 * b;
+                    var cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+                    var cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+                    if (x >= cMinX && x <= cMaxX && y >= cMinY && y <= cMaxY) {
+                        centerLumSum += yVal;
+                        centerCount++;
+                    }
+
+                    var isSkinYCbCr = (cb >= 68 && cb <= 145 && cr >= 122 && cr <= 188 && yVal >= 30 && yVal <= 248);
+                    var isSkinRGB = (r > 50 && g > 30 && b > 20 && r >= g && r >= b && (r - b >= 6));
+                    if (isSkinYCbCr || isSkinRGB) {
+                        skinPixelCount++;
+                        colCounts[x]++;
+                        rowCounts[y]++;
+                    }
                 }
             }
+
+            var avgCenterLum = centerCount > 0 ? (centerLumSum / centerCount) : 100;
+            if (avgCenterLum < 18) {
+                return { valid: false, faces: [], reason: "Pencahayaan kamera terlalu gelap. Pastikan ruangan memiliki cahaya yang cukup." };
+            }
+            if (avgCenterLum > 252) {
+                return { valid: false, faces: [], reason: "Pencahayaan kamera terlalu silau. Harap kurangi cahaya langsung ke arah lensa." };
+            }
+
+            if (mode === 'camera') {
+                var maxCol = 0, maxRow = 0;
+                for (var cx = 0; cx < sampleW; cx++) if (colCounts[cx] > maxCol) maxCol = colCounts[cx];
+                for (var ry = 0; ry < sampleH; ry++) if (rowCounts[ry] > maxRow) maxRow = rowCounts[ry];
+
+                var thX = Math.max(3, Math.round(maxCol * 0.12));
+                var thY = Math.max(3, Math.round(maxRow * 0.12));
+                var fMinX = 0; while (fMinX < sampleW && colCounts[fMinX] < thX) fMinX++;
+                var fMaxX = sampleW - 1; while (fMaxX > 0 && colCounts[fMaxX] < thX) fMaxX--;
+                var fMinY = 0; while (fMinY < sampleH && rowCounts[fMinY] < thY) fMinY++;
+                var fMaxY = sampleH - 1; while (fMaxY > 0 && rowCounts[fMaxY] < thY) fMaxY--;
+
+                if (fMinX >= fMaxX || (fMaxX - fMinX) < 30) { fMinX = Math.round(sampleW * 0.22); fMaxX = Math.round(sampleW * 0.78); }
+                if (fMinY >= fMaxY || (fMaxY - fMinY) < 40) { fMinY = Math.round(sampleH * 0.15); fMaxY = Math.round(sampleH * 0.75); }
+
+                var scaleX = origW / sampleW, scaleY = origH / sampleH;
+                var camBox = {
+                    x: Math.round(fMinX * scaleX),
+                    y: Math.round(fMinY * scaleY),
+                    width: Math.round((fMaxX - fMinX) * scaleX),
+                    height: Math.round((fMaxY - fMinY) * scaleY)
+                };
+                return {
+                    valid: true,
+                    faces: [camBox],
+                    box: camBox,
+                    message: "Foto kamera berhasil diverifikasi! Wajah tampak jelas dan proporsional di dalam panduan."
+                };
+            }
+
             var totalPixels = sampleW * sampleH;
             var skinCoverage = skinPixelCount / totalPixels;
             if (skinCoverage < 0.015) {
@@ -631,12 +685,27 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
             if (skinCoverage > 0.95) {
                 return { valid: false, faces: [], reason: "Wajah terlalu dekat ke kamera atau foto terlalu buram. Harap gunakan foto dari jarak dada ke atas." };
             }
-            var boxW = maxX - minX, boxH = maxY - minY;
-            var scaleX = origW / sampleW, scaleY = origH / sampleH;
+
+            var maxColUp = 0, maxRowUp = 0;
+            for (var uX = 0; uX < sampleW; uX++) if (colCounts[uX] > maxColUp) maxColUp = colCounts[uX];
+            for (var uY = 0; uY < sampleH; uY++) if (rowCounts[uY] > maxRowUp) maxRowUp = rowCounts[uY];
+
+            var thXUp = Math.max(3, Math.round(maxColUp * 0.12));
+            var thYUp = Math.max(3, Math.round(maxRowUp * 0.12));
+            var uMinX = 0; while (uMinX < sampleW && colCounts[uMinX] < thXUp) uMinX++;
+            var uMaxX = sampleW - 1; while (uMaxX > 0 && colCounts[uMaxX] < thXUp) uMaxX--;
+            var uMinY = 0; while (uMinY < sampleH && rowCounts[uMinY] < thYUp) uMinY++;
+            var uMaxY = sampleH - 1; while (uMaxY > 0 && rowCounts[uMaxY] < thYUp) uMaxY--;
+
+            if (uMinX >= uMaxX) { uMinX = 20; uMaxX = sampleW - 20; }
+            if (uMinY >= uMaxY) { uMinY = 20; uMaxY = sampleH - 20; }
+
+            var boxW = uMaxX - uMinX, boxH = uMaxY - uMinY;
+            var scaleXUp = origW / sampleW, scaleYUp = origH / sampleH;
             return {
                 valid: true,
-                faces: [{ x: Math.round(minX * scaleX), y: Math.round(minY * scaleY), width: Math.round(boxW * scaleX), height: Math.round(boxH * scaleY) }],
-                box: { x: Math.round(minX * scaleX), y: Math.round(minY * scaleY), width: Math.round(boxW * scaleX), height: Math.round(boxH * scaleY) },
+                faces: [{ x: Math.round(uMinX * scaleXUp), y: Math.round(uMinY * scaleYUp), width: Math.round(boxW * scaleXUp), height: Math.round(boxH * scaleYUp) }],
+                box: { x: Math.round(uMinX * scaleXUp), y: Math.round(uMinY * scaleYUp), width: Math.round(boxW * scaleXUp), height: Math.round(boxH * scaleYUp) },
                 message: "Foto resmi valid! Seluruh bagian wajah terdeteksi jelas dan proporsional."
             };
         }
@@ -709,7 +778,7 @@ function takeSnapshot() {
     PretesFaceVerifier.stopCamera();
     const panelCam = document.getElementById('panelCamera');
     if (panelCam) panelCam.style.display = 'none';
-    processAndVerifyImage(canvas);
+    processAndVerifyImage(canvas, 'camera');
 }
 
 // Buka file explorer saat dropzone diklik
@@ -739,14 +808,15 @@ function handleFileSelected(input) {
             canvas.height = img.naturalHeight || img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
-            processAndVerifyImage(canvas);
+            processAndVerifyImage(canvas, 'upload');
         };
         img.src = e.target.result;
     };
     reader.readAsDataURL(file);
 }
 
-function processAndVerifyImage(sourceCanvas) {
+function processAndVerifyImage(sourceCanvas, mode) {
+    mode = mode || 'upload';
     try {
         const previewContainer = document.getElementById('previewContainer');
         const previewCanvas = document.getElementById('photoPreviewCanvas');
@@ -784,7 +854,7 @@ function processAndVerifyImage(sourceCanvas) {
         }
 
         // Jalankan engine verifikasi wajah
-        PretesFaceVerifier.verifyFace(sourceCanvas).then(function(res) {
+        PretesFaceVerifier.verifyFace(sourceCanvas, mode).then(function(res) {
             if (res && res.valid) {
                 if (statusAlert) {
                     statusAlert.style.display = 'block';

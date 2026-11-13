@@ -5,6 +5,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 07:03:15 +0700 — Optimalisasi AI Verifikasi Pasfoto: Histogram Density Projection & Mode Kamera Adaptif
+
+**Ringkasan:** Mengatasi kendala di mana pengambilan foto langsung melalui webcam/kamera HP ditolak berulang kali ("Wajah terpotong di tepi foto"), sementara opsi unggah file foto studio berhasil. Akar masalah teridentifikasi pada perhitungan *bounding box* lama yang menggunakan nilai minimum/maksimum koordinat absolut piksel warna kulit (`minX`, `maxX`). Pada pengambilan foto kamera di ruangan nyata, pantulan warna hangat (tembok krem, pintu kayu, bingkai jendela, gorden, atau baju hangat) di tepi frame menyebabkan `minX = 0` dan `maxX = 239`, sehingga sistem mengira wajah terpotong di tepi 100% dan memicu penolakan keliru. Solusi yang diimplementasikan:
+1. Memperkenalkan algoritma **Histogram Density Projection** (`colCounts[x]`, `rowCounts[y]`) dengan filter densitas puncak 12%. Piksel ruangan terisolir di tepi otomatis diabaikan, dan hanya klaster kepala manusia yang dihitung.
+2. Memisahkan evaluasi ke dalam 2 mode: `'upload'` (file galeri) dan `'camera'` (jepret langsung).
+3. Pada mode `'camera'`, sistem memanfaatkan fakta bahwa pengguna sudah memposisikan kepala di dalam panduan oval on-screen. Validasi difokuskan pada kecukupan pencahayaan (mencegah kamera gelap/tertutup atau silau ekstrem) serta pembentukan bounding box presisi dari klaster kepala.
+4. Menyelaraskan modul eksternal `assets/js/pretes-face-verifier.js` dan fallback inline di `pages/pretes-daftar.php`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/pretes-face-verifier.js` | 114–175, 210–330, 370–420 | Engine Verifikasi Wajah AI | Menambahkan parameter `mode` (`camera` vs `upload`), histogram densitas kolom/baris dengan noise filter 12%, evaluasi luminansi pencahayaan, dan verifikasi adaptif mode kamera. |
+| `pages/pretes-daftar.php` | 587–655 | Inline Fallback Face Verifier | Menyelaraskan engine fallback inline dengan dukungan parameter `mode`, histogram densitas, dan toleransi pencahayaan kamera. |
+| `pages/pretes-daftar.php` | 771–860 | Event Handler Foto | Menghubungkan `takeSnapshot()` dengan mode `'camera'`, `handleFileSelected()` dengan mode `'upload'`, dan memforward parameter `mode` ke `PretesFaceVerifier.verifyFace()`. |
+| `tests/pretes-foto-verifikasi-test.php` | 90–115 | Unit & Regression Tests | Menambahkan pengujian integrasi untuk parameter mode `'camera'`, histogram `colCounts`, dan handler verifikasi foto. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **25/25 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 06:41:05 +0700 — Perbaikan Elemen Status AI & Resilience Engine Verifikasi Wajah Pretes
 
 **Ringkasan:** Memperbaiki insiden di mana tombol pendaftaran pretes tetap terkunci meskipun pasfoto resmi yang diunggah sudah jelas. Akar masalah teridentifikasi pada skrip global `assets/js/app.js` yang secara otomatis menghapus elemen berkategori `.alert` pada saat DOMContentLoaded, sehingga kontainer status `#verifStatusAlert` terhapus dan menyebabkan JavaScript error saat memproses hasil AI. Dilakukan perbaikan arsitektural: melepas class `.alert` dari `#verifStatusAlert`, menambahkan pengecualian `:not(#verifStatusAlert)` di `app.js`, menyematkan engine `PretesFaceVerifier` secara inline di `pages/pretes-daftar.php` dengan deteksi kulit adaptif untuk jas almamater/busana muslim, safety timeout 450ms pada API eksperimental peramban, serta mekanisme fallback otomatis agar tombol pendaftaran selalu terbuka begitu foto resmi valid dimuat.
