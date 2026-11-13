@@ -13,6 +13,22 @@ if (isset($_GET['face_api'])) {
     require __DIR__ . '/../api/pretes-proctoring-check.php';
     exit;
 }
+if (isset($_GET['cbt_api'])) {
+    require __DIR__ . '/../api/pretes-cbt.php';
+    exit;
+}
+if (isset($_GET['cbt_asset'])) {
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: public, max-age=3600');
+    readfile(__DIR__ . '/../assets/js/pretes-cbt.js');
+    exit;
+}
+if (isset($_GET['cbt_bank'])) {
+    // Admin controller enforces requireAdmin() before rendering any keys/results.
+    require __DIR__ . '/../admin/pretes-bank-soal.php';
+    exit;
+}
 
 define('PAGE_TITLE', 'Ujian Pretes & Pengawas AI');
 require_once __DIR__ . '/../includes/auth.php';
@@ -30,7 +46,7 @@ $stmtMyReg = $pdo->prepare("
     FROM pretes_registrations pr
     LEFT JOIN pretes_schedules ps ON pr.periode = ps.periode AND ps.status = 'aktif'
     WHERE pr.user_id = ?
-    ORDER BY pr.tanggal_daftar DESC
+    ORDER BY pr.tanggal_daftar DESC, pr.id DESC
     LIMIT 1
 ");
 $stmtMyReg->execute([$user['id']]);
@@ -83,9 +99,6 @@ $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
 // Sesi dari mesin lama harus diverifikasi ulang menggunakan model baru.
 $isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_v2_' . $regId])
     && time() - (int)$_SESSION['pretes_cbt_verified_v2_' . $regId] <= 14400);
-
-// Portal E-Ujian resmi
-$eUjianUrl = 'https://www.e-ujian.com/lppai/gologin';
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -397,8 +410,8 @@ include __DIR__ . '/../includes/header.php';
                 <span style="font-size:28px;">🟢</span>
                 <div>
                     <div style="font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px;">
-                        <span>Pengawas AI Aktif (Skenario B)</span>
-                        <span style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengecekan Tiap 5 Menit</span>
+                        <span id="proctorStatusTitle">Pengawas Kamera Aktif</span>
+                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengecekan Tiap 5 Menit</span>
                     </div>
                     <div style="font-size:12px; color:#ccfbf1; margin-top:2px;" id="lastCheckInfo">
                         Sesi diverifikasi. Pemeriksaan wajah berkala aktif di latar belakang.
@@ -430,58 +443,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- Lembar Akses Soal Ujian CBT -->
-        <div class="card" style="border:1.5px solid #0f766e; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px rgba(15,118,110,0.08); margin-bottom:24px;">
-            <div style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%); color:#ffffff; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <h3 style="margin:0; font-size:16px; font-weight:800; color:#fff;">Kredensial Login CBT E-Ujian Mahasiswa</h3>
-                    <div style="font-size:12.5px; color:#ccfbf1; margin-top:2px;">
-                        Gunakan data login berikut untuk masuk ke portal lembar soal CBT E-Ujian.
-                    </div>
-                </div>
-                <span class="badge" style="background:#22c55e; color:#fff; font-size:12px; padding:6px 14px; border-radius:20px;">
-                    ✓ Akses Terbuka
-                </span>
-            </div>
-
-            <div class="card-body" style="padding:22px;">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
-                    <!-- ID Lembaga -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Kode Lembaga / ID</div>
-                        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:2px;">22205</div>
-                    </div>
-                    <!-- Username -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Username CBT</div>
-                        <div style="font-size:17px; font-weight:800; color:#0f766e; margin-top:2px;">
-                            <?= sanitize($myReg['username_tes'] ?: ($user['nim'] . '.22205')) ?>
-                        </div>
-                    </div>
-                    <!-- Password -->
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Password / Kode Akses</div>
-                        <div style="font-size:17px; font-weight:800; color:#0f766e; margin-top:2px;">
-                            <?= sanitize($myReg['password_tes'] ?: 'Menunggu TU') ?>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tombol Akses CBT E-Ujian -->
-                <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:18px; text-align:center;">
-                    <h4 style="margin:0 0 6px; font-size:15px; font-weight:800; color:#15803d;">
-                        Portal CBT Ujian Pretes Siap Dikerjakan
-                    </h4>
-                    <p style="margin:0 auto 14px; font-size:13px; color:#166534; max-width:540px; line-height:1.5;">
-                        Klik tombol di bawah untuk membuka portal E-Ujian di tab baru. <strong>Jangan tutup tab halaman ini</strong> agar sistem kamera pengawas AI tetap dapat memverifikasi kehadiran Anda berkala setiap 5 menit.
-                    </p>
-                    <a href="<?= htmlspecialchars($eUjianUrl) ?>" target="_blank" rel="noopener" class="btn btn-success"
-                       style="padding:12px 32px; font-size:15px; font-weight:800; border-radius:10px; box-shadow:0 4px 14px rgba(22,163,74,0.3); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-                        <span>🚀</span> <span>Buka Portal Soal CBT E-Ujian Sekarang ➔</span>
-                    </a>
-                </div>
-            </div>
-        </div>
+        <?php require __DIR__ . '/../includes/pretes-cbt-view.php'; ?>
 
         <!-- 4 Tata Tertib Pengawasan -->
         <div class="card" style="border:1px solid #e2e8f0; border-radius:14px; padding:18px; background:#f8fafc;">
@@ -505,19 +467,22 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════
      CLIENT SCRIPT SKENARIO A & B PROCTORING ENGINE
      ═══════════════════════════════════════════════════════════════════ -->
+<script src="<?= BASE_URL ?>/pretes-ujian.php?cbt_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt.js') ?>"></script>
 <script>
 const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 const REGISTRATION_ID = <?= (int)$regId ?>;
 const API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?face_api=1') ?>;
+const CBT_API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?cbt_api=1') ?>;
 
 let proctorInterval = null;
 let countdownTimer = null;
 let secondsRemaining = 300; // 5 menit = 300 detik
 let activeStream = null;
 let currentFacingMode = 'user';
+let cbtCompleted = false;
 
 // Batasi seluruh request, termasuk pembacaan body respons, agar UI selalu pulih.
-function requestProctoringCheck(payload) {
+function requestProctoringCheck(payload, endpoint) {
     const controller = new AbortController();
     let timeoutId;
     const timeout = new Promise(function(resolve, reject) {
@@ -527,7 +492,7 @@ function requestProctoringCheck(payload) {
         }, 20000);
     });
     const request = Promise.resolve().then(function() {
-        return fetch(API_URL, {
+        return fetch(endpoint || API_URL, {
             method: 'POST',
             credentials: 'same-origin',
             signal: controller.signal,
@@ -933,6 +898,7 @@ function initProctoringExamRoom() {
         } else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ audio: false, video: true })
                 .then(function(s) {
+                    if (cbtCompleted) { s.getTracks().forEach(function(track) { track.stop(); }); return; }
                     activeStream = s;
                     video.srcObject = s;
                     video.play();
@@ -941,12 +907,36 @@ function initProctoringExamRoom() {
     }
 
     startProctoringTimer();
+    if (window.PretesCbt) {
+        window.PretesCbt.init({
+            request: function(payload) { return requestProctoringCheck(payload, CBT_API_URL); },
+            onSubmitted: function() {
+                cbtCompleted = true;
+                if (countdownTimer) clearInterval(countdownTimer);
+                if (proctorInterval) clearInterval(proctorInterval);
+                if (activeStream) activeStream.getTracks().forEach(function(track) { track.stop(); });
+                activeStream = null;
+                const timer = document.getElementById('proctorTimerDisplay');
+                if (timer) timer.textContent = 'Selesai';
+                const title = document.getElementById('proctorStatusTitle');
+                if (title) title.textContent = 'Ujian Selesai';
+                const frequency = document.getElementById('proctorFrequency');
+                if (frequency) frequency.textContent = 'Kamera dihentikan';
+                const info = document.getElementById('lastCheckInfo');
+                if (info) info.textContent = 'Hasil CBT tersimpan. Pengawasan kamera telah selesai.';
+            }
+        });
+    } else {
+        const message = document.getElementById('cbtMessage');
+        if (message) message.textContent = 'Modul CBT belum termuat. Muat ulang halaman untuk mencoba lagi.';
+    }
 }
 
 /**
  * ── Timer Hitung Mundur 5 Menit & Pemicu Snapshot Berkala ──
  */
 function startProctoringTimer() {
+    if (cbtCompleted) return;
     if (countdownTimer) clearInterval(countdownTimer);
     if (proctorInterval) clearInterval(proctorInterval);
 
@@ -976,6 +966,7 @@ function updateTimerDisplay() {
  * ── Eksekusi Skenario B: Pengambilan Snapshot Berkala Tiap 5 Menit ──
  */
 function runPeriodicProctoringCheck() {
+    if (cbtCompleted) return;
     const video = document.getElementById('proctorVideo') || document.getElementById('checkinVideo');
     if (!video || !video.videoWidth) {
         recordProctoringViolation("Kamera terputus atau tidak aktif saat pengawasan 5 menit.");
@@ -996,6 +987,7 @@ function runPeriodicProctoringCheck() {
     })
     .then(data => {
         const lastInfo = document.getElementById('lastCheckInfo');
+        if (cbtCompleted) return;
         const alertBox = document.getElementById('proctorViolationAlert');
         const alertMsg = document.getElementById('proctorViolationMsg');
 

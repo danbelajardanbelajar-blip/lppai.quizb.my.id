@@ -46,6 +46,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/admin/pretes-nilai.php" class="<?= menuActive('pretes-nilai.php') ?>" data-no-spa>
                 <span class="icon">📚</span> Nilai Rinci & Absensi Pretes
             </a>
+            <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_bank=1" class="<?= isset($_GET['cbt_bank']) ? 'active' : '' ?>" data-no-spa>
+                <span class="icon">🧩</span> Bank Soal & Hasil CBT
+            </a>
             <a href="<?= BASE_URL ?>/admin/pretes-rekap-nilai.php" class="page-nav <?= menuActive('pretes-rekap-nilai.php') ?>">
                 <span class="icon">🎓</span> Rekapitulasi Nilai Pretes
             </a>

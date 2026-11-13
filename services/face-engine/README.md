@@ -111,12 +111,11 @@ model mati, token salah, nonce kedaluwarsa, dan pemutusan koneksi VPS.
 Layanan tidak menyimpan gambar atau embedding; snapshot audit tetap disimpan oleh
 aplikasi PHP sesuai alur sebelumnya. Tidak ada gambar dikirim ke penyedia AI luar.
 
-## Batas integrasi E-Ujian
+## CBT internal
 
-Portal soal saat ini adalah URL eksternal yang bisa dibuka langsung. Verifikasi
-di situs PHP hanya mengendalikan tampilan tombol di situs ini; untuk mewajibkan
-verifikasi sebelum akses soal, integrasikan token/SSO atau aturan akses pada
-penyedia E-Ujian. Menyembunyikan URL tidak mengamankan portal eksternal.
+Halaman ujian kini memakai CBT internal dengan pemeriksaan sesi wajah di setiap
+aksi API, menggantikan tombol ke portal eksternal. Lihat `../../docs/pretes-cbt.md`
+untuk aturan paket, deadline, penilaian, bank soal, dan pengujian CBT.
 
 Rujukan:
 - https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html

@@ -98,6 +98,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.match(visual.element('facePoseTitle').textContent, /KANAN layar/);
     vm.runInContext(script, env.sandbox);
     assert.equal(vm.runInContext('API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?face_api=1');
+    assert.equal(vm.runInContext('CBT_API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?cbt_api=1');
     env.sandbox.waitForFacePose = () => Promise.resolve();
     for (const name of ['startCheckinCamera', 'toggleCameraFace', 'runInitialCheckin']) {
         assert.equal(typeof env.sandbox[name], 'function', name);
@@ -170,8 +171,14 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.match(unsupported.element('checkinAlert').innerHTML, /Tidak Mendukung Kamera/);
 
     const verified = environment(() => Promise.resolve(stream));
+    let cbtSettings;
+    verified.sandbox.PretesCbt = { init(settings) { cbtSettings = settings; } };
     vm.runInContext(renderScript(true), verified.sandbox);
     await settle();
     assert.equal(verified.element('proctorVideo').srcObject, stream);
+    assert.equal(typeof cbtSettings.request, 'function');
+    cbtSettings.onSubmitted();
+    assert.equal(verified.element('proctorTimerDisplay').textContent, 'Selesai');
+    assert.equal(verified.element('proctorStatusTitle').textContent, 'Ujian Selesai');
     console.log('PASS: PHP/JS runtime, aktivasi satu kali, balik kamera, request verifikasi, izin ditolak, browser tidak mendukung, dan sesi terverifikasi.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
