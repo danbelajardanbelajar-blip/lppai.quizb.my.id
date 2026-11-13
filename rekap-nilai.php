@@ -17,6 +17,10 @@ $isMahasiswa = !$isAdmin && !$isDosen;
 if ($isMahasiswa) {
     require_once __DIR__ . '/includes/pretes-stage.php';
     pretesStageGate($pdo, $user, 'Rincian nilai tutorial akan tersedia bila Anda mengikuti program Tutorial. Nilai pretes dapat dilihat di menu Hasil Pretes.');
+
+    // Peserta tutorial yang belum diplot → kartu Menunggu Plotting (seragam dengan Info Tutorial)
+    require_once __DIR__ . '/includes/tutorial-waiting.php';
+    tutorialWaitingGate($pdo, $user, 'Rincian nilai tutorial akan tersedia setelah Anda mendapatkan kelas dan mulai mengikuti perkuliahan tutorial.');
 }
 
 $action = $_GET['action'] ?? '';

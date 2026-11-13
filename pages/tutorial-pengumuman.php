@@ -67,6 +67,12 @@ if ($showPretesOngoing) {
     exit;
 }
 
+// Peserta tutorial yang belum diplot → kartu Menunggu Plotting (seragam dengan Info Tutorial)
+if (!$isTutorialLulus && !$showPretesLulus) {
+    require_once __DIR__ . '/../includes/tutorial-waiting.php';
+    tutorialWaitingGate($pdo, $user, 'Pengumuman kelulusan akan tampil di halaman ini setelah Anda mengikuti seluruh rangkaian tutorial dan nilai akhir ditetapkan.');
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 

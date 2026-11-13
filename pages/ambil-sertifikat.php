@@ -14,6 +14,10 @@ $currentUser = getCurrentUser();
 require_once __DIR__ . '/../includes/pretes-stage.php';
 pretesStageGate($pdo, $currentUser, 'Pengambilan sertifikat tersedia setelah Anda dinyatakan lulus pretes atau lulus tutorial.');
 
+// Peserta tutorial yang belum diplot → kartu Menunggu Plotting (seragam dengan Info Tutorial)
+require_once __DIR__ . '/../includes/tutorial-waiting.php';
+tutorialWaitingGate($pdo, $currentUser, 'Pengambilan sertifikat tersedia setelah Anda menyelesaikan tutorial dan dinyatakan lulus.');
+
 // Auto-migration aman untuk tabel pengambilan_sertifikat jika belum ada
 try {
     $pdo->exec("

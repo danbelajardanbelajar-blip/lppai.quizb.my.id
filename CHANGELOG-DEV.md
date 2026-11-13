@@ -77,6 +77,25 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:38:45 +0700 — Kartu "Menunggu Plotting" Info Tutorial diseragamkan ke 3 halaman
+
+**Ringkasan:** Mahasiswa yang terdaftar tutorial (status `terdaftar`/`aktif`) tetapi belum diplot ke kelas kini melihat kartu yang sama dengan halaman Info Tutorial (penjelasan menunggu plotting, stepper 4 langkah, ajakan pelajari diktat, kontak Bu Umami) di `tutorial-pengumuman`, `rekap-nilai`, dan `ambil-sertifikat`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/tutorial-waiting.php` (baru) | 12–38 | `getStudentTutorialWaiting()` | Pendaftaran tutorial terakhir berstatus terdaftar/aktif yang belum diplot (definisi sama dengan Info Tutorial: tanpa kelas **atau** status masih `terdaftar`). |
+| `includes/tutorial-waiting.php` | 40–212 | `renderTutorialWaitingCard()` | CSS + markup disalin dari `pages/tutorial-info.php` (blok `.ti-waiting-card` & gaya baris 67–70, 114–166; markup baris 201–293). Tombol diktat diganti tautan `tutorial-info.php#diktat`; ditambah kotak catatan konteks per halaman. |
+| `includes/tutorial-waiting.php` | 214–237 | `tutorialWaitingGate()` | Hanya role mahasiswa; dilewati bila sudah lulus pretes; XHR/JSON → 403 JSON; selain itu header + kartu + footer lalu `exit`. |
+| `pages/tutorial-pengumuman.php` | 70–75 | Setelah gate pretes | `tutorialWaitingGate()` (kecuali sudah lulus tutorial / lulus pretes). |
+| `rekap-nilai.php` | 20–23 | Blok `$isMahasiswa` | `tutorialWaitingGate()`; admin/dosen tidak terdampak. |
+| `pages/ambil-sertifikat.php` | 17–20 | Setelah gate pretes | `tutorialWaitingGate()`; admin tidak terdampak. |
+| `tests/tutorial-waiting-test.php` (baru) | 1–56 | Test | 6 skenario plotting + render kartu + cek integrasi 3 halaman. |
+
+**Catatan pemeliharaan:** `pages/tutorial-info.php` tidak diubah (masih memakai markup sendiri karena `tests/tutorial-info-test.php` memeriksa isi file tersebut) → bila tampilan menunggu plotting diubah di Info Tutorial, sesuaikan juga `includes/tutorial-waiting.php`.
+**Verifikasi:** `php -l` OK di 5 file; `tests/tutorial-waiting-test.php`, `tests/pretes-stage-test.php`, `tests/tutorial-info-test.php`, dan 6 test tutorial lain PASS.
+
+---
+
 ## 2026-11-13 22:25:52 +0700 — Kartu "Tahap Pretes" diseragamkan di 5 halaman mahasiswa (helper bersama)
 
 **Ringkasan:** Logika status pretes dan kartu "📝 Tahap Pretes" dipindah ke helper bersama, lalu dipakai di `tutorial-pengumuman`, `tutorial-pendaftaran`, `tutorial-info`, `rekap-nilai`, dan `ambil-sertifikat`. Mahasiswa yang terdaftar di periode pretes aktif (hasil belum final, belum punya pendaftaran tutorial berjalan, belum lulus tutorial) melihat kartu yang sama di semua halaman tersebut.
