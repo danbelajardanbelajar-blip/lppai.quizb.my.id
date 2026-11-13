@@ -6,6 +6,14 @@
  * - Skenario B: Pengawasan Kamera Berkala Setiap 5 Menit Sekali Selama Ujian Berlangsung.
  */
 
+// Route the API through the same public page that served the camera UI.
+// Some hosting layouts expose pages at / while the physical API lives under /web/.
+// Dispatch before any HTML; the API retains its own login, CSRF and ownership checks.
+if (isset($_GET['face_api'])) {
+    require __DIR__ . '/../api/pretes-proctoring-check.php';
+    exit;
+}
+
 define('PAGE_TITLE', 'Ujian Pretes & Pengawas AI');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
@@ -465,7 +473,7 @@ include __DIR__ . '/../includes/header.php';
 <script>
 const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 const REGISTRATION_ID = <?= (int)$regId ?>;
-const API_URL = <?= json_encode(BASE_URL . '/api/pretes-proctoring-check.php') ?>;
+const API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?face_api=1') ?>;
 
 let proctorInterval = null;
 let countdownTimer = null;

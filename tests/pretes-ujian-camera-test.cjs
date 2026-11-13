@@ -74,6 +74,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     const env = environment(() => { calls++; return Promise.resolve(stream); });
     const script = renderScript();
     vm.runInContext(script, env.sandbox);
+    assert.equal(vm.runInContext('API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?face_api=1');
     env.sandbox.waitForFacePose = () => Promise.resolve();
     for (const name of ['startCheckinCamera', 'toggleCameraFace', 'runInitialCheckin']) {
         assert.equal(typeof env.sandbox[name], 'function', name);
