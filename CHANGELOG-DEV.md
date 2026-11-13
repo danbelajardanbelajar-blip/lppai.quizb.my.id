@@ -5,6 +5,33 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 11:05:20 +0700 — Penyesuaian Informasi Dashboard Mahasiswa: Transisi Akses Ujian ke Scan Verifikasi Wajah (Face Recognition)
+
+**Ringkasan:** Memperbarui seluruh informasi, instruksi, dan aksi cepat pada Dashboard Mahasiswa (`pages/dashboard.php`) serta Halaman Peserta Pretes (`pages/pretes-peserta.php`) menyusul implementasi sistem ujian berbasis pengenalan wajah (*AI Face Recognition & Proctoring*), meniadakan instruksi manual username/password dan konfigurasi SEB:
+1. **Penggantian Banner Status Akun CBT:**
+   - Menghapus pesan lama: *"Akun Tes Tulis CBT sedang diproses TU dan akan dibagikan menjelang hari pelaksanaan"*.
+   - Menggantikannya dengan panel status **"Metode Masuk Ujian: Scan Verifikasi Wajah (Face Recognition)"** yang mengonfirmasi bahwa pasfoto wajah pendaftaran peserta telah terverifikasi dan siap digunakan untuk membuka ujian secara otomatis tanpa username/password.
+2. **Pembaruan Banner Tata Tertib & Pengawasan AI:**
+   - Menghilangkan instruksi lama yang usang (*"Wajib catat Username & Password di kertas", "Kode Lembaga 22205", "Install E-Ujian Browser / Safe Exam Browser"*).
+   - Menampilkan ringkasan 4 tata tertib utama: 1) Berdoa & belajar; 2) Dikerjakan sendiri (jujur); 3) Dilarang membuka web lain; 4) Dilarang menggunakan HP lain.
+   - Menginformasikan sistem pengawasan AI berkala tiap 5 menit dengan tombol aksi dinamis `Masuk Ujian Pretes ➔` (jika ujian dibuka / akun tester `12345`) atau `Lihat Jadwal & Panduan ➔`.
+3. **Pembersihan Banner SEB iPhone (.seb):**
+   - Menghapus banner unduh file konfigurasi `seb-config-lppai.seb` yang tidak lagi diperlukan, mencegah kebingungan mahasiswa pengguna iOS.
+4. **Penyelarasan Tombol Aksi Cepat & Kredensial Halaman Peserta:**
+   - Mengganti tombol `🔑 Buka Akun CBT & Jadwal Lengkap` menjadi `📋 Jadwal & Panduan Pretes` dan menambahkan tombol pintas langsung `📝 Kerjakan Pretes (Scan Wajah)` saat sesi dibuka / tester `12345`.
+   - Menyesuaikan kotak pada `pages/pretes-peserta.php` agar menampilkan status aktif verifikasi wajah tanpa kotak salin username & password.
+5. **Verifikasi:**
+   - `php -l pages/dashboard.php` dan `php -l pages/pretes-peserta.php` (**No syntax errors**).
+   - **27/27 test suites lulus 100%** tanpa regresi.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/dashboard.php` | 108–117, 425–490 | Gating Ujian & Komponen Pretes Mahasiswa | Menambahkan gating pretes, mengganti banner CBT username/password ke info scan wajah, menghapus banner .seb, dan menyesuaikan tombol aksi cepat. |
+| `pages/pretes-peserta.php` | 208–226 | Kotak Status Akses Ujian | Menampilkan badge sistem verifikasi wajah aktif menggantikan kotak kredensial login lama. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 10:40:00 +0700 — Perbaikan Tampilan Kamera Layar Hitam pada Halaman Ujian Pretes (pages/pretes-ujian.php)
 
 **Ringkasan:** Mengatasi kendala tampilan kamera web yang hanya menampilkan layar hitam kosong saat peserta atau tester mengunjungi portal ujian pretes (`pages/pretes-ujian.php`):

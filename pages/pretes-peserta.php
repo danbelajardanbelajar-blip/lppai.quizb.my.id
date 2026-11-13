@@ -206,21 +206,21 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- Kredensial Akun Tes (Jika Ada) -->
-            <?php if (!empty($myReg['username_tes']) && !empty($myReg['password_tes'])): ?>
-                <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <!-- Sistem Masuk Ujian: Scan Verifikasi Wajah -->
+            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:24px;">📸</span>
                     <div>
-                        <div style="font-size:11.5px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:0.5px;">Akun Login Ujian CBT Anda:</div>
-                        <div style="font-size:14px;color:#1e293b;margin-top:2px;">
-                            Username: <strong><?= sanitize($myReg['username_tes']) ?></strong> &bull; Password: <strong><?= sanitize($myReg['password_tes']) ?></strong>
+                        <div style="font-size:12px;font-weight:800;color:#15803d;text-transform:uppercase;letter-spacing:0.5px;">Sistem Masuk Ujian:</div>
+                        <div style="font-size:13.5px;color:#1e293b;margin-top:2px;">
+                            Ujian menggunakan <strong>Scan Verifikasi Wajah (Face Recognition)</strong> secara langsung melalui kamera peramban tanpa memerlukan username dan password.
                         </div>
                     </div>
-                    <button type="button" onclick="copyText('Username: <?= sanitize($myReg['username_tes']) ?> | Password: <?= sanitize($myReg['password_tes']) ?>', 'btn-copy-akun')" id="btn-copy-akun"
-                        style="background:#0f766e;color:#fff;border:none;padding:7px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">
-                        📋 Salin Akun
-                    </button>
                 </div>
-            <?php endif; ?>
+                <span class="badge badge-success" style="padding:6px 14px;font-size:12px;background:#16a34a;color:#fff;border-radius:20px;font-weight:700;">
+                    ✓ Scan Wajah Aktif
+                </span>
+            </div>
         </div>
     </div>
 

@@ -107,6 +107,14 @@ if ($myPretesReg) {
     } catch (Exception $e) {}
 }
 
+// Gating & Privilege Ujian Pretes
+$tglSekarangPretes   = date('Y-m-d');
+$tglBukaUjianPretes  = '2026-11-16';
+$isTesterPrivileged  = (isset($user['username']) && (string)$user['username'] === '12345') 
+                    || (isset($user['nim']) && (string)$user['nim'] === '12345')
+                    || ((int)($user['id'] ?? 0) === 12345);
+$isUjianPretesDibuka = ($tglSekarangPretes >= $tglBukaUjianPretes) || $isTesterPrivileged;
+
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
 $stmt = $pdo->prepare("
     SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan 
@@ -416,51 +424,52 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
-        <!-- Status Akun CBT & Catatan -->
-        <div style="background: <?= !empty($myPretesReg['username_tes']) ? '#eff6ff' : '#fffbeb' ?>; border: 1px solid <?= !empty($myPretesReg['username_tes']) ? '#bfdbfe' : '#fde68a' ?>; border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:20px;"><?= !empty($myPretesReg['username_tes']) ? '🔑' : '⏳' ?></span>
-                <span style="font-size:13px; color: <?= !empty($myPretesReg['username_tes']) ? '#1e40af' : '#92400e' ?>; font-weight:500;">
-                    <?php if (!empty($myPretesReg['username_tes'])): ?>
-                        Akun Tes Tulis CBT Anda <strong>sudah siap</strong>. Username: <code style="background:#dbeafe; padding:2px 6px; border-radius:4px; font-weight:700; color:#1e40af;"><?= sanitize($myPretesReg['username_tes']) ?></code>
-                    <?php else: ?>
-                        Akun Tes Tulis CBT <strong>sedang diproses TU</strong> dan akan dibagikan menjelang hari pelaksanaan.
-                    <?php endif; ?>
-                </span>
+        <!-- Status Metode Masuk Pretes: Scan Verifikasi Wajah (Face Recognition) -->
+        <div style="background: <?= !empty($myPretesReg['foto']) ? '#f0fdf4' : '#fffbeb' ?>; border: 1.5px solid <?= !empty($myPretesReg['foto']) ? '#86efac' : '#fde68a' ?>; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:24px;"><?= !empty($myPretesReg['foto']) ? '📸' : '⚠️' ?></span>
+                <div>
+                    <div style="font-size:13.5px; font-weight:800; color: <?= !empty($myPretesReg['foto']) ? '#15803d' : '#92400e' ?>;">
+                        Metode Masuk Ujian: Scan Verifikasi Wajah (Face Recognition)
+                    </div>
+                    <div style="font-size:12.5px; color: <?= !empty($myPretesReg['foto']) ? '#166534' : '#78350f' ?>; margin-top:2px; line-height:1.45;">
+                        <?php if (!empty($myPretesReg['foto'])): ?>
+                            ✅ Pasfoto wajah Anda <strong>sudah terverifikasi</strong>. Akses ujian dibuka langsung melalui pemindaian kamera peramban tanpa memerlukan username &amp; password.
+                        <?php else: ?>
+                            Pasfoto wajah pendaftaran belum tersedia. Harap pastikan pasfoto resmi Anda telah terunggah pada akun pendaftaran.
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
-            <div style="font-size:12px; color:var(--text-muted);">
+            <div style="font-size:12px; color:var(--text-muted); font-weight:600;">
                 ℹ️ Harap hadir 15 menit sebelum ujian dimulai
             </div>
         </div>
 
-        <!-- Info Wajib Try Out & Exam Browser -->
-        <div style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:12px; padding:12px 16px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:20px;">🚨</span>
-                <div style="font-size:12.5px; color:#9f1239; line-height:1.5;">
-                    <strong>Info Wajib Pretes:</strong> 📝 <strong>Wajib catat Username & Password di kertas</strong> (HP terkunci saat ujian) | Try Out Mandiri dari rumah <strong>Malam Ini s.d. Malam Senin</strong> | Wajib Install <strong>E-Ujian Browser (Android)</strong> atau <strong>Safe Exam Browser (iPhone)</strong> | Kode Lembaga: <strong>22205</strong> | <strong>Dilarang membawa 2 HP di meja ujian</strong> (dimatikan & tas di depan).
+        <!-- Info Tata Tertib & Pengawasan AI Pretes -->
+        <div style="background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:12px; padding:14px 18px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:flex-start; gap:12px; max-width:820px;">
+                <span style="font-size:24px; flex-shrink:0; line-height:1.2;">🛡️</span>
+                <div style="font-size:12.5px; color:#1e40af; line-height:1.55;">
+                    <strong style="color:#1e3a8a; font-size:13px; display:block; margin-bottom:3px;">
+                        Tata Tertib &amp; Pengawasan Ujian Pretes:
+                    </strong>
+                    1. Berdoa &amp; belajar dengan sungguh-sungguh | 2. Wajib dikerjakan sendiri secara mandiri &amp; jujur | 3. Dilarang membuka web/aplikasi lain | 4. Dilarang menggunakan HP lain.
+                    <div style="margin-top:4px; font-size:12px; color:#2563eb;">
+                        🔍 Ujian diverifikasi di awal (Check-in) dan diawasi berkala setiap 5 menit dengan sistem kamera <strong>AI Face Recognition</strong>.
+                    </div>
                 </div>
             </div>
-            <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-sm btn-danger" style="white-space:nowrap; padding:6px 12px; font-size:12px; font-weight:700;">
-                Lihat Panduan & Akun ➔
-            </a>
-        </div>
-
-        <!-- Banner Khusus Pengguna iPhone (Config SEB) -->
-        <div style="background:#f0fdfa; border:1.5px solid #99f6e4; border-radius:12px; padding:12px 16px; margin-bottom:18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:22px;">🍏</span>
-                <div style="font-size:12.5px; color:#134e4a; line-height:1.5;">
-                    <strong style="color:#0f766e;">Pengguna iPhone (iOS)?</strong> Wajib pasang file konfigurasi <code>seb-config-lppai.seb</code> agar Safe Exam Browser otomatis terhubung ke ujian.
-                </div>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <a href="<?= BASE_URL ?>/assets/downloads/seb-config-lppai.seb" download="seb-config-lppai.seb" class="btn btn-sm" style="background:#0f766e; color:#ffffff; padding:6px 12px; font-size:12px; font-weight:700; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-                    📥 Unduh File .seb
-                </a>
-                <a href="<?= BASE_URL ?>/pretes-peserta.php#panduan-seb-iphone" class="btn btn-sm btn-light" style="padding:6px 12px; font-size:12px; border:1px solid #99f6e4; color:#0f766e; font-weight:600; border-radius:6px; text-decoration:none;">
-                    📖 Panduan iPhone ➔
-                </a>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <?php if ($isUjianPretesDibuka): ?>
+                    <a href="<?= BASE_URL ?>/pretes-ujian.php" class="btn btn-sm btn-success" style="white-space:nowrap; padding:8px 16px; font-size:12.5px; font-weight:800; border-radius:8px; box-shadow:0 2px 8px rgba(22,163,74,0.3); text-decoration:none;">
+                        🚀 Masuk Ujian Pretes ➔
+                    </a>
+                <?php else: ?>
+                    <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-sm btn-primary" style="white-space:nowrap; padding:8px 16px; font-size:12.5px; font-weight:700; border-radius:8px; background:#0f766e; border-color:#0f766e; text-decoration:none;">
+                        Lihat Jadwal &amp; Panduan ➔
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -469,8 +478,13 @@ include __DIR__ . '/../includes/header.php';
             <button type="button" class="btn btn-primary" onclick="togglePretesScanner()" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:700; background:#0284c7; border-color:#0284c7; cursor:pointer;">
                 📷 Scan Absensi Pretes
             </button>
+            <?php if ($isUjianPretesDibuka): ?>
+                <a href="<?= BASE_URL ?>/pretes-ujian.php" class="btn btn-success" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:800; text-decoration:none; background:#16a34a; border-color:#16a34a; box-shadow:0 2px 8px rgba(22,163,74,0.3);">
+                    📝 Kerjakan Pretes (Scan Wajah)
+                </a>
+            <?php endif; ?>
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-light" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; text-decoration:none; border:1px solid #cbd5e1;">
-                🔑 Buka Akun CBT & Jadwal Lengkap
+                📋 Jadwal &amp; Panduan Pretes
             </a>
             <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-secondary" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:600; text-decoration:none;">
                 📊 Cek Hasil Pretes
