@@ -126,6 +126,20 @@ Mahasiswa yang sedang berada dalam periode pretes aktif (baik yang sudah terdaft
 
 ---
 
+## 2026-11-14 06:47:31 +0700 — Skrip CLI tambah admin (`tools/tambah-admin.php`)
+
+| File | Baris | Bagian | Perubahan |
+|---|---|---|---|
+| `tools/tambah-admin.php` (baru) | 1–17 | Header & guard | Pemakaian `php tools/tambah-admin.php <username> <password> ["Nama"] [--reset]`; menolak akses non-CLI (`PHP_SAPI !== 'cli'` → 404). Kredensial **tidak** di-hardcode (repo publik). |
+| `tools/tambah-admin.php` | 19–60 | `lppaiTambahAdmin()` | Validasi username/password, `password_hash(PASSWORD_DEFAULT)`, insert `role='admin', is_active=1` (fallback `nim=''` bila NOT NULL); username yang ada ditolak kecuali `--reset` (jadikan admin aktif + ganti password). |
+| `tools/tambah-admin.php` | 62–85 | Runner CLI | Parsing argumen, koneksi `config/database.php`, keluaran `[OK]`/`[!]`/`[GAGAL]` + exit code 0/2/1. |
+| `tools/.htaccess` (baru) | 1–7 | Proteksi folder | `Require all denied` (+ fallback Apache 2.2). |
+| `tests/tambah-admin-test.php` (baru) | 1–43 | Test SQLite | Buat admin, hash password, tolak duplikat, `--reset`, validasi input, guard CLI & `.htaccess`. |
+
+**Verifikasi:** `php -l` OK; `tests/tambah-admin-test.php` PASS; tanpa argumen menampilkan petunjuk pemakaian.
+
+---
+
 ## 2026-11-13 23:24:04 +0700 — Modal Tambah/Edit Sesi & Tambah/Edit Soal bisa di-scroll
 
 **Akar masalah (diukur di harness lokal, viewport 1280×640):**
