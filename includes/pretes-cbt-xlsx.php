@@ -29,8 +29,9 @@ function cbtReadQuestionXlsx(string $file): array {
             if ($stat['size'] > 12 * 1024 * 1024 || $total > 25 * 1024 * 1024 || !empty($stat['encryption_method'])) throw new InvalidArgumentException('Isi Excel terlalu besar atau terenkripsi.');
         }
         $get = static function (string $name) use ($zip): SimpleXMLElement {
-            $value = $zip->getFromName($name);
+            $value = $zip->getFromName($name, 12 * 1024 * 1024 + 1);
             if ($value === false) throw new InvalidArgumentException('Struktur workbook Excel tidak lengkap.');
+            if (strlen($value) > 12 * 1024 * 1024) throw new InvalidArgumentException('Isi lembar Excel terlalu besar.');
             return cbtXlsxXml($value);
         };
         $book = $get('xl/workbook.xml');
@@ -58,6 +59,7 @@ function cbtReadQuestionXlsx(string $file): array {
                 $column = 0;
                 foreach (str_split($ref[1]) as $letter) $column = $column * 26 + ord($letter) - 64;
                 if ($column > 64) continue;
+                if ((string)$cell['t'] === 'e') throw new InvalidArgumentException('Baris ' . (int)$row['r'] . ': sel memuat error Excel. Perbaiki nilainya sebelum impor.');
                 if ($cell->xpath('./*[local-name()="f"]')) throw new InvalidArgumentException('Baris ' . (int)$row['r'] . ': formula tidak diterima. Gunakan Paste Values di Excel.');
                 $v = $cell->xpath('./*[local-name()="v"]');
                 $value = $v ? (string)$v[0] : '';
@@ -169,6 +171,7 @@ function cbtWriteXlsx(iterable $rows, string $name, array $widths): string {
     $file = tempnam(sys_get_temp_dir(), 'cbt-xlsx-');
     $zip = new ZipArchive();
     $handle = null;
+    $opened = false;
     try {
         $handle = fopen($sheetFile, 'wb');
         fwrite($handle, '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>');
@@ -191,6 +194,7 @@ function cbtWriteXlsx(iterable $rows, string $name, array $widths): string {
         fwrite($handle, '</sheetData><autoFilter ref="A1:' . chr(64 + count($widths)) . max(1, $number) . '"/></worksheet>');
         fclose($handle); $handle = null;
         if ($zip->open($file, ZipArchive::OVERWRITE) !== true) throw new RuntimeException('File Excel belum dapat dibuat.');
+        $opened = true;
         $zip->addFromString('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
         $zip->addFromString('_rels/.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
         $zip->addFromString('xl/workbook.xml', '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' . cbtXmlEscape($name) . '" sheetId="1" r:id="rId1"/></sheets></workbook>');
@@ -198,8 +202,10 @@ function cbtWriteXlsx(iterable $rows, string $name, array $widths): string {
         $zip->addFromString('xl/styles.xml', '<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="dd/mm/yyyy hh:mm"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0F766E"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="4"><xf fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
         $zip->addFile($sheetFile, 'xl/worksheets/sheet1.xml');
         if (!$zip->close()) throw new RuntimeException('Ekspor Excel belum dapat diselesaikan.');
+        $opened = false;
         return $file;
     } catch (Throwable $error) {
+        if ($opened) $zip->close();
         if (is_file($file)) unlink($file);
         throw $error;
     } finally {
@@ -223,7 +229,7 @@ function cbtResultsExportRows(PDO $pdo): Generator {
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         yield [(string)$row['nim'], $row['nama_lengkap'], ['style' => 2, 'value' => ((int)$row['started_at'] + 25200) / 86400 + 25569],
             $row['submitted_at'] !== null ? ['style' => 2, 'value' => ((int)$row['submitted_at'] + 25200) / 86400 + 25569] : null,
-            $row['submitted_at'] !== null ? 'Selesai' : 'Berlangsung',
+            $row['submitted_at'] !== null ? 'Selesai' : (time() >= (int)$row['deadline_at'] ? 'Waktu habis; menunggu finalisasi' : 'Berlangsung'),
             $row['correct_count'] !== null ? (int)$row['correct_count'] : null, 25,
             $row['score'] !== null ? ['style' => 3, 'value' => (float)$row['score']] : null];
     }

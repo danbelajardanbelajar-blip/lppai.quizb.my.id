@@ -1,8 +1,8 @@
 <?php
 /**
  * Sinkronisasi data Mahasiswa Angkatan 2026 ke tabel `users`:
- * - Total data: 112 mahasiswa dari ekspor SIAKAD UNISDA.
- * - Sementara diset: jenis_program = 'Reguler', angkatan = '2026', role = 'mahasiswa', is_active = 1.
+ * - Total data: 112 mahasiswa RPL dari ekspor SIAKAD UNISDA.
+ * - Terkonfirmasi: jenis_program = 'RPL', angkatan = '2026', role = 'mahasiswa', is_active = 1.
  * - Password default: tanggal lahir format dmY (misal: 03111981) atau 123456 jika kosong (cost 8).
  * - Idempotent: aman dijalankan berulang kali.
  *
@@ -21,10 +21,10 @@ if ($isCli) {
 
 $records = require __DIR__ . '/data/mahasiswa-angkatan-2026.php';
 $pdo = getDBConnection();
-$stats = upsertAngkatan2026Records($pdo, $records);
+$stats = upsertAngkatan2026Records($pdo, $records, 'RPL');
 
 if ($isCli) {
-    echo "=== SINKRONISASI MAHASISWA ANGKATAN 2026 (REGULER) ===\n";
+    echo "=== SINKRONISASI MAHASISWA ANGKATAN 2026 (RPL) ===\n";
     echo "Total diproses : {$stats['total']}\n";
     echo "Baru di-insert : {$stats['inserted']}\n";
     echo "Di-update      : {$stats['updated']}\n";
@@ -41,7 +41,7 @@ header('Content-Type: text/html; charset=UTF-8');
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Sinkronisasi Mahasiswa Angkatan 2026</title>
+    <title>Sinkronisasi Mahasiswa Angkatan 2026 (RPL)</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #f8fafc; color: #1e293b; padding: 32px; }
         .box { max-width: 820px; margin: 0 auto; background: #fff; border-radius: 14px; padding: 24px 28px; box-shadow: 0 8px 24px rgba(15, 23, 42, .08); }
@@ -54,10 +54,10 @@ header('Content-Type: text/html; charset=UTF-8');
 </head>
 <body>
 <div class="box">
-    <h2 style="margin-top:0;">Sinkronisasi Mahasiswa Angkatan 2026 Selesai</h2>
+    <h2 style="margin-top:0;">Sinkronisasi Mahasiswa Angkatan 2026 (RPL) Selesai</h2>
     <div class="stats">
         <div class="stat"><span>Total Data</span><strong><?= (int)$stats['total'] ?></strong></div>
-        <div class="stat"><span>Insert Baru (Reguler)</span><strong><?= (int)$stats['inserted'] ?></strong></div>
+        <div class="stat"><span>Insert Baru (RPL)</span><strong><?= (int)$stats['inserted'] ?></strong></div>
         <div class="stat"><span>Update</span><strong><?= (int)$stats['updated'] ?></strong></div>
         <div class="stat"><span>Dilewati (Sudah Ada)</span><strong><?= (int)$stats['skipped'] ?></strong></div>
     </div>

@@ -37,7 +37,7 @@ foreach ($records as $idx => $rec) {
     mhs2026Assert($nama !== '', "Row #$idx ($nim) has empty nama_lengkap.", $errors);
     mhs2026Assert($prodi !== '', "Row #$idx ($nim) has empty program_studi.", $errors);
     mhs2026Assert($angkatan === '2026', "Row #$idx ($nim) angkatan must be '2026', got '$angkatan'.", $errors);
-    mhs2026Assert($jenis === 'Reguler', "Row #$idx ($nim) jenis_program must be 'Reguler', got '$jenis'.", $errors);
+    mhs2026Assert($jenis === 'RPL', "Row #$idx ($nim) jenis_program must be 'RPL', got '$jenis'.", $errors);
 
     $parsedTgl = parseFlexibleDateToYmd($tgl);
     mhs2026Assert($parsedTgl !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsedTgl) === 1, "Row #$idx ($nim) tanggal_lahir must parse to YYYY-MM-DD (got '$tgl').", $errors);
@@ -87,23 +87,23 @@ $pdo->exec("CREATE TABLE users (
     is_active INTEGER NOT NULL DEFAULT 0
 )");
 
-// Pre-seed 1 record: NIM 2601101019 already in DB with older data
+// Pre-seed 1 record: NIM 2601101019 already in DB with older data and Reguler status
 $firstRec = $records[0];
 $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, program_studi, jenis_program, angkatan, role, is_active) VALUES (?,?,?,?,?,?,?,?,?)")
-    ->execute([$firstRec['nim'], 'EXISTING_HASH', 'BAMBANG LAMA', $firstRec['nim'], 'PAI LAMA', 'RPL', '2025', 'mahasiswa', 0]);
+    ->execute([$firstRec['nim'], 'EXISTING_HASH', 'BAMBANG LAMA', $firstRec['nim'], 'PAI LAMA', 'Reguler', '2026', 'mahasiswa', 1]);
 
-// First migration run
-$stats1 = upsertAngkatan2026Records($pdo, $records);
+// First run: updateAngkatan2026ToRpl()
+$stats1 = updateAngkatan2026ToRpl($pdo, $records);
 mhs2026Assert(empty($stats1['errors']), 'First run must have 0 errors.', $errors);
 mhs2026Assert($stats1['total'] === 112, 'Total processed must be 112.', $errors);
-mhs2026Assert($stats1['updated'] === 1, 'Expected 1 existing user to be updated to Reguler 2026 is_active=1.', $errors);
-mhs2026Assert($stats1['inserted'] === 111, 'Expected 111 new users inserted, got ' . $stats1['inserted'], $errors);
+mhs2026Assert($stats1['updated'] === 1, 'Expected 1 existing user to be updated to RPL.', $errors);
+mhs2026Assert($stats1['inserted'] === 111, 'Expected 111 new users inserted as RPL, got ' . $stats1['inserted'], $errors);
 
-// Verify pre-seeded user was updated to Reguler, 2026, is_active=1, preserving password
+// Verify pre-seeded user was updated to RPL, preserving name/password
 $stmt = $pdo->prepare("SELECT * FROM users WHERE nim = ?");
 $stmt->execute([$firstRec['nim']]);
 $u1 = $stmt->fetch(PDO::FETCH_ASSOC);
-mhs2026Assert($u1['jenis_program'] === 'Reguler', 'User 1 jenis_program must be Reguler.', $errors);
+mhs2026Assert($u1['jenis_program'] === 'RPL', 'User 1 jenis_program must be RPL.', $errors);
 mhs2026Assert($u1['angkatan'] === '2026', 'User 1 angkatan must be 2026.', $errors);
 mhs2026Assert((int)$u1['is_active'] === 1, 'User 1 is_active must be 1.', $errors);
 mhs2026Assert($u1['password'] === 'EXISTING_HASH', 'User 1 password must be preserved.', $errors);
@@ -114,7 +114,7 @@ $stmt->execute([$secondRec['nim']]);
 $u2 = $stmt->fetch(PDO::FETCH_ASSOC);
 mhs2026Assert($u2 !== false, "User 2 ({$secondRec['nim']}) must exist.", $errors);
 mhs2026Assert($u2['nama_lengkap'] === $secondRec['nama_lengkap'], 'User 2 name must match.', $errors);
-mhs2026Assert($u2['jenis_program'] === 'Reguler', 'User 2 jenis_program must be Reguler.', $errors);
+mhs2026Assert($u2['jenis_program'] === 'RPL', 'User 2 jenis_program must be RPL.', $errors);
 mhs2026Assert($u2['angkatan'] === '2026', 'User 2 angkatan must be 2026.', $errors);
 mhs2026Assert((int)$u2['is_active'] === 1, 'User 2 is_active must be 1.', $errors);
 mhs2026Assert($u2['role'] === 'mahasiswa', 'User 2 role must be mahasiswa.', $errors);
@@ -126,7 +126,7 @@ $expectedPlainPass = $dt2 ? $dt2->format('dmY') : '123456';
 mhs2026Assert(password_verify($expectedPlainPass, $u2['password']), "User 2 password hash must verify with '$expectedPlainPass'.", $errors);
 
 // Second migration run (Idempotency test)
-$stats2 = upsertAngkatan2026Records($pdo, $records);
+$stats2 = updateAngkatan2026ToRpl($pdo, $records);
 mhs2026Assert(empty($stats2['errors']), 'Second run must have 0 errors.', $errors);
 mhs2026Assert($stats2['inserted'] === 0, 'Second run must have 0 inserted.', $errors);
 mhs2026Assert($stats2['updated'] === 0, 'Second run must have 0 updated.', $errors);

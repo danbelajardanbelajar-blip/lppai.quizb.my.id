@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 14:03:00 +0700 — Penyesuaian Status 112 Mahasiswa Angkatan 2026 ke Program RPL & Skrip Update Otomatis
+
+**Ringkasan:** Mengubah seluruh data 112 mahasiswa Angkatan 2026 menjadi program RPL dan menyediakan skrip khusus untuk memperbarui data yang telah diinput di database:
+1. **Pembaruan Dataset Angkatan 2026 (`data/mahasiswa-angkatan-2026.php`):**
+   - Menyesuaikan `jenis_program` dari 'Reguler' menjadi 'RPL' untuk seluruh 112 mahasiswa baru.
+2. **Helper Update & Idempotent Upsert (`includes/user-helper.php`):**
+   - Menambahkan fungsi `updateAngkatan2026ToRpl(PDO $pdo, ?array $records = null): array` yang aman dijalankan berulang kali (idempotent).
+   - Memperbarui `upsertAngkatan2026Records` agar mendukung parameter `$defaultJenisProgram = 'RPL'` dan memprioritaskan nilai dari dataset.
+   - Idempotent: jika mahasiswa sudah di database dengan status Reguler, statusnya diperbarui ke RPL. Jika belum ada di database, otomatis di-insert sebagai RPL 2026 (is_active = 1, password format dmY). Jika sudah RPL, otomatis dilewati (skip).
+3. **Skrip Update Khusus (`update_angkatan_2026_to_rpl.php`):**
+   - Dibuat untuk menjalankan pembaruan database baik via CLI (`php update_angkatan_2026_to_rpl.php`) maupun browser oleh Admin (`/update_angkatan_2026_to_rpl.php`).
+   - Menyajikan laporan statistik lengkap: Total Data, Diupdate ke RPL, Baru Di-insert RPL, dan Dilewati.
+4. **Pembaruan Skrip Migrasi (`migration_angkatan_2026.php`):**
+   - Mengalihkan label dan default import ke program RPL.
+5. **Verifikasi & Test Suites (`tests/mahasiswa-angkatan-2026-test.php`):**
+   - Pengujian keabsahan seluruh 112 data dengan status RPL.
+   - Pengujian in-memory SQLite untuk fungsi `updateAngkatan2026ToRpl()`: simulasi update dari Reguler ke RPL, insert baru, dan idempotency.
+   - `php -l` seluruh file (No syntax errors).
+   - Seluruh 29 unit test suite lulus 100% (TOTAL_FAILED=0).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `data/mahasiswa-angkatan-2026.php` | 1–125 | Dataset Mahasiswa 2026 | Mengubah `jenis_program` seluruh 112 mahasiswa menjadi 'RPL'. |
+| `includes/user-helper.php` | 408–540 | `upsertAngkatan2026Records()` & `updateAngkatan2026ToRpl()` | Menambahkan fungsi update idempotent ke RPL dan mendukung parameter jenis program dinamis. |
+| `update_angkatan_2026_to_rpl.php` | 1–75 | Skrip Update RPL | Skrip CLI dan Web untuk memperbarui data 112 mahasiswa 2026 ke RPL. |
+| `migration_angkatan_2026.php` | 1–68 | Skrip Migrasi 2026 | Mengupdate target jenis program menjadi RPL. |
+| `tests/mahasiswa-angkatan-2026-test.php` | 39–135 | Unit Test Suite | Menguji pembaruan status RPL dan fungsi `updateAngkatan2026ToRpl()`. |
+| `CHANGELOG-DEV.md` | 8–45 | Catatan Rilis | Dokumentasi sistematis penyesuaian program RPL angkatan 2026. |
+
+---
+
 ## 2026-11-13 13:52:00 +0700 — Penambahan Dataset & Migrasi Mahasiswa Angkatan 2026 (Reguler)
 
 **Ringkasan:** Menambahkan seluruh mahasiswa Angkatan 2026 (112 mahasiswa baru dari ekspor SIAKAD UNISDA) ke dalam database user dengan pemetaan kolom yang disesuaikan terhadap perubahan urutan kolom SIAKAD 2026:

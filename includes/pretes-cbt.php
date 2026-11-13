@@ -176,17 +176,18 @@ function pretesCbtChange(PDO $pdo, int $userId, int $registrationId, string $act
 }
 
 function pretesCbtSaveQuestion(PDO $pdo, array $input): void {
+    $length = static fn(string $text): int => function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : strlen($text);
     $text = trim((string)($input['question_text'] ?? ''));
     $category = trim((string)($input['category'] ?? 'Umum'));
     $options = [];
     foreach (range('A', 'E') as $letter) {
         $value = trim((string)($input['option_' . $letter] ?? ''));
-        if ($value === '' || strlen($value) > 2000) throw new InvalidArgumentException('Isi kelima pilihan A–E, maksimal 2.000 karakter per pilihan.');
+        if ($value === '' || $length($value) > 2000) throw new InvalidArgumentException('Isi kelima pilihan A–E, maksimal 2.000 karakter per pilihan.');
         $options[$letter] = $value;
     }
     if (count(array_unique($options)) !== 5) throw new InvalidArgumentException('Kelima pilihan jawaban harus berbeda.');
     $correct = $input['correct_answer'] ?? '';
-    if ($text === '' || strlen($text) > 10000 || $category === '' || strlen($category) > 80 || !in_array($correct, range('A', 'E'), true)) throw new InvalidArgumentException('Periksa pertanyaan, kategori, dan kunci jawaban.');
+    if ($text === '' || $length($text) > 10000 || $category === '' || $length($category) > 80 || !in_array($correct, range('A', 'E'), true)) throw new InvalidArgumentException('Periksa pertanyaan, kategori, dan kunci jawaban.');
     $values = [$category, $text, json_encode($options, JSON_UNESCAPED_UNICODE), $correct, isset($input['is_active']) ? 1 : 0];
     if (!empty($input['id'])) {
         $values[] = (int)$input['id'];

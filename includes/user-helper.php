@@ -398,14 +398,15 @@ if (!function_exists('upsertRplUserRecords')) {
 if (!function_exists('upsertAngkatan2026Records')) {
     /**
      * Upsert idempotent data mahasiswa Angkatan 2026 ke tabel users.
-     * Sesuai kebutuhan fase 1: sementara semua dijadikan jenis_program = 'Reguler', angkatan = '2026', is_active = 1.
+     * Secara default menggunakan jenis_program = 'RPL', angkatan = '2026', is_active = 1.
      * Password default menggunakan format dmY (misal 03111981) dari tanggal_lahir, atau '123456' jika tanggal lahir kosong.
      *
      * @param PDO $pdo
      * @param array $records
+     * @param string $defaultJenisProgram
      * @return array
      */
-    function upsertAngkatan2026Records(PDO $pdo, array $records): array {
+    function upsertAngkatan2026Records(PDO $pdo, array $records, string $defaultJenisProgram = 'RPL'): array {
         ensureJenisProgramColumn($pdo);
 
         $normalizePhone = static function ($raw): ?string {
@@ -426,10 +427,10 @@ if (!function_exists('upsertAngkatan2026Records')) {
         };
 
         $stmtFind = $pdo->prepare("SELECT id, nim, username, nama_lengkap, jenis_program, angkatan, is_active FROM users WHERE nim = ? OR username = ? LIMIT 1");
-        $stmtUpdate = $pdo->prepare("UPDATE users SET jenis_program = 'Reguler', angkatan = '2026', is_active = 1 WHERE id = ?");
+        $stmtUpdate = $pdo->prepare("UPDATE users SET jenis_program = ?, angkatan = '2026', is_active = 1 WHERE id = ?");
         $stmtInsert = $pdo->prepare(
             "INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, tanggal_lahir, email, no_hp, program_studi, jenis_program, angkatan, role, is_active) "
-            . "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Reguler', '2026', 'mahasiswa', 1)"
+            . "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '2026', 'mahasiswa', 1)"
         );
 
         $startedTx = false;
@@ -457,6 +458,8 @@ if (!function_exists('upsertAngkatan2026Records')) {
                     continue;
                 }
 
+                $targetJenis = normalizeJenisProgram($rec['jenis_program'] ?? $defaultJenisProgram);
+
                 $stmtFind->execute([$nim, $nim]);
                 $existing = $stmtFind->fetch(PDO::FETCH_ASSOC);
 
@@ -465,16 +468,16 @@ if (!function_exists('upsertAngkatan2026Records')) {
                     $currAngkatan = trim((string)($existing['angkatan'] ?? ''));
                     $currActive = (int)($existing['is_active'] ?? 0);
 
-                    // Idempotent: jika sudah Reguler, angkatan 2026, dan is_active 1, skip
-                    if ($currJenis === 'Reguler' && $currAngkatan === '2026' && $currActive === 1) {
+                    // Idempotent: jika sudah sesuai target jenis, angkatan 2026, dan is_active 1, skip
+                    if ($currJenis === $targetJenis && $currAngkatan === '2026' && $currActive === 1) {
                         $stats['skipped']++;
-                        $stats['details'][] = "SKIP [{$nim}] {$nama} (sudah Reguler 2026 aktif)";
+                        $stats['details'][] = "SKIP [{$nim}] {$nama} (sudah {$targetJenis} 2026 aktif)";
                         continue;
                     }
 
-                    $stmtUpdate->execute([(int)$existing['id']]);
+                    $stmtUpdate->execute([$targetJenis, (int)$existing['id']]);
                     $stats['updated']++;
-                    $stats['details'][] = "UPDATE [{$nim}] {$nama} -> jenis_program='Reguler', angkatan='2026', is_active=1";
+                    $stats['details'][] = "UPDATE [{$nim}] {$nama} -> jenis_program='{$targetJenis}', angkatan='2026', is_active=1";
                     continue;
                 }
 
@@ -502,9 +505,10 @@ if (!function_exists('upsertAngkatan2026Records')) {
                     $email !== '' ? $email : null,
                     $noHp,
                     $prodi !== '' ? $prodi : null,
+                    $targetJenis,
                 ]);
                 $stats['inserted']++;
-                $stats['details'][] = "INSERT [{$nim}] {$nama} ({$prodi}) -> Reguler 2026 (aktif)";
+                $stats['details'][] = "INSERT [{$nim}] {$nama} ({$prodi}) -> {$targetJenis} 2026 (aktif)";
             }
 
             if ($startedTx) {
@@ -518,6 +522,30 @@ if (!function_exists('upsertAngkatan2026Records')) {
         }
 
         return $stats;
+    }
+}
+
+if (!function_exists('updateAngkatan2026ToRpl')) {
+    /**
+     * Memperbarui data mahasiswa Angkatan 2026 menjadi jenis_program = 'RPL'.
+     * - Jika sudah ada di DB: UPDATE jenis_program = 'RPL', angkatan = '2026', is_active = 1.
+     * - Jika belum ada di DB: INSERT langsung sebagai mahasiswa RPL 2026 aktif.
+     * - Idempotent: aman dijalankan berulang kali.
+     *
+     * @param PDO $pdo
+     * @param array|null $records
+     * @return array
+     */
+    function updateAngkatan2026ToRpl(PDO $pdo, ?array $records = null): array {
+        if ($records === null) {
+            $datasetPath = __DIR__ . '/../data/mahasiswa-angkatan-2026.php';
+            if (!file_exists($datasetPath)) {
+                throw new RuntimeException("File dataset tidak ditemukan: {$datasetPath}");
+            }
+            $records = require $datasetPath;
+        }
+
+        return upsertAngkatan2026Records($pdo, $records, 'RPL');
     }
 }
 

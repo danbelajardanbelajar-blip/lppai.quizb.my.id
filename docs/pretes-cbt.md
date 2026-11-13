@@ -28,6 +28,35 @@ Git tersedia publik; buat/ubah bank resmi melalui admin dan tinjau materi serta
 kuncinya sebelum digunakan untuk penilaian resmi. Daftar admin menampilkan 100
 upaya terbaru beserta nilai, jumlah benar, dan waktu mulai WIB.
 
+### Excel .xlsx
+
+Tab Bank Soal menyediakan pencarian, filter kategori/status, pagination, tautan
+unduh template, dan ekspor seluruh bank. Tab Impor Excel mendukung pemilihan file
+atau drag-and-drop. Tab Hasil Ujian menyediakan ekspor hasil peserta.
+
+Template: `pretes-ujian.php?cbt_bank=1&download=template` (login admin diperlukan).
+Berkas asli tersedia di `downloads/template-bank-soal-cbt.xlsx`, berisi lembar
+Bank Soal dan Panduan. Gunakan judul kolom:
+
+`Kode Soal | Kategori | Pertanyaan | Pilihan A | Pilihan B | Pilihan C | Pilihan D | Pilihan E | Kunci | Status`
+
+- Ganti baris contoh. Kode boleh kosong untuk soal baru; kode dari ekspor dipertahankan saat memperbarui.
+- Kunci satu huruf A–E. Status Aktif/Nonaktif; kategori, pertanyaan, dan lima pilihan berbeda wajib diisi.
+- Maksimal 1.000 soal/file dan 5 MB; ZIP, XML, ukuran hasil ekstraksi, dan tipe sel diperiksa.
+- Formula, macro, workbook terenkripsi, entity XML, dan file selain .xlsx ditolak.
+- Semua baris divalidasi sebelum transaksi. Satu baris salah membatalkan seluruh impor dengan nomor baris kesalahan.
+- Pembaruan soal lama hanya jika opsi Perbarui dipilih dan Kode Soal cocok. Tanpa opsi, soal lama dilewati.
+- Pertanyaan duplikat yang sudah ada dilewati; kode/pertanyaan ganda dalam file ditolak.
+- Ekspor bank dapat diimpor kembali. Semua teks ditulis sebagai sel teks, bukan formula Excel.
+- Ekspor hasil mempertahankan NIM sebagai teks, nilai sebagai angka, dan waktu sebagai tanggal Excel dalam WIB.
+- Ekspor maksimal 10.000 baris atau 32 MB XML; ZIP/SimpleXML diperlukan pada PHP, tanpa dependensi Composer baru.
+- Impor soal tidak mengubah snapshot paket berjalan atau nilai ujian sebelumnya.
+
+```sh
+php tests/pretes-cbt-xlsx-test.php
+python tests/pretes-cbt-xlsx-http-test.py
+```
+
 ## Instalasi
 
 Tarik kode terbaru ke hosting. Tabel `pretes_cbt_questions`, `pretes_cbt_attempts`,

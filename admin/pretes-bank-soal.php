@@ -8,7 +8,7 @@ $bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
 if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
 $pdo = getDBConnection();
 ensurePretesCbtTables($pdo);
-$expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? LIMIT 100');
+$expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? ORDER BY deadline_at DESC LIMIT 100');
 $expired->execute([time()]);
 foreach ($expired->fetchAll(PDO::FETCH_ASSOC) as $entry) pretesCbtState($pdo, (int)$entry['user_id'], (int)$entry['registration_id']);
 if (isset($_GET['download'])) {

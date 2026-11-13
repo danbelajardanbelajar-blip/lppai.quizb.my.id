@@ -26,6 +26,7 @@
             <select id="bankCategory" class="bank-input" aria-label="Filter kategori"><option value="">Semua kategori</option><?php foreach ($categories as $category): ?><option value="<?= sanitize($category) ?>"><?= sanitize($category) ?></option><?php endforeach; ?></select>
             <select id="bankStatus" class="bank-input" aria-label="Filter status"><option value="">Semua status</option><option value="aktif">Aktif</option><option value="nonaktif">Nonaktif</option></select>
         </div>
+        <p class="bank-scroll-hint">Geser tabel untuk melihat kategori, kunci, status, dan tombol edit.</p>
         <div class="bank-table-scroll"><table class="bank-table"><thead><tr><th>No.</th><th>Pertanyaan</th><th>Kategori</th><th>Kunci</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
         <?php foreach ($questions as $i => $question): ?><tr data-bank-row data-category="<?= sanitize($question['category']) ?>" data-status="<?= $question['is_active'] ? 'aktif' : 'nonaktif' ?>">
             <td style="color:#8b978e"><?= $i + 1 ?></td>
