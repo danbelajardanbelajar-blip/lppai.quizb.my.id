@@ -73,6 +73,29 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     const stream = { getTracks: () => [{ stop() {} }] };
     const env = environment(() => { calls++; return Promise.resolve(stream); });
     const script = renderScript();
+    const visual = environment(() => Promise.resolve(stream));
+    vm.runInContext(script, visual.sandbox);
+    const waits = [];
+    visual.sandbox.waitForFacePose = milliseconds => {
+        assert.equal(milliseconds, 1000);
+        return new Promise(resolve => waits.push(resolve));
+    };
+    const pose = visual.sandbox.guideFacePose('←', '2/3 · KIRI layar', 'Ikuti panah di kamera', 4);
+    assert.equal(visual.element('facePoseGuide').style.display, 'grid');
+    assert.equal(visual.element('facePoseSymbol').textContent, '←');
+    assert.match(visual.element('facePoseTitle').textContent, /KIRI layar/);
+    assert.equal(visual.element('facePoseCountdown').textContent, 'Tahan 4 detik');
+    for (const remaining of [3, 2, 1]) {
+        waits.shift()();
+        await settle();
+        assert.equal(visual.element('facePoseCountdown').textContent, 'Tahan ' + remaining + ' detik');
+    }
+    waits.shift()();
+    await pose;
+    assert.equal(visual.element('facePoseCountdown').textContent, 'Foto diambil');
+    await visual.sandbox.guideFacePose('→', '2/3 · KANAN layar', 'Menoleh ke kanan layar', 0);
+    assert.equal(visual.element('facePoseSymbol').textContent, '→');
+    assert.match(visual.element('facePoseTitle').textContent, /KANAN layar/);
     vm.runInContext(script, env.sandbox);
     assert.equal(vm.runInContext('API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?face_api=1');
     env.sandbox.waitForFacePose = () => Promise.resolve();
@@ -100,6 +123,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(checkin.challenge_id, 'nonce-from-server');
     assert.equal(checkin.frames.length, 3);
     assert.equal(env.element('btnRunCheckin').disabled, false);
+    assert.equal(env.element('facePoseGuide').style.display, 'none');
     assert.equal(env.timers.size, 0, 'Timer dibersihkan setelah respons');
 
     // Server tidak merespons: pulihkan tombol dan tampilkan batas waktu.

@@ -164,6 +164,33 @@ include __DIR__ . '/../includes/header.php';
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
 }
 
+.face-pose-guide {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 12;
+    display: none;
+    grid-template-columns: 60px 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 2px solid #facc15;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.94);
+    color: #fff;
+    text-align: left;
+    pointer-events: none;
+}
+.face-pose-guide-symbol {
+    font-family: Arial, sans-serif;
+    font-size: 60px;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    color: #fde047;
+}
+
 /* Floating Proctoring Bar */
 .proctoring-monitor-bar {
     background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
@@ -313,6 +340,14 @@ include __DIR__ . '/../includes/header.php';
                             <!-- Badge Status Kamera -->
                             <div id="checkinCameraBadge" style="display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(22,163,74,0.95); color:#fff; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; z-index:10; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.3);">
                                 🟢 Kamera Aktif (Siap Verifikasi)
+                            </div>
+
+                            <div id="facePoseGuide" class="face-pose-guide" role="status" aria-live="polite">
+                                <span id="facePoseSymbol" class="face-pose-guide-symbol" aria-hidden="true"></span>
+                                <div>
+                                    <strong id="facePoseTitle" style="display:block; font-size:13px; line-height:1.3;"></strong>
+                                    <span id="facePoseCountdown" aria-hidden="true" style="display:block; margin-top:4px; font-size:14px; font-weight:800; color:#fde047;"></span>
+                                </div>
                             </div>
 
                             <!-- Placeholder Saat Kamera Belum Aktif -->
@@ -517,6 +552,23 @@ function requestProctoringCheck(payload) {
 
 function waitForFacePose(milliseconds) {
     return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+}
+
+async function guideFacePose(symbol, title, instruction, seconds) {
+    const guide = document.getElementById('facePoseGuide');
+    const icon = document.getElementById('facePoseSymbol');
+    const label = document.getElementById('facePoseTitle');
+    const countdown = document.getElementById('facePoseCountdown');
+    const alertBox = document.getElementById('checkinAlert');
+    if (guide) guide.style.display = 'grid';
+    if (icon) icon.textContent = symbol;
+    if (label) label.textContent = title;
+    if (alertBox) alertBox.textContent = instruction;
+    for (let remaining = seconds; remaining > 0; remaining--) {
+        if (countdown) countdown.textContent = 'Tahan ' + remaining + ' detik';
+        await waitForFacePose(1000);
+    }
+    if (countdown) countdown.textContent = 'Foto diambil';
 }
 
 function captureFaceFrame(video) {
@@ -793,16 +845,17 @@ function runInitialCheckin() {
         if (!challenge.challenge_id || !['left', 'right'].includes(challenge.direction)) {
             throw new Error('Tantangan wajah tidak valid. Silakan ulangi.');
         }
-        if (alertBox) alertBox.textContent = '1/3 — Hadapkan wajah lurus ke kamera dan tahan sebentar.';
-        await waitForFacePose(1500);
+        await guideFacePose('◎', '1/3 · Wajah lurus', 'Hadapkan wajah lurus ke kamera. Foto diambil setelah hitung mundur selesai.', 3);
         const frames = [captureFaceFrame(video)];
-        const arrow = challenge.direction === 'left' ? '← kiri layar' : '→ kanan layar';
-        if (alertBox) alertBox.textContent = '2/3 — Putar kepala sedikit sehingga hidung mengarah ke ' + arrow + '. Tahan posisi.';
-        await waitForFacePose(2500);
+        const left = challenge.direction === 'left';
+        const direction = left ? 'KIRI layar' : 'KANAN layar';
+        await guideFacePose(left ? '←' : '→', '2/3 · ' + direction,
+            'Putar kepala sedikit: hidung pada video harus mengarah ke ' + direction + ', sesuai panah kuning besar di kamera. Tahan hingga hitung mundur selesai.', 4);
         frames.push(captureFaceFrame(video));
-        if (alertBox) alertBox.textContent = '3/3 — Kembali menghadap lurus ke kamera. Tahan posisi.';
-        await waitForFacePose(2000);
+        await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembali menghadap lurus ke kamera. Tahan hingga hitung mundur selesai.', 3);
         frames.push(captureFaceFrame(video));
+        const guide = document.getElementById('facePoseGuide');
+        if (guide) guide.style.display = 'none';
         if (alertBox) alertBox.textContent = 'Sedang memeriksa ciri wajah dan gerakan di server…';
         return requestProctoringCheck({
             action: 'initial_checkin',
@@ -862,6 +915,9 @@ function runInitialCheckin() {
             alertBox.style.color = '#991b1b';
             alertBox.textContent = 'Verifikasi belum selesai: ' + err.message;
         }
+    }).finally(function() {
+        const guide = document.getElementById('facePoseGuide');
+        if (guide) guide.style.display = 'none';
     });
 }
 
