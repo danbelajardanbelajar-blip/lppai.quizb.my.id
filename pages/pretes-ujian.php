@@ -29,6 +29,23 @@ if (isset($_GET['cbt_bank'])) {
     require __DIR__ . '/../admin/pretes-bank-soal.php';
     exit;
 }
+if (isset($_GET['cbt_style'])) {
+    $styles = ['bank' => 'pretes-cbt-admin.css', 'exam' => 'pretes-cbt-exam.css'];
+    $key = is_string($_GET['cbt_style']) ? $_GET['cbt_style'] : '';
+    if (!isset($styles[$key])) { http_response_code(404); exit; }
+    header('Content-Type: text/css; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: public, max-age=3600');
+    readfile(__DIR__ . '/../assets/css/' . $styles[$key]);
+    exit;
+}
+if (isset($_GET['cbt_admin_asset'])) {
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: public, max-age=3600');
+    readfile(__DIR__ . '/../assets/js/pretes-cbt-admin.js');
+    exit;
+}
 
 define('PAGE_TITLE', 'Ujian Pretes & Pengawas AI');
 require_once __DIR__ . '/../includes/auth.php';

@@ -394,3 +394,130 @@ if (!function_exists('upsertRplUserRecords')) {
         return $stats;
     }
 }
+
+if (!function_exists('upsertAngkatan2026Records')) {
+    /**
+     * Upsert idempotent data mahasiswa Angkatan 2026 ke tabel users.
+     * Sesuai kebutuhan fase 1: sementara semua dijadikan jenis_program = 'Reguler', angkatan = '2026', is_active = 1.
+     * Password default menggunakan format dmY (misal 03111981) dari tanggal_lahir, atau '123456' jika tanggal lahir kosong.
+     *
+     * @param PDO $pdo
+     * @param array $records
+     * @return array
+     */
+    function upsertAngkatan2026Records(PDO $pdo, array $records): array {
+        ensureJenisProgramColumn($pdo);
+
+        $normalizePhone = static function ($raw): ?string {
+            $rawStr = trim((string)($raw ?? ''));
+            if ($rawStr === '' || $rawStr === '-') {
+                return null;
+            }
+            if (function_exists('formatNoHp')) {
+                $formatted = formatNoHp($rawStr);
+                return $formatted !== '' ? $formatted : null;
+            }
+            $clean = preg_replace('/[^0-9]/', '', $rawStr);
+            if ($clean === '') return null;
+            if (str_starts_with($clean, '62')) return $clean;
+            if (str_starts_with($clean, '0')) return '62' . substr($clean, 1);
+            if (str_starts_with($clean, '8')) return '62' . $clean;
+            return $clean;
+        };
+
+        $stmtFind = $pdo->prepare("SELECT id, nim, username, nama_lengkap, jenis_program, angkatan, is_active FROM users WHERE nim = ? OR username = ? LIMIT 1");
+        $stmtUpdate = $pdo->prepare("UPDATE users SET jenis_program = 'Reguler', angkatan = '2026', is_active = 1 WHERE id = ?");
+        $stmtInsert = $pdo->prepare(
+            "INSERT INTO users (username, password, nama_lengkap, nim, tempat_lahir, tanggal_lahir, email, no_hp, program_studi, jenis_program, angkatan, role, is_active) "
+            . "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Reguler', '2026', 'mahasiswa', 1)"
+        );
+
+        $startedTx = false;
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+            $startedTx = true;
+        }
+
+        $stats = [
+            'total'    => count($records),
+            'inserted' => 0,
+            'updated'  => 0,
+            'skipped'  => 0,
+            'details'  => [],
+            'errors'   => [],
+        ];
+
+        try {
+            foreach ($records as $idx => $rec) {
+                $nim = trim((string)($rec['nim'] ?? ''));
+                $nama = trim((string)($rec['nama_lengkap'] ?? ''));
+                if ($nim === '' || $nama === '') {
+                    $stats['skipped']++;
+                    $stats['errors'][] = "Baris #" . ($idx + 1) . ": NIM atau Nama kosong.";
+                    continue;
+                }
+
+                $stmtFind->execute([$nim, $nim]);
+                $existing = $stmtFind->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    $currJenis = normalizeJenisProgram($existing['jenis_program'] ?? 'Reguler');
+                    $currAngkatan = trim((string)($existing['angkatan'] ?? ''));
+                    $currActive = (int)($existing['is_active'] ?? 0);
+
+                    // Idempotent: jika sudah Reguler, angkatan 2026, dan is_active 1, skip
+                    if ($currJenis === 'Reguler' && $currAngkatan === '2026' && $currActive === 1) {
+                        $stats['skipped']++;
+                        $stats['details'][] = "SKIP [{$nim}] {$nama} (sudah Reguler 2026 aktif)";
+                        continue;
+                    }
+
+                    $stmtUpdate->execute([(int)$existing['id']]);
+                    $stats['updated']++;
+                    $stats['details'][] = "UPDATE [{$nim}] {$nama} -> jenis_program='Reguler', angkatan='2026', is_active=1";
+                    continue;
+                }
+
+                $prodi = trim((string)($rec['program_studi'] ?? ''));
+                $tmptLahir = trim((string)($rec['tempat_lahir'] ?? ''));
+                $tglYmd = parseFlexibleDateToYmd($rec['tanggal_lahir'] ?? null);
+                $passwordRaw = '123456';
+                if ($tglYmd !== null) {
+                    $dt = DateTime::createFromFormat('!Y-m-d', $tglYmd);
+                    if ($dt instanceof DateTime) {
+                        $passwordRaw = $dt->format('dmY');
+                    }
+                }
+                $hash = password_hash($passwordRaw, PASSWORD_BCRYPT, ['cost' => 8]);
+                $noHp = $normalizePhone($rec['no_hp'] ?? '');
+                $email = trim((string)($rec['email'] ?? ''));
+
+                $stmtInsert->execute([
+                    $nim,
+                    $hash,
+                    $nama,
+                    $nim,
+                    $tmptLahir !== '' ? $tmptLahir : null,
+                    $tglYmd,
+                    $email !== '' ? $email : null,
+                    $noHp,
+                    $prodi !== '' ? $prodi : null,
+                ]);
+                $stats['inserted']++;
+                $stats['details'][] = "INSERT [{$nim}] {$nama} ({$prodi}) -> Reguler 2026 (aktif)";
+            }
+
+            if ($startedTx) {
+                $pdo->commit();
+            }
+        } catch (Throwable $e) {
+            if ($startedTx && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return $stats;
+    }
+}
+

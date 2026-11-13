@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 13:52:00 +0700 — Penambahan Dataset & Migrasi Mahasiswa Angkatan 2026 (Reguler)
+
+**Ringkasan:** Menambahkan seluruh mahasiswa Angkatan 2026 (112 mahasiswa baru dari ekspor SIAKAD UNISDA) ke dalam database user dengan pemetaan kolom yang disesuaikan terhadap perubahan urutan kolom SIAKAD 2026:
+1. **Ekstraksi Dataset SIAKAD 2026 (`data/mahasiswa-angkatan-2026.php`):**
+   - Mengurai file XLS berbasis HTML SIAKAD (`media_1794551943520_11e6c2bc.xls`).
+   - Berhasil memetakan perbedaan urutan kolom SIAKAD 2026:
+     - Indeks 1: `NIM` (seluruh 112 NIM unik dan diawali `26`).
+     - Indeks 2: `NAMA` (`nama_lengkap`).
+     - Indeks 4: `Jurusan` (`program_studi`).
+     - Indeks 8: `TEMPAT LAHIR` (`tempat_lahir`).
+     - Indeks 9: `TGL LAHIR` (`tanggal_lahir`).
+     - Indeks 17: `No HP` (`no_hp`).
+     - Indeks 18: `Email` (`email`).
+   - Sesuai instruksi pengguna: seluruh mahasiswa baru sementara diset `jenis_program = 'Reguler'`, `angkatan = '2026'`, `role = 'mahasiswa'`, dan `is_active = 1` agar dapat langsung login dan mengikuti ujian/pretes tanpa terblokir halaman aktivasi.
+   - Password default: format `dmY` (contoh: `03111981`) yang di-hash dengan `PASSWORD_BCRYPT` cost 8.
+2. **Helper Upsert Idempotent (`includes/user-helper.php`):**
+   - Menambahkan fungsi `upsertAngkatan2026Records(PDO $pdo, array $records): array`.
+   - Idempotent: jika dijalankan berulang, akun yang sudah sesuai akan diskip secara otomatis tanpa duplikasi atau perubahan data yang tidak perlu.
+3. **Skrip Migrasi (`migration_angkatan_2026.php`):**
+   - Dapat dijalankan via CLI (`php migration_angkatan_2026.php`) maupun via browser oleh Admin.
+   - Dilengkapi kartu laporan statistik (Total, Insert Baru, Update, Dilewati, dan Daftar Rincian).
+4. **Pencegahan Terjebak Aktivasi Akun (`index.php`):**
+   - Memperluas verifikasi sesi login agar angkatan 2025 dan 2026 otomatis diaktifkan dan diarahkan ke `dashboard.php`.
+5. **Unit Test Baru (`tests/mahasiswa-angkatan-2026-test.php`):**
+   - Memvalidasi 112 record, keunikan NIM, keabsahan parse tanggal lahir ke `YYYY-MM-DD`, kesesuaian deteksi kolom SIAKAD 2026, dan simulasi in-memory SQLite (insert, update, idempotency skip).
+6. **Verifikasi:**
+   - `php -l data/mahasiswa-angkatan-2026.php` (**No syntax errors**).
+   - `php -l includes/user-helper.php` (**No syntax errors**).
+   - `php -l migration_angkatan_2026.php` (**No syntax errors**).
+   - `php -l index.php` (**No syntax errors**).
+   - `php tests/mahasiswa-angkatan-2026-test.php` (**Lulus 100%**).
+   - Seluruh test suites di `tests/*test*.php` (**Lulus 100%**).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `data/mahasiswa-angkatan-2026.php` | 1–125 | Dataset Mahasiswa 2026 | Berisi 112 data mahasiswa hasil parsing ekspor SIAKAD UNISDA dengan `jenis_program = 'Reguler'`. |
+| `includes/user-helper.php` | 398–525 | `upsertAngkatan2026Records()` | Fungsi upsert idempotent untuk mahasiswa angkatan 2026 dengan password hash dmY dan `is_active = 1`. |
+| `index.php` | 31 | Login Session Refresh | Memperluas auto-active untuk mahasiswa angkatan 2025 dan 2026. |
+| `migration_angkatan_2026.php` | 1–55 | Skrip Migrasi 2026 | Antarmuka CLI & Web untuk eksekusi migrasi mahasiswa angkatan 2026 ke DB users. |
+| `tests/mahasiswa-angkatan-2026-test.php` | 1–110 | Unit Test Suite | Pengujian 112 record dataset, column mapping SIAKAD 2026, dan SQLite upsert/idempotency. |
+| `CHANGELOG-DEV.md` | 8–50 | Catatan Rilis | Dokumentasi sistematis penambahan mahasiswa angkatan 2026. |
+
+---
+
 ## 2026-11-13 13:35:10 +0700 — Penambahan Notifikasi Bantuan WhatsApp Bu Umami Saat Gagal Login (index.php)
 
 **Ringkasan:** Menambahkan peringatan dan tautan bantuan WhatsApp resmi Bu Umami (`https://wa.me/6281515726827`) pada halaman login utama (`index.php`) ketika pengguna gagal melakukan autentikasi (username atau password salah):

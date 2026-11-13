@@ -28,7 +28,7 @@ if (isLoggedIn()) {
         if (isset($_SESSION['is_active']) && $_SESSION['is_active'] == 0) {
             $nim = trim($_SESSION['nim'] ?? '');
             $angkatan = trim($_SESSION['angkatan'] ?? '');
-            if (substr($nim, 0, 2) === '24' || $angkatan === '2024') {
+            if (in_array(substr($nim, 0, 2), ['24', '25', '26'], true) || in_array($angkatan, ['2024', '2025', '2026'], true)) {
                 $_SESSION['is_active'] = 1;
                 try {
                     $pdo = getDBConnection();

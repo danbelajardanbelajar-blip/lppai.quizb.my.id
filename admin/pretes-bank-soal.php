@@ -3,86 +3,79 @@ define('PAGE_TITLE', 'Bank Soal & Hasil CBT Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-cbt.php';
+require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
+$bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
+if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
 $pdo = getDBConnection();
 ensurePretesCbtTables($pdo);
-$bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
-$message = '';
-$form = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    try {
-        if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) throw new InvalidArgumentException('Sesi tidak valid. Muat ulang halaman.');
-        pretesCbtSaveQuestion($pdo, $_POST);
-        header('Location: ' . $bankUrl . '&saved=1');
-        exit;
-    } catch (InvalidArgumentException $e) {
-        $message = $e->getMessage();
-        $form = $_POST;
-    } catch (Throwable $e) {
-        error_log('CBT bank save: ' . $e->getMessage());
-        $message = 'Soal belum dapat disimpan. Coba lagi.';
-        $form = $_POST;
-    }
-}
-if ($form === null && !empty($_GET['edit'])) {
-    $stmt = $pdo->prepare('SELECT * FROM pretes_cbt_questions WHERE id = ?');
-    $stmt->execute([(int)$_GET['edit']]);
-    $form = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-    if ($form) foreach (json_decode($form['options_json'], true) as $letter => $text) $form['option_' . $letter] = $text;
-}
-$form ??= ['is_active' => 1, 'category' => 'Umum'];
-$questions = $pdo->query('SELECT * FROM pretes_cbt_questions ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
-$active = count(array_filter($questions, static fn($q) => (bool)$q['is_active']));
 $expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? LIMIT 100');
 $expired->execute([time()]);
 foreach ($expired->fetchAll(PDO::FETCH_ASSOC) as $entry) pretesCbtState($pdo, (int)$entry['user_id'], (int)$entry['registration_id']);
+if (isset($_GET['download'])) {
+    try {
+        if ($_GET['download'] === 'bank') cbtSendXlsx(cbtWriteXlsx(cbtBankExportRows($pdo), 'Bank Soal', [24,22,60,28,28,28,28,28,12,16]), 'bank-soal-cbt-' . date('Ymd') . '.xlsx', true);
+        elseif ($_GET['download'] === 'results') cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo), 'Hasil CBT', [20,34,24,24,18,18,16,14]), 'hasil-cbt-' . date('Ymd') . '.xlsx', true);
+        throw new InvalidArgumentException('Jenis unduhan tidak dikenal.');
+    } catch (Throwable $error) {
+        error_log('CBT XLSX download: ' . $error->getMessage());
+        http_response_code(503);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $error instanceof RuntimeException ? $error->getMessage() : 'Unduhan belum tersedia. Kembali ke bank soal dan coba lagi.';
+        exit;
+    }
+}
+$message = ''; $errors = []; $form = null;
+$allowedTabs = ['bank','form','import','results'];
+$activeTab = in_array($_GET['tab'] ?? '', $allowedTabs, true) ? $_GET['tab'] : 'bank';
+$flash = $_SESSION['cbt_bank_flash'] ?? null;
+unset($_SESSION['cbt_bank_flash']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? 'save_question';
+    $activeTab = $action === 'import_xlsx' ? 'import' : 'form';
+    try {
+        if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) {
+            http_response_code(403);
+            throw new InvalidArgumentException('Sesi tidak valid. Muat ulang halaman.');
+        }
+        if ($action === 'import_xlsx') {
+            $file = $_FILES['question_file'] ?? null;
+            if (!$file || $file['error'] !== UPLOAD_ERR_OK) throw new InvalidArgumentException('Pilih file .xlsx. Batas unggahan server: ' . ini_get('upload_max_filesize') . '.');
+            if (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'xlsx' || !is_uploaded_file($file['tmp_name'])) throw new InvalidArgumentException('Gunakan file Excel .xlsx dari template bank soal.');
+            $result = cbtImportQuestions($pdo, cbtReadQuestionXlsx($file['tmp_name']), isset($_POST['update_existing']));
+            if ($result['errors']) {
+                http_response_code(422);
+                $message = 'Impor dibatalkan. Tidak ada soal ditambahkan atau diperbarui. Perbaiki baris berikut dan unggah kembali.';
+                $errors = $result['errors'];
+            } else {
+                $_SESSION['cbt_bank_flash'] = $result['added'] . ' soal ditambahkan, ' . $result['updated'] . ' diperbarui, ' . $result['skipped'] . ' duplikat/soal lama dilewati.';
+                header('Location: ' . $bankUrl . '&tab=bank'); exit;
+            }
+        } elseif ($action === 'save_question') {
+            pretesCbtSaveQuestion($pdo, $_POST);
+            $_SESSION['cbt_bank_flash'] = 'Soal berhasil disimpan. Paket ujian yang sudah dimulai tidak berubah.';
+            header('Location: ' . $bankUrl . '&tab=bank'); exit;
+        } else throw new InvalidArgumentException('Aksi bank soal tidak valid.');
+    } catch (InvalidArgumentException $error) {
+        if (http_response_code() !== 403) http_response_code(422);
+        $message = $error->getMessage();
+        if ($action === 'save_question') $form = $_POST;
+    } catch (Throwable $error) {
+        error_log('CBT bank update: ' . $error->getMessage()); http_response_code(503);
+        $message = 'Perubahan belum tersimpan. ' . ($error instanceof RuntimeException && !($error instanceof PDOException) ? $error->getMessage() : 'Coba lagi atau hubungi admin.');
+        if ($action === 'save_question') $form = $_POST;
+    }
+}
+if ($form === null && !empty($_GET['edit'])) {
+    $stmt = $pdo->prepare('SELECT * FROM pretes_cbt_questions WHERE id = ?'); $stmt->execute([(int)$_GET['edit']]);
+    $form = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($form) { $activeTab = 'form'; foreach (json_decode($form['options_json'], true) as $letter => $text) $form['option_' . $letter] = $text; }
+}
+$form ??= ['is_active'=>1,'category'=>'Umum'];
+$questions = $pdo->query('SELECT * FROM pretes_cbt_questions ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
+$active = count(array_filter($questions, static fn($question) => (bool)$question['is_active']));
+$categories = array_values(array_unique(array_column($questions, 'category'))); sort($categories);
+$stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC);
 $attempts = $pdo->query('SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id ORDER BY a.started_at DESC LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="card" style="margin-bottom:20px">
-    <div class="card-header"><h3 style="margin:0">Bank Soal CBT Pretes</h3></div>
-    <div class="card-body">
-        <p><strong><?= count($questions) ?> soal</strong> · <?= $active ?> aktif · Paket ujian: <strong>25 soal acak, 30 menit, pilihan A–E</strong>.</p>
-        <p>Bank awal berisi materi dasar ubudiyah. Tinjau materi dan kunci sebelum ujian resmi. Perubahan soal berlaku untuk paket baru; soal dan kunci paket yang sedang dikerjakan tetap tersimpan sesuai saat ujian dimulai.</p>
-        <?php if ($active < PRETES_CBT_COUNT): ?><div class="alert alert-warning">Minimal 25 soal aktif diperlukan agar peserta dapat memulai ujian.</div><?php endif; ?>
-        <?php if ($message): ?><div class="alert alert-danger"><?= sanitize($message) ?></div><?php endif; ?>
-        <?php if (isset($_GET['saved'])): ?><div class="alert alert-success">Soal berhasil disimpan.</div><?php endif; ?>
-        <h4><?= empty($form['id']) ? 'Tambah Soal' : 'Edit Soal #' . (int)$form['id'] ?></h4>
-        <form method="post">
-            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-            <input type="hidden" name="id" value="<?= (int)($form['id'] ?? 0) ?>">
-            <label>Kategori <input class="form-control" name="category" maxlength="80" required value="<?= sanitize($form['category'] ?? '') ?>"></label>
-            <div class="form-group" style="margin:14px 0"><label>Pertanyaan</label><textarea class="form-control" name="question_text" rows="3" maxlength="10000" required><?= sanitize($form['question_text'] ?? '') ?></textarea></div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
-                <?php foreach (range('A', 'E') as $letter): ?>
-                    <label>Pilihan <?= $letter ?><textarea class="form-control" name="option_<?= $letter ?>" maxlength="2000" rows="2" required><?= sanitize($form['option_' . $letter] ?? '') ?></textarea></label>
-                <?php endforeach; ?>
-            </div>
-            <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin:18px 0">
-                <label>Kunci jawaban <select class="form-control" name="correct_answer" required><option value="">Pilih</option><?php foreach (range('A', 'E') as $letter): ?><option value="<?= $letter ?>" <?= ($form['correct_answer'] ?? '') === $letter ? 'selected' : '' ?>><?= $letter ?></option><?php endforeach; ?></select></label>
-                <label><input type="checkbox" name="is_active" value="1" <?= !empty($form['is_active']) ? 'checked' : '' ?>> Soal aktif</label>
-                <button class="btn btn-primary" type="submit">Simpan Soal</button>
-                <a class="btn btn-secondary" href="<?= $bankUrl ?>">Form Soal Baru</a>
-            </div>
-        </form>
-    </div>
-</div>
-<div class="card" style="margin-bottom:20px"><div class="card-header">Daftar Bank Soal</div><div class="card-body table-responsive">
-    <table class="table"><thead><tr><th>No.</th><th>Kategori</th><th>Pertanyaan & Pilihan</th><th>Kunci</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
-    <?php foreach ($questions as $i => $question): ?><tr>
-        <td><?= $i + 1 ?></td><td><?= sanitize($question['category']) ?></td>
-        <td><strong><?= sanitize($question['question_text']) ?></strong><?php foreach (json_decode($question['options_json'], true) as $letter => $text): ?><div style="font-size:12px;margin-top:4px"><?= $letter ?>. <?= sanitize($text) ?></div><?php endforeach; ?></td>
-        <td><?= sanitize($question['correct_answer']) ?></td><td><?= $question['is_active'] ? 'Aktif' : 'Nonaktif' ?></td>
-        <td><a class="btn btn-sm btn-primary" href="<?= $bankUrl ?>&amp;edit=<?= (int)$question['id'] ?>">Edit</a></td>
-    </tr><?php endforeach; ?></tbody></table>
-</div></div>
-<div class="card"><div class="card-header">100 Sesi CBT Terbaru</div><div class="card-body table-responsive">
-    <p>Nilai CBT dicatat terpisah dari penilaian praktik pretes dan nilai impor lama.</p>
-    <table class="table"><thead><tr><th>Nama</th><th>NIM</th><th>Mulai (WIB)</th><th>Status</th><th>Benar / 25</th><th>Nilai</th></tr></thead><tbody>
-    <?php foreach ($attempts as $attempt): ?><tr>
-        <td><?= sanitize($attempt['nama_lengkap']) ?></td><td><?= sanitize($attempt['nim'] ?? '-') ?></td>
-        <td><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></td>
-        <td><?= $attempt['submitted_at'] !== null ? 'Selesai' : (time() >= $attempt['deadline_at'] ? 'Waktu habis · menunggu finalisasi' : 'Berlangsung') ?></td>
-        <td><?= $attempt['correct_count'] !== null ? (int)$attempt['correct_count'] : '-' ?></td><td><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 0) : '-' ?></td>
-    </tr><?php endforeach; ?></tbody></table>
-</div></div>
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+require __DIR__ . '/../includes/pretes-cbt-admin-view.php';
+include __DIR__ . '/../includes/footer.php';

@@ -8,6 +8,11 @@
         el('cbtMessage').className = 'cbt-message' + (error ? ' error' : '');
     };
     const answered = () => attempt.questions.filter(q => q.answer !== null).length;
+    function progress(count, total) {
+        el('cbtAnsweredCount').textContent = count + '/' + total;
+        el('cbtCompletionFill').style.width = (count / total * 100) + '%';
+        el('cbtCompletion').setAttribute('aria-valuenow', String(count));
+    }
 
     function navigation() {
         const nav = el('cbtNumbers');
@@ -23,6 +28,7 @@
             nav.appendChild(button);
         });
         el('cbtProgress').textContent = answered() + '/' + attempt.total + ' dijawab · ' + pending.size + ' perubahan belum tersimpan';
+        progress(answered(), attempt.total);
     }
 
     function edit(answer, flagged) {
@@ -68,6 +74,7 @@
 
     function showResult(result) {
         attempt = result;
+        progress(result.answered, result.total);
         needsSubmit = false;
         pending.clear();
         if (ticker) clearInterval(ticker);
