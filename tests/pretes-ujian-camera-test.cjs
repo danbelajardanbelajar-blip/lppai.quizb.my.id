@@ -1,0 +1,108 @@
+// Regression: render PHP-generated JavaScript before exercising the camera controls.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { spawnSync } = require('node:child_process');
+
+const root = path.resolve(__dirname, '..');
+const page = fs.readFileSync(path.join(root, 'pages/pretes-ujian.php'), 'utf8');
+const auth = fs.readFileSync(path.join(root, 'includes/auth.php'), 'utf8');
+const csrfFunction = auth.match(/function csrfToken\(\) \{[\s\S]*?\n\}/)[0];
+const template = page.match(/<script>([\s\S]*?)<\/script>/)[1];
+
+function renderScript(verified = false) {
+    const result = spawnSync('php', ['-n'], {
+        input: '<?php $_SESSION = []; $regId = 42; $isVerified = ' +
+            (verified ? 'true' : 'false') + '; define("BASE_URL", "https://example.test"); ' +
+            csrfFunction + ' ?>' + template,
+        encoding: 'utf8'
+    });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.doesNotMatch(result.stdout, /Fatal error|Warning:/);
+    return result.stdout;
+}
+
+function environment(getUserMedia) {
+    const elements = new Map();
+    function element(id) {
+        if (!elements.has(id)) elements.set(id, {
+            style: {}, listeners: {}, textContent: '', innerHTML: '', videoWidth: 640,
+            addEventListener(name, callback) { this.listeners[name] = callback; },
+            contains(target) { return target === this; },
+            setAttribute() {}, play() { return Promise.resolve(); }
+        });
+        return elements.get(id);
+    }
+    const alerts = [];
+    const requests = [];
+    const sandbox = {
+        document: {
+            readyState: 'complete', getElementById: element,
+            createElement() {
+                return { getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,test' };
+            }
+        },
+        navigator: { mediaDevices: { getUserMedia } },
+        console: { log() {}, warn() {}, error() {} },
+        alert: message => alerts.push(message),
+        setInterval() { return 1; }, clearInterval() {}, setTimeout() {},
+        fetch(url, options) {
+            requests.push(JSON.parse(options.body));
+            return Promise.resolve({ json: () => Promise.resolve({ verified: false, score: 0, message: 'Tidak cocok' }) });
+        }
+    };
+    sandbox.window = sandbox;
+    vm.createContext(sandbox);
+    return { sandbox, element, alerts, requests };
+}
+
+const settle = () => new Promise(resolve => setImmediate(resolve));
+
+(async () => {
+    let calls = 0;
+    const stream = { getTracks: () => [{ stop() {} }] };
+    const env = environment(() => { calls++; return Promise.resolve(stream); });
+    const script = renderScript();
+    vm.runInContext(script, env.sandbox);
+    for (const name of ['startCheckinCamera', 'toggleCameraFace', 'runInitialCheckin']) {
+        assert.equal(typeof env.sandbox[name], 'function', name);
+    }
+    // Execute the actual inline button handler and any explicit click binding.
+    const handler = page.match(/id="btnActivateCamera" onclick="([^"]+)"/)[1];
+    vm.runInContext(handler, env.sandbox);
+    env.element('btnActivateCamera').listeners.click?.({ preventDefault() {} });
+    await settle();
+    assert.equal(calls, 1, 'Satu klik hanya boleh meminta satu stream');
+    assert.equal(env.element('checkinVideo').srcObject, stream);
+    assert.equal(env.element('checkinCameraPlaceholder').style.display, 'none');
+
+    env.sandbox.toggleCameraFace();
+    await settle();
+    assert.equal(calls, 2);
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.equal(env.requests[0].action, 'initial_checkin');
+    assert.match(env.requests[0].csrf_token, /^[a-f0-9]{64}$/);
+    assert.equal(env.requests[0].registration_id, 42);
+    assert.equal(env.element('btnRunCheckin').disabled, false);
+
+    const denied = environment(() => Promise.reject({ name: 'NotAllowedError', message: 'Denied' }));
+    vm.runInContext(script, denied.sandbox);
+    denied.sandbox.startCheckinCamera(true);
+    await settle();
+    assert.match(denied.element('checkinAlert').innerHTML, /Izin Kamera Terblokir/);
+    assert.equal(denied.element('checkinCameraPlaceholder').style.display, 'flex');
+    assert.equal(denied.alerts.length, 1);
+
+    const unsupported = environment();
+    vm.runInContext(script, unsupported.sandbox);
+    unsupported.sandbox.startCheckinCamera(true);
+    assert.match(unsupported.element('checkinAlert').innerHTML, /Tidak Mendukung Kamera/);
+
+    const verified = environment(() => Promise.resolve(stream));
+    vm.runInContext(renderScript(true), verified.sandbox);
+    await settle();
+    assert.equal(verified.element('proctorVideo').srcObject, stream);
+    console.log('PASS: PHP/JS runtime, aktivasi satu kali, balik kamera, request verifikasi, izin ditolak, browser tidak mendukung, dan sesi terverifikasi.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

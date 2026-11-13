@@ -466,7 +466,7 @@ include __DIR__ . '/../includes/header.php';
      ═══════════════════════════════════════════════════════════════════ -->
 <script src="<?= BASE_URL ?>/assets/js/pretes-face-verifier.js?v=<?= time() ?>"></script>
 <script>
-const CSRF_TOKEN = <?= json_encode(generateCsrf()) ?>;
+const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 const REGISTRATION_ID = <?= (int)$regId ?>;
 const API_URL = <?= json_encode(BASE_URL . '/api/pretes-proctoring-check.php') ?>;
 
@@ -686,19 +686,14 @@ function initCameraBindings() {
     inspectCameraPermissions();
 
     const btnActivate = document.getElementById('btnActivateCamera');
-    if (btnActivate) {
-        btnActivate.addEventListener('click', function(e) {
-            e.preventDefault();
-            window.startCheckinCamera(true);
-        });
-    }
+    // Tombol sudah memakai onclick; jangan meminta stream kamera dua kali per klik.
 
     const placeholder = document.getElementById('checkinCameraPlaceholder');
     if (placeholder) {
         placeholder.style.cursor = 'pointer';
         placeholder.addEventListener('click', function(e) {
             // Jika mengklik area box selain tombol, tetap aktifkan kamera
-            if (e.target !== btnActivate && !btnActivate.contains(e.target)) {
+            if (!btnActivate || (e.target !== btnActivate && !btnActivate.contains(e.target))) {
                 window.startCheckinCamera(true);
             }
         });
