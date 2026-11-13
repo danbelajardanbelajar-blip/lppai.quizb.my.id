@@ -77,6 +77,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:25:52 +0700 — Kartu "Tahap Pretes" diseragamkan di 5 halaman mahasiswa (helper bersama)
+
+**Ringkasan:** Logika status pretes dan kartu "📝 Tahap Pretes" dipindah ke helper bersama, lalu dipakai di `tutorial-pengumuman`, `tutorial-pendaftaran`, `tutorial-info`, `rekap-nilai`, dan `ambil-sertifikat`. Mahasiswa yang terdaftar di periode pretes aktif (hasil belum final, belum punya pendaftaran tutorial berjalan, belum lulus tutorial) melihat kartu yang sama di semua halaman tersebut.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-stage.php` (baru) | 11–113 | `getStudentPretesStage()` | Status `none/berlangsung/lulus/tidak_lulus`, data jadwal/ruangan/penguji, progres komponen, tanggal (via `getPretesPeriodDayLabels`), status tutorial, flag `showOngoing`/`showLulus` (prioritas: lulus tutorial › lulus pretes › tutorial berjalan › pretes berlangsung). |
+| `includes/pretes-stage.php` | 115–175 | `renderPretesStageCard()` | Kartu Tahap Pretes seragam + kalimat konteks per halaman (`$note`). |
+| `includes/pretes-stage.php` | 177–201 | `pretesStageGate()` | Hanya role mahasiswa; bila `showOngoing` → render header + kartu + footer lalu `exit` (juga menolak POST); request XHR/JSON → 403 JSON. |
+| `pages/tutorial-pengumuman.php` | 53–67 | Backend status pretes | Blok perhitungan lokal (63 baris) diganti helper; bila tahap pretes → kartu bersama lalu `exit`. Cabang HTML `elseif ($showPretesOngoing)` lama (48 baris) dihapus. |
+| `pages/tutorial-pendaftaran.php` | 18–21 | Setelah `$pdo` | `pretesStageGate()` (memblokir juga submit pendaftaran tutorial selama tahap pretes). |
+| `pages/tutorial-info.php` | 19–22 | Setelah `$pdo` | `pretesStageGate()`. |
+| `rekap-nilai.php` | 16–21 | Setelah `$isMahasiswa` | `pretesStageGate()` khusus mahasiswa (admin/dosen tidak terdampak). |
+| `pages/ambil-sertifikat.php` | 13–16 | Setelah `$currentUser` | `pretesStageGate()` (admin tidak terdampak). |
+| `tests/pretes-stage-test.php` (baru) | 1–77 | Test | 7 skenario status (aktif belum dinilai, sebagian, <80, lulus, periode ditutup, tutorial diprioritaskan, tanpa pretes) + cek integrasi 5 halaman. |
+
+**Verifikasi:** `php -l` OK di 7 file; `tests/pretes-stage-test.php` PASS; 9 test tutorial/pretes/pengumuman terkait PASS.
+
+---
+
 ## 2026-11-13 22:17:37 +0700 — Kelulusan Tutorial: tampilan khusus mahasiswa tahap Pretes & lulus via Pretes
 
 **File:** `pages/tutorial-pengumuman.php`

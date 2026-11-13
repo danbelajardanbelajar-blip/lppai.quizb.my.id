@@ -13,6 +13,12 @@ $isAdmin = isAdmin();
 $isDosen = isDosen();
 $isMahasiswa = !$isAdmin && !$isDosen;
 
+// Mahasiswa yang sedang di tahap pretes aktif → tampilkan kartu Tahap Pretes
+if ($isMahasiswa) {
+    require_once __DIR__ . '/includes/pretes-stage.php';
+    pretesStageGate($pdo, $user, 'Rincian nilai tutorial akan tersedia bila Anda mengikuti program Tutorial. Nilai pretes dapat dilihat di menu Hasil Pretes.');
+}
+
 $action = $_GET['action'] ?? '';
 
 // Label gelombang

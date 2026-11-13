@@ -10,6 +10,10 @@ requireLogin();
 $pdo = getDBConnection();
 $currentUser = getCurrentUser();
 
+// Mahasiswa yang sedang di tahap pretes aktif → tampilkan kartu Tahap Pretes
+require_once __DIR__ . '/../includes/pretes-stage.php';
+pretesStageGate($pdo, $currentUser, 'Pengambilan sertifikat tersedia setelah Anda dinyatakan lulus pretes atau lulus tutorial.');
+
 // Auto-migration aman untuk tabel pengambilan_sertifikat jika belum ada
 try {
     $pdo->exec("

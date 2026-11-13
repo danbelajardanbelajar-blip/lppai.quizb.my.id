@@ -15,6 +15,10 @@ if (isAdmin()) {
 $user = getCurrentUser();
 $pdo = getDBConnection();
 
+// Mahasiswa yang sedang di tahap pretes aktif → tampilkan kartu Tahap Pretes (juga menolak POST pendaftaran)
+require_once __DIR__ . '/../includes/pretes-stage.php';
+pretesStageGate($pdo, $user, 'Pendaftaran Tutorial baru dapat dilakukan bila hasil pretes Anda dinyatakan belum lulus.');
+
 // Cek kelulusan pretes (mahasiswa yang lulus pretes dibebaskan dari tutorial)
 $isLulusPretes = isUserLulusPretes($pdo, $user['id']);
 

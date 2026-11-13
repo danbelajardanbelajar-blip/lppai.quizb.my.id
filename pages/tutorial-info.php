@@ -16,6 +16,10 @@ if (isAdmin()) {
 $user = getCurrentUser();
 $pdo  = getDBConnection();
 
+// Mahasiswa yang sedang di tahap pretes aktif → tampilkan kartu Tahap Pretes
+require_once __DIR__ . '/../includes/pretes-stage.php';
+pretesStageGate($pdo, $user, 'Info kelas, tutor, ruangan, dan diktat tutorial akan tersedia bila Anda mengikuti program Tutorial.');
+
 $gelombangs = [
     'gel1'    => 'Gelombang 1 (Ganjil)',
     'gel2'    => 'Gelombang 2 (Genap)',
