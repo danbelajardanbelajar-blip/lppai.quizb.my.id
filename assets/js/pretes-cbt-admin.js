@@ -3,9 +3,27 @@
     const get = id => document.getElementById(id);
 
     // ── Global Modal Controller ──────────────────────────────────────────────
+    function sanitizeBackdrops() {
+        document.querySelectorAll('.bank-modal-backdrop').forEach(el => {
+            if (!el.classList.contains('open')) {
+                el.style.display = 'none';
+                el.style.pointerEvents = 'none';
+                el.style.visibility = 'hidden';
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', sanitizeBackdrops);
+    } else {
+        sanitizeBackdrops();
+    }
+
     window.openModal = function (id) {
-        const modal = get(id);
+        const modal = typeof id === 'string' ? get(id) : id;
         if (modal) {
+            modal.style.display = 'flex';
+            modal.style.pointerEvents = 'auto';
+            modal.style.visibility = 'visible';
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             const firstInput = modal.querySelector('input:not([type=hidden]), textarea, select');
@@ -17,6 +35,9 @@
         const modal = typeof id === 'string' ? get(id) : id;
         if (modal) {
             modal.classList.remove('open');
+            modal.style.display = 'none';
+            modal.style.pointerEvents = 'none';
+            modal.style.visibility = 'hidden';
             if (!document.querySelector('.bank-modal-backdrop.open')) {
                 document.body.style.overflow = '';
             }
@@ -32,6 +53,40 @@
         }
         if (e.target.classList && e.target.classList.contains('bank-modal-backdrop')) {
             window.closeModal(e.target);
+            return;
+        }
+
+        // Action event delegation for resilient button handling
+        const btnCreatePkg = e.target.closest('[data-action="create-package"]');
+        if (btnCreatePkg) {
+            e.preventDefault();
+            window.openPackageModal(false);
+            return;
+        }
+
+        const btnCreateSes = e.target.closest('[data-action="create-session"]');
+        if (btnCreateSes) {
+            e.preventDefault();
+            window.openSessionModal(false);
+            return;
+        }
+
+        const btnAddQ = e.target.closest('[data-action="add-question"]');
+        if (btnAddQ) {
+            e.preventDefault();
+            const pkgId = parseInt(btnAddQ.getAttribute('data-package-id') || '0', 10);
+            window.openQuestionFormModal(false, null, pkgId > 0 ? pkgId : null);
+            return;
+        }
+
+        const btnManageQ = e.target.closest('[data-action="manage-questions"]');
+        if (btnManageQ) {
+            e.preventDefault();
+            const pkgId = parseInt(btnManageQ.getAttribute('data-package-id') || '0', 10);
+            const pkgName = btnManageQ.getAttribute('data-package-name') || '';
+            const pkgCode = btnManageQ.getAttribute('data-package-code') || '';
+            window.openPackageQuestionsModal(pkgId, pkgName, pkgCode);
+            return;
         }
     });
 

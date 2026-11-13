@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:51:40 +0700 — Perbaikan Tombol Unclickable pada Tab Paket Soal & Relokasi Sesi Ujian ke Sebelah Kanan Paket Soal
+
+**Ringkasan:** Memperbaiki kendala fatal pada `pretes-ujian.php?cbt_bank=1&tab=packages` di mana tombol tidak dapat diklik, serta menata ulang urutan navigasi tab agar Sesi Ujian berada tepat di sebelah kanan Paket Soal:
+1. **Resolusi Tombol Tidak Bisa Diklik (*Click Interception & Overlay Immunity*):**
+   - Menetapkan aturan ketat pada `.bank-modal-backdrop` di `assets/css/pretes-cbt-admin.css`: `display: none !important; pointer-events: none !important; visibility: hidden !important; z-index: 99999 !important;`.
+   - Memasang inline style `style="display:none;pointer-events:none;visibility:hidden"` langsung pada 4 kontainer modal (`#modalPackageForm`, `#modalSessionForm`, `#modalPackageQuestions`, `#modalQuestionForm`).
+   - Mengotomatiskan manajemen display dan pointer-events di `window.openModal` dan `window.closeModal`, serta menyuntikkan fungsi `sanitizeBackdrops()` pada saat DOM ready.
+   - Menambahkan event delegation click pada `document` untuk `[data-action="create-package"]`, `[data-action="create-session"]`, `[data-action="add-question"]`, `[data-action="manage-questions"]`.
+   - Menambahkan kelas `no-datatable` pada `<table class="bank-table">` untuk mencegah manipulasi destruktif DOM oleh DataTables global.
+   - Mengamankan output atribut serialisasi edit dengan `JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE`.
+   - Menginjeksikan stylesheet awal melalui konstanta `EXTRA_HEAD` di `admin/pretes-bank-soal.php`.
+2. **Relokasi Posisi Tab Sesi Ujian ke Sebelah Kanan Paket Soal:**
+   - Menyusun ulang array tab bilah atas: 1. `Paket Soal` (`packages`), 2. `Sesi Ujian` (`sessions`), 3. `Impor Excel` (`import`), 4. `Hasil Ujian` (`results`).
+   - Menjadikan `packages` sebagai active tab default bila parameter `tab` tidak dikirimkan.
+   - Memindahkan urutan perenderan panel pada view sehingga panel `packages` berada di urutan pertama dan `sessions` di urutan kedua.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `admin/pretes-bank-soal.php` | 74–82 | Tab Routing & Allowed Tabs | Mengubah `$allowedTabs = ['packages', 'sessions', 'import', 'results']` dan default `$activeTab = 'packages'`. |
+| `admin/pretes-bank-soal.php` | 100–105 | Redirect Action Handler | Mengarahkan fallback `$activeTab` ke `'packages'`. |
+| `admin/pretes-bank-soal.php` | 325–330 | Early Stylesheet Injection | Mendefinisikan konstanta `EXTRA_HEAD` dengan tag stylesheet `pretes-cbt-admin.css`. |
+| `assets/css/pretes-cbt-admin.css` | 14–17 | Modal Backdrop System | Menambahkan `pointer-events: none !important; visibility: hidden !important; display: none !important; z-index: 99999 !important;`. |
+| `assets/js/pretes-cbt-admin.js` | 5–45 | Controller Modal & Backdrops | Menambahkan `sanitizeBackdrops()`, penyesuaian inline style di `openModal`/`closeModal`, dan event delegation click. |
+| `includes/pretes-cbt-admin-view.php` | 10–20 | Hero Action Buttons | Mengatur tombol `Buat Paket Soal`, `Buat Sesi Ujian`, `Tambah Soal` (via modal), dan menambahkan `data-action`. |
+| `includes/pretes-cbt-admin-view.php` | 55–68 | Bilah Tab Navigasi | Menempatkan `Paket Soal` di posisi 1 dan `Sesi Ujian` di posisi 2 (sebelah kanan Paket Soal). |
+| `includes/pretes-cbt-admin-view.php` | 72–145 | Panel Paket Soal | Memindahkan panel Paket Soal ke urutan pertama, menambahkan `no-datatable`, dan memasang pengaman JSON atribut. |
+| `includes/pretes-cbt-admin-view.php` | 148–280 | Panel Sesi Ujian | Memindahkan panel Sesi Ujian ke urutan kedua, menambahkan `no-datatable`, dan pengaman JSON atribut. |
+| `includes/pretes-cbt-admin-view.php` | 408–650 | Markup Modal Backdrops | Menambahkan inline `style="display:none;pointer-events:none;visibility:hidden"` pada seluruh elemen modal backdrop. |
+
+---
+
 ## 2026-11-13 22:23:00 +0700 — Peningkatan Antarmuka Mahasiswa Menunggu Plotting & Banner Edukasi Diktat (tutorial-info.php)
 
 **Ringkasan:** Memperbarui antarmuka halaman Info Tutorial Mahasiswa (`pages/tutorial-info.php`) saat status masih "Menunggu Plotting" agar jauh lebih informatif, transparan, dan edukatif:

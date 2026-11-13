@@ -12,8 +12,8 @@
 .bank-empty-state{text-align:center;padding:48px 24px;background:#fcfdfc;border:2px dashed #cfe3d6;border-radius:14px;margin:10px 0}.bank-empty-state-icon{font-size:42px;margin-bottom:14px;display:block}.bank-empty-state h3{font-size:18px;color:#1c4b3a;margin:0 0 10px;font-weight:750}.bank-empty-state p{font-size:13px;color:#557063;max-width:540px;margin:0 auto 20px;line-height:1.65}
 
 /* Modal Dialog System */
-.bank-modal-backdrop{position:fixed;inset:0;background:rgba(14,30,24,0.65);backdrop-filter:blur(4px);z-index:1050;display:none;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .2s ease}
-.bank-modal-backdrop.open{display:flex;opacity:1}
+.bank-modal-backdrop{position:fixed!important;inset:0!important;background:rgba(14,30,24,0.65)!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important;z-index:99999!important;display:none!important;pointer-events:none!important;visibility:hidden!important;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .2s ease}
+.bank-modal-backdrop.open{display:flex!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important}
 .bank-modal{background:#fff;width:100%;max-width:680px;max-height:90vh;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.25);transform:translateY(14px) scale(0.98);transition:transform .2s ease}
 .bank-modal-backdrop.open .bank-modal{transform:translateY(0) scale(1)}
 .bank-modal.large{max-width:840px}

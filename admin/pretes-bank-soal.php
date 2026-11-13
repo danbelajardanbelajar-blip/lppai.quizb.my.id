@@ -72,12 +72,12 @@ if (isset($_GET['download'])) {
 }
 
 $message = ''; $errors = []; $form = null; $pkgForm = null; $sesForm = null;
-$allowedTabs = ['sessions', 'packages', 'import', 'results'];
+$allowedTabs = ['packages', 'sessions', 'import', 'results'];
 $rawTab = $_GET['tab'] ?? '';
 if ($rawTab === 'bank' || $rawTab === 'form') {
     $activeTab = 'packages';
 } else {
-    $activeTab = in_array($rawTab, $allowedTabs, true) ? $rawTab : 'sessions';
+    $activeTab = in_array($rawTab, $allowedTabs, true) ? $rawTab : 'packages';
 }
 $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'delete_attempt' || $action === 'delete_all_attempts') {
         $activeTab = 'results';
     } else {
-        $activeTab = in_array($_POST['current_tab'] ?? '', $allowedTabs, true) ? $_POST['current_tab'] : 'form';
+        $activeTab = in_array($_POST['current_tab'] ?? '', $allowedTabs, true) ? $_POST['current_tab'] : 'packages';
     }
 
     try {
@@ -323,6 +323,9 @@ foreach ($packages as $pkg) {
 
 $stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC);
 $attempts = $pdo->query('SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id ORDER BY a.started_at DESC LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
+if (!defined('EXTRA_HEAD')) {
+    define('EXTRA_HEAD', '<link rel="stylesheet" href="' . BASE_URL . '/pretes-ujian.php?cbt_style=bank&amp;v=' . (file_exists(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ? filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') : time()) . '">');
+}
 include __DIR__ . '/../includes/header.php';
 require __DIR__ . '/../includes/pretes-cbt-admin-view.php';
 include __DIR__ . '/../includes/footer.php';

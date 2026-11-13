@@ -7,10 +7,10 @@
             <p>Atur sesi pelaksanaan ujian, tentukan paket soal aktif, kadar proporsi kategori materi, waktu, kewajiban kamera, dan token ujian dalam satu sistem terintegrasi.</p>
         </div>
         <div class="bank-actions">
-            <button type="button" class="bank-button primary" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Ujian</button>
-            <button type="button" class="bank-button gold" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal</button>
+            <button type="button" class="bank-button gold" data-action="create-package" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal</button>
+            <button type="button" class="bank-button primary" data-action="create-session" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Ujian</button>
+            <button type="button" class="bank-button" data-action="add-question" onclick="openQuestionFormModal(false)">＋ Tambah Soal</button>
             <a data-no-spa class="bank-button ghost" href="<?= $bankUrl ?>&amp;tab=import">Impor Excel</a>
-            <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;tab=form">＋ Tambah Soal</a>
         </div>
     </header>
 
@@ -54,33 +54,113 @@
 
     <nav class="bank-tabs" aria-label="Kelola CBT">
         <?php foreach ([
-            'sessions' => 'Sesi Ujian',
             'packages' => 'Paket Soal',
+            'sessions' => 'Sesi Ujian',
             'import' => 'Impor Excel',
             'results' => 'Hasil Ujian'
         ] as $tab => $label): ?>
             <a data-no-spa href="<?= $bankUrl ?>&amp;tab=<?= $tab ?>" class="<?= $activeTab === $tab ? 'active' : '' ?>" <?= $activeTab === $tab ? 'aria-current="page"' : '' ?>>
                 <?= $label ?>
-                <?php if ($tab === 'sessions'): ?><span class="bank-tab-count"><?= count($sessions) ?></span><?php endif; ?>
                 <?php if ($tab === 'packages'): ?><span class="bank-tab-count"><?= count($packages) ?></span><?php endif; ?>
+                <?php if ($tab === 'sessions'): ?><span class="bank-tab-count"><?= count($sessions) ?></span><?php endif; ?>
             </a>
         <?php endforeach; ?>
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TAB 1: SESI UJIAN (PENGATUR SESI)
+         TAB 1: PAKET SOAL
          ═══════════════════════════════════════════════════════════════════ -->
-    <?php if ($activeTab === 'sessions'): ?>
+    <?php if ($activeTab === 'packages'): ?>
+    <section class="bank-panel">
+        <div class="bank-panel-head">
+            <div>
+                <h3>Daftar Paket Soal CBT</h3>
+                <p>Kelola wadah materi soal ujian. Tambah dan edit paket soal dilakukan langsung di jendela modal tanpa berpindah halaman.</p>
+            </div>
+            <button type="button" class="bank-button gold" data-action="create-package" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal Baru</button>
+        </div>
+        <div class="bank-table-scroll">
+            <table class="bank-table no-datatable">
+                <thead>
+                    <tr>
+                        <th style="width:40px">No.</th>
+                        <th>Kode</th>
+                        <th>Nama Paket &amp; Deskripsi</th>
+                        <th>Durasi</th>
+                        <th>Target Soal</th>
+                        <th>Soal Terdaftar</th>
+                        <th>Status</th>
+                        <th style="text-align:right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($packages)): ?>
+                    <tr><td colspan="8" class="bank-empty">Belum ada paket soal. Klik tombol <strong>＋ Buat Paket Soal Baru</strong> untuk membuat paket pertama.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($packages as $idx => $pkg): ?>
+                    <tr>
+                        <td style="color:#8b978e"><?= $idx + 1 ?></td>
+                        <td><span class="bank-code"><?= sanitize($pkg['code']) ?></span></td>
+                        <td>
+                            <strong><?= sanitize($pkg['name']) ?></strong>
+                            <?php if (!empty($pkg['description'])): ?>
+                                <div style="font-size:12px;color:#6b7972;margin-top:4px"><?= sanitize($pkg['description']) ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="bank-badge"><?= (int)$pkg['duration_minutes'] ?> menit</span></td>
+                        <td><span class="bank-badge"><?= (int)$pkg['question_count'] ?> butir</span></td>
+                        <td>
+                            <strong><?= (int)$pkg['question_count_actual'] ?></strong> aktif
+                            <span style="color:#8b978e;font-size:11px">(dari <?= (int)$pkg['total_questions'] ?> total)</span>
+                        </td>
+                        <td>
+                            <?php if ($pkg['is_active']): ?>
+                                <span class="bank-badge active">● SEDANG AKTIF</span>
+                            <?php else: ?>
+                                <span class="bank-badge inactive">Tidak Aktif</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="text-align:right;white-space:nowrap">
+                            <?php if (!$pkg['is_active']): ?>
+                                <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 4px">
+                                    <input type="hidden" name="action" value="activate_package">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
+                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan paket ini aktif untuk ujian peserta">Jadikan Aktif</button>
+                                </form>
+                            <?php endif; ?>
+                            <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>" data-package-code="<?= htmlspecialchars($pkg['code'], ENT_QUOTES, 'UTF-8') ?>" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>)" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
+                            <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" onclick="openQuestionFormModal(false, null, <?= (int)$pkg['id'] ?>)" title="Tambah soal baru ke paket ini">＋ Soal</button>
+                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-package" data-package-id="<?= (int)$pkg['id'] ?>" onclick='openPackageModal(true, <?= htmlspecialchars(json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
+                            <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 0 0 4px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Paket Soal \'<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>\'?\n\nSemua butir soal (<?= (int)$pkg['total_questions'] ?> butir) di dalam paket ini juga akan dihapus!')">
+                                <input type="hidden" name="action" value="delete_package">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
+                                <button type="submit" class="bank-button danger-sm" title="Hapus paket beserta seluruh butir soalnya">🗑️ Hapus</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TAB 2: SESI UJIAN (PENGATUR SESI)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <?php elseif ($activeTab === 'sessions'): ?>
     <section class="bank-panel">
         <div class="bank-panel-head">
             <div>
                 <h3>Pengatur Sesi Ujian CBT</h3>
                 <p>Atur paket soal yang ditampilkan, kadar kuota masing-masing kategori, kewajiban kamera, waktu, penilaian, jadwal mulai/selesai, dan token ujian.</p>
             </div>
-            <button type="button" class="bank-button primary" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Baru</button>
+            <button type="button" class="bank-button primary" data-action="create-session" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Baru</button>
         </div>
         <div class="bank-table-scroll">
-            <table class="bank-table">
+            <table class="bank-table no-datatable">
                 <thead>
                     <tr>
                         <th style="width:35px">No.</th>
@@ -180,92 +260,12 @@
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan sesi ini aktif untuk ujian mahasiswa">Set Aktif</button>
                                 </form>
                             <?php endif; ?>
-                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" onclick='openSessionModal(true, <?= htmlspecialchars(json_encode($ses, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
+                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick='openSessionModal(true, <?= htmlspecialchars(json_encode($ses, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=sessions" style="display:inline;margin:0 0 0 3px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Sesi Ujian \'<?= htmlspecialchars(addslashes($ses['title']), ENT_QUOTES, 'UTF-8') ?>\'?')">
                                 <input type="hidden" name="action" value="delete_session">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
                                 <button type="submit" class="bank-button danger-sm" title="Hapus sesi ujian">🗑️ Hapus</button>
-                            </form>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         TAB 2: PAKET SOAL
-         ═══════════════════════════════════════════════════════════════════ -->
-    <?php elseif ($activeTab === 'packages'): ?>
-    <section class="bank-panel">
-        <div class="bank-panel-head">
-            <div>
-                <h3>Daftar Paket Soal CBT</h3>
-                <p>Kelola wadah materi soal ujian. Tambah dan edit paket soal dilakukan langsung di jendela modal tanpa berpindah halaman.</p>
-            </div>
-            <button type="button" class="bank-button gold" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal Baru</button>
-        </div>
-        <div class="bank-table-scroll">
-            <table class="bank-table">
-                <thead>
-                    <tr>
-                        <th style="width:40px">No.</th>
-                        <th>Kode</th>
-                        <th>Nama Paket &amp; Deskripsi</th>
-                        <th>Durasi</th>
-                        <th>Target Soal</th>
-                        <th>Soal Terdaftar</th>
-                        <th>Status</th>
-                        <th style="text-align:right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php if (empty($packages)): ?>
-                    <tr><td colspan="8" class="bank-empty">Belum ada paket soal. Klik tombol <strong>＋ Buat Paket Soal Baru</strong> untuk membuat paket pertama.</td></tr>
-                <?php else: ?>
-                    <?php foreach ($packages as $idx => $pkg): ?>
-                    <tr>
-                        <td style="color:#8b978e"><?= $idx + 1 ?></td>
-                        <td><span class="bank-code"><?= sanitize($pkg['code']) ?></span></td>
-                        <td>
-                            <strong><?= sanitize($pkg['name']) ?></strong>
-                            <?php if (!empty($pkg['description'])): ?>
-                                <div style="font-size:12px;color:#6b7972;margin-top:4px"><?= sanitize($pkg['description']) ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td><span class="bank-badge"><?= (int)$pkg['duration_minutes'] ?> menit</span></td>
-                        <td><span class="bank-badge"><?= (int)$pkg['question_count'] ?> butir</span></td>
-                        <td>
-                            <strong><?= (int)$pkg['question_count_actual'] ?></strong> aktif
-                            <span style="color:#8b978e;font-size:11px">(dari <?= (int)$pkg['total_questions'] ?> total)</span>
-                        </td>
-                        <td>
-                            <?php if ($pkg['is_active']): ?>
-                                <span class="bank-badge active">● SEDANG AKTIF</span>
-                            <?php else: ?>
-                                <span class="bank-badge inactive">Tidak Aktif</span>
-                            <?php endif; ?>
-                        </td>
-                        <td style="text-align:right;white-space:nowrap">
-                            <?php if (!$pkg['is_active']): ?>
-                                <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 4px">
-                                    <input type="hidden" name="action" value="activate_package">
-                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                    <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
-                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan paket ini aktif untuk ujian peserta">Jadikan Aktif</button>
-                                </form>
-                            <?php endif; ?>
-                            <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, '<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars(addslashes($pkg['code']), ENT_QUOTES, 'UTF-8') ?>')" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
-                            <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" onclick="openQuestionFormModal(false, null, <?= (int)$pkg['id'] ?>)" title="Tambah soal baru ke paket ini">＋ Soal</button>
-                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" onclick='openPackageModal(true, <?= htmlspecialchars(json_encode($pkg, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
-                            <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 0 0 4px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Paket Soal \'<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>\'?\n\nSemua butir soal (<?= (int)$pkg['total_questions'] ?> butir) di dalam paket ini juga akan dihapus!')">
-                                <input type="hidden" name="action" value="delete_package">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
-                                <button type="submit" class="bank-button danger-sm" title="Hapus paket beserta seluruh butir soalnya">🗑️ Hapus</button>
                             </form>
                         </td>
                     </tr>
@@ -362,7 +362,7 @@
             </div>
         </div>
         <div class="bank-table-scroll">
-            <table class="bank-table">
+            <table class="bank-table no-datatable">
                 <thead>
                     <tr>
                         <th>Peserta</th>
@@ -408,7 +408,7 @@
 <!-- ═══════════════════════════════════════════════════════════════════════
      MODAL 1: BUAT / EDIT PAKET SOAL (TANPA PINDAH HALAMAN)
      ═══════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="modalPackageForm" role="dialog" aria-modal="true" aria-labelledby="modalPackageTitle">
+<div class="bank-modal-backdrop" id="modalPackageForm" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalPackageTitle">
     <div class="bank-modal">
         <div class="bank-modal-head">
             <h3 id="modalPackageTitle">Buat Paket Soal Baru</h3>
@@ -457,7 +457,7 @@
 <!-- ═══════════════════════════════════════════════════════════════════════
      MODAL 2: PENGATUR SESI UJIAN (LARGE MODAL - TANPA PINDAH HALAMAN)
      ═══════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="modalSessionForm" role="dialog" aria-modal="true" aria-labelledby="modalSessionTitle">
+<div class="bank-modal-backdrop" id="modalSessionForm" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalSessionTitle">
     <div class="bank-modal large">
         <div class="bank-modal-head">
             <h3 id="modalSessionTitle">Pengatur Sesi Ujian Baru</h3>
@@ -591,7 +591,7 @@
 <!-- ===================================================================
      MODAL 3: KELOLA & KOLEKSI SOAL PAKET (MODAL CANTIK & LENGKAP)
      =================================================================== -->
-<div class="bank-modal-backdrop" id="modalPackageQuestions" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
+<div class="bank-modal-backdrop" id="modalPackageQuestions" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
     <div class="bank-modal extra-large">
         <div class="modal-header-banner">
             <div>
@@ -640,7 +640,7 @@
 <!-- ===================================================================
      MODAL 4: TAMBAH / EDIT BUTIR SOAL (MODAL CANTIK & LENGKAP)
      =================================================================== -->
-<div class="bank-modal-backdrop" id="modalQuestionForm" role="dialog" aria-modal="true" aria-labelledby="modalQuestionFormTitle">
+<div class="bank-modal-backdrop" id="modalQuestionForm" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalQuestionFormTitle">
     <div class="bank-modal large">
         <div class="bank-modal-head">
             <div>
