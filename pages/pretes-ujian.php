@@ -293,20 +293,51 @@ include __DIR__ . '/../includes/header.php';
                             Kamera Langsung Peserta (Live Webcam)
                         </div>
                         
-                        <div class="camera-guide-box" id="checkinCameraBox">
-                            <video id="checkinVideo" playsinline autoplay muted></video>
+                        <div class="camera-guide-box" id="checkinCameraBox" style="position:relative; width:240px; height:320px; margin:0 auto 14px; border-radius:12px; overflow:hidden; background:#0f172a; box-shadow:0 4px 14px rgba(0,0,0,0.15);">
+                            <!-- Video Stream -->
+                            <video id="checkinVideo" playsinline autoplay muted style="width:100%; height:100%; object-fit:cover; display:none;"></video>
                             <canvas id="checkinCanvas" style="display:none;"></canvas>
-                            <div class="camera-oval-overlay"></div>
+                            
+                            <!-- Panduan Oval Wajah (Tampil saat video aktif) -->
+                            <div class="camera-oval-overlay" id="checkinOvalGuide" style="display:none;"></div>
+                            
+                            <!-- Badge Status Kamera -->
+                            <div id="checkinCameraBadge" style="display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(22,163,74,0.9); color:#fff; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; z-index:5;">
+                                🟢 Kamera Aktif
+                            </div>
+
+                            <!-- Placeholder Saat Kamera Belum Aktif -->
+                            <div id="checkinCameraPlaceholder" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; background:#0f172a; color:#fff; z-index:4;">
+                                <span style="font-size:38px; display:block; margin-bottom:8px;">📹</span>
+                                <div style="font-size:13px; font-weight:800; color:#f8fafc; margin-bottom:4px;">Kamera Belum Aktif</div>
+                                <p style="font-size:11px; color:#94a3b8; margin:0 0 12px; line-height:1.4;">
+                                    Klik tombol di bawah untuk memberikan izin dan mengaktifkan kamera web.
+                                </p>
+                                <button type="button" class="btn btn-primary" onclick="startCheckinCamera(true)" 
+                                    style="background:#0f766e; border:none; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:800; display:inline-flex; align-items:center; gap:6px; cursor:pointer; box-shadow:0 4px 12px rgba(15,118,110,0.4);">
+                                    <span>📹</span> <span>Aktifkan Kamera</span>
+                                </button>
+                            </div>
+
+                            <!-- Loading State Saat Menghubungkan Kamera -->
+                            <div id="checkinCameraLoading" style="position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; background:rgba(15,23,42,0.95); color:#fff; z-index:4;">
+                                <span style="font-size:32px; display:block; margin-bottom:8px;">⏳</span>
+                                <div style="font-size:12.5px; font-weight:700; color:#38bdf8;">Menghubungkan Kamera...</div>
+                                <div style="font-size:10.5px; color:#cbd5e1; margin-top:4px;">Harap izinkan (Allow) pop-up peramban.</div>
+                            </div>
                         </div>
 
                         <div id="checkinAlert" style="display:none; margin:10px auto; padding:10px 14px; border-radius:10px; font-size:12.5px; text-align:left; line-height:1.5;"></div>
 
-                        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:10px;">
-                            <button type="button" class="btn btn-secondary" onclick="toggleCameraFace('checkinVideo')" style="font-size:12px; padding:8px 14px; border-radius:8px;">
-                                🔄 Balik Kamera
+                        <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                            <button type="button" class="btn btn-secondary" onclick="startCheckinCamera(true)" style="font-size:11.5px; padding:7px 12px; border-radius:8px;">
+                                🔄 Nyalakan / Ulang
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="toggleCameraFace()" style="font-size:11.5px; padding:7px 12px; border-radius:8px;">
+                                📷 Balik Kamera
                             </button>
                             <button type="button" id="btnRunCheckin" class="btn btn-success" onclick="runInitialCheckin()" 
-                                style="font-size:14px; font-weight:800; padding:10px 22px; border-radius:10px; box-shadow:0 4px 12px rgba(22,163,74,0.3); display:inline-flex; align-items:center; gap:8px;">
+                                style="font-size:13.5px; font-weight:800; padding:9px 20px; border-radius:10px; box-shadow:0 4px 12px rgba(22,163,74,0.3); display:inline-flex; align-items:center; gap:8px;">
                                 <span>🔍</span> <span>Verifikasi Wajah & Buka Ujian</span>
                             </button>
                         </div>
@@ -447,43 +478,126 @@ let proctorInterval = null;
 let countdownTimer = null;
 let secondsRemaining = 300; // 5 menit = 300 detik
 let activeStream = null;
+let currentFacingMode = 'user';
 
 // Mulai kamera saat halaman dimuat
 document.addEventListener('DOMContentLoaded', function() {
     const isAlreadyVerified = <?= $isVerified ? 'true' : 'false' ?>;
     if (!isAlreadyVerified) {
-        initCheckinCamera();
+        startCheckinCamera(false);
     } else {
         initProctoringExamRoom();
     }
 });
 
 /**
- * ── Inisialisasi Kamera Skenario A (Check-in Awal) ──
+ * ── Inisialisasi & Pengaktifan Kamera Skenario A (Check-in Awal) ──
+ * Menggunakan strategi fallback multi-level dan penanganan izin autoplay browser.
  */
-function initCheckinCamera() {
+function startCheckinCamera(isUserAction) {
     const video = document.getElementById('checkinVideo');
+    const placeholder = document.getElementById('checkinCameraPlaceholder');
+    const loading = document.getElementById('checkinCameraLoading');
+    const ovalGuide = document.getElementById('checkinOvalGuide');
+    const cameraBadge = document.getElementById('checkinCameraBadge');
+    const alertBox = document.getElementById('checkinAlert');
+
     if (!video) return;
 
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
-        }).then(function(stream) {
-            activeStream = stream;
-            video.srcObject = stream;
-            video.play();
-        }).catch(function(err) {
-            const alertBox = document.getElementById('checkinAlert');
-            if (alertBox) {
-                alertBox.style.display = 'block';
-                alertBox.style.background = '#fef2f2';
-                alertBox.style.border = '1px solid #fca5a5';
-                alertBox.style.color = '#991b1b';
-                alertBox.innerHTML = '<strong>Gagal Mengakses Kamera:</strong> ' + (err.message || err) + '<br>Pastikan peramban Anda diizinkan mengakses kamera.';
-            }
-        });
+    if (alertBox) alertBox.style.display = 'none';
+    if (loading) loading.style.display = 'flex';
+    if (placeholder) placeholder.style.display = 'none';
+
+    // Bersihkan stream aktif sebelumnya bila ada
+    if (activeStream) {
+        try {
+            activeStream.getTracks().forEach(function(track) { track.stop(); });
+        } catch(e) {}
+        activeStream = null;
     }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showCameraError("Peramban Anda tidak mendukung WebRTC kamera. Silakan gunakan Google Chrome, Edge, atau Firefox terbaru.");
+        return;
+    }
+
+    function onCameraReady() {
+        if (loading) loading.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'none';
+        video.style.display = 'block';
+        if (ovalGuide) ovalGuide.style.display = 'block';
+        if (cameraBadge) cameraBadge.style.display = 'block';
+    }
+
+    function showCameraError(msg) {
+        if (loading) loading.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'flex';
+        video.style.display = 'none';
+        if (ovalGuide) ovalGuide.style.display = 'none';
+        if (cameraBadge) cameraBadge.style.display = 'none';
+
+        if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '1px solid #fca5a5';
+            alertBox.style.color = '#991b1b';
+            alertBox.innerHTML = '<strong>❌ Akses Kamera Belum Diizinkan:</strong><br>' + msg +
+                '<div style="margin-top:6px;font-size:11.5px;color:#7f1d1d;">💡 Klik tombol <strong>Aktifkan Kamera</strong> di dalam kotak preview di atas atau izinkan akses kamera pada ikon gembok/kamera di bilah alamat peramban Anda.</div>';
+        }
+    }
+
+    function attachStream(stream) {
+        activeStream = stream;
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
+
+        video.onloadedmetadata = function() {
+            video.play().then(function() {
+                onCameraReady();
+            }).catch(function(e) {
+                console.warn("[Camera] Autoplay prevented, waiting user click:", e);
+                onCameraReady();
+            });
+        };
+
+        // Fallback jika onloadedmetadata sudah terpicu
+        setTimeout(function() {
+            if (video.videoWidth > 0) {
+                onCameraReady();
+            }
+        }, 400);
+    }
+
+    // Strategi 1: Constraints ideal dengan facingMode
+    const c1 = { audio: false, video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } };
+    // Strategi 2: Constraints fleksibel tanpa width/height kaku
+    const c2 = { audio: false, video: { facingMode: currentFacingMode } };
+    // Strategi 3: Constraints universal untuk webcam USB PC/laptop
+    const c3 = { audio: false, video: true };
+
+    navigator.mediaDevices.getUserMedia(c1)
+        .then(attachStream)
+        .catch(function(err1) {
+            console.warn("[Camera] Constraint c1 gagal, mencoba fallback c2...", err1);
+            navigator.mediaDevices.getUserMedia(c2)
+                .then(attachStream)
+                .catch(function(err2) {
+                    console.warn("[Camera] Constraint c2 gagal, mencoba fallback c3...", err2);
+                    navigator.mediaDevices.getUserMedia(c3)
+                        .then(attachStream)
+                        .catch(function(err3) {
+                            console.error("[Camera] Semua fallback kamera gagal:", err3);
+                            showCameraError(err3.message || "Akses kamera ditolak oleh peramban atau perangkat tidak terhubung.");
+                        });
+                });
+        });
+}
+
+function toggleCameraFace() {
+    currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+    startCheckinCamera(true);
 }
 
 /**

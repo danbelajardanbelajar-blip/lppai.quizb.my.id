@@ -5,6 +5,33 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 10:40:00 +0700 — Perbaikan Tampilan Kamera Layar Hitam pada Halaman Ujian Pretes (pages/pretes-ujian.php)
+
+**Ringkasan:** Mengatasi kendala tampilan kamera web yang hanya menampilkan layar hitam kosong saat peserta atau tester mengunjungi portal ujian pretes (`pages/pretes-ujian.php`):
+1. **Penyebab Utama Layar Hitam:**
+   - Kebijakan keamanan browser modern (Chrome/Edge/Safari/Firefox) membatasi autoplay media stream tanpa *user gesture* (interaksi klik langsung oleh pengguna).
+   - Pemanggilan `video.play()` secara sinkron sebelum event `onloadedmetadata` menyebabkan `DOMException: The play() request was interrupted by a new load request` atau `AbortError`.
+   - Konstrain kamera yang kaku (`facingMode: 'user', width: 640, height: 480`) memicu `OverconstrainedError` pada webcam laptop/PC desktop yang memiliki konfigurasi driver atau aspek rasio berbeda.
+   - Tidak adanya indikator visual atau tombol pemicu manual ketika akses kamera masih menunggu izin (*pending permission*) atau diblokir.
+2. **Solusi & Peningkatan yang Diterapkan:**
+   - **Multi-Stage Constraint Fallback:** Menerapkan 3 lapis fallback `getUserMedia`:
+     - *Strategi 1:* Ideal resolution (`width: 640, height: 480, facingMode: currentFacingMode`).
+     - *Strategi 2:* Relaxed facing mode (`facingMode: currentFacingMode`).
+     - *Strategi 3:* Universal desktop fallback (`video: true`), menjamin kompatibilitas 100% pada webcam PC desktop, laptop, maupun kamera virtual.
+   - **Interactive User-Gesture Placeholder:** Menambahkan container visual interaktif `#checkinCameraPlaceholder` dengan ikon kamera dan tombol eksplisit **"📹 Aktifkan Kamera"** sehingga pengguna dapat mengaktifkan kamera secara sadar jika autorun diblokir peramban.
+   - **Asynchronous Lifecycle Handler:** Mengaitkan pemutaran video stream pada event `video.onloadedmetadata` dengan atribut `playsinline`, `autoplay`, dan `muted`.
+   - **Visual Feedback & Panduan Kesalahan:** Menyediakan state loading `#checkinCameraLoading`, badge status hijau `🟢 Kamera Aktif`, panduan oval wajah dinamis, serta instruksi bantuan yang jelas jika izin kamera ditolak di bilah alamat (*URL lock icon*).
+3. **Verifikasi & Pengujian:**
+   - Sintaks PHP `php -l pages/pretes-ujian.php` valid (No syntax errors).
+   - Seluruh test suite (27/27 test files) lulus 100% (`tests/pretes-proctoring-scenarios-test.php`, `tests/pretes-peserta-instruksi-test.php`, dll).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-ujian.php` | 295–340, 520–610 | UI Kamera Check-in & Skrip WebRTC | Menambahkan placeholder interaktif tombol aktifkan kamera, multi-stage fallback constraint, event `onloadedmetadata`, dan error guide peramban. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 09:12:20 +0700 — Pemberian Privilege Khusus Akun Tester (Username 12345) untuk Uji Coba Pengerjaan Pretes Sebelum 16 November 2026
 
 **Ringkasan:** Memberikan hak akses khusus (*developer/tester privilege*) untuk akun pengguna dengan username atau NIM `12345` agar dapat langsung mencoba, membuka, dan menguji seluruh fungsionalitas halaman ujian pretes (`pages/pretes-ujian.php`) beserta sistem pengawasan AI (Skenario A & B) tanpa dibatasi oleh gating tanggal 16 November:
