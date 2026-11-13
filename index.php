@@ -57,6 +57,7 @@ if (isLoggedIn()) {
 }
 
 $error = '';
+$isLoginFailed = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -85,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         exit;
     } else {
+        $isLoginFailed = true;
         $error = 'Username atau password salah.';
     }
 }
@@ -107,7 +109,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p class="subtitle">Lembaga Pengembangan Pendidikan Agama Islam</p>
 
         <?php if ($error): ?>
-            <div class="alert alert-danger"><?= sanitize($error) ?></div>
+            <div class="alert alert-danger" style="display:block; text-align:left;">
+                <div style="font-weight:600; margin-bottom:<?= $isLoginFailed ? '6px' : '0' ?>;">
+                    <?= sanitize($error) ?>
+                </div>
+                <?php if ($isLoginFailed): ?>
+                    <?php 
+                        $waUsername = !empty($username) ? $username : '-';
+                        $waText = "Assalamu'alaikum Bu Umami, saya mengalami kesulitan login di portal LPPAI (Username: {$waUsername}). Mohon bantuannya.";
+                        $waUrl = "https://wa.me/6281515726827?text=" . rawurlencode($waText);
+                    ?>
+                    <div style="font-size:12.5px; color:#991b1b; padding-top:6px; border-top:1px dashed #fca5a5; margin-top:6px; line-height:1.5;">
+                        Jika kesulitan, bisa menghubungi <strong>Bu Umami</strong>: 
+                        <a href="<?= $waUrl ?>" target="_blank" rel="noopener noreferrer" style="color:#047857; font-weight:700; text-decoration:underline; display:inline-flex; align-items:center; gap:4px; margin-top:3px;">
+                            <span>💬</span> 081515726827 (wa.me) &rarr;
+                        </a>
+                    </div>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <form method="POST" action="">

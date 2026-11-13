@@ -5,6 +5,29 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 13:35:10 +0700 — Penambahan Notifikasi Bantuan WhatsApp Bu Umami Saat Gagal Login (index.php)
+
+**Ringkasan:** Menambahkan peringatan dan tautan bantuan WhatsApp resmi Bu Umami (`https://wa.me/6281515726827`) pada halaman login utama (`index.php`) ketika pengguna gagal melakukan autentikasi (username atau password salah):
+1. **Penanganan Peringatan Kegagalan Login (`index.php`):**
+   - Mendeteksi kondisi kegagalan login secara eksplisit melalui variabel `$isLoginFailed`.
+   - Mengubah layout box `.alert.alert-danger` menjadi `display: block; text-align: left;` agar pesan peringatan dan tautan kontak tersusun rapi.
+   - Menambahkan petunjuk bantuan: *"Jika kesulitan, bisa menghubungi **Bu Umami**: 💬 081515726827 (wa.me) &rarr;"*.
+   - Menggunakan format resmi `https://wa.me/6281515726827` lengkap dengan teks pesan otomatis yang memuat username yang diinput mahasiswa untuk mempercepat verifikasi oleh Bu Umami.
+2. **Pembaruan Test Suite & Validasi (`tests/login-wa-help-test.php`):**
+   - Menambahkan unit test baru untuk memastikan sintaks PHP valid, variabel `$isLoginFailed` aktif, teks nama Bu Umami muncul, serta URL WhatsApp berformat `wa.me/6281515726827` dengan atribut keamanan `target="_blank"` dan `rel="noopener noreferrer"`.
+3. **Verifikasi:**
+   - `php -l index.php` (**No syntax errors detected**).
+   - `tests/login-wa-help-test.php` (**Lulus 100%**).
+   - Seluruh test suite PHP dan Node.js lulus 100% (`TOTAL_FAILED=0`).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `index.php` | 59–90, 110–135 | Handler Login & Alert Box | Menambahkan state `$isLoginFailed`, penataan layout alert, dan tautan format `wa.me` ke Bu Umami (081515726827). |
+| `tests/login-wa-help-test.php` | 1–52 | Test Suite Baru | Validasi otomatis link WhatsApp bantuan Bu Umami saat gagal login. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **seluruh test suite lulus 100%** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 11:52:50 +0700 — Diferensiasi Periode Pretes Aktif vs Tidak Aktif & Pencegahan Vonis Prematur (pages/pretes-hasil.php)
 
 **Ringkasan:** Memperbaiki sistem pengumuman hasil pretes pada portal (`pages/pretes-hasil.php`) agar membedakan secara tegas antara Periode Pretes yang berstatus AKTIF dan Periode Pretes yang TIDAK AKTIF / SELESAI:
