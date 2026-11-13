@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 18:30:10 +0700 — Menu "Info Tutorial" Mahasiswa (Jadwal/Tutor/Ruangan) & Reader Diktat LPPAI 2026 Tanpa Unduh
+
+**Ringkasan:** Menambahkan halaman `Info Tutorial` di panel mahasiswa yang menampilkan kelas, tutor, jadwal, dan ruangan tutorial, serta tab `Diktat Tutorial` berisi reader PDF.js modern (scroll kontinu, zoom, fit-width, layar penuh, progress bar, watermark nama+NIM) yang tidak menyediakan unduh/cetak.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/tutorial-info.php` (baru) | 1–52 | Backend | `requireLogin`, redirect admin, query `tutorial_registrations` LEFT JOIN `tutorial_classes` (kelas, `dosen_pengampu`, hari, jam, ruangan, gelombang), buat `$_SESSION['diktat_key']` (32 byte acak, baris 37–40), watermark nama+NIM. |
+| `pages/tutorial-info.php` | 54–109 | CSS | Gaya hero, tab, kartu kelas, reader gelap (`.dr-*`), `@media print` menyembunyikan reader (105–108). |
+| `pages/tutorial-info.php` | 111–186 | HTML | Hero, tab `Jadwal & Kelas` / `Diktat Tutorial`, panel jadwal (121–156) dengan status "Menunggu Plotting" bila belum diplot, panel reader (158–186). |
+| `pages/tutorial-info.php` | 188–365 | JS | PDF.js 3.11.174 (cdnjs); fetch `diktat-stream.php` dengan header `X-Diktat-Key`, dekode XOR di browser, render canvas lazy (IntersectionObserver), blok klik kanan, drag, Ctrl+S/P/U (222–225). |
+| `pages/diktat-stream.php` (baru) | 1–49 | Endpoint stream | Hanya untuk user login + header `X-Diktat-Key` cocok dengan sesi; tolak `Sec-Fetch-Dest` document/iframe/embed/object (403); kirim byte PDF ter-XOR kunci sesi, `Cache-Control: no-store`. |
+| `storage/.htaccess` (baru) | 1–8 | Proteksi folder | `Require all denied` (+ fallback Apache 2.2) dan `Options -Indexes` agar PDF tidak bisa diakses via URL. |
+| `storage/diktat/diktat-lppai-2026.pdf` | — | Berkas diktat | Salinan "Layout Diktat LPPAI 2026 NEW 17,5 x 25cm.pdf" (3,58 MB). **Tidak di-commit** (di-.gitignore) → wajib diunggah manual ke server di path yang sama. |
+| `.gitignore` | akhir file | Ignore PDF | Menambah `storage/diktat/*.pdf`. |
+| `includes/sidebar.php` | 192–194 | Menu mahasiswa › Tutorial | Menambah tautan `📘 Info Tutorial` setelah `Pendaftaran Tutorial`. |
+
+**Alasan:** permintaan menu info tutorial (jadwal, tutor, ruangan) + diktat yang hanya bisa dibaca.
+**Batasan:** proteksi bersifat pencegahan; tangkapan layar tetap mungkin (ditandai watermark).
+**Verifikasi:** `php -l` OK di 3 file PHP; uji round-trip XOR PDF OK; suite `tests/` → 33/38 lulus. 4 test CBT (`pretes-cbt*-test.php`) gagal karena perubahan lokal `includes/pretes-cbt.php` di luar commit ini (sesi dibuka 16/11/2026), 1 positif palsu (`login-wa-help-test.php` lulus).
+
+---
+
 ## 2026-11-13 16:28:00 +0700 — Penambahan Modul Manajemen Paket Soal CBT & Prasyarat Penginputan Soal (pretes-ujian.php?cbt_bank=1&tab=packages)
 
 **Ringkasan:** Mengimplementasikan fitur pembuatan dan pengelolaan **Paket Soal** pada Bank Soal CBT (pretes-ujian.php?cbt_bank=1), di mana sistem mewajibkan pembuatan Paket Soal terlebih dahulu sebelum butir pertanyaan dapat dimasukkan:

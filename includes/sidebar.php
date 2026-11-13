@@ -189,6 +189,9 @@ function menuActive($page) {
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">
                 <span class="icon">📝</span> Pendaftaran Tutorial
             </a>
+            <a href="<?= BASE_URL ?>/tutorial-info.php" class="page-nav <?= menuActive('tutorial-info.php') ?>">
+                <span class="icon">📘</span> Info Tutorial
+            </a>
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">📋</span> Rincian Nilai
             </a>
