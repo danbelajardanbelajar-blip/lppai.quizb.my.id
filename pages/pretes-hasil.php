@@ -2,7 +2,6 @@
 /**
  * LPPAI Corner - Hasil Pretes
  */
-define('PAGE_TITLE', 'Pengumuman Hasil Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-helper.php';
 requireLogin();
@@ -13,32 +12,16 @@ $pdo = getDBConnection();
 // Pastikan fitur pretes siap
 ensurePretesFeatures($pdo);
 
-// Auto-update pengumuman hasil pretes di database jika masih menggunakan teks lama dengan typo atau charset non-utf8mb4
+// Periode pretes aktif adalah sumber status, terlepas dari tutorial yang juga aktif.
+ensurePretesPeriodTargetColumns($pdo);
+$activePretes = null;
 try {
-    try {
-        $pdo->exec("SET NAMES utf8mb4");
-        $pdo->exec("ALTER TABLE announcements CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("ALTER TABLE announcements MODIFY COLUMN judul VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("ALTER TABLE announcements MODIFY COLUMN konten TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    } catch (Exception $e) {}
-
-    $cleanPretesKonten = "Berikut kami sampaikan Pengumuman Hasil Pretes 2026/2027:\n\n"
-        . "🎉 BAGI MAHASISWA YANG DINYATAKAN LULUS PRETES:\n"
-        . "Selamat atas kelulusan Anda! Harap menyelesaikan tahapan administrasi dan pengambilan sertifikat berikut:\n"
-        . "1. 🕌 Mengikuti kegiatan rutin Majlis Dzikir Al Khidmah di Masjid KH. Soefyan AW setiap awal bulan.\n"
-        . "2. 📱 Melakukan presensi online (kehadiran & kepulangan) melalui sistem serta mengunggah swafoto (selfie) yang jelas dan rapi.\n"
-        . "3. 💳 Menyelesaikan pembayaran biaya administrasi kelulusan pretes sebesar Rp 50.000,-.\n"
-        . "4. 🎓 Mengambil Sertifikat Kelulusan resmi di Kantor LPPAI (Lantai 2 Gedung Fakultas Hukum, sebelah timur kantin) dengan membawa Nota Pembayaran yang sah dan pasfoto 3×4.\n\n"
-        . "⚠️ BAGI MAHASISWA YANG BELUM LULUS PRETES:\n"
-        . "Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, Anda diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1 melalui link di bawah ini.";
-
-    $pdo->prepare("
-        UPDATE announcements 
-        SET konten = ?, link_tujuan = '/pages/pretes-hasil.php' 
-        WHERE (tipe = 'hasil_pretes' OR judul LIKE '%Hasil Pretes%') 
-          AND (konten NOT LIKE '%swafoto%' OR konten LIKE '%? BAGI%' OR link_tujuan LIKE '%pretes-peserta%')
-    ")->execute([$cleanPretesKonten]);
+    $activePeriods = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($activePeriods as $period) {
+        if (isUserEligibleForPretesPeriod($user, $period)) { $activePretes = $period; break; }
+    }
 } catch (Exception $e) {}
+$registrationOrder = $activePretes ? 'CASE WHEN pr.periode = ? THEN 0 ELSE 1 END, ' : '';
 
 // Ambil data pendaftaran & asesmen nilai rinci terbaru mahasiswa
 $stmtReg = $pdo->prepare("
@@ -48,10 +31,10 @@ $stmtReg = $pdo->prepare("
     LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
     LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id
     WHERE pr.user_id = ?
-    ORDER BY pr.id DESC
+    ORDER BY {$registrationOrder}pr.id DESC
     LIMIT 1
 ");
-$stmtReg->execute([$user['id']]);
+$stmtReg->execute($activePretes ? [$user['id'], $activePretes['periode']] : [$user['id']]);
 $myReg = $stmtReg->fetch();
 
 // Ambil hasil pretes resmi jika ada di database
@@ -65,19 +48,6 @@ $stmtRes = $pdo->prepare("
 ");
 $stmtRes->execute([$user['id']]);
 $myResult = $stmtRes->fetch();
-
-// ── Cek Status Periode Pretes & Tutorial Aktif ──────────────────────────────
-ensurePretesPeriodTargetColumns($pdo);
-$activePretes = null;
-try {
-    $activePretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
-} catch (Exception $e) {}
-
-// Cek apakah ada gelombang tutorial aktif di sistem
-$activeGelombang = null;
-try {
-    $activeGelombang = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch();
-} catch (Exception $e) {}
 
 // Deteksi status aktif periode pendaftaran mahasiswa ($isRegPeriodeAktif):
 $isRegPeriodeAktif = false;
@@ -98,23 +68,12 @@ if ($myReg) {
     $isRegPeriodeAktif = ($regPeriodeStatus === 'aktif');
 }
 
-// Pretes dinyatakan selesai / tertutup bagi mahasiswa jika:
-// 1. Tidak ada periode master_pretes yang berstatus 'aktif'
-// 2. ATAU mahasiswa bukan merupakan target program dari periode aktif (mis. periode khusus RPL diakses Reguler)
-// 3. ATAU status periode pretes pendaftaran mahasiswa sudah nonaktif/selesai
-// 4. ATAU sistem saat ini sedang aktif menjalankan Tutorial untuk periode umum ('Semua')
+// Jangan menyimpulkan pretes selesai hanya karena periode tutorial sudah aktif.
 $isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
-$activeTargetProgram = $activePretes ? normalizePretesTargetProgram($activePretes['target_program'] ?? 'Semua') : 'Semua';
-$isPretesSelesai = false;
-if (!$activePretes || !$isEligibleActivePretes) {
-    $isPretesSelesai = true;
-} elseif ($myReg && !$isRegPeriodeAktif) {
-    $isPretesSelesai = true;
-}
-if (!$isPretesSelesai && $activeGelombang && $activeTargetProgram === 'Semua') {
-    // Jika tutorial sudah aktif berjalan, pendaftaran pretes umum bagi yang belum terdaftar telah ditutup
-    $isPretesSelesai = true;
-}
+$isPretesSelesai = !$activePretes || !$isEligibleActivePretes;
+$showPretesPreparation = $activePretes && $isEligibleActivePretes;
+$registeredForActivePretes = $showPretesPreparation && $myReg
+    && trim((string)($myReg['periode'] ?? '')) === trim((string)$activePretes['periode']);
 
 // Cek apakah mahasiswa memiliki riwayat pretes (pendaftaran, hasil nilai, atau asesmen terisi)
 $hasPretesRecord = (!empty($myResult) || !empty($myReg));
@@ -227,6 +186,7 @@ if (isAdmin() || isDosen()) {
     $allResults = $stmtAllRes->fetchAll();
 }
 
+define('PAGE_TITLE', $showPretesPreparation ? 'Informasi & Persiapan Pretes' : 'Pengumuman Hasil Pretes');
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -352,6 +312,9 @@ include __DIR__ . '/../includes/header.php';
 }
 </style>
 
+<?php if ($showPretesPreparation): ?>
+    <?php include __DIR__ . '/../includes/pretes-preparation-view.php'; ?>
+<?php else: ?>
 <!-- Hasil & Nilai Keseluruhan Pretes Saya -->
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -389,7 +352,7 @@ include __DIR__ . '/../includes/header.php';
                             Periode Pretes Telah Berakhir
                         </h3>
                         <p style="margin:0 0 14px 0; color:#78350f; font-size:13.5px; line-height:1.6;">
-                            Pelaksanaan dan pendaftaran Pretes untuk periode ini telah resmi ditutup karena sistem LPPAI saat ini sedang menjalankan periode Tutorial. Karena Anda belum memiliki riwayat kelulusan pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1</strong>.
+                            Pendaftaran pretes untuk periode ini telah ditutup oleh pengelola. Karena Anda belum memiliki riwayat kelulusan pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1</strong>.
                         </p>
                         <div style="display:flex; flex-wrap:wrap; gap:10px;">
                             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-success" style="display:inline-flex; align-items:center; gap:8px; width:auto; text-decoration:none; padding:9px 18px; font-size:13.5px; font-weight:700; border-radius:8px;">
@@ -862,6 +825,8 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php endif; ?>
 
 <?php if (isAdmin() || isDosen()): ?>
 <!-- All Results (Hanya untuk Admin / Dosen) -->

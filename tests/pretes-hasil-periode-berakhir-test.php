@@ -15,7 +15,8 @@ assert($daftarCode !== false, "File pages/pretes-daftar.php harus dapat dibaca")
 
 // 2. Verifikasi pengecekan status master_pretes & master_gelombang di pages/pretes-hasil.php
 assert(strpos($hasilCode, "SELECT * FROM master_pretes WHERE status = 'aktif'") !== false, "Query master_pretes aktif harus ada di pretes-hasil.php");
-assert(strpos($hasilCode, "SELECT * FROM master_gelombang WHERE status = 'aktif'") !== false, "Query master_gelombang aktif harus ada di pretes-hasil.php");
+assert(strpos($hasilCode, '$showPretesPreparation') !== false, "Periode pretes aktif harus memiliki tampilan persiapan tersendiri");
+assert(strpos($hasilCode, '&& $activeGelombang') === false, "Tutorial aktif tidak boleh menutup informasi pretes yang masih aktif");
 assert(strpos($hasilCode, '$isPretesSelesai') !== false, "Variabel \$isPretesSelesai harus ada di pretes-hasil.php");
 assert(strpos($hasilCode, '$hasPretesRecord') !== false, "Variabel \$hasPretesRecord harus ada di pretes-hasil.php");
 
