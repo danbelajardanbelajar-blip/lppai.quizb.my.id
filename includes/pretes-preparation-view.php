@@ -44,24 +44,34 @@ $learningReadings = json_decode(file_get_contents(__DIR__ . '/../data/pretes-lea
 <div class="pretes-preparation">
     <section class="pretes-preparation-hero" aria-labelledby="pretesPreparationTitle">
         <div class="pretes-preparation-status">Pendaftaran pretes masih aktif</div>
-        <div class="pretes-preparation-eyebrow"><?= sanitize($activePretes['periode']) ?></div>
-        <h2 id="pretesPreparationTitle"><?= $registeredForActivePretes ? 'Menunggu pembagian kelas dan penguji' : 'Persiapkan diri untuk mengikuti pretes' ?></h2>
+        <div class="pretes-preparation-eyebrow"><?= sanitize($activePretes['periode'] ?? 'Pretes LPPAI') ?></div>
+        <h2 id="pretesPreparationTitle"><?= $registeredForActivePretes ? 'Materi Persiapan &amp; Praktik Pretes' : 'Persiapkan diri untuk mengikuti pretes' ?></h2>
         <?php if ($registeredForActivePretes): ?>
-            <p>Pendaftaran Anda untuk periode ini sudah tercatat. Silakan menunggu pengumuman <strong>pembagian kelas, jadwal, dan penguji pretes</strong>. Selama menunggu, gunakan waktu untuk mempersiapkan materi dan praktik pretes.</p>
+            <p>Pendaftaran Anda untuk periode ini telah tercatat resmi. Sembari <strong>menunggu pembagian kelas dan penguji</strong> dari panitia, manfaatkan waktu untuk mempelajari 12 materi pokok serta bacaan istighasah di bawah ini.</p>
         <?php else: ?>
-            <p>Pendaftaran pretes periode ini masih dibuka. Jika Anda belum mendaftar pada periode ini, silakan menyelesaikan pendaftaran terlebih dahulu. Setelah terdaftar, pantau pengumuman pembagian kelas, jadwal, dan penguji.</p>
+            <p>Pendaftaran pretes periode ini masih dibuka. Sembari menunggu pembagian kelas dan penguji, silakan menyelesaikan pendaftaran dan mempelajari materi persiapan ujian di bawah ini.</p>
         <?php endif; ?>
-        <p><strong>Hasil kelulusan periode ini belum ditampilkan.</strong> Status pendaftaran aktif tidak berarti Anda telah lulus atau tidak lulus pretes.</p>
         <div class="pretes-preparation-grid">
-            <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">01 / Persiapan</span><strong>Pelajari kembali materi pretes</strong><p>Ulangi bacaan Al-Qur’an, doa, serta materi dan praktik ibadah yang akan diujikan.</p></div>
-            <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">02 / Informasi</span><strong>Pantau pembagian peserta</strong><p>Periksa menu Peserta &amp; Jadwal Pretes secara berkala untuk melihat informasi yang diterbitkan pengelola.</p></div>
-            <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">03 / Latihan</span><strong>Persiapkan seluruh materi ujian</strong><p>Pelajari seluruh 12 materi di bawah. Istighasah merupakan salah satu bagian dari materi yang diujikan.</p></div>
+            <div class="pretes-preparation-step">
+                <span class="pretes-preparation-eyebrow">01 / Teori &amp; Tulis</span>
+                <strong>Ujian Tulis CBT</strong>
+                <p>Pelajari wawasan keislaman, aqidah, fiqih ibadah, dan tajwid Al-Qur'an.</p>
+            </div>
+            <div class="pretes-preparation-step">
+                <span class="pretes-preparation-eyebrow">02 / Praktik Ubudiyah</span>
+                <strong>Praktik Ibadah</strong>
+                <p>Latihan tata cara wudhu, tayammum, shalat subuh (qunut), shalat jenazah, dan doa harian.</p>
+            </div>
+            <div class="pretes-preparation-step">
+                <span class="pretes-preparation-eyebrow">03 / Al-Qur'an &amp; Dzikir</span>
+                <strong>Surah Pendek &amp; Istighasah</strong>
+                <p>Hafalkan surah pendek pilihan (Al-Bayyinah, Al-'Alaq, Ad-Dhuha) dan bacaan Istighasah.</p>
+            </div>
         </div>
         <div class="pretes-preparation-actions">
             <?php if (!$registeredForActivePretes): ?><a class="btn btn-success" href="<?= BASE_URL ?>/pretes-daftar.php">Daftar Pretes</a><?php endif; ?>
-            <a class="btn btn-primary" href="<?= BASE_URL ?>/pretes-peserta.php">Lihat Peserta &amp; Jadwal Pretes</a>
-            <a class="btn btn-secondary" href="#materi-persiapan-pretes">Lihat 12 Materi Pretes</a>
-            <a class="btn btn-secondary" href="#bacaan-istighasah">Baca Istighasah</a>
+            <a class="btn btn-primary" href="#materi-persiapan-pretes">📖 Buka 12 Materi Pretes</a>
+            <a class="btn btn-secondary" href="#bacaan-istighasah">📿 Bacaan Istighasah</a>
         </div>
     </section>
     <section id="materi-persiapan-pretes" class="pretes-istighasah pretes-preparation-materials" aria-labelledby="pretesMaterialsTitle">

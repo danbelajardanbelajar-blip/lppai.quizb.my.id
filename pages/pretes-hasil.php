@@ -8,8 +8,7 @@ requireLogin();
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
-require_once __DIR__ . '/../includes/pretes-active-page.php';
-if (renderActivePretesParticipantPage($pdo, $user)) return;
+// Halaman hasil pretes menyajikan status kelulusan & kartu nilai 12 komponen resmi
 
 // Pastikan fitur pretes siap
 ensurePretesFeatures($pdo);
@@ -188,7 +187,7 @@ if (isAdmin() || isDosen()) {
     $allResults = $stmtAllRes->fetchAll();
 }
 
-define('PAGE_TITLE', $showPretesPreparation ? 'Informasi & Persiapan Pretes' : 'Pengumuman Hasil Pretes');
+define('PAGE_TITLE', 'Pengumuman Hasil Pretes');
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -314,9 +313,6 @@ include __DIR__ . '/../includes/header.php';
 }
 </style>
 
-<?php if ($showPretesPreparation): ?>
-    <?php include __DIR__ . '/../includes/pretes-preparation-view.php'; ?>
-<?php else: ?>
 <!-- Hasil & Nilai Keseluruhan Pretes Saya -->
 <div class="card" style="margin-bottom: 24px;">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -743,7 +739,7 @@ include __DIR__ . '/../includes/header.php';
                             $no = 1;
                             foreach ($componentDetails as $ck => $detail): 
                             ?>
-                            <tr style="border-bottom:1px solid #f1f5f9;">
+                            <tr style="border-bottom:1px solid #f1f5f9;" data-pretes-component="<?= $ck ?>">
                                 <td align="center" style="padding:10px; font-weight:600; color:#64748b;"><?= $no++ ?></td>
                                 <td style="padding:10px; font-weight:600; color:#1e293b;">
                                     <?= sanitize($detail['label']) ?>
@@ -827,8 +823,6 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
-
-<?php endif; ?>
 
 <?php if (isAdmin() || isDosen()): ?>
 <!-- All Results (Hanya untuk Admin / Dosen) -->

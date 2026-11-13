@@ -5,6 +5,48 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 23:17:15 +0700 — Eliminasi Informasi Berulang "Menunggu Pembagian Kelas dan Penguji" pada Pretes Peserta & Hasil
+
+**Akar Masalah:**
+1. Di `pages/pretes-hasil.php`, baris 12 sebelumnya memanggil `if (renderActivePretesParticipantPage($pdo, $user)) return;` yang membajak halaman Hasil Pretes bagi peserta aktif untuk menampilkan duplikat 100% identik dari `pages/pretes-peserta.php` (kartu jadwal + instruksi scan wajah + hero persiapan), menelan kartu nilai dan pengumuman hasil aslinya.
+2. Di `includes/pretes-preparation-view.php`, judul hero bertuliskan `<h2>Menunggu pembagian kelas dan penguji</h2>`, disertai teks repetitif *"Pendaftaran Anda untuk periode ini sudah tercatat. Silakan menunggu pengumuman pembagian kelas, jadwal, dan penguji pretes..."* dan Step 02 *"Pantau pembagian peserta: Periksa menu Peserta & Jadwal Pretes..."* padahal mahasiswa sudah berada di menu tersebut dan kartu jadwal di atasnya sudah menerangkan status ruangan/dosen penguji dengan rapi. Hal ini menimbulkan repetisi kalimat "menunggu pembagian kelas dan penguji" hingga 5 kali lebih pada satu layar.
+
+**Solusi & Perubahan:**
+- **`includes/pretes-preparation-view.php`**: Mengganti headline hero menjadi `<h2>Materi Persiapan &amp; Praktik Pretes</h2>`, merapikan deskripsi pengantar menjadi satu kalimat informatif yang santun, menata 3 kartu langkah menjadi fokus persiapan substansi ujian:
+  - Step 01: Teori & Tulis (Ujian Tulis CBT wawasan keislaman, aqidah, fiqih ibadah, tajwid).
+  - Step 02: Praktik Ubudiyah (Praktik ibadah wudhu, tayammum, shalat subuh qunut, shalat jenazah, doa harian).
+  - Step 03: Al-Qur'an & Dzikir (Surah Pendek Al-Bayyinah, Al-'Alaq, Ad-Dhuha & Istighasah).
+  - Merapikan tombol CTA di hero untuk fokus navigasi internal: `📖 Buka 12 Materi Pretes` dan `📿 Bacaan Istighasah`.
+- **`pages/pretes-hasil.php`**: Menghapus `renderActivePretesParticipantPage` dan kondisional penggantian materi persiapan. Mengembalikan identitas halaman Hasil Pretes:
+  - Saat periode aktif & nilai belum lengkap: Menyajikan kotak status *"Pretes Periode Aktif Sedang Berlangsung"* dengan rincian jadwal, status dosen penguji, tombol navigasi langsung ke `pretes-peserta.php`, serta tabel evaluasi 12 komponen nilai pretes resmi yang transparan.
+  - Menambahkan atribut semantic `data-pretes-component` pada setiap baris tabel rincian nilai 12 komponen.
+- **`tests/pretes-hasil-preparation-test.py`**: Menambahkan tabel `pretes_assessments` pada harness in-memory SQLite, serta memperbarui pengujian integrasi untuk memastikan `pretes-peserta.php` fokus pada jadwal + instruksi + materi persiapan 12 komponen & Istighasah, sementara `pretes-hasil.php` fokus pada pengumuman status kelulusan resmi & kartu evaluasi 12 komponen.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-preparation-view.php` | 47–74 | Hero section & preparation steps | Mengubah judul menjadi "Materi Persiapan & Praktik Pretes", mengeliminasi kalimat repetitif pantau menu dan belum lulus/tidak lulus, menata 3 langkah persiapan terarah, merapikan tombol CTA internal. |
+| `pages/pretes-hasil.php` | 8–12, 190, 316, 742, 824 | Handler rute, page title & tabel nilai | Menghapus pembajakan rute `renderActivePretesParticipantPage`, mengembalikan PAGE_TITLE hasil, menyematkan `data-pretes-component` pada tabel nilai 12 komponen. |
+| `tests/pretes-hasil-preparation-test.py` | 36, 70–120 | Test suite integrasi pretes peserta & hasil | Menambahkan inisialisasi tabel `pretes_assessments`, memperbarui pemisahan asersi peserta vs hasil pada seluruh 11 kasus uji aktif & tertutup. |
+
+**Verifikasi:**
+1. `php -l pages/pretes-hasil.php` → No syntax errors detected.
+2. `php -l includes/pretes-preparation-view.php` → No syntax errors detected.
+3. `python tests/pretes-hasil-preparation-test.py` → PASS (11 kasus uji: registered, none, old_only, full_active, multiple, priority, assigned, tester, closed_pass, closed_fail, closed_none).
+4. `php tests/pretes-hasil-active-period-test.php` → PASS (100%).
+5. `php tests/pretes-hasil-periode-berakhir-test.php` → PASS (100%).
+6. `php tests/pretes-peserta-aktif-test.php` → PASS (100%).
+7. `php tests/pretes-peserta-instruksi-test.php` → PASS (100%).
+8. `php tests/pretes-pengumuman-hasil-test.php` → PASS (100%).
+9. `php tests/pretes-cbt-session-test.php` → PASS (100%).
+10. `php tests/pretes-cbt-package-test.php` → PASS (100%).
+11. `php tests/pretes-cbt-delete-test.php` → PASS (100%).
+12. `php tests/pretes-cbt-admin-buttons-test.php` → PASS (100%).
+13. `php tests/tutorial-waiting-test.php` → PASS (100%).
+14. `php tests/tutorial-info-test.php` → PASS (100%).
+15. `node tests/pretes-cbt-ui-test.cjs` → PASS (100%).
+
+---
+
 ## 2026-11-13 23:04:22 +0700 — Perbaikan akar masalah: tombol & tab Bank Soal CBT tidak bisa diklik
 
 **Akar masalah (direproduksi dengan harness lokal + browser):** `assets/js/app.js` dimuat di footer **setelah** `pretes-cbt-admin.js` dan mendeklarasikan `function openModal(id)` / `function closeModal(id)` global (hanya menambah/menghapus kelas `.show`). Deklarasi ini **menimpa** `window.openModal`/`window.closeModal` milik CBT, sehingga semua tombol yang membuka modal (Buat Paket, Buat Sesi, Tambah Soal, Kelola Soal, Edit Paket/Sesi) tidak memunculkan apa pun, dan tombol tutup/Esc/klik backdrop gagal. Masalah kedua: handler `submit` global di `app.js` mengubah tombol menjadi "Memproses..." + `disabled` meskipun `onsubmit="return confirm(...)"` dibatalkan, sehingga tombol Hapus/Set Aktif/Jadikan Aktif terkunci setelah klik Batal. Perbaikan sebelumnya (22:51:40) hanya menambah `!important`/inline style dan tidak menyentuh bentrokan nama ini.

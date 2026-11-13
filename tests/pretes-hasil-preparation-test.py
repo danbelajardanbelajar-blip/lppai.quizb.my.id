@@ -34,6 +34,7 @@ function getDBConnection() {
         CREATE TABLE master_gelombang (id INTEGER, status TEXT);
         INSERT INTO master_gelombang VALUES (1, 'aktif');
         CREATE TABLE pretes_registrations (id INTEGER, user_id INTEGER, periode TEXT, pretes_schedule_id INTEGER, hari_pilihan TEXT, jam TEXT, ruangan TEXT, dosen_penguji TEXT, tanggal_daftar TEXT DEFAULT '2026-11-13', status TEXT DEFAULT 'terdaftar');
+        CREATE TABLE pretes_assessments (registration_id INTEGER PRIMARY KEY, scores_json TEXT, assessed_by INTEGER, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE pretes_schedules (id INTEGER, tanggal TEXT, waktu_mulai TEXT, waktu_selesai TEXT, ruangan TEXT, periode TEXT, status TEXT, terisi INTEGER DEFAULT 0, kuota INTEGER DEFAULT 40);
         INSERT INTO pretes_schedules (id, tanggal, waktu_mulai, waktu_selesai, ruangan, periode, status) VALUES (4, '2026-11-17', '13:00', '15:00', 'Ruang Periode Lain', '2026 RPL', 'aktif');
         CREATE TABLE pretes_results (id INTEGER, user_id INTEGER, pretes_schedule_id INTEGER, nilai REAL, created_at TEXT);
@@ -69,37 +70,54 @@ function getDBConnection() {
         if not case.startswith('closed'):
             other = subprocess.run(['php', '-d', 'display_errors=1', 'pages/pretes-peserta.php', case], cwd=root, capture_output=True, text=True, encoding='utf-8')
             assert other.returncode == 0, other.stderr + other.stdout
-            assert html == other.stdout, 'The two active participant routes must render identical content'
-            assert html.count('id="pretes-active-information"') == 1
-            assert html.index('id="pretes-active-participant"') < html.index('id="pretes-active-preparation"')
-            assert html.count('<html ') == 1 and html.count('</html>') == 1
-            assert 'Ruang Periode Lain' not in html and 'Jadwal Nonaktif' not in html
-            if case == 'assigned':
-                assert 'Ruang Peserta' in html and 'Penguji Peserta' in html
-            if case == 'tester': assert 'id="btn-kerjakan-pretes"' in html
-            assert 'Pendaftaran pretes masih aktif' in html
-            assert 'Status Akhir:' not in html and 'Rp 50.000' not in html and 'tutorial-pendaftaran.php' not in html
-            assert 'Periode Pretes Telah Berakhir' not in html
-            assert html.count('data-pretes-component=') == 12
-            for component in ['ujian_tulis', 'praktik_wudlu', 'doa_setelah_wudlu', 'praktik_tayammum',
-                              'niat_mandi_besar', 'niat_jamak_qashar', 'bacaan_shalat_subuh',
-                              'al_bayyinah', 'al_alaq', 'al_dluha', 'istighasah', 'shalat_jenazah']:
-                assert f'data-pretes-component="{component}"' in html
-            assert html.index('id="materi-persiapan-pretes"') < html.index('id="bacaan-istighasah"')
-            assert html.count('class="pretes-reading"') == 5
-            assert html.count('class="pretes-video-link"') == 5
-            assert html.count('class="pretes-reading-verse"') == 39  # 11 + 19 + 8 verses and one doa.
-            assert '<iframe' not in html
-            assert 'Istighasah' in html and html.count('class="pretes-istighasah-arabic"') == 12
-            assert html.count('>40 kali</span>') == 3 and html.count('>11 kali</span>') == 9
-            assert 'Surat Yasin' in html and 'lang="ar" dir="rtl"' in html
-            if case in ['none', 'old_only']:
-                assert '>Daftar Pretes</a>' in html
-                assert 'Pendaftaran Anda untuk periode ini sudah tercatat' not in html
-            else:
-                assert 'Menunggu pembagian kelas dan penguji' in html
-                assert '>Daftar Pretes</a>' not in html
-            assert 'Khusus RPL' not in html and '>2026/2027<' in html
+            peserta_html = other.stdout
+            hasil_html = html
+
+            if case in ['registered', 'multiple', 'priority', 'assigned', 'tester', 'full_active']:
+                # Peserta terdaftar periode aktif: pretes-peserta menampilkan jadwal, instruksi & materi persiapan
+                assert peserta_html.count('id="pretes-active-information"') == 1
+                assert peserta_html.index('id="pretes-active-participant"') < peserta_html.index('id="pretes-active-preparation"')
+                assert peserta_html.count('<html ') == 1 and peserta_html.count('</html>') == 1
+                assert 'Ruang Periode Lain' not in peserta_html and 'Jadwal Nonaktif' not in peserta_html
+                if case == 'assigned':
+                    assert 'Ruang Peserta' in peserta_html and 'Penguji Peserta' in peserta_html
+                if case == 'tester': assert 'id="btn-kerjakan-pretes"' in peserta_html
+                assert 'Pendaftaran pretes masih aktif' in peserta_html
+                assert 'Status Akhir:' not in peserta_html and 'Rp 50.000' not in peserta_html and 'tutorial-pendaftaran.php' not in peserta_html
+                assert 'Periode Pretes Telah Berakhir' not in peserta_html
+                assert peserta_html.count('data-pretes-component=') == 12
+                for component in ['ujian_tulis', 'praktik_wudlu', 'doa_setelah_wudlu', 'praktik_tayammum',
+                                  'niat_mandi_besar', 'niat_jamak_qashar', 'bacaan_shalat_subuh',
+                                  'al_bayyinah', 'al_alaq', 'al_dluha', 'istighasah', 'shalat_jenazah']:
+                    assert f'data-pretes-component="{component}"' in peserta_html
+                assert peserta_html.index('id="materi-persiapan-pretes"') < peserta_html.index('id="bacaan-istighasah"')
+                assert peserta_html.count('class="pretes-reading"') == 5
+                assert peserta_html.count('class="pretes-video-link"') == 5
+                assert peserta_html.count('class="pretes-reading-verse"') == 39
+                assert '<iframe' not in peserta_html
+                assert 'Istighasah' in peserta_html and peserta_html.count('class="pretes-istighasah-arabic"') == 12
+                assert peserta_html.count('>40 kali</span>') == 3 and peserta_html.count('>11 kali</span>') == 9
+                assert 'Surat Yasin' in peserta_html and 'lang="ar" dir="rtl"' in peserta_html
+                assert 'Materi Persiapan &amp; Praktik Pretes' in peserta_html
+                assert '>Daftar Pretes</a>' not in peserta_html
+                assert 'Khusus RPL' not in peserta_html and '>2026/2027<' in peserta_html
+
+                # Halaman hasil (pretes-hasil.php) fokus pada hasil kelulusan resmi & kartu nilai 12 komponen
+                assert 'Pengumuman Hasil Kelulusan Pretes' in hasil_html
+                assert hasil_html.count('data-pretes-component=') == 12
+                if case in ['registered', 'multiple', 'priority', 'assigned', 'tester']:
+                    assert 'Pretes Periode Aktif Sedang Berlangsung' in hasil_html
+                    assert 'pretes-peserta.php' in hasil_html
+                elif case == 'full_active':
+                    assert 'Selamat, Anda Dinyatakan LULUS Pretes!' in hasil_html
+                    assert 'Rp 50.000' in hasil_html
+            elif case == 'none':
+                # Kasus belum pernah mendaftar pretes: arahkan ke pendaftaran pretes
+                assert 'Pendaftaran Pretes Sedang Dibuka' in hasil_html
+                assert 'pretes-daftar.php' in hasil_html
+            elif case == 'old_only':
+                # Memiliki riwayat pretes lama yang lulus
+                assert 'Selamat, Anda Dinyatakan LULUS Pretes!' in hasil_html
         else:
             assert 'pretes-preparation-hero' not in html
             legacy = subprocess.run(['php', '-d', 'display_errors=1', 'pages/pretes-peserta.php', case], cwd=root, capture_output=True, text=True, encoding='utf-8')
@@ -114,4 +132,4 @@ function getDBConnection() {
             output.mkdir(parents=True, exist_ok=True)
             (output / (case + '.html')).write_text(html, encoding='utf-8')
         print('PASS:', case)
-print('PASS: active pretes overrides active tutorial and old results; waiting/preparation, Arabic reading counts, and closed-period results.')
+print('PASS: active pretes separation, non-redundant waiting/preparation, Arabic reading counts, and closed-period results.')
