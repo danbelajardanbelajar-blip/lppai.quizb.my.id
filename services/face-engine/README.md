@@ -69,6 +69,12 @@ PRETES_FACE_ENGINE_TOKEN=<token-rahasia-yang-sama-dengan-VPS>
 
 Jangan menaruh token di JavaScript, Git, atau URL. `.env` tidak dimuat otomatis oleh
 aplikasi ini. Pastikan environment benar-benar diteruskan ke PHP oleh pengelola hosting.
+Jika hosting tidak menyediakan pengaturan environment, salin file PHP privat
+`config/pretes-face.local.php` melalui SSH/SCP dengan isi `return ['url' =>
+'https://hostname-layanan', 'token' => 'token-layanan'];` setelah tag pembuka PHP.
+Atur izin file ke `600`. File tersebut diabaikan Git, direktori `config/` ditolak
+untuk akses HTTP oleh `.htaccess`, dan file hanya dibaca di server. Environment,
+jika diisi, tetap mendapat prioritas. Jangan menyalin `runtime.env` mentah ke web root.
 PHP menunggu maksimal 15 detik ke VPS, browser maksimal 20 detik per request.
 Tanpa konfigurasi, saat model gagal, atau saat VPS tidak merespons, verifikasi
 gagal dan akses ujian tetap terkunci. Tidak ada fallback pembandingan piksel/GD.

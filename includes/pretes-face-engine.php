@@ -1,9 +1,17 @@
 <?php
 /** Server-authoritative face recognition bridge. Never trust a browser match score. */
 function pretesFaceEngineConfig(): array {
+    // Shared hosting may not expose PHP-FPM environment settings. This private,
+    // ignored PHP file is copied over SSH; it must never be committed to Git.
+    $local = [];
+    $path = __DIR__ . '/../config/pretes-face.local.php';
+    if (is_file($path)) {
+        $settings = require $path;
+        if (is_array($settings)) $local = $settings;
+    }
     return [
-        'url' => rtrim((string)getenv('PRETES_FACE_ENGINE_URL'), '/'),
-        'token' => (string)getenv('PRETES_FACE_ENGINE_TOKEN'),
+        'url' => rtrim((string)(getenv('PRETES_FACE_ENGINE_URL') ?: ($local['url'] ?? '')), '/'),
+        'token' => (string)(getenv('PRETES_FACE_ENGINE_TOKEN') ?: ($local['token'] ?? '')),
     ];
 }
 

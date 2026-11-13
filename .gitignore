@@ -37,4 +37,5 @@ uploads/
 
 scratch/
 services/face-engine/models/
+config/pretes-face.local.php
 **/__pycache__/
