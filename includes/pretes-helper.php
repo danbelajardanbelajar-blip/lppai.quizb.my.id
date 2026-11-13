@@ -859,6 +859,14 @@ if (!function_exists('ensurePretesProctoringTables')) {
     function ensurePretesProctoringTables(PDO $pdo): void {
         static $checked = false;
         if ($checked) return;
+        // Jalur normal cukup membaca tabel; hindari DDL di setiap request kamera.
+        try {
+            $pdo->query("SELECT 1 FROM pretes_proctoring_logs LIMIT 0");
+            $checked = true;
+            return;
+        } catch (PDOException $e) {
+            // Instalasi pertama: buat tabel di bawah bila belum tersedia.
+        }
         try {
             $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
             if ($driver === 'sqlite') {

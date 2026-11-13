@@ -36,6 +36,8 @@ function environment(getUserMedia) {
     }
     const alerts = [];
     const requests = [];
+    const timers = new Map();
+    let timerId = 0;
     const sandbox = {
         document: {
             readyState: 'complete', getElementById: element,
@@ -46,15 +48,18 @@ function environment(getUserMedia) {
         navigator: { mediaDevices: { getUserMedia } },
         console: { log() {}, warn() {}, error() {} },
         alert: message => alerts.push(message),
-        setInterval() { return 1; }, clearInterval() {}, setTimeout() {},
+        AbortController,
+        setInterval() { return 1; }, clearInterval() {},
+        setTimeout(callback, delay) { timers.set(++timerId, { callback, delay }); return timerId; },
+        clearTimeout(id) { timers.delete(id); },
         fetch(url, options) {
             requests.push(JSON.parse(options.body));
-            return Promise.resolve({ json: () => Promise.resolve({ verified: false, score: 0, message: 'Tidak cocok' }) });
+            return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: false, score: 0, message: 'Tidak cocok' }) });
         }
     };
     sandbox.window = sandbox;
     vm.createContext(sandbox);
-    return { sandbox, element, alerts, requests };
+    return { sandbox, element, alerts, requests, timers };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -85,6 +90,36 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(env.requests[0].action, 'initial_checkin');
     assert.match(env.requests[0].csrf_token, /^[a-f0-9]{64}$/);
     assert.equal(env.requests[0].registration_id, 42);
+    assert.equal(env.element('btnRunCheckin').disabled, false);
+    assert.equal(env.timers.size, 0, 'Timer dibersihkan setelah respons');
+
+    // Server tidak merespons: pulihkan tombol dan tampilkan batas waktu.
+    env.sandbox.fetch = () => new Promise(() => {});
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.equal(env.element('btnRunCheckin').disabled, true);
+    const timer = [...env.timers.values()].find(timer => timer.delay === 20000);
+    assert.ok(timer, 'Batas waktu 20 detik harus terpasang');
+    timer.callback();
+    await settle();
+    assert.equal(env.element('btnRunCheckin').disabled, false);
+    assert.match(env.element('checkinAlert').textContent, /20 detik/);
+
+    // HTML error hosting dan sesi kedaluwarsa harus menghasilkan pesan yang jelas.
+    env.sandbox.fetch = () => Promise.resolve({ ok: false, status: 502, json: () => Promise.reject(new SyntaxError('HTML')) });
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.match(env.element('checkinAlert').textContent, /HTTP 502/);
+    assert.equal(env.element('btnRunCheckin').disabled, false);
+    env.sandbox.fetch = () => Promise.resolve({ ok: false, status: 401, json: () => Promise.resolve({ message: 'Sesi login telah berakhir' }) });
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.match(env.element('checkinAlert').textContent, /Sesi login telah berakhir/);
+
+    env.sandbox.document.createElement = () => { throw new Error('Snapshot gagal'); };
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.match(env.element('checkinAlert').textContent, /Snapshot gagal/);
     assert.equal(env.element('btnRunCheckin').disabled, false);
 
     const denied = environment(() => Promise.reject({ name: 'NotAllowedError', message: 'Denied' }));

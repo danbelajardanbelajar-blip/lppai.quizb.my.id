@@ -476,6 +476,40 @@ let secondsRemaining = 300; // 5 menit = 300 detik
 let activeStream = null;
 let currentFacingMode = 'user';
 
+// Batasi seluruh request, termasuk pembacaan body respons, agar UI selalu pulih.
+function requestProctoringCheck(payload) {
+    const controller = new AbortController();
+    let timeoutId;
+    const timeout = new Promise(function(resolve, reject) {
+        timeoutId = setTimeout(function() {
+            reject(new Error('Server belum merespons dalam 20 detik. Silakan coba lagi. Jika berulang, hubungi admin.'));
+            controller.abort();
+        }, 20000);
+    });
+    const request = Promise.resolve().then(function() {
+        return fetch(API_URL, {
+            method: 'POST',
+            credentials: 'same-origin',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ csrf_token: CSRF_TOKEN, registration_id: REGISTRATION_ID }, payload))
+        });
+    }).then(async function(response) {
+        let data;
+        try {
+            data = await response.json();
+        } catch (error) {
+            throw new Error('Respons server tidak valid (HTTP ' + response.status + '). Muat ulang halaman atau hubungi admin.');
+        }
+        if (!response.ok) {
+            throw new Error(data.message || 'Server gagal memproses verifikasi (HTTP ' + response.status + ').');
+        }
+        if (!data || typeof data !== 'object') throw new Error('Data verifikasi server tidak valid.');
+        return data;
+    });
+    return Promise.race([request, timeout]).finally(function() { clearTimeout(timeoutId); });
+}
+
 // ── Global Webcam Handler & Engine Skenario A & B ──
 window.startCheckinCamera = function(isUserAction) {
     console.log("[Webcam] startCheckinCamera dipanggil, userAction:", isUserAction);
@@ -713,6 +747,7 @@ function runInitialCheckin() {
     const video = document.getElementById('checkinVideo');
     const alertBox = document.getElementById('checkinAlert');
     const btn = document.getElementById('btnRunCheckin');
+    if (btn && btn.disabled) return;
 
     if (!video || !video.videoWidth || !activeStream) {
         alert("Kamera belum aktif. Klik tombol 'Aktifkan Kamera' terlebih dahulu dan pastikan wajah Anda tampak di layar.");
@@ -733,26 +768,22 @@ function runInitialCheckin() {
         alertBox.innerHTML = '<strong>⏳ Sedang Mencocokkan...</strong><br>Sistem AI sedang membandingkan wajah di kamera dengan pasfoto pendaftaran resmi Anda.';
     }
 
-    // Ambil snapshot 3:4 portrait
-    const snapCanvas = document.createElement('canvas');
-    snapCanvas.width = 360;
-    snapCanvas.height = 480;
-    const ctx = snapCanvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
-    const livePhotoData = snapCanvas.toDataURL('image/jpeg', 0.88);
+    // Sertakan kegagalan snapshot dalam jalur penanganan error yang sama.
+    Promise.resolve().then(function() {
+        // Ambil snapshot 3:4 portrait
+        const snapCanvas = document.createElement('canvas');
+        snapCanvas.width = 360;
+        snapCanvas.height = 480;
+        const ctx = snapCanvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
+        const livePhotoData = snapCanvas.toDataURL('image/jpeg', 0.88);
 
-    // Kirim ke backend API
-    fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            csrf_token: CSRF_TOKEN,
+        // Kirim ke backend API
+        return requestProctoringCheck({
             action: 'initial_checkin',
-            registration_id: REGISTRATION_ID,
             live_photo: livePhotoData
-        })
+        });
     })
-    .then(res => res.json())
     .then(data => {
         if (btn) {
             btn.disabled = false;
@@ -803,7 +834,7 @@ function runInitialCheckin() {
             alertBox.style.background = '#fef2f2';
             alertBox.style.border = '1px solid #fca5a5';
             alertBox.style.color = '#991b1b';
-            alertBox.innerHTML = '<strong>Error Koneksi Server:</strong> ' + err.message;
+            alertBox.textContent = 'Verifikasi belum selesai: ' + err.message;
         }
     });
 }
@@ -876,17 +907,10 @@ function runPeriodicProctoringCheck() {
     ctx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
     const livePhotoData = snapCanvas.toDataURL('image/jpeg', 0.85);
 
-    fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            csrf_token: CSRF_TOKEN,
-            action: 'periodic_5min',
-            registration_id: REGISTRATION_ID,
-            live_photo: livePhotoData
-        })
+    requestProctoringCheck({
+        action: 'periodic_5min',
+        live_photo: livePhotoData
     })
-    .then(res => res.json())
     .then(data => {
         const lastInfo = document.getElementById('lastCheckInfo');
         const alertBox = document.getElementById('proctorViolationAlert');
@@ -911,6 +935,8 @@ function runPeriodicProctoringCheck() {
     })
     .catch(err => {
         console.error("Periodic proctoring error:", err);
+        const lastInfo = document.getElementById('lastCheckInfo');
+        if (lastInfo) lastInfo.textContent = 'Pemeriksaan belum selesai: ' + err.message;
     });
 }
 
