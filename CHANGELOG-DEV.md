@@ -34,6 +34,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 21:42:36 +0700 — Kelulusan Tutorial: peserta aktif/terdaftar tidak lagi disuruh daftar ulang
+
+**File:** `pages/tutorial-pengumuman.php`
+
+| Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|
+| 19–20 | Query pendaftaran terakhir | Ambil `dosen_pengampu`, `hari`, `jam`, `ruangan`; `gelombang` = `COALESCE(NULLIF(tc.gelombang,''), tr.gelombang)` (sebelumnya `tc.gelombang` NULL menimpa `tr.gelombang` → label gelombang kosong). |
+| 44–51 | Gelombang aktif & flag status | `master_gelombang` kini difilter `status = 'aktif'`; tambah `$isOngoing` (status `terdaftar`/`aktif`), `$isPlotted`, `$gelText` (label gelombang ramah). |
+| 129–182 | Cabang baru `elseif ($isOngoing)` | Kartu "Anda Sedang Mengikuti Tutorial": badge Peserta Aktif / Menunggu Plotting, info kelas-tutor-jadwal-ruangan bila sudah diplot, tombol Info Tutorial / Rincian Nilai / Dashboard. **Tanpa** ajakan "Daftarkan Diri Anda Sekarang". |
+| 195 | Cabang belum lulus | Label gelombang memakai `$gelText`. |
+
+**Alasan:** mahasiswa berstatus `Terdaftar` (sedang menjadi peserta) melihat "Belum Dinyatakan Lulus" + tombol daftar tutorial lagi.
+**Verifikasi:** `php -l` OK; 10 test terkait tutorial/pengumuman lulus.
+
+---
+
 ## 2026-11-13 21:23:37 +0700 — Diktat PDF dimasukkan ke repo (atas permintaan user)
 
 | File | Baris | Bagian | Perubahan |

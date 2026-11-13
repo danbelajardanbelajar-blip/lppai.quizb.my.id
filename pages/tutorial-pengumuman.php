@@ -16,7 +16,8 @@ $pdo  = getDBConnection();
 
 // Cek pendaftaran tutorial terakhir (terbaru)
 $stmt = $pdo->prepare("
-    SELECT tr.*, tc.nama_kelas, tc.gelombang
+    SELECT tr.*, tc.nama_kelas, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan,
+           COALESCE(NULLIF(tc.gelombang, ''), tr.gelombang) AS gelombang
     FROM tutorial_registrations tr
     LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tr.user_id = ?
@@ -40,8 +41,14 @@ if (!empty($user['nim'])) {
     }
 }
 
-// Cek ketersediaan pendaftaran aktif saat ini
-$active_gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+// Cek ketersediaan pendaftaran aktif saat ini (hanya gelombang berstatus aktif)
+$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
+
+// Peserta yang masih berjalan (terdaftar / aktif) tidak boleh diarahkan daftar ulang
+$isOngoing = $latestReg && in_array($latestReg['status'] ?? '', ['terdaftar', 'aktif'], true);
+$isPlotted = $isOngoing && !empty($latestReg['nama_kelas']);
+$gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
+$gelText   = $latestReg ? ($gelLabels[$latestReg['gelombang'] ?? ''] ?? ucfirst((string)($latestReg['gelombang'] ?? ''))) : '';
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -119,6 +126,60 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+    <?php elseif ($isOngoing): ?>
+        <!-- Tampilan Jika Masih Menjadi Peserta Tutorial (terdaftar / aktif) -->
+        <div style="background: linear-gradient(135deg, #0b3b22, #156138); color: white; padding: 30px 20px; text-align: center;">
+            <h2 style="margin: 0; font-size: 26px; color:#fff;">📘 STATUS KELULUSAN</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 16px;">Lembaga Pengembangan Pendidikan Agama Islam</p>
+        </div>
+        <div style="padding: 36px 30px; text-align: center;">
+            <h3 style="color: #0b3b22; margin: 0 0 12px;">Anda Sedang Mengikuti Tutorial</h3>
+            <p style="color: #4b5563; font-size: 16px; margin: 0 0 10px;">
+                Status Anda pada program Tutorial<?= $gelText !== '' ? ' <strong>' . sanitize($gelText) . '</strong>' : '' ?>
+                adalah
+                <?php if ($latestReg['status'] === 'aktif'): ?>
+                    <span class="badge" style="font-size: 14px; background:#d1fae5; color:#047857;">Peserta Aktif</span>
+                <?php else: ?>
+                    <span class="badge" style="font-size: 14px; background:#fef3c7; color:#b45309;">Terdaftar · Menunggu Plotting Kelas</span>
+                <?php endif; ?>
+            </p>
+            <p style="color: #4b5563; font-size: 15.5px; margin: 0 0 22px; line-height: 1.6;">
+                Pengumuman kelulusan akan tampil di halaman ini setelah seluruh rangkaian tutorial selesai dan nilai akhir Anda ditetapkan.
+                Ikuti setiap pertemuan dan lengkapi seluruh penilaian.
+            </p>
+
+            <?php if ($isPlotted): ?>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; text-align:left; margin-bottom:22px;">
+                    <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                        <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">🏫 KELAS</div>
+                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($latestReg['nama_kelas']) ?></div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                        <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">👨‍🏫 TUTOR</div>
+                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($latestReg['dosen_pengampu'] ?: '-') ?></div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                        <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">🗓️ JADWAL</div>
+                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($latestReg['hari'] ?: '-') ?><?= !empty($latestReg['jam']) ? ', ' . sanitize($latestReg['jam']) : '' ?></div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                        <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">📍 RUANGAN</div>
+                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($latestReg['ruangan'] ?: '-') ?></div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div style="background:#fffbeb; border:1px solid #fde68a; padding:16px; border-radius:8px; margin-bottom:22px; color:#92400e; font-size:15px;">
+                    ⏳ Pendaftaran Anda sudah diterima. Kelas, tutor, jadwal, dan ruangan akan diumumkan setelah plotting oleh TU selesai.
+                </div>
+            <?php endif; ?>
+
+            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                <a href="<?= BASE_URL ?>/tutorial-info.php" class="btn btn-primary" style="padding: 10px 22px; text-decoration:none;">📘 Lihat Info Tutorial</a>
+                <a href="<?= BASE_URL ?>/rekap-nilai.php" class="btn btn-secondary" style="padding: 10px 22px; text-decoration:none;">📋 Rincian Nilai</a>
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="padding: 10px 22px; text-decoration:none;">🏠 Dashboard</a>
+            </div>
+        </div>
+
     <?php else: ?>
         <!-- Tampilan Jika Belum Lulus atau Belum Ada Data -->
         <div style="background-color: #f59e0b; color: white; padding: 30px 20px; text-align: center;">
@@ -131,7 +192,7 @@ include __DIR__ . '/../includes/header.php';
                 <p style="color: #4b5563; font-size: 16px; margin-bottom: 25px;">Anda belum memiliki riwayat pendaftaran atau kelulusan pada program Tutorial LPPAI.</p>
             <?php else: ?>
                 <h3 style="color: #dc2626; margin-bottom: 15px;">Belum Dinyatakan Lulus</h3>
-                <p style="color: #4b5563; font-size: 16px; margin-bottom: 15px;">Status terakhir Anda pada program Tutorial <strong><?= sanitize(ucfirst($latestReg['gelombang'])) ?></strong> adalah <span class="badge badge-danger" style="font-size: 14px;"><?= ucfirst(str_replace('_', ' ', $latestReg['status'])) ?></span>.</p>
+                <p style="color: #4b5563; font-size: 16px; margin-bottom: 15px;">Status terakhir Anda pada program Tutorial <strong><?= sanitize($gelText) ?></strong> adalah <span class="badge badge-danger" style="font-size: 14px;"><?= ucfirst(str_replace('_', ' ', $latestReg['status'])) ?></span>.</p>
                 <p style="color: #4b5563; font-size: 16px; margin-bottom: 25px;">Oleh karena itu, Anda belum berhak mendapatkan sertifikat kelulusan.</p>
             <?php endif; ?>
 
