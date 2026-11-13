@@ -75,8 +75,8 @@ function comparePretesFaces(string $referencePath, array $frames, ?array $challe
         return pretesFaceEngineError('Pasfoto pendaftaran tidak ditemukan. Perbarui pasfoto Anda.');
     }
     if (filesize($reference) > 8 * 1024 * 1024) return pretesFaceEngineError('Pasfoto terlalu besar. Unggah ulang foto maksimal 8 MB.');
-    $expected = $challenge ? 3 : 1;
-    if (count($frames) !== $expected) return pretesFaceEngineError('Jumlah foto tantangan tidak sesuai. Silakan ulangi.');
+    $expected = $challenge ? [3, 9] : [1];
+    if (!in_array(count($frames), $expected, true)) return pretesFaceEngineError('Jumlah foto tantangan tidak sesuai. Silakan ulangi.');
     foreach ($frames as $frame) {
         if (!is_string($frame) || strlen($frame) > 700000 || !preg_match('#^data:image/jpeg;base64,#', $frame)) {
             return pretesFaceEngineError('Foto kamera tidak valid atau terlalu besar.');

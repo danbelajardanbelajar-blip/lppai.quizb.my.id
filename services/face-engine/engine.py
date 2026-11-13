@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import os
+import statistics
 import threading
 from pathlib import Path
 
@@ -12,7 +13,9 @@ from PIL import Image, ImageOps
 
 
 class FaceError(ValueError):
-    pass
+    def __init__(self, message, fatal=False):
+        super().__init__(message)
+        self.fatal = fatal
 
 
 def decode_image(payload: str):
@@ -34,7 +37,7 @@ def decode_image(payload: str):
         raise FaceError('Gambar tidak dapat dibaca.') from error
 
 
-def motion_passes(faces, direction):
+def motion_details(groups, direction):
     """Basic randomized head-turn challenge; NOT certified presentation attack detection."""
     def nose_ratio(face):
         eye_mid = (face[4] + face[6]) / 2
@@ -43,10 +46,22 @@ def motion_passes(faces, direction):
             raise FaceError('Wajah terlalu kecil. Dekatkan wajah ke kamera.')
         return float((face[8] - eye_mid) / eye_distance)
 
-    neutral, turn, returned = [nose_ratio(face) for face in faces]
-    delta = turn - neutral
-    correct_direction = delta < -0.12 if direction == 'left' else delta > 0.12
-    return correct_direction and abs(returned - neutral) < 0.10
+    baseline = statistics.median(nose_ratio(face) for face in groups[0])
+    turns = [nose_ratio(face) - baseline for face in groups[1]]
+    required = min(2, len(turns))
+    if sum(delta < -0.12 if direction == 'left' else delta > 0.12 for delta in turns) < required:
+        side = 'kiri' if direction == 'left' else 'kanan'
+        return False, 2, f'Langkah 2: gerakan ke {side} layar belum cukup terbaca. Putar kepala perlahan, bukan hanya menggeser badan, dan tahan mengikuti hitung mundur.'
+    returned = [abs(nose_ratio(face) - baseline) < 0.10 for face in groups[2]]
+    if sum(returned) < min(2, len(returned)):
+        return False, 3, 'Langkah 3: kepala belum kembali ke posisi awal. Hadapkan wajah seperti pada langkah pertama dan tahan hingga hitung mundur selesai.'
+    return True, None, ''
+
+
+def motion_passes(faces, direction):
+    size = len(faces) // 3
+    groups = [faces[i * size:(i + 1) * size] for i in range(3)]
+    return motion_details(groups, direction)[0]
 
 
 class FaceEngine:
@@ -63,6 +78,8 @@ class FaceEngine:
         height, width = image.shape[:2]
         self.detector.setInputSize((width, height))
         _, faces = self.detector.detect(image)
+        if faces is not None and len(faces) > 1:
+            raise FaceError('Lebih dari satu wajah terdeteksi. Pastikan hanya Anda berada di kamera.', fatal=True)
         if faces is None or len(faces) != 1:
             raise FaceError('Harus ada tepat satu wajah pada setiap foto, termasuk pasfoto pendaftaran.')
         face = faces[0]
@@ -81,16 +98,34 @@ class FaceEngine:
     def verify(self, reference, frames, direction=None):
         result = dict(engine='opencv-sface-v1', match=False, similarity=0.0,
                       status='ERROR', reason='', motion_passed=False)
-        if direction not in (None, 'left', 'right') or len(frames) != (3 if direction else 1):
+        if direction not in (None, 'left', 'right') or len(frames) not in ((3, 9) if direction else (1,)):
             return dict(result, reason='Data tantangan tidak valid.')
         if not self.lock.acquire(blocking=False):
             raise BlockingIOError('Engine busy')
         try:
-            _, ref_embedding = self.describe(decode_image(reference))
+            try:
+                _, ref_embedding = self.describe(decode_image(reference))
+            except FaceError as error:
+                raise FaceError('Pasfoto pendaftaran: ' + str(error)) from error
             images = [decode_image(frame) for frame in frames]
-            if direction and len({hashlib.sha256(image.tobytes()).digest() for image in images}) != 3:
+            if direction and len({hashlib.sha256(image.tobytes()).digest() for image in images}) != len(images):
                 raise FaceError('Foto tantangan berulang. Ikuti gerakan dari kamera secara langsung.')
-            descriptions = [self.describe(image) for image in images]
+            groups = []
+            size = len(images) // 3 if direction else 1
+            for stage in range(3 if direction else 1):
+                valid = []
+                last_error = None
+                for image in images[stage * size:(stage + 1) * size]:
+                    try:
+                        valid.append(self.describe(image))
+                    except FaceError as error:
+                        if error.fatal: raise
+                        last_error = error
+                if len(valid) < min(2, size):
+                    prefix = f'Langkah {stage + 1}: ' if direction else 'Kamera: '
+                    raise FaceError(prefix + str(last_error or 'Wajah belum cukup jelas.'))
+                groups.append(valid)
+            descriptions = [description for group in groups for description in group]
             scores = [float(self.recognizer.match(ref_embedding, embedding, cv2.FaceRecognizerSF_FR_COSINE))
                       for _, embedding in descriptions]
             same_person = all(score >= self.threshold for score in scores)
@@ -98,14 +133,14 @@ class FaceEngine:
             consistent = all(float(self.recognizer.match(descriptions[0][1], embedding,
                               cv2.FaceRecognizerSF_FR_COSINE)) >= self.threshold
                              for _, embedding in descriptions[1:])
-            motion = motion_passes([face for face, _ in descriptions], direction) if direction else False
             score = round(min(scores) * 100, 1)
             if not same_person or not consistent:
                 return dict(result, status='MISMATCH', similarity=score,
                             reason='Ciri wajah belum sesuai pasfoto pendaftaran. Hadapkan wajah dengan pencahayaan jelas.')
+            motion, step, motion_reason = motion_details([[face for face, _ in group] for group in groups], direction) if direction else (False, None, '')
             if direction and not motion:
                 return dict(result, status='MOTION_REQUIRED', similarity=score,
-                            reason='Gerakan belum sesuai. Gerakkan kepala mengikuti panah, lalu kembali menghadap lurus.')
+                            failed_step=step, reason=motion_reason)
             return dict(result, match=True, status='MATCH', similarity=score, motion_passed=motion,
                         reason='Ciri wajah sesuai pasfoto pendaftaran. Skor adalah indeks kemiripan, bukan persentase kepastian identitas.')
         except FaceError as error:

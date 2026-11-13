@@ -78,6 +78,11 @@ Semua aksi API memerlukan login, CSRF, kepemilikan pendaftaran, dan sesi
 verifikasi wajah versi baru yang belum berakhir. API tidak mengirim kunci ke
 peserta dan tidak menerima skor/jam ujian dari browser sebagai dasar penilaian.
 Pengawasan kamera bersifat pemeriksaan berkala, bukan jaminan antikecurangan.
+Check-in wajah mengambil tiga sampel per posisi (sembilan foto total) selama
+hitung mundur. Mesin VPS menerima protokol lama tiga foto dan protokol baru
+sembilan foto; pasang versi layanan yang mendukung `pose-burst-v2` sebelum menarik
+versi halaman ini ke hosting. Pesan gagal menjelaskan langkah gerakan yang belum
+terbaca. Ambang pengenalan identitas tetap sama.
 
 ## Pemeriksaan
 

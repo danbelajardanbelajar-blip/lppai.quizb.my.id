@@ -25,7 +25,7 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 
 @app.get('/health')
 async def health(request: Request):
-    return {'ready': hasattr(request.app.state, 'engine'), 'engine': 'opencv-sface-v1'}
+    return {'ready': hasattr(request.app.state, 'engine'), 'engine': 'opencv-sface-v1', 'capture_protocol': 'pose-burst-v2', 'max_frames': 9}
 
 
 @app.post('/verify')
@@ -42,7 +42,7 @@ async def verify(request: Request):
         if not isinstance(data, dict) or not isinstance(data.get('reference'), str):
             raise ValueError('Invalid reference')
         frames = data.get('frames')
-        if not isinstance(frames, list) or not 1 <= len(frames) <= 3 or not all(isinstance(f, str) and len(f) <= 700000 for f in frames):
+        if not isinstance(frames, list) or len(frames) not in (1, 3, 9) or not all(isinstance(f, str) and len(f) <= 700000 for f in frames):
             raise ValueError('Invalid frames')
         started = time.perf_counter()
         result = await run_in_threadpool(request.app.state.engine.verify,

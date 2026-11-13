@@ -1,15 +1,22 @@
 # Mesin verifikasi wajah pretes
 
 Server PHP membaca pasfoto dari `uploads/`, memvalidasi kepemilikan pendaftaran,
-dan menerbitkan nonce tantangan yang berlaku 90 detik. Browser mengirim tiga foto
-(lurus, menoleh mengikuti panah acak, lurus kembali). PHP mengonsumsi nonce secara
+dan menerbitkan nonce tantangan yang berlaku 90 detik. Browser mengirim sembilan
+foto (tiga sampel lurus, tiga menoleh mengikuti panah acak, tiga kembali ke posisi
+awal). PHP mengonsumsi nonce secara
 atomik, lalu mengirim foto ke layanan ini. Browser tidak mengirim keputusan cocok
 atau embedding yang dipercaya server.
 
 YuNet mendeteksi tepat satu wajah dan landmark. SFace menyelaraskan wajah dan
 menghasilkan embedding; semua foto harus cocok dengan pasfoto serta satu sama
 lain. Pemeriksaan kualitas menolak wajah kecil, foto buram, dan pencahayaan ekstrem.
-Pemeriksaan gerakan menghitung perubahan posisi hidung relatif terhadap mata.
+Pemeriksaan gerakan menghitung perubahan posisi hidung relatif terhadap mata,
+menggunakan median posisi awal dan minimal dua sampel konsisten per posisi.
+Satu bingkai berkualitas buruk dapat diabaikan bila dua sampel lainnya jelas;
+lebih dari satu wajah atau identitas berbeda pada sampel valid tetap ditolak.
+Pesan langkah 2/3 membedakan gerakan menoleh yang belum terbaca dari posisi akhir
+yang belum kembali. Batas kecocokan identitas tidak diturunkan. Protokol tiga foto
+lama masih diterima selama pembaruan bergulir; `/health` melaporkan `max_frames: 9`.
 Ini tantangan gerakan dasar, **bukan PAD/liveness bersertifikasi**, dan belum
 menjamin penolakan video replay, deepfake, atau kamera virtual. Untuk ujian dengan
 risiko tinggi, gunakan pengawas atau penyedia PAD yang dievaluasi secara terpisah.

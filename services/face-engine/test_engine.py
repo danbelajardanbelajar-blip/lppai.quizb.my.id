@@ -2,6 +2,7 @@ import base64
 import io
 import os
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from PIL import Image
@@ -51,6 +52,43 @@ class EngineTests(unittest.TestCase):
 
     def test_wrong_frame_count(self):
         self.assertFalse(self.engine.verify(image_payload(), [], 'left')['match'])
+
+    def test_burst_sampling_and_failure_steps(self):
+        def face(nose):
+            return np.array([0, 0, 160, 200, 40, 50, 100, 50, nose, 90, 50, 130, 90, 130, 1], dtype=np.float32)
+        center, left, right = face(70), face(55), face(85)
+        embedding = np.ones((1, 128), dtype=np.float32)
+        def run(poses):
+            images = [np.full((128,128,3), i, dtype=np.uint8) for i in range(10)]
+            descriptions = [(center, embedding)] + [pose if isinstance(pose, Exception) else (pose, embedding) for pose in poses]
+            with patch('engine.decode_image', side_effect=images), patch.object(self.engine, 'describe', side_effect=descriptions):
+                return self.engine.verify('reference', ['frame'] * 9, 'left')
+        # A turn was present in two frames but absent at the exact last capture moment.
+        poses = [center]*3 + [left,left,center] + [left,center,center]
+        result = run(poses)
+        self.assertTrue(result['match'])
+        self.assertTrue(result['motion_passed'])
+        result = run([center]*3 + [right]*3 + [center]*3)
+        self.assertFalse(result['match']); self.assertEqual(result['failed_step'], 2)
+        result = run([center]*3 + [left]*3 + [left]*3)
+        self.assertFalse(result['match']); self.assertEqual(result['failed_step'], 3)
+        result = run([center,FaceError('Blur'),center] + [left]*3 + [center]*3)
+        self.assertTrue(result['match'], 'One poor frame cannot hide two valid stable samples')
+        result = run([center]*3 + [left]*3 + [FaceError('Blur'),FaceError('Blur'),center])
+        self.assertFalse(result['match']); self.assertIn('Langkah 3', result['reason'])
+        result = run([center]*3 + [left,FaceError('Multiple faces',fatal=True),left] + [center]*3)
+        self.assertFalse(result['match'], 'Multiple faces are never ignored')
+
+    def test_burst_identity_threshold_unchanged(self):
+        face = np.array([0,0,160,200,40,50,100,50,70,90,50,130,90,130,1], dtype=np.float32)
+        same = np.ones((1,128), dtype=np.float32)
+        different = np.array([[1]*64+[-1]*64], dtype=np.float32)
+        descriptions = [(face,same)]*10
+        descriptions[5] = (face,different)
+        images = [np.full((128,128,3),i,dtype=np.uint8) for i in range(10)]
+        with patch('engine.decode_image', side_effect=images), patch.object(self.engine,'describe',side_effect=descriptions):
+            result = self.engine.verify('reference',['frame']*9,'left')
+        self.assertFalse(result['match']); self.assertEqual(result['status'],'MISMATCH')
 
     def test_busy(self):
         with self.engine.lock:

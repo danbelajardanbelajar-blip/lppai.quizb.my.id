@@ -332,7 +332,7 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="card" style="border:1.5px solid #cbd5e1; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.04);">
             <div style="background:#f8fafc; border-bottom:1.5px solid #e2e8f0; padding:14px 18px; font-size:13px; color:#334155;">
-                <strong>Petunjuk:</strong> Pastikan hanya wajah Anda berada di kamera dengan pencahayaan terang. Klik <strong>Verifikasi Wajah & Buka Ujian</strong>, ikuti panah untuk menggerakkan kepala, lalu kembali menghadap lurus. Tiga foto akan diperiksa oleh mesin pengenal wajah.
+                <strong>Petunjuk:</strong> Pastikan hanya wajah Anda berada di kamera dengan pencahayaan terang. Klik <strong>Verifikasi Wajah & Buka Ujian</strong>, putar kepala mengikuti panah, lalu kembali ke posisi awal. Kamera mengambil beberapa sampel pada setiap langkah.
             </div>
 
             <div class="card-body" style="padding:20px;">
@@ -540,7 +540,7 @@ function waitForFacePose(milliseconds) {
     return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
 }
 
-async function guideFacePose(symbol, title, instruction, seconds) {
+async function guideFacePose(symbol, title, instruction, seconds, sample) {
     const guide = document.getElementById('facePoseGuide');
     const icon = document.getElementById('facePoseSymbol');
     const label = document.getElementById('facePoseTitle');
@@ -553,6 +553,7 @@ async function guideFacePose(symbol, title, instruction, seconds) {
     for (let remaining = seconds; remaining > 0; remaining--) {
         if (countdown) countdown.textContent = 'Tahan ' + remaining + ' detik';
         await waitForFacePose(1000);
+        if (sample && remaining <= 3) sample();
     }
     if (countdown) countdown.textContent = 'Foto diambil';
 }
@@ -831,15 +832,14 @@ function runInitialCheckin() {
         if (!challenge.challenge_id || !['left', 'right'].includes(challenge.direction)) {
             throw new Error('Tantangan wajah tidak valid. Silakan ulangi.');
         }
-        await guideFacePose('◎', '1/3 · Wajah lurus', 'Hadapkan wajah lurus ke kamera. Foto diambil setelah hitung mundur selesai.', 3);
-        const frames = [captureFaceFrame(video)];
+        const frames = [];
+        const sample = function() { frames.push(captureFaceFrame(video)); };
+        await guideFacePose('◎', '1/3 · Wajah lurus', 'Hadapkan wajah lurus ke kamera. Tahan posisi; kamera mengambil beberapa sampel selama hitung mundur.', 3, sample);
         const left = challenge.direction === 'left';
         const direction = left ? 'KIRI layar' : 'KANAN layar';
         await guideFacePose(left ? '←' : '→', '2/3 · ' + direction,
-            'Putar kepala sedikit: hidung pada video harus mengarah ke ' + direction + ', sesuai panah kuning besar di kamera. Tahan hingga hitung mundur selesai.', 4);
-        frames.push(captureFaceFrame(video));
-        await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembali menghadap lurus ke kamera. Tahan hingga hitung mundur selesai.', 3);
-        frames.push(captureFaceFrame(video));
+            'Putar kepala perlahan: arahkan hidung pada video ke ' + direction + ', sesuai panah kuning besar. Jangan hanya menggeser badan. Tahan hingga hitung mundur selesai.', 4, sample);
+        await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembalikan kepala ke posisi seperti langkah pertama. Tahan hingga hitung mundur selesai.', 3, sample);
         const guide = document.getElementById('facePoseGuide');
         if (guide) guide.style.display = 'none';
         if (alertBox) alertBox.textContent = 'Sedang memeriksa ciri wajah dan gerakan di server…';
