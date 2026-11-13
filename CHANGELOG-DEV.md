@@ -108,6 +108,21 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:55:16 +0700 — `pretes-peserta.php`: peserta aktif vs tidak aktif dibedakan
+
+**Ringkasan:** Peserta pretes aktif (terdaftar di periode pretes aktif yang sesuai programnya) tetap melihat halaman peserta/jadwal/persiapan yang ada sekarang. Mahasiswa lain (tidak terdaftar di periode aktif, atau hanya terdaftar di periode yang sudah tidak aktif) melihat isi yang sama persis dengan `pretes-hasil.php` di URL `pretes-peserta.php`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-peserta.php` | 1–20 (ditulis ulang) | Seluruh file | Docblock baru; setelah `renderActivePretesParticipantPage()` → `require __DIR__ . '/pretes-hasil.php';`. Kode lama (query registrasi, gating tanggal, `$schedules`, include `pretes-participant-view.php`) dihapus karena tidak terpakai (sudah ditangani helper). |
+| `includes/pretes-active-page.php` | 4–8 | Docblock | Definisi "peserta aktif" = terdaftar di periode aktif. |
+| `includes/pretes-active-page.php` | 31–32 | `renderActivePretesParticipantPage()` setelah query `$myReg` | `if (!$myReg) return false;` — sebelumnya halaman aktif tampil bagi semua mahasiswa yang eligible meski belum mendaftar. Berlaku juga untuk `pretes-hasil.php` (non-peserta melihat isi Hasil Pretes normal). |
+| `tests/pretes-peserta-aktif-test.php` (baru) | 1–55 | Test | Tanpa pendaftaran / periode lama / admin → false tanpa output; cek integrasi `pretes-peserta.php` & helper. |
+
+**Verifikasi:** `php -l` OK di 3 file; `pretes-peserta-aktif`, `pretes-peserta-instruksi`, `pretes-hasil-active-period`, `pretes-hasil-periode-berakhir`, `pretes-pengumuman-hasil`, `pretes-stage`, `pretes-target-program` → PASS.
+
+---
+
 ## 2026-11-13 22:38:45 +0700 — Kartu "Menunggu Plotting" Info Tutorial diseragamkan ke 3 halaman
 
 **Ringkasan:** Mahasiswa yang terdaftar tutorial (status `terdaftar`/`aktif`) tetapi belum diplot ke kelas kini melihat kartu yang sama dengan halaman Info Tutorial (penjelasan menunggu plotting, stepper 4 langkah, ajakan pelajari diktat, kontak Bu Umami) di `tutorial-pengumuman`, `rekap-nilai`, dan `ambil-sertifikat`.

@@ -1,7 +1,11 @@
 <?php
 require_once __DIR__ . '/pretes-helper.php';
 
-/** Both student routes render this exact page while an eligible pretes period is active. */
+/**
+ * Both student routes render this exact page for ACTIVE pretes participants only:
+ * mahasiswa terdaftar (pretes_registrations) pada periode pretes aktif yang sesuai programnya.
+ * Mengembalikan false untuk selain itu, sehingga halaman memakai tampilan Hasil Pretes.
+ */
 function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     if (strtolower((string)($user['role'] ?? 'mahasiswa')) !== 'mahasiswa') return false;
     ensurePretesPeriodTargetColumns($pdo);
@@ -24,6 +28,8 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
         WHERE pr.user_id = ? AND pr.periode = ? ORDER BY pr.id DESC LIMIT 1');
     $stmt->execute([$user['id'], $activePretes['periode']]);
     $myReg = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Belum terdaftar di periode aktif → bukan peserta aktif (tampilkan Hasil Pretes)
+    if (!$myReg) return false;
     $registeredForActivePretes = (bool)$myReg;
     $stmt = $pdo->prepare("SELECT * FROM pretes_schedules WHERE periode = ? AND status = 'aktif' ORDER BY tanggal ASC, waktu_mulai ASC");
     $stmt->execute([$activePretes['periode']]);
