@@ -887,6 +887,32 @@ function handleFileSelected(input) {
     reader.readAsDataURL(file);
 }
 
+function renderVerificationFailureHtml(reason) {
+    const mainReason = reason || 'Wajah tidak terdeteksi dengan jelas pada foto.';
+    return '<div style="font-weight:700; font-size:14px; margin-bottom:5px; display:flex; align-items:center; gap:6px; color:#b91c1c;">' +
+        '<span>❌</span> <span>Foto Belum Memenuhi Syarat:</span>' +
+    '</div>' +
+    '<div style="font-size:13.5px; line-height:1.5; margin-bottom:10px; color:#991b1b; font-weight:600;">' +
+        mainReason +
+    '</div>' +
+    '<hr style="border:0; border-top:1.5px dashed #fca5a5; margin:10px 0;">' +
+    '<div style="font-size:12.5px; line-height:1.6; color:#7f1d1d;">' +
+        '<div style="font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px; color:#991b1b;">' +
+            '<span>📋</span> <span>Ketentuan Pasfoto Resmi yang Wajib Dipenuhi:</span>' +
+        '</div>' +
+        '<ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px;">' +
+            '<li><strong>Foto Tunggal (Sendiri):</strong> Wajib foto perorangan, tidak boleh ada orang lain di dalam frame.</li>' +
+            '<li><strong>Kedua Mata Terbuka Jelas:</strong> Menghadap lurus ke kamera, tidak terpejam/berkedip, serta tidak memakai kacamata hitam atau masker.</li>' +
+            '<li><strong>Posisi Wajah di Tengah:</strong> Kepala tegak dan proporsional di dalam panduan oval dari jarak dada/bahu ke atas (tidak terpotong di tepi).</li>' +
+            '<li><strong>Pencahayaan Cukup & Terang:</strong> Ruangan cukup cahaya, tidak gelap gulita dan tidak silau ekstrem/overexposed.</li>' +
+            '<li><strong>Busana Rapi:</strong> Mengenakan jas almamater atau pakaian muslim rapi.</li>' +
+        '</ul>' +
+        '<div style="margin-top:10px; font-weight:600; color:#b91c1c;">' +
+            '👉 Silakan klik tombol <em>Ganti / Ambil Ulang Foto</em> untuk mencoba kembali.' +
+        '</div>' +
+    '</div>';
+}
+
 function processAndVerifyImage(sourceCanvas, mode) {
     mode = mode || 'upload';
     try {
@@ -962,7 +988,7 @@ function processAndVerifyImage(sourceCanvas, mode) {
                     statusAlert.style.background = '#fef2f2';
                     statusAlert.style.borderColor = '#fca5a5';
                     statusAlert.style.color = '#b91c1c';
-                    statusAlert.innerHTML = '<strong>❌ Foto Belum Memenuhi Syarat:</strong><br>' + ((res && res.reason) || 'Wajah tidak terdeteksi jelas.') + '<div style="margin-top:6px; font-size:12.5px;">Silakan klik tombol <em>Ganti / Ambil Ulang Foto</em> dan pastikan wajah berada di tengah dengan pencahayaan terang.</div>';
+                    statusAlert.innerHTML = renderVerificationFailureHtml(res && res.reason);
                 }
 
                 if (badge) badge.style.display = 'none';
@@ -982,7 +1008,7 @@ function processAndVerifyImage(sourceCanvas, mode) {
                 statusAlert.style.background = '#fef2f2';
                 statusAlert.style.borderColor = '#fca5a5';
                 statusAlert.style.color = '#b91c1c';
-                statusAlert.innerHTML = '<strong>❌ Terjadi Kesalahan:</strong><br>Gagal memverifikasi wajah pada foto. Pastikan pencahayaan cukup dan wajah terlihat jelas di depan kamera.';
+                statusAlert.innerHTML = renderVerificationFailureHtml('Gagal memverifikasi wajah pada foto. Pastikan pencahayaan cukup dan wajah terlihat jelas di depan kamera.');
             }
             if (badge) badge.style.display = 'none';
             if (photoBox) photoBox.style.border = '2.5px solid #ef4444';

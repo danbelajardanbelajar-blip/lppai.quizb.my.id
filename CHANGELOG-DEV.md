@@ -5,6 +5,21 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 08:11:05 +0700 — Penambahan Garis Pemisah & Panduan Ketentuan Pasfoto Saat Kegagalan Verifikasi
+
+**Ringkasan:** Memperbarui tampilan kotak peringatan kegagalan verifikasi foto wajah pada `pages/pretes-daftar.php`. Sesuai instruksi, setiap kali foto gagal diverifikasi, di bawah alasan utama penolakan kini disematkan garis pemisah (*dashed border*) yang rapi dan diikuti oleh daftar instruksi/ketentuan pasfoto resmi yang wajib dipenuhi oleh mahasiswa (foto perorangan sendiri, kedua mata terbuka jelas tanpa masker/kacamata hitam, posisi kepala tegak di tengah panduan oval, pencahayaan terang tanpa silau, dan berbusana rapi jas almamater/muslim), serta tombol aksi untuk mengambil ulang foto.
+1. Membuat fungsi pembantu `renderVerificationFailureHtml(reason)` pada `pages/pretes-daftar.php` untuk merender struktur pesan penolakan secara terpadu.
+2. Menyisipkan garis pembatas bertema warning/danger (`border-top: 1.5px dashed #fca5a5`) di bawah alasan kegagalan utama.
+3. Menyusun 5 poin checklist ketentuan pasfoto resmi secara ringkas dan tegas agar mahasiswa langsung memahami hal yang perlu diperbaiki.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-daftar.php` | 890–920, 985–1015 | UI Status Verifikasi Gagal | Menambahkan fungsi `renderVerificationFailureHtml()` dengan garis pemisah `<hr>` dan daftar 5 ketentuan pasfoto resmi yang wajib dipenuhi. |
+| `tests/pretes-foto-verifikasi-test.php` | 115–125 | Unit & Regression Tests | Menambahkan asersi keberadaan fungsi `renderVerificationFailureHtml` dan komponen checklist ketentuan pasfoto resmi. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **25/25 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 07:42:50 +0700 — Penambahan Fitur Eye Openness & Anti-Blink Detection (Wajib Mata Terbuka)
 
 **Ringkasan:** Menambahkan modul pendeteksi mata terbuka (*Eye Openness & Anti-Blink Detection*) pada verifikasi pasfoto resmi pretes di `assets/js/pretes-face-verifier.js` dan fallback inline `pages/pretes-daftar.php`. Fitur ini memastikan bahwa foto mahasiswa yang sedang memejamkan mata, mengantuk, atau berkedip saat pengambilan foto kamera langsung maupun unggah pasfoto ditolak secara otomatis, dan tombol pendaftaran tetap terkunci sampai foto diambil ulang dengan kedua mata terbuka memandang lurus ke kamera.

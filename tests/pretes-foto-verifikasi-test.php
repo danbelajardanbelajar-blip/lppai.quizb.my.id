@@ -115,6 +115,8 @@ fotoAssert(str_contains($daftarSrc, 'id="btnSubmitDaftarPretes"'), 'pretes-dafta
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'camera')"), 'pretes-daftar.php harus meneruskan mode kamera saat jepret foto.', $errors);
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'upload')"), 'pretes-daftar.php harus meneruskan mode upload saat pilih file.', $errors);
 fotoAssert(str_contains($daftarSrc, 'checkEyeOpenness'), 'pretes-daftar.php fallback harus mendukung verifikasi mata terbuka.', $errors);
+fotoAssert(str_contains($daftarSrc, 'renderVerificationFailureHtml'), 'pretes-daftar.php harus memiliki fungsi renderVerificationFailureHtml untuk instruksi kegagalan.', $errors);
+fotoAssert(str_contains($daftarSrc, 'Ketentuan Pasfoto Resmi yang Wajib Dipenuhi'), 'pretes-daftar.php harus menyertakan checklist ketentuan pasfoto di bawah garis pemisah saat verifikasi gagal.', $errors);
 fotoAssert(!str_contains($daftarSrc, 'submitBtn.disabled = false;\n            if (lockNotice) lockNotice.style.display = \'none\';\n        });'), 'pretes-daftar.php tidak boleh membuka submit lock pada catch error.', $errors);
 
 // Verifikasi integrasi di includes/pretes-card.php
