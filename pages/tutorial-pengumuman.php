@@ -50,11 +50,76 @@ $isPlotted = $isOngoing && !empty($latestReg['nama_kelas']);
 $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
 $gelText   = $latestReg ? ($gelLabels[$latestReg['gelombang'] ?? ''] ?? ucfirst((string)($latestReg['gelombang'] ?? ''))) : '';
 
+// ── Status Pretes mahasiswa (jalur alternatif tutorial) ───────────────────────
+require_once __DIR__ . '/../includes/pretes-helper.php';
+$isTutorialLulus = $latestReg && (!empty($latestReg['nomor_sertifikat']) || ($latestReg['status'] ?? '') === 'lulus');
+$pretesReg = null;
+$pretesPeriod = null;
+$pretesFilled = 0;
+$pretesTotal = count(pretesComponents());
+$pretesState = 'none'; // none | berlangsung | lulus | tidak_lulus
+try {
+    $stmtPr = $pdo->prepare("
+        SELECT pr.*, pa.scores_json
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
+        WHERE pr.user_id = ?
+        ORDER BY pr.id DESC
+        LIMIT 1
+    ");
+    $stmtPr->execute([$user['id']]);
+    $pretesReg = $stmtPr->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    if (isUserLulusPretes($pdo, $user['id'])) {
+        $pretesState = 'lulus';
+    } elseif ($pretesReg) {
+        $scores = json_decode($pretesReg['scores_json'] ?? '{}', true);
+        foreach (pretesComponents() as $ck => $cl) {
+            $v = is_array($scores) ? ($scores[$ck] ?? null) : null;
+            if ($v !== null && $v !== '' && is_numeric($v)) $pretesFilled++;
+        }
+        $rawStatus = getPretesStatusLulus($scores);
+
+        $stmtRes = $pdo->prepare("SELECT status_lulus FROM pretes_results WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+        $stmtRes->execute([$user['id']]);
+        $resultStatus = strtolower(trim((string)$stmtRes->fetchColumn()));
+
+        $stmtMp = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1");
+        $stmtMp->execute([$pretesReg['periode'] ?? '']);
+        $pretesPeriod = $stmtMp->fetch(PDO::FETCH_ASSOC) ?: null;
+        $periodActive = $pretesPeriod && ($pretesPeriod['status'] ?? '') === 'aktif';
+
+        if ($rawStatus === 'tidak_lulus' || $resultStatus === 'tidak_lulus') {
+            $pretesState = 'tidak_lulus';
+        } elseif ($periodActive) {
+            $pretesState = 'berlangsung';
+        } else {
+            // Periode pretes sudah ditutup tanpa nilai lengkap → dianggap belum lulus
+            $pretesState = 'tidak_lulus';
+        }
+    }
+} catch (Throwable $e) {
+    $pretesState = 'none';
+}
+
+// Prioritas tampilan: lulus tutorial > lulus pretes > tutorial berjalan > pretes berlangsung > default
+$showPretesLulus   = !$isTutorialLulus && $pretesState === 'lulus';
+$showPretesOngoing = !$isTutorialLulus && !$isOngoing && $pretesState === 'berlangsung';
+
+$pretesTanggal = '';
+if ($pretesReg && $pretesPeriod) {
+    $dayInfo = getPretesPeriodDayLabels($pretesPeriod);
+    $hariP = trim((string)($pretesReg['hari_pilihan'] ?? ''));
+    $pretesTanggal = $dayInfo['days'][$hariP] ?? $hariP;
+} elseif ($pretesReg) {
+    $pretesTanggal = (string)($pretesReg['hari_pilihan'] ?? '');
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="card" style="max-width: 700px; margin: 0 auto; overflow: hidden; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-    <?php if ($latestReg && (!empty($latestReg['nomor_sertifikat']) || $latestReg['status'] === 'lulus')): ?>
+    <?php if ($isTutorialLulus): ?>
         <!-- Tampilan Jika Lulus (Pengganti Modal) -->
         <div style="background-color: #10b981; color: white; padding: 30px 20px; text-align: center;">
             <h2 style="margin: 0; font-size: 28px;">🎉 PENGUMUMAN KELULUSAN 🎉</h2>
@@ -126,6 +191,87 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+    <?php elseif ($showPretesLulus): ?>
+        <!-- Tampilan Jika Lulus Melalui Jalur Pretes (dibebaskan dari tutorial) -->
+        <div style="background-color: #10b981; color: white; padding: 30px 20px; text-align: center;">
+            <h2 style="margin: 0; font-size: 26px; color:#fff;">🎉 LULUS MELALUI PRETES</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 16px;">Lembaga Pengembangan Pendidikan Agama Islam</p>
+        </div>
+        <div style="padding: 34px 30px; text-align: center;">
+            <h3 style="margin: 0 0 10px; color: #1f2937;">Selamat, <?= sanitize($user['nama_lengkap']) ?>!</h3>
+            <p style="color: #4b5563; font-size: 16px; margin: 0 0 22px; line-height:1.6;">
+                Anda telah dinyatakan <strong style="color:#10b981;">LULUS PRETES</strong> sehingga <strong>dibebaskan dari kewajiban mengikuti Tutorial</strong>.
+                Silakan selesaikan tahapan berikut untuk mendapatkan sertifikat LPPAI.
+            </p>
+            <div style="text-align:left; display:grid; gap:10px; margin-bottom:24px;">
+                <div style="display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:10px; border:1px solid <?= $hasAlkhidmah ? '#bbf7d0' : '#e5e7eb' ?>; background:<?= $hasAlkhidmah ? '#f0fdf4' : '#f8fafc' ?>;">
+                    <span style="font-size:20px;"><?= $hasAlkhidmah ? '✅' : '🕌' ?></span>
+                    <div><strong>Majlis Dzikir Al Khidmah</strong><br><span style="color:#64748b; font-size:14px;"><?= $hasAlkhidmah ? 'Kehadiran Anda sudah tercatat.' : 'Hadiri majlis dzikir rutin di Masjid KH. Soefyan AW setiap awal bulan dan lakukan presensi online dengan swafoto.' ?></span></div>
+                </div>
+                <div style="display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:10px; border:1px solid #e5e7eb; background:#f8fafc;">
+                    <span style="font-size:20px;">💳</span>
+                    <div><strong>Administrasi Kelulusan Pretes</strong><br><span style="color:#64748b; font-size:14px;">Selesaikan pembayaran administrasi sebesar Rp 50.000,- melalui kanal resmi.</span></div>
+                </div>
+                <div style="display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:10px; border:1px solid #e5e7eb; background:#f8fafc;">
+                    <span style="font-size:20px;">🎓</span>
+                    <div><strong>Pengambilan Sertifikat</strong><br><span style="color:#64748b; font-size:14px;">Ambil di Kantor LPPAI (Lt. 2 Gedung Fakultas Hukum, timur kantin) dengan membawa nota pembayaran &amp; pasfoto 3×4.</span></div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-primary" style="padding: 10px 22px; text-decoration:none;">📊 Lihat Hasil Pretes</a>
+                <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="padding: 10px 22px; text-decoration:none; background-color:#10b981;">📷 Scan Pengambilan Sertifikat</a>
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="padding: 10px 22px; text-decoration:none;">🏠 Dashboard</a>
+            </div>
+        </div>
+
+    <?php elseif ($showPretesOngoing): ?>
+        <!-- Tampilan Jika Mahasiswa Sedang Menjalani Pretes -->
+        <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); color: white; padding: 30px 20px; text-align: center;">
+            <h2 style="margin: 0; font-size: 26px; color:#fff;">📝 TAHAP PRETES</h2>
+            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 16px;">Lembaga Pengembangan Pendidikan Agama Islam</p>
+        </div>
+        <div style="padding: 34px 30px; text-align: center;">
+            <h3 style="color: #1e3a8a; margin: 0 0 10px;">Anda Sedang Mengikuti Pretes</h3>
+            <p style="color: #4b5563; font-size: 16px; margin: 0 0 20px; line-height:1.6;">
+                Status kelulusan Anda ditentukan oleh hasil Pretes <strong><?= sanitize($pretesReg['periode'] ?? '') ?></strong>.
+                Anda <strong>belum perlu mendaftar Tutorial</strong> sampai hasil pretes diumumkan.
+            </p>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; text-align:left; margin-bottom:18px;">
+                <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">🗓️ JADWAL</div>
+                    <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($pretesTanggal ?: '-') ?><?= !empty($pretesReg['jam']) ? '<br><span style="font-weight:600;color:#475569;font-size:13.5px;">' . sanitize($pretesReg['jam']) . '</span>' : '' ?></div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">📍 RUANGAN</div>
+                    <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize(($pretesReg['ruangan'] ?? '') ?: 'Menunggu plotting') ?></div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">👨‍🏫 PENGUJI</div>
+                    <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize(($pretesReg['dosen_penguji'] ?? '') ?: 'Menunggu plotting') ?></div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
+                    <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">📊 PENILAIAN</div>
+                    <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= $pretesFilled ?> / <?= $pretesTotal ?> komponen</div>
+                    <div style="height:6px; background:#e5e7eb; border-radius:999px; margin-top:8px; overflow:hidden;"><div style="height:100%; width:<?= $pretesTotal > 0 ? round($pretesFilled / $pretesTotal * 100) : 0 ?>%; background:#2563eb;"></div></div>
+                </div>
+            </div>
+
+            <div style="text-align:left; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:16px 18px; margin-bottom:24px; color:#1e3a8a; font-size:14.5px; line-height:1.6;">
+                <strong>📌 Ketentuan setelah pretes:</strong>
+                <ul style="margin:8px 0 0 18px; padding:0;">
+                    <li><strong>Lulus</strong> jika seluruh <?= $pretesTotal ?> komponen bernilai minimal <strong>80</strong> → dibebaskan dari Tutorial dan lanjut ke tahap pengambilan sertifikat.</li>
+                    <li><strong>Belum lulus</strong> (ada komponen di bawah 80) → wajib mendaftar <strong>Tutorial LPPAI</strong> pada gelombang berikutnya.</li>
+                </ul>
+            </div>
+
+            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="padding: 10px 22px; text-decoration:none;">📋 Peserta &amp; Jadwal Pretes</a>
+                <a href="<?= BASE_URL ?>/pretes-hasil.php" class="btn btn-secondary" style="padding: 10px 22px; text-decoration:none;">📊 Hasil Pretes</a>
+                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="padding: 10px 22px; text-decoration:none;">🏠 Dashboard</a>
+            </div>
+        </div>
+
     <?php elseif ($isOngoing): ?>
         <!-- Tampilan Jika Masih Menjadi Peserta Tutorial (terdaftar / aktif) -->
         <div style="background: linear-gradient(135deg, #0b3b22, #156138); color: white; padding: 30px 20px; text-align: center;">
@@ -188,8 +334,13 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div style="padding: 40px 30px; text-align: center;">
             <?php if (!$latestReg): ?>
-                <h3 style="color: #1f2937; margin-bottom: 15px;">Belum Ada Riwayat Pendaftaran</h3>
-                <p style="color: #4b5563; font-size: 16px; margin-bottom: 25px;">Anda belum memiliki riwayat pendaftaran atau kelulusan pada program Tutorial LPPAI.</p>
+                <?php if ($pretesState === 'tidak_lulus'): ?>
+                    <h3 style="color: #dc2626; margin-bottom: 15px;">Belum Lulus Pretes</h3>
+                    <p style="color: #4b5563; font-size: 16px; margin-bottom: 25px;">Anda belum memenuhi standar kelulusan Pretes<?= !empty($pretesReg['periode']) ? ' <strong>' . sanitize($pretesReg['periode']) . '</strong>' : '' ?>. Untuk memperoleh sertifikat LPPAI, Anda <strong>wajib mendaftar dan mengikuti program Tutorial LPPAI</strong>.</p>
+                <?php else: ?>
+                    <h3 style="color: #1f2937; margin-bottom: 15px;">Belum Ada Riwayat Pendaftaran</h3>
+                    <p style="color: #4b5563; font-size: 16px; margin-bottom: 25px;">Anda belum memiliki riwayat pendaftaran atau kelulusan pada program Tutorial LPPAI.</p>
+                <?php endif; ?>
             <?php else: ?>
                 <h3 style="color: #dc2626; margin-bottom: 15px;">Belum Dinyatakan Lulus</h3>
                 <p style="color: #4b5563; font-size: 16px; margin-bottom: 15px;">Status terakhir Anda pada program Tutorial <strong><?= sanitize($gelText) ?></strong> adalah <span class="badge badge-danger" style="font-size: 14px;"><?= ucfirst(str_replace('_', ' ', $latestReg['status'])) ?></span>.</p>

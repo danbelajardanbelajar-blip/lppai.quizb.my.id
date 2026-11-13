@@ -59,6 +59,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 22:17:37 +0700 — Kelulusan Tutorial: tampilan khusus mahasiswa tahap Pretes & lulus via Pretes
+
+**File:** `pages/tutorial-pengumuman.php`
+
+| Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|
+| 53–117 | Backend status pretes | Load `includes/pretes-helper.php`; ambil pendaftaran pretes terakhir + `scores_json`; tentukan `$pretesState` (`lulus` via `isUserLulusPretes()`, `tidak_lulus` bila ada nilai <80 / `pretes_results` tidak_lulus / periode ditutup tanpa nilai lengkap, `berlangsung` bila periode `master_pretes` masih aktif). Hitung komponen terisi, tanggal pretes via `getPretesPeriodDayLabels()`. Flag `$showPretesLulus`, `$showPretesOngoing`. |
+| 122 | Cabang lulus tutorial | Memakai `$isTutorialLulus`. |
+| 194–231 | Cabang baru `$showPretesLulus` | "🎉 Lulus Melalui Pretes": dibebaskan dari tutorial + 3 langkah sertifikat (Al Khidmah dengan status kehadiran, administrasi Rp 50.000, pengambilan sertifikat), tombol Hasil Pretes / Scan Sertifikat. |
+| 233–274 | Cabang baru `$showPretesOngoing` | "📝 Tahap Pretes": jadwal (hari+tanggal, jam), ruangan, penguji, progres penilaian x/12, ketentuan lulus (semua ≥80 → bebas tutorial) / belum lulus (→ wajib tutorial). **Tanpa** ajakan daftar tutorial. |
+| 337–343 | Cabang default (tanpa pendaftaran tutorial) | Bila pretes tidak lulus: judul "Belum Lulus Pretes" + kewajiban mendaftar Tutorial. |
+
+**Prioritas tampilan:** lulus tutorial › lulus pretes › tutorial berjalan › pretes berlangsung › default.
+**Alasan:** mahasiswa yang sedang pretes sebelumnya melihat "Belum Ada Riwayat"/"Belum Lulus" + tombol daftar tutorial.
+**Verifikasi:** `php -l` OK; 8 test tutorial/pretes/pengumuman lulus.
+
+---
+
 ## 2026-11-13 21:42:36 +0700 — Kelulusan Tutorial: peserta aktif/terdaftar tidak lagi disuruh daftar ulang
 
 **File:** `pages/tutorial-pengumuman.php`
