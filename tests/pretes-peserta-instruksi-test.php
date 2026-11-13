@@ -38,6 +38,9 @@ $asserts = [
     },
     'Privilege Tester Akun 12345 Terdefinisi' => function() use ($fileContent) {
         return strpos($fileContent, "'12345'") !== false && strpos($fileContent, '$isTesterPrivileged') !== false;
+    },
+    'Tombol Cetak Kartu Pretes Disembunyikan Sesuai Kebijakan Scan Wajah' => function() use ($fileContent) {
+        return strpos($fileContent, 'cetak-kartu-pretes.php') === false && strpos($fileContent, 'Cetak Kartu Pretes') === false;
     }
 ];
 

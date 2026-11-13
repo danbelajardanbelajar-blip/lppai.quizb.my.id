@@ -125,19 +125,11 @@ include __DIR__ . '/../includes/header.php';
 ═══════════════════════════════════════════════════════════════════ -->
 <?php if ($myReg): ?>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-        <div>
-            <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
-            <p style="margin:4px 0 0;color:#64748b;font-size:13.5px;">
-                Tutorial Ubudiyah Unisda (Pelaksanaan: 16 – 20 November 2026). Periksa jadwal Anda dan cetak kartu ujian.
-            </p>
-        </div>
-        <a href="<?= BASE_URL ?>/cetak-kartu-pretes.php" target="_blank" rel="noopener" data-no-spa class="btn btn-primary"
-            style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:11px 20px;border-radius:10px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(15,118,110,0.2);"
-            aria-label="Cetak kartu pretes (buka tab baru)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6z"/><path d="M17 12h1"/></svg>
-            Cetak Kartu Pretes
-        </a>
+    <div style="margin-bottom:20px;">
+        <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
+        <p style="margin:4px 0 0;color:#64748b;font-size:13.5px;">
+            Tutorial Ubudiyah Unisda (Pelaksanaan: 16 – 20 November 2026). Periksa jadwal Anda dan persiapkan diri mengikuti ujian.
+        </p>
     </div>
 
     <!-- ── 1. KARTU JADWAL RESMI PESERTA ── -->

@@ -5,6 +5,33 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 11:37:30 +0700 — Penyembunyian Menu & Tombol "Cetak Kartu Pretes" Seiring Transisi Penuh ke Sistem Ujian Scan Wajah (pages/pretes-peserta.php, pages/pretes-daftar.php)
+
+**Ringkasan:** Menyembunyikan dan membersihkan menu, tombol, serta teks instruksi fisik "Cetak Kartu Pretes" pada seluruh antarmuka portal mahasiswa (`pages/pretes-peserta.php` dan `pages/pretes-daftar.php`) karena sistem ujian pretes kini telah bertransisi penuh menggunakan Verifikasi Scan Wajah (Face Recognition & Proctoring AI) langsung di peramban, sehingga pencetakan kartu fisik E-Ujian tidak lagi diperlukan:
+1. **Penyembunyian Tombol & Pembaruan Teks pada Halaman Peserta Pretes (`pages/pretes-peserta.php`):**
+   - Menghapus tombol `[ 🖨️ Cetak Kartu Pretes ]` pada header bagian atas halaman peserta.
+   - Memperbarui sub-judul deskripsi dari semula *"Tutorial Ubudiyah Unisda (Pelaksanaan: 16 – 20 November 2026). Periksa jadwal Anda dan cetak kartu ujian."* menjadi *"Tutorial Ubudiyah Unisda (Pelaksanaan: 16 – 20 November 2026). Periksa jadwal Anda dan persiapkan diri mengikuti ujian."*.
+2. **Pembersihan pada Halaman Pendaftaran Pretes (`pages/pretes-daftar.php`):**
+   - Memperbarui keterangan pasfoto dari *"Pasfoto resmi Anda telah disetujui dan akan dicetak otomatis pada Kartu Ujian Pretes fisik."* menjadi *"Pasfoto resmi Anda telah disetujui dan akan digunakan untuk verifikasi scan wajah saat ujian pretes."*.
+   - Menghapus tombol `[ 🖨️ Cetak Kartu Pretes ]` pada bagian konfirmasi pendaftaran.
+   - Mengganti teks tombol lanjutan dari *"🔑 Lihat Jadwal & Credentials Tes Tulis CBT"* menjadi *"📅 Lihat Jadwal & Instruksi Pretes"*.
+3. **Pembaruan Test Suite & Validasi (`tests/pretes-peserta-instruksi-test.php`):**
+   - Menambahkan assertion pengujian untuk memastikan tombol dan URL `cetak-kartu-pretes.php` tidak lagi muncul di `pages/pretes-peserta.php`.
+4. **Verifikasi:**
+   - `php -l pages/pretes-peserta.php` (**No syntax errors**).
+   - `php -l pages/pretes-daftar.php` (**No syntax errors**).
+   - `php -l tests/pretes-peserta-instruksi-test.php` (**No syntax errors**).
+   - **27/27 test suites lulus 100%**.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-peserta.php` | 128–134 | Header Pretes Saya | Menghapus tombol "Cetak Kartu Pretes" dan memperbarui sub-judul instruksi persiapan ujian. |
+| `pages/pretes-daftar.php` | 225–232, 276–287 | Card Pasfoto & Aksi Pasca Pendaftaran | Memperbarui narasi pasfoto untuk scan wajah dan menghapus tombol cetak kartu pretes. |
+| `tests/pretes-peserta-instruksi-test.php` | 39–43 | Test Suite Pretes Peserta | Menambahkan assertion otomatis untuk menjamin tombol cetak kartu disembunyikan. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 11:30:31 +0700 — Penanganan Tombol Kamera Tidak Merespon: Penghapusan Auto-Call Pending, Binding Interaktif Ganda, & Penanganan Izin Terblokir (pages/pretes-ujian.php)
 
 **Ringkasan:** Memperbaiki secara tuntas kendala tombol "Aktifkan Kamera" yang tidak merespon (*unresponsive button*) pada portal ujian pretes (`pages/pretes-ujian.php`):
