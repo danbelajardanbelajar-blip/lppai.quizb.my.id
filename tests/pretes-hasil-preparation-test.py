@@ -63,6 +63,12 @@ function getDBConnection() {
             assert 'Pendaftaran pretes masih aktif' in html
             assert 'Status Akhir:' not in html and 'Rp 50.000' not in html and 'tutorial-pendaftaran.php' not in html
             assert 'Periode Pretes Telah Berakhir' not in html
+            assert html.count('data-pretes-component=') == 12
+            for component in ['ujian_tulis', 'praktik_wudlu', 'doa_setelah_wudlu', 'praktik_tayammum',
+                              'niat_mandi_besar', 'niat_jamak_qashar', 'bacaan_shalat_subuh',
+                              'al_bayyinah', 'al_alaq', 'al_dluha', 'istighasah', 'shalat_jenazah']:
+                assert f'data-pretes-component="{component}"' in html
+            assert html.index('id="materi-persiapan-pretes"') < html.index('id="bacaan-istighasah"')
             assert 'Istighasah' in html and html.count('class="pretes-istighasah-arabic"') == 12
             assert html.count('>40 kali</span>') == 3 and html.count('>11 kali</span>') == 9
             assert 'Surat Yasin' in html and 'lang="ar" dir="rtl"' in html

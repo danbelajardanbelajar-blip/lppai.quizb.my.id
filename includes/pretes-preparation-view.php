@@ -1,4 +1,7 @@
-<?php $istighasah = require __DIR__ . '/../data/pretes-istighasah.php'; ?>
+<?php
+$istighasah = require __DIR__ . '/../data/pretes-istighasah.php';
+$preparationComponents = pretesComponents();
+?>
 <style>
 .pretes-preparation{max-width:1040px;margin:0 auto 24px;color:#183a31}
 .pretes-preparation-hero{padding:30px;border:1px solid #b9dfd2;border-radius:20px;background:linear-gradient(135deg,#edf9f3,#fff);margin-bottom:20px}
@@ -11,6 +14,13 @@
 .pretes-preparation-step strong{display:block;margin:8px 0;font-size:15px}
 .pretes-preparation-step p{margin:0;color:#52675f;font-size:13px}
 .pretes-preparation-actions{display:flex;flex-wrap:wrap;gap:10px}
+.pretes-preparation-materials{margin-bottom:20px}
+.pretes-material-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 32px;padding-left:24px;margin:20px 0 0}
+.pretes-material-list li{padding:14px 12px 14px 6px;border-bottom:1px solid #e7ede8;line-height:1.6}
+.pretes-material-list li::marker{color:#31705a;font-weight:700}
+.pretes-material-list strong{display:block;font-size:15px;color:#183a31}
+.pretes-material-type{display:block;font-size:12px;color:#64786d;margin-top:4px}
+.pretes-material-list a{display:inline-block;margin-top:6px;color:#176246;font-size:13px;text-decoration:underline}
 .pretes-istighasah{border:1px solid #dfE8df;border-radius:20px;background:#fff;padding:28px}
 .pretes-istighasah h3{margin:8px 0;color:#194f3b;font-size:23px}
 .pretes-istighasah-intro{color:#596d62;margin-bottom:20px}
@@ -20,7 +30,7 @@
 .pretes-istighasah-arabic{flex:1;min-width:0;font-family:"Traditional Arabic","Noto Naskh Arabic","Amiri",serif;font-size:clamp(26px,4vw,34px);line-height:2.1;text-align:right;overflow-wrap:break-word}
 .pretes-istighasah-count{flex:none;min-width:68px;text-align:center;border-radius:10px;background:#f1f7f2;color:#2e6044;padding:9px 7px;font-size:13px;font-weight:700;white-space:nowrap}
 .pretes-istighasah-closing{padding:16px;border-radius:12px;background:#f5f8f2;margin:22px 0 0}
-@media(max-width:650px){.pretes-preparation-hero,.pretes-istighasah{padding:20px}.pretes-preparation-grid{grid-template-columns:1fr}.pretes-istighasah-list li{gap:12px;align-items:flex-start}.pretes-istighasah-count{min-width:56px;margin-top:10px;font-size:12px}.pretes-istighasah-bismillah{font-size:27px}}
+@media(max-width:650px){.pretes-preparation-hero,.pretes-istighasah{padding:20px}.pretes-preparation-grid,.pretes-material-list{grid-template-columns:1fr}.pretes-istighasah-list li{gap:12px;align-items:flex-start}.pretes-istighasah-count{min-width:56px;margin-top:10px;font-size:12px}.pretes-istighasah-bismillah{font-size:27px}}
 </style>
 <div class="pretes-preparation">
     <section class="pretes-preparation-hero" aria-labelledby="pretesPreparationTitle">
@@ -36,16 +46,31 @@
         <div class="pretes-preparation-grid">
             <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">01 / Persiapan</span><strong>Pelajari kembali materi pretes</strong><p>Ulangi bacaan Al-Qur’an, doa, serta materi dan praktik ibadah yang akan diujikan.</p></div>
             <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">02 / Informasi</span><strong>Pantau pembagian peserta</strong><p>Periksa menu Peserta &amp; Jadwal Pretes secara berkala untuk melihat informasi yang diterbitkan pengelola.</p></div>
-            <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">03 / Amaliah</span><strong>Baca istighasah</strong><p>Gunakan bacaan di bawah untuk mempersiapkan diri, memohon pertolongan dan kemudahan kepada Allah.</p></div>
+            <div class="pretes-preparation-step"><span class="pretes-preparation-eyebrow">03 / Latihan</span><strong>Persiapkan seluruh materi ujian</strong><p>Pelajari seluruh 12 materi di bawah. Istighasah merupakan salah satu bagian dari materi yang diujikan.</p></div>
         </div>
         <div class="pretes-preparation-actions">
             <?php if (!$registeredForActivePretes): ?><a class="btn btn-success" href="<?= BASE_URL ?>/pretes-daftar.php">Daftar Pretes</a><?php endif; ?>
             <a class="btn btn-primary" href="<?= BASE_URL ?>/pretes-peserta.php">Lihat Peserta &amp; Jadwal Pretes</a>
+            <a class="btn btn-secondary" href="#materi-persiapan-pretes">Lihat 12 Materi Pretes</a>
             <a class="btn btn-secondary" href="#bacaan-istighasah">Baca Istighasah</a>
         </div>
     </section>
+    <section id="materi-persiapan-pretes" class="pretes-istighasah pretes-preparation-materials" aria-labelledby="pretesMaterialsTitle">
+        <div class="pretes-preparation-eyebrow">Panduan persiapan ujian</div>
+        <h3 id="pretesMaterialsTitle">12 Materi yang Harus Dipersiapkan</h3>
+        <p class="pretes-istighasah-intro">Persiapkan seluruh komponen ujian berikut. Istighasah adalah salah satu dari 12 materi pretes, bersama ujian tulis, bacaan, doa, dan praktik ibadah lainnya.</p>
+        <ol class="pretes-material-list">
+            <?php foreach ($preparationComponents as $key => $label): ?>
+                <li data-pretes-component="<?= sanitize($key) ?>">
+                    <strong><?= sanitize($label) ?></strong>
+                    <span class="pretes-material-type"><?= $key === 'ujian_tulis' ? 'CBT / Ujian tulis' : 'Lisan / Praktik' ?></span>
+                    <?php if ($key === 'istighasah'): ?><a href="#bacaan-istighasah">Lihat bacaan istighasah</a><?php endif; ?>
+                </li>
+            <?php endforeach; ?>
+        </ol>
+    </section>
     <section id="bacaan-istighasah" class="pretes-istighasah" aria-labelledby="pretesIstighasahTitle">
-        <div class="pretes-preparation-eyebrow">Bacaan persiapan pretes</div>
+        <div class="pretes-preparation-eyebrow">Salah satu dari 12 materi pretes</div>
         <h3 id="pretesIstighasahTitle">Istighasah</h3>
         <p class="pretes-istighasah-intro">Bacaan dan jumlah pengulangan berikut mengikuti gambar panduan yang diberikan LPPAI.</p>
         <div class="pretes-istighasah-bismillah" lang="ar" dir="rtl">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيمِ</div>
