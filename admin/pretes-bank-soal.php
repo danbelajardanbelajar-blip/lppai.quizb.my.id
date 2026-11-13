@@ -31,7 +31,7 @@ $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
-    $activeTab = $action === 'import_xlsx' ? 'import' : 'form';
+    $activeTab = ($action === 'import_xlsx') ? 'import' : (($action === 'delete_attempt' || $action === 'delete_all_attempts') ? 'results' : 'form');
     try {
         if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) {
             http_response_code(403);
@@ -54,6 +54,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             pretesCbtSaveQuestion($pdo, $_POST);
             $_SESSION['cbt_bank_flash'] = 'Soal berhasil disimpan. Paket ujian yang sudah dimulai tidak berubah.';
             header('Location: ' . $bankUrl . '&tab=bank'); exit;
+        } elseif ($action === 'delete_attempt') {
+            $activeTab = 'results';
+            $attemptId = (int)($_POST['attempt_id'] ?? 0);
+            if ($attemptId <= 0) throw new InvalidArgumentException('ID sesi CBT tidak valid.');
+            $stmtFind = $pdo->prepare('SELECT a.id, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.id = ?');
+            $stmtFind->execute([$attemptId]);
+            $info = $stmtFind->fetch(PDO::FETCH_ASSOC);
+
+            if (pretesCbtDeleteAttempt($pdo, $attemptId)) {
+                $name = $info ? ($info['nama_lengkap'] . ' (' . ($info['nim'] ?: '-') . ')') : "ID #$attemptId";
+                $_SESSION['cbt_bank_flash'] = "Sesi CBT peserta $name berhasil dihapus. Peserta kini dapat mengulang ujian kembali.";
+            } else {
+                $_SESSION['cbt_bank_flash'] = 'Sesi CBT tidak ditemukan atau sudah dihapus sebelumnya.';
+            }
+            header('Location: ' . $bankUrl . '&tab=results'); exit;
+        } elseif ($action === 'delete_all_attempts') {
+            $activeTab = 'results';
+            $count = pretesCbtDeleteAllAttempts($pdo);
+            $_SESSION['cbt_bank_flash'] = "Berhasil menghapus seluruh data sesi CBT ($count sesi dihapus).";
+            header('Location: ' . $bankUrl . '&tab=results'); exit;
         } else throw new InvalidArgumentException('Aksi bank soal tidak valid.');
     } catch (InvalidArgumentException $error) {
         if (http_response_code() !== 403) http_response_code(422);

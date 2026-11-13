@@ -197,3 +197,59 @@ function pretesCbtSaveQuestion(PDO $pdo, array $input): void {
         $pdo->prepare('INSERT INTO pretes_cbt_questions (code, category, question_text, options_json, correct_answer, is_active) VALUES (?, ?, ?, ?, ?, ?)')->execute($values);
     }
 }
+
+function pretesCbtDeleteAttempt(PDO $pdo, int $attemptId): bool {
+    if ($attemptId <= 0) return false;
+    $tx = false;
+    if (!$pdo->inTransaction()) {
+        $pdo->beginTransaction();
+        $tx = true;
+    }
+    try {
+        $stmtItems = $pdo->prepare('DELETE FROM pretes_cbt_items WHERE attempt_id = ?');
+        $stmtItems->execute([$attemptId]);
+
+        $stmtAttempt = $pdo->prepare('DELETE FROM pretes_cbt_attempts WHERE id = ?');
+        $stmtAttempt->execute([$attemptId]);
+        $deleted = $stmtAttempt->rowCount() > 0;
+
+        if ($tx) $pdo->commit();
+        return $deleted;
+    } catch (Throwable $e) {
+        if ($tx && $pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
+function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int {
+    $tx = false;
+    if (!$pdo->inTransaction()) {
+        $pdo->beginTransaction();
+        $tx = true;
+    }
+    try {
+        if ($attemptIds === null) {
+            $pdo->exec('DELETE FROM pretes_cbt_items');
+            $count = (int)$pdo->exec('DELETE FROM pretes_cbt_attempts');
+        } else {
+            $cleanIds = array_values(array_filter(array_map('intval', $attemptIds), fn($id) => $id > 0));
+            if (empty($cleanIds)) {
+                if ($tx) $pdo->commit();
+                return 0;
+            }
+            $inClause = implode(',', array_fill(0, count($cleanIds), '?'));
+            $stmtItems = $pdo->prepare("DELETE FROM pretes_cbt_items WHERE attempt_id IN ($inClause)");
+            $stmtItems->execute($cleanIds);
+
+            $stmtAttempts = $pdo->prepare("DELETE FROM pretes_cbt_attempts WHERE id IN ($inClause)");
+            $stmtAttempts->execute($cleanIds);
+            $count = (int)$stmtAttempts->rowCount();
+        }
+        if ($tx) $pdo->commit();
+        return $count;
+    } catch (Throwable $e) {
+        if ($tx && $pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+

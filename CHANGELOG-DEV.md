@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 14:50:00 +0700 — Penambahan Fitur Hapus Hasil Sesi CBT Pretes (pretes-ujian.php?cbt_bank=1&tab=results)
+
+**Ringkasan:** Menambahkan menu dan tombol penghapusan sesi hasil CBT peserta pada tab Hasil Ujian (`pretes-ujian.php?cbt_bank=1&tab=results`):
+1. **Helper Penghapusan Transaksional (`includes/pretes-cbt.php`):**
+   - Menambahkan fungsi `pretesCbtDeleteAttempt(PDO $pdo, int $attemptId): bool` untuk menghapus 1 sesi attempt beserta seluruh data jawaban/snapshot paket soal terkait di `pretes_cbt_items` dan `pretes_cbt_attempts`.
+   - Menambahkan fungsi `pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int` untuk menghapus seluruh sesi atau sejumlah sesi tertentu secara aman dalam transaksi database.
+   - Penghapusan sesi memungkinkan peserta bersangkutan untuk mengulang pengerjaan ujian CBT secara fresh (state reset ke awal).
+2. **Controller Penanganan Aksi Hapus (`admin/pretes-bank-soal.php`):**
+   - Menangani action POST `delete_attempt` dan `delete_all_attempts` dengan validasi CSRF token, hak akses Admin (`requireAdmin()`), dan pesan notifikasi flash informatif (nama & NIM peserta yang dihapus).
+   - Menjaga tab aktif tetap di `tab=results` pasca penghapusan atau jika terjadi error validasi.
+3. **Pembaruan Tampilan UI Tabel Hasil CBT (`includes/pretes-cbt-admin-view.php`):**
+   - Menambahkan kolom `<th>Aksi</th>` pada tabel Hasil Ujian.
+   - Menyediakan tombol `🗑️ Hapus` per baris peserta dengan form POST dan dialog konfirmasi alert nama & NIM peserta.
+   - Menyediakan tombol `🗑️ Hapus Semua Hasil` pada header panel tabel hasil CBT lengkap dengan peringatan konfirmasi ganda.
+4. **Penataan Gaya CSS (`assets/css/pretes-cbt-admin.css`):**
+   - Menambahkan class `.bank-button.danger` dan `.bank-button.danger-sm` untuk tampilan tombol aksi hapus yang tegas, rapi, dan responsif di mobile.
+5. **Pembaruan & Penambahan Test Suites (`tests/pretes-cbt-delete-test.php` & `tests/pretes-cbt-test.php`):**
+   - Menguji isolasi penghapusan per attempt, integritas relasi `pretes_cbt_items`, reset state peserta ke unstarted, penghapusan bulk/all, serta elemen markup view CSRF & button.
+   - Seluruh 30 test suite PHP dan 2 test suite Node.js lulus 100% (TOTAL_FAILED=0).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-cbt.php` | 200–255 | Backend Helper | Menambahkan fungsi `pretesCbtDeleteAttempt()` dan `pretesCbtDeleteAllAttempts()`. |
+| `admin/pretes-bank-soal.php` | 34, 57–80 | Controller Admin | Menangani aksi POST `delete_attempt` & `delete_all_attempts` dengan CSRF dan flash session. |
+| `includes/pretes-cbt-admin-view.php` | 67–72 | View Admin Tab Results | Menambahkan tombol Hapus per baris dan tombol Hapus Semua Hasil pada header. |
+| `assets/css/pretes-cbt-admin.css` | 5 | Styling UI | Menambahkan styling `.bank-button.danger` dan `.bank-button.danger-sm`. |
+| `tests/pretes-cbt-test.php` | 58–72 | Unit Test | Menambahkan pengujian delete attempt dan delete all attempts. |
+| `tests/pretes-cbt-delete-test.php` | 1–90 | Test Suite Baru | Validasi menyeluruh fungsi delete, controller, markup UI, dan style button. |
+| `CHANGELOG-DEV.md` | 8–45 | Catatan Rilis | Dokumentasi sistematis fitur delete hasil CBT. |
+
+---
+
 ## 2026-11-13 14:03:00 +0700 — Penyesuaian Status 112 Mahasiswa Angkatan 2026 ke Program RPL & Skrip Update Otomatis
 
 **Ringkasan:** Mengubah seluruh data 112 mahasiswa Angkatan 2026 menjadi program RPL dan menyediakan skrip khusus untuk memperbarui data yang telah diinput di database:

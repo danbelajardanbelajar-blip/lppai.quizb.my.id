@@ -56,4 +56,17 @@ cbtReject(fn() => pretesCbtSaveQuestion($pdo, array_merge($form, ['option_A' => 
 $pdo->exec('UPDATE pretes_cbt_questions SET is_active = 0');
 cbtReject(fn() => pretesCbtStart($pdo, 9, 88, 4000));
 cbtAssert(pretesCbtState($pdo, 9, 88, 4000)['attempt'] === null, 'Insufficient bank rolls back attempt');
-echo "PASS: seed bank, random snapshots and choices, resume, ownership, validation, autosave, server grading, immutable submit, and expiry.\n";
+
+// Delete attempt tests
+cbtAssert(pretesCbtDeleteAttempt($pdo, (int)$final['id']) === true, 'Single attempt delete succeeds');
+cbtAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = ' . (int)$final['id'])->fetchColumn() === 0, 'Attempt items deleted');
+cbtAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts WHERE id = ' . (int)$final['id'])->fetchColumn() === 0, 'Attempt row deleted');
+cbtAssert(pretesCbtState($pdo, 7, 42, 5000)['attempt'] === null, 'User can start a fresh CBT attempt after deletion');
+cbtAssert(pretesCbtDeleteAttempt($pdo, (int)$final['id']) === false, 'Deleting non-existent attempt returns false');
+
+// Delete all attempts test
+cbtAssert(pretesCbtDeleteAllAttempts($pdo) >= 1, 'Delete all attempts removes remaining attempts');
+cbtAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts')->fetchColumn() === 0, 'All attempts deleted');
+cbtAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_items')->fetchColumn() === 0, 'All attempt items deleted');
+
+echo "PASS: seed bank, random snapshots and choices, resume, ownership, validation, autosave, server grading, immutable submit, expiry, and attempt deletion.\n";
