@@ -16,7 +16,7 @@ function environment() {
         };
     }
     const elements = new Map(), events = {}, intervals = [], requests = [], deferred = [];
-    let now = 1000, stored = null, mode = 'immediate', submitted = false;
+    let now = 1000, stored = null, mode = 'immediate', submitted = false, started = 0;
     const element = id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
     const sandbox = {
         document: { getElementById: element, createElement: node },
@@ -43,17 +43,19 @@ function environment() {
         if (payload.action === 'submit') stored = { ...stored, submitted: true, score: 88, correct: 22, questions: [] };
         return { success: true, attempt: stored ? clone(stored) : null };
     };
-    sandbox.PretesCbt.init({ request, onSubmitted: () => { submitted = true; } });
+    sandbox.PretesCbt.init({ request, onStarted: () => { started++; }, onSubmitted: () => { submitted = true; } });
     return { element, events, intervals, requests, deferred,
         setMode(value) { mode = value; }, advance(value) { now += value; },
-        get stored() { return stored; }, get submitted() { return submitted; } };
+        get stored() { return stored; }, get submitted() { return submitted; }, get started() { return started; } };
 }
 
 (async () => {
     const env = environment();
     await settle();
     assert.equal(env.element('cbtStart').disabled, false);
+    assert.equal(env.started, 0);
     await env.element('cbtStart').onclick();
+    assert.equal(env.started, 1);
     assert.equal(env.element('cbtWorkspace').style.display, 'grid');
     assert.equal(env.element('cbtNumbers').children.length, 25);
     assert.match(env.element('cbtQuestion').textContent, /^<img onerror/); // Rendered as text, never HTML.

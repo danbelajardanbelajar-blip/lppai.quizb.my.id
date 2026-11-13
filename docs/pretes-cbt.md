@@ -17,6 +17,10 @@ Bagian kredensial dan tautan E-Ujian di halaman tersebut telah dihapus.
 - Pengumpulan berulang mengembalikan hasil yang sama. Jawaban tidak bisa diubah setelah dikumpulkan.
 - Waktu habis difinalisasi pada request selanjutnya atau saat admin membuka hasil. Jawaban lewat deadline ditolak.
 - Kamera dan timer pengawasan dihentikan setelah hasil pengumpulan dikonfirmasi server.
+- Pemeriksaan wajah ke VPS dilakukan setiap 30 detik selama paket aktif. Satu request berjalan pada satu waktu; pemeriksaan berikutnya dijadwalkan 30 detik setelah request selesai.
+- Timer memakai waktu nyata; saat kembali ke tab yang sempat ditunda browser, satu pemeriksaan yang jatuh tempo dicoba kembali. Browser/OS HP tetap dapat menunda kamera dan request di latar belakang.
+- Gangguan jaringan/mesin ditampilkan sebagai pemeriksaan tertunda, bukan hasil pelanggaran. Hasil wajah tidak sesuai memberi peringatan dan log, tanpa penguncian atau pengurangan nilai otomatis.
+- Metadata dicatat per pemeriksaan. Foto cocok disimpan maksimal sekali per lima menit (termasuk foto check-in); foto tidak sesuai tetap disimpan untuk audit. Ini bukan pelacakan tatapan mata.
 - Hasil CBT disimpan terpisah; nilai praktik dan nilai impor lama tidak ditimpa.
 
 ## Admin

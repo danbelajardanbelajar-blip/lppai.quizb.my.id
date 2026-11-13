@@ -903,6 +903,17 @@ if (!function_exists('ensurePretesProctoringTables')) {
     }
 }
 
+if (!function_exists('pretesPeriodicSnapshotNeeded')) {
+function pretesPeriodicSnapshotNeeded(PDO $pdo, int $registrationId, bool $matched): bool {
+    if (!$matched) return true;
+    $cutoff = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? "datetime('now', '-5 minutes')" : 'DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 5 MINUTE)';
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_proctoring_logs WHERE registration_id = ? AND status = 'MATCH' AND snapshot_path IS NOT NULL AND created_at >= $cutoff");
+    $stmt->execute([$registrationId]);
+    return (int)$stmt->fetchColumn() === 0;
+}
+}
+
 if (!function_exists('saveProctoringSnapshot')) {
     /**
      * Menyimpan snapshot foto pengawasan kamera live (Skenario A & Skenario B)

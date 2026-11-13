@@ -25,6 +25,7 @@ function renderScript(verified = false) {
 
 function environment(getUserMedia) {
     const elements = new Map();
+    const documentEvents = {};
     function element(id) {
         if (!elements.has(id)) elements.set(id, {
             style: {}, listeners: {}, textContent: '', innerHTML: '', videoWidth: 640, videoHeight: 480,
@@ -41,6 +42,7 @@ function environment(getUserMedia) {
     const sandbox = {
         document: {
             readyState: 'complete', getElementById: element,
+            addEventListener(name, callback) { documentEvents[name] = callback; },
             createElement() {
                 return { getContext: () => ({ drawImage() {} }), toDataURL: () => 'data:image/jpeg;base64,test' };
             }
@@ -63,7 +65,7 @@ function environment(getUserMedia) {
     };
     sandbox.window = sandbox;
     vm.createContext(sandbox);
-    return { sandbox, element, alerts, requests, timers };
+    return { sandbox, element, alerts, requests, timers, documentEvents };
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -177,6 +179,48 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     await settle();
     assert.equal(verified.element('proctorVideo').srcObject, stream);
     assert.equal(typeof cbtSettings.request, 'function');
+    cbtSettings.onStarted();
+    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    assert.equal(typeof verified.documentEvents.visibilitychange, 'function');
+    let resolvePeriodic;
+    let periodicRequests = 0;
+    verified.sandbox.fetch = () => {
+        periodicRequests++;
+        return new Promise(resolve => { resolvePeriodic = resolve; });
+    };
+    verified.sandbox.runPeriodicProctoringCheck();
+    verified.sandbox.runPeriodicProctoringCheck();
+    await settle();
+    assert.equal(periodicRequests, 1, 'Concurrent checks must not overlap');
+    resolvePeriodic({ ok: true, status: 200, json: () => Promise.resolve({ verified: true, score: 80 }) });
+    await settle();
+    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    verified.sandbox.fetch = () => Promise.reject(new Error('VPS unavailable'));
+    await verified.sandbox.runPeriodicProctoringCheck();
+    assert.match(verified.element('lastCheckInfo').textContent, /bukan pelanggaran/);
+    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    const timerEnv = environment(() => Promise.resolve(stream));
+    let clock = 0, timerSettings, checks = 0;
+    timerEnv.sandbox.Date = { now: () => clock };
+    timerEnv.sandbox.PretesCbt = { init(settings) { timerSettings = settings; } };
+    timerEnv.sandbox.fetch = (url, options) => {
+        assert.equal(JSON.parse(options.body).action, 'periodic_check');
+        checks++;
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: true, score: 85 }) });
+    };
+    vm.runInContext(renderScript(true), timerEnv.sandbox);
+    await settle();
+    assert.equal(checks, 0, 'Do not poll before the CBT is started');
+    timerSettings.onStarted();
+    clock = 29999; timerEnv.sandbox.tickProctoringTimer(); await settle();
+    assert.equal(checks, 0);
+    clock = 30000; timerEnv.sandbox.tickProctoringTimer(); await settle();
+    assert.equal(checks, 1, 'Check after 30 seconds');
+    clock = 120000; timerEnv.documentEvents.visibilitychange(); await settle();
+    assert.equal(checks, 2, 'Returning from a suspended tab triggers one overdue check');
+    timerSettings.onSubmitted();
+    clock = 200000; timerEnv.sandbox.tickProctoringTimer(); await settle();
+    assert.equal(checks, 2, 'No checks after collection');
     cbtSettings.onSubmitted();
     assert.equal(verified.element('proctorTimerDisplay').textContent, 'Selesai');
     assert.equal(verified.element('proctorStatusTitle').textContent, 'Ujian Selesai');

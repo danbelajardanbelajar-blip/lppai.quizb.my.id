@@ -1,7 +1,7 @@
 <?php
 /**
  * LPPAI Corner - API Proctoring Pengawas AI Ujian Pretes
- * Menangani Skenario A (Check-in Awal) dan Skenario B (Pengecekan Berkala 5 Menit Sekali).
+ * Menangani check-in awal dan pemeriksaan berkala selama CBT.
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -56,6 +56,8 @@ if (!verifyCsrf($csrfToken)) {
 }
 
 $action = trim($_POST['action'] ?? ($jsonBody['action'] ?? ''));
+// Older open tabs remain compatible after changing the polling interval.
+if ($action === 'periodic_5min') $action = 'periodic_check';
 $livePhotoInput = $_POST['live_photo'] ?? ($jsonBody['live_photo'] ?? '');
 $livePhoto = is_string($livePhotoInput) ? trim($livePhotoInput) : '';
 $regIdInput = (int)($_POST['registration_id'] ?? ($jsonBody['registration_id'] ?? 0));
@@ -118,7 +120,7 @@ if (empty($refPhoto)) {
     exit;
 }
 
-if (!in_array($action, ['challenge', 'initial_checkin', 'periodic_5min'], true)) {
+if (!in_array($action, ['challenge', 'initial_checkin', 'periodic_check'], true)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'verified' => false, 'message' => 'Aksi verifikasi tidak valid.']);
     exit;
@@ -222,18 +224,20 @@ if ($action === 'initial_checkin') {
     ]);
     exit;
 
-} elseif ($action === 'periodic_5min') {
+} elseif ($action === 'periodic_check') {
     // ═════════════════════════════════════════════════════════════════════════
     // SKENARIO B: PENGAWASAN BERKALA SETIAP 5 MENIT SEKALI SAAT PENGERJAAN
     // ═════════════════════════════════════════════════════════════════════════
     $snapType = $match ? 'periodic_ok' : 'periodic_violation';
-    $snapshotPath = saveProctoringSnapshot($livePhoto, $user['nim'] ?? 'peserta', $snapType);
+    // Log each check; retain successful images at most once per five minutes.
+    $snapshotPath = pretesPeriodicSnapshotNeeded($pdo, $regId, $match)
+        ? saveProctoringSnapshot($livePhoto, $user['nim'] ?? 'peserta', $snapType) : null;
 
     try {
         $stmtLog = $pdo->prepare("
             INSERT INTO pretes_proctoring_logs 
             (registration_id, user_id, event_type, similarity_score, status, snapshot_path, notes)
-            VALUES (?, ?, 'periodic_5min', ?, ?, ?, ?)
+            VALUES (?, ?, 'periodic_check', ?, ?, ?, ?)
         ");
         $stmtLog->execute([
             $regId,
@@ -252,14 +256,14 @@ if ($action === 'initial_checkin') {
         $stmtViolations->execute([$regId]);
         $violationCount = (int)$stmtViolations->fetchColumn();
     } catch (Throwable $e) {
-        error_log("Gagal mencatat log periodic_5min: " . $e->getMessage());
+        error_log("Gagal mencatat log periodic_check: " . $e->getMessage());
         $violationCount = 0;
     }
 
     echo json_encode([
         'success'         => true,
         'verified'        => $match,
-        'event_type'      => 'periodic_5min',
+        'event_type'      => 'periodic_check',
         'score'           => $score,
         'status'          => $status,
         'message'         => $reason,

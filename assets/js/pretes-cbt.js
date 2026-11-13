@@ -1,6 +1,6 @@
 (function (window) {
     'use strict';
-    let config, attempt = null, position = 0, target = 0, ticker = null, savePromise = null, finishing = false, needsSubmit = false;
+    let config, attempt = null, position = 0, target = 0, ticker = null, savePromise = null, finishing = false, needsSubmit = false, monitoringStarted = false;
     const pending = new Map();
     const el = id => document.getElementById(id);
     const message = (text, error) => {
@@ -110,6 +110,7 @@
         renderQuestion();
         if (ticker) clearInterval(ticker);
         ticker = setInterval(tick, 1000);
+        if (!monitoringStarted && config.onStarted) { monitoringStarted = true; config.onStarted(); }
         tick();
     }
 

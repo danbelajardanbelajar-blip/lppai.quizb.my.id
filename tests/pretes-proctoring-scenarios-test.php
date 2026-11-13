@@ -140,8 +140,8 @@ foreach ($filesToCheck as $f) {
 // Uji konten pages/pretes-ujian.php (memiliki Skenario A & Skenario B)
 $ujianContent = file_get_contents(__DIR__ . '/../pages/pretes-ujian.php');
 procAssert(strpos($ujianContent, 'initial_checkin') !== false, "pretes-ujian.php harus mendukung action 'initial_checkin' (Skenario A).", $errors);
-procAssert(strpos($ujianContent, 'periodic_5min') !== false, "pretes-ujian.php harus mendukung action 'periodic_5min' (Skenario B).", $errors);
-procAssert(strpos($ujianContent, '300') !== false || strpos($ujianContent, '05:00') !== false, "pretes-ujian.php harus memiliki konfigurasi timer 5 menit.", $errors);
+procAssert(strpos($ujianContent, 'periodic_check') !== false, "Halaman harus memakai action pemeriksaan berkala.", $errors);
+procAssert(strpos($ujianContent, 'PROCTOR_INTERVAL_SECONDS = 30') !== false, "Interval pengawasan default harus 30 detik.", $errors);
 
 if (!empty($errors)) {
     echo "❌ PENGUJIAN GAGAL:\n";

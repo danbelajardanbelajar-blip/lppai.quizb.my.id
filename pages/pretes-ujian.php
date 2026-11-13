@@ -3,7 +3,7 @@
  * LPPAI Corner - Portal Ujian Pretes & Sistem Pengawasan AI (Proctoring)
  * Mengintegrasikan:
  * - Skenario A: Verifikasi Wajah di Awal (Gatekeeper Check-in).
- * - Skenario B: Pengawasan Kamera Berkala Setiap 5 Menit Sekali Selama Ujian Berlangsung.
+ * - Skenario B: Pengawasan Kamera Berkala Setiap 30 Detik Selama Ujian Berlangsung.
  */
 
 // Route the API through the same public page that served the camera UI.
@@ -254,7 +254,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <strong style="color:#92400e;font-size:14px;display:block;">Panel Percobaan Ujian Pretes (Hak Akses Akun: <?= sanitize($user['username'] ?? '12345') ?>)</strong>
                     <div style="color:#b45309;font-size:12px;margin-top:2px;">
-                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan 5 Menit) secara langsung.
+                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan 30 Detik) secara langsung.
                     </div>
                 </div>
             </div>
@@ -417,7 +417,7 @@ include __DIR__ . '/../includes/header.php';
 
     <!-- ═════════════════════════════════════════════════════════════════════
          BAGIAN 2: SKENARIO B — RUANG PENGERJAAN UJIAN DENGAN PENGAWAS AI
-         Pengecekan Wajah Berkala Setiap 5 Menit Sekali Selama Ujian Aktif
+         Pengecekan Wajah Berkala Setiap 30 Detik Selama Ujian Aktif
          ═════════════════════════════════════════════════════════════════════ -->
     <div id="sectionExamRoom" style="<?= $isVerified ? 'display:block;' : 'display:none;' ?>">
         
@@ -427,20 +427,20 @@ include __DIR__ . '/../includes/header.php';
                 <span style="font-size:28px;">🟢</span>
                 <div>
                     <div style="font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px;">
-                        <span id="proctorStatusTitle">Pengawas Kamera Aktif</span>
-                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengecekan Tiap 5 Menit</span>
+                        <span id="proctorStatusTitle">Kamera Siap untuk Ujian</span>
+                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengecekan Tiap 30 Detik</span>
                     </div>
                     <div style="font-size:12px; color:#ccfbf1; margin-top:2px;" id="lastCheckInfo">
-                        Sesi diverifikasi. Pemeriksaan wajah berkala aktif di latar belakang.
+                        Sesi diverifikasi. Pemeriksaan berkala dimulai saat ujian dikerjakan.
                     </div>
                 </div>
             </div>
 
-            <!-- Countdown Timer 5 Menit -->
+            <!-- Countdown Timer 30 Detik -->
             <div style="display:flex; align-items:center; gap:16px;">
                 <div style="text-align:right;">
                     <div style="font-size:11px; color:#ccfbf1; text-transform:uppercase; font-weight:700;">Pengecekan Berikutnya:</div>
-                    <div style="font-size:18px; font-weight:800; font-family:monospace;" id="proctorTimerDisplay">05:00</div>
+                    <div style="font-size:18px; font-weight:800; font-family:monospace;" id="proctorTimerDisplay">00:30</div>
                 </div>
                 <!-- Mini Video Stream Hidden/Background -->
                 <div style="width:48px; height:64px; border-radius:6px; overflow:hidden; border:1.5px solid rgba(255,255,255,0.5); background:#000;">
@@ -471,7 +471,7 @@ include __DIR__ . '/../includes/header.php';
                 <li>1. Wajib dikerjakan secara mandiri dan jujur tanpa bantuan orang lain (tidak memakai joki).</li>
                 <li>2. Pastikan wajah selalu menghadap ke arah layar dan tidak meninggalkan kamera selama ujian berlangsung.</li>
                 <li>3. Dilarang membuka website lain atau menggunakan HP tambahan saat mengerjakan soal.</li>
-                <li>4. Sistem AI akan mengambil snapshot otomatis tiap 5 menit untuk memastikan kontinuitas peserta asli.</li>
+                <li>4. Sistem AI akan mengambil snapshot otomatis tiap 30 detik untuk memastikan kontinuitas peserta asli.</li>
             </ul>
         </div>
 
@@ -493,7 +493,11 @@ const CBT_API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?cbt_api=1') ?>
 
 let proctorInterval = null;
 let countdownTimer = null;
-let secondsRemaining = 300; // 5 menit = 300 detik
+const PROCTOR_INTERVAL_SECONDS = 30;
+let secondsRemaining = PROCTOR_INTERVAL_SECONDS;
+let nextProctorCheckAt = 0;
+let periodicCheckPending = false;
+let proctorVisibilityBound = false;
 let activeStream = null;
 let currentFacingMode = 'user';
 let cbtCompleted = false;
@@ -904,7 +908,7 @@ function runInitialCheckin() {
 }
 
 /**
- * ── Inisialisasi Skenario B: Pengawasan Berkala Tiap 5 Menit ──
+ * ── Inisialisasi Skenario B: Pengawasan Berkala Tiap 30 Detik ──
  */
 function initProctoringExamRoom() {
     const video = document.getElementById('proctorVideo');
@@ -923,10 +927,16 @@ function initProctoringExamRoom() {
         }
     }
 
-    startProctoringTimer();
     if (window.PretesCbt) {
         window.PretesCbt.init({
             request: function(payload) { return requestProctoringCheck(payload, CBT_API_URL); },
+            onStarted: function() {
+                const title = document.getElementById('proctorStatusTitle');
+                if (title) title.textContent = 'Pengawas Kamera Aktif';
+                const info = document.getElementById('lastCheckInfo');
+                if (info) info.textContent = 'Pemeriksaan wajah setiap 30 detik selama ujian aktif.';
+                startProctoringTimer();
+            },
             onSubmitted: function() {
                 cbtCompleted = true;
                 if (countdownTimer) clearInterval(countdownTimer);
@@ -950,25 +960,33 @@ function initProctoringExamRoom() {
 }
 
 /**
- * ── Timer Hitung Mundur 5 Menit & Pemicu Snapshot Berkala ──
+ * ── Timer Hitung Mundur 30 Detik & Pemicu Snapshot Berkala ──
  */
+function scheduleProctoringCheck(seconds) {
+    nextProctorCheckAt = Date.now() + seconds * 1000;
+    secondsRemaining = seconds;
+    updateTimerDisplay();
+}
+
+function tickProctoringTimer() {
+    if (cbtCompleted || periodicCheckPending || !nextProctorCheckAt) return;
+    secondsRemaining = Math.max(0, Math.ceil((nextProctorCheckAt - Date.now()) / 1000));
+    if (secondsRemaining <= 0) { runPeriodicProctoringCheck(); return; }
+    updateTimerDisplay();
+}
+
 function startProctoringTimer() {
     if (cbtCompleted) return;
     if (countdownTimer) clearInterval(countdownTimer);
     if (proctorInterval) clearInterval(proctorInterval);
-
-    secondsRemaining = 300; // 5 menit
-
-    countdownTimer = setInterval(function() {
-        secondsRemaining--;
-        if (secondsRemaining <= 0) {
-            secondsRemaining = 300;
-            runPeriodicProctoringCheck();
-        }
-        updateTimerDisplay();
-    }, 1000);
-
-    updateTimerDisplay();
+    scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
+    countdownTimer = setInterval(tickProctoringTimer, 1000);
+    if (!proctorVisibilityBound) {
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) tickProctoringTimer();
+        });
+        proctorVisibilityBound = true;
+    }
 }
 
 function updateTimerDisplay() {
@@ -980,13 +998,14 @@ function updateTimerDisplay() {
 }
 
 /**
- * ── Eksekusi Skenario B: Pengambilan Snapshot Berkala Tiap 5 Menit ──
+ * ── Eksekusi Skenario B: Pengambilan Snapshot Berkala Tiap 30 Detik ──
  */
 function runPeriodicProctoringCheck() {
-    if (cbtCompleted) return;
+    if (cbtCompleted || periodicCheckPending) return;
     const video = document.getElementById('proctorVideo') || document.getElementById('checkinVideo');
     if (!video || !video.videoWidth) {
-        recordProctoringViolation("Kamera terputus atau tidak aktif saat pengawasan 5 menit.");
+        recordProctoringViolation("Kamera terputus atau belum aktif. Nyalakan kembali kamera agar pemeriksaan dapat berjalan.");
+        scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
         return;
     }
 
@@ -995,11 +1014,15 @@ function runPeriodicProctoringCheck() {
         livePhotoData = captureFaceFrame(video);
     } catch (error) {
         recordProctoringViolation(error.message);
+        scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
         return;
     }
 
-    requestProctoringCheck({
-        action: 'periodic_5min',
+    periodicCheckPending = true;
+    const timer = document.getElementById('proctorTimerDisplay');
+    if (timer) timer.textContent = 'Memeriksa…';
+    return requestProctoringCheck({
+        action: 'periodic_check',
         live_photo: livePhotoData
     })
     .then(data => {
@@ -1009,26 +1032,29 @@ function runPeriodicProctoringCheck() {
         const alertMsg = document.getElementById('proctorViolationMsg');
 
         if (data && data.verified) {
-            // Pengecekan 5 Menit Lolos
+            // Pemeriksaan berkala sesuai
             if (lastInfo) {
-                lastInfo.innerHTML = 'Pemeriksaan terakhir: <strong>' + (data.checked_at || 'Baru saja') + '</strong> &bull; Status: <span style="color:#86efac; font-weight:700;">Peserta Sesuai (' + data.score + '%)</span>';
+                lastInfo.textContent = 'Pemeriksaan terakhir: ' + (data.checked_at || 'Baru saja') + ' · Ciri wajah sesuai (indeks ' + data.score + '/100).';
             }
             if (alertBox) alertBox.style.display = 'none';
         } else {
-            // Pengecekan 5 Menit Terdeteksi Pelanggaran (Mismatch atau Wajah Hilang)
+            // Pemeriksaan berkala perlu perhatian (Mismatch atau Wajah Hilang)
             if (lastInfo) {
-                lastInfo.innerHTML = 'Pemeriksaan terakhir: <strong>' + (data.checked_at || 'Baru saja') + '</strong> &bull; Status: <span style="color:#fca5a5; font-weight:700;">Pelanggaran Terdeteksi</span>';
+                lastInfo.textContent = 'Pemeriksaan terakhir: ' + (data.checked_at || 'Baru saja') + ' · Wajah perlu diperiksa kembali.';
             }
             if (alertBox && alertMsg) {
                 alertBox.style.display = 'block';
-                alertMsg.innerHTML = '<strong>' + (data.message || 'Wajah tidak terdeteksi atau tidak cocok dengan pasfoto resmi terdaftar!') + '</strong><br>Pastikan Anda tetap duduk tegak menghadap kamera dan mengerjakan sendiri secara jujur.';
+                alertMsg.textContent = (data.message || 'Wajah belum terdeteksi atau belum sesuai pasfoto.') + ' Hadapkan wajah ke kamera dengan pencahayaan yang cukup.';
             }
         }
     })
     .catch(err => {
         console.error("Periodic proctoring error:", err);
         const lastInfo = document.getElementById('lastCheckInfo');
-        if (lastInfo) lastInfo.textContent = 'Pemeriksaan belum selesai: ' + err.message;
+        if (!cbtCompleted && lastInfo) lastInfo.textContent = 'Pemeriksaan tertunda (bukan pelanggaran): ' + err.message;
+    }).finally(function() {
+        periodicCheckPending = false;
+        if (!cbtCompleted) scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
     });
 }
 
@@ -1042,8 +1068,7 @@ function recordProctoringViolation(msg) {
 }
 
 function testFastPeriodicTimer() {
-    secondsRemaining = 15;
-    updateTimerDisplay();
+    scheduleProctoringCheck(15);
     alert("⏱️ Timer pengawasan berkala disetel ke 15 detik untuk pengujian cepat!");
 }
 </script>
