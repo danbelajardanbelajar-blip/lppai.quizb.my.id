@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 23:36:56 +0700 — Sembunyikan menu pretes selama menjadi peserta tutorial aktif
+
+**ID perubahan:** NAV-TUTORIAL-AKTIF · **Awal pengerjaan:** 2026-11-13 23:27:34 +0700 · **Parent Git:** `34f3d5c`.
+**Tujuan:** mahasiswa berstatus `terdaftar`/`aktif` pada periode tutorial aktif hanya mendapat navigasi tutorial. Menu admin/dosen tetap tersedia. Riwayat lama, gelombang/semester berbeda, lulus/tidak lulus atau mengundurkan diri tidak menyembunyikan menu.
+
+Waktu tabel adalah waktu penyimpanan terakhir berkas saat audit (WIB, sampai detik). Baris mengacu pada snapshot commit yang memuat entri ini; gunakan riwayat Git untuk menemukan versi tersebut bila baris bergeser.
+
+| Waktu edit file (WIB) | File | Baris snapshot | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-13 23:27:34 | `includes/tutorial-membership.php` | 3–45 | Aturan keanggotaan tutorial aktif | Cocokkan mahasiswa, tahun ajaran, gelombang, semester kelas, status terbaru dan fallback tanggal untuk data lama tanpa tahun. Tanpa cache sesi dan tanpa menulis pendaftaran. |
+| 2026-11-13 23:33:28 | `includes/sidebar.php` | 167–170 | Penentuan menu | Gunakan aturan keanggotaan bersama untuk menentukan visibilitas menu mahasiswa. |
+| 2026-11-13 23:33:28 | `includes/sidebar.php` | 182–196 | Kelompok menu pretes | Sembunyikan Daftar Pretes, Peserta & Jadwal, Hasil Pretes, dan label Pretes untuk peserta tutorial aktif. |
+| 2026-11-13 23:33:28 | `includes/sidebar.php` | 173–174, 221–225 | Prioritas tutorial dan Absensi Pretes | Tutorial aktif didahulukan bila riwayat pretes juga aktif; item Absensi Pretes disembunyikan. |
+| 2026-11-13 23:29:19 | `pages/dashboard.php` | 23–24 | Status visibilitas dashboard | Gunakan keanggotaan tutorial aktif yang sama dengan sidebar. |
+| 2026-11-13 23:29:19 | `pages/dashboard.php` | 164–167 | Pengumuman pretes | Sembunyikan pengumuman bertipe pretes atau bertautan ke halaman pretes saat tutorial aktif. |
+| 2026-11-13 23:29:19 | `pages/dashboard.php` | 247–277 | Kartu ringkasan pretes | Sembunyikan statistik pendaftaran/status pretes agar dashboard berfokus pada tutorial. |
+| 2026-11-13 23:29:19 | `pages/dashboard.php` | 288–288 | Kartu jadwal dan akses ujian | Sembunyikan seluruh tindakan pretes untuk anggota tutorial aktif. |
+| 2026-11-13 23:29:19 | `pages/dashboard.php` | 506–506 | Ringkasan hasil lama | Sembunyikan kartu hasil/tombol pretes selama tutorial aktif. |
+| 2026-11-13 23:34:11 | `tests/tutorial-pretes-menu-test.py` | 1–107 | Regresi aturan & render nyata | 20 skenario keanggotaan/sidebar dan 5 render dashboard: menunggu plotting, sudah kelas, data lama, beda tahun/gelombang/semester, batal/lulus, pemilik lain, multi-periode, admin dan dosen. |
+
+**Verifikasi:** `python tests/tutorial-pretes-menu-test.py` PASS (20 skenario sidebar/keanggotaan + 5 dashboard), termasuk pengujian ulang dari snapshot staging yang terpisah dari perubahan kerja lainnya. `php -l` pada helper, sidebar, dashboard PASS; `git diff --cached --check` bersih.
+**Batas lingkup:** perubahan visibilitas menu/tombol; tidak menghapus riwayat pretes dan tidak mencabut akses langsung URL/API. Data tanpa penanda periode yang cukup tidak dianggap otomatis sebagai peserta tutorial aktif.
+**Penerapan:** implementasi tercakup dalam commit `34f3d5c`; entri audit ini ditambahkan lewat commit `Document active tutorial pretest menu visibility audit`. Push lalu pull `--ff-only`. Hosting cPanel diperbarui pengguna melalui direktori `~/public_html/lppai.quizb.my.id/web`.
+
+---
+
 ## 2026-11-13 23:36:00 +0700 — Sembunyikan Seluruh Menu Tutorial & Absensi Saat Mahasiswa Berada Dalam Keadaan Pretes Aktif
 
 **Akar Masalah:**
