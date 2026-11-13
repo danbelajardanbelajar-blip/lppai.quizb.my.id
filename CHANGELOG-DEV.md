@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 08:32:56 +0700 — Pembaruan Halaman Peserta Pretes: 4 Poin Tata Tertib & Gating Link Pengerjaan Soal (16 November 2026)
+
+**Ringkasan:** Memperbarui konten halaman `pages/pretes-peserta.php` (`https://lppai.quizb.my.id/pretes-peserta.php`) secara komprehensif sesuai instruksi pengguna:
+1. Mengganti tata tertib ujian menjadi 4 poin instruksi utama:
+   - **Poin 1:** Persiapkan diri untuk mengikuti ujian dengan berdoa dan belajar dengan sungguh-sungguh.
+   - **Poin 2:** Pastikan dikerjakan sendiri secara mandiri, jujur, dan bertanggung jawab tanpa bantuan orang lain.
+   - **Poin 3:** Pastikan tidak membuka web lain, tab baru, aplikasi lain, atau mesin pencari selama ujian berlangsung.
+   - **Poin 4:** Pastikan tidak menggunakan HP lain atau perangkat komunikasi tambahan apapun saat mengerjakan soal.
+2. Menyematkan tombol/tautan **"Kerjakan Soal Pretes"** dengan link yang dikosongkan terlebih dahulu (`href="javascript:void(0);"` / dialog pengawas ujian).
+3. Mengimplementasikan pembatasan akses (*date gating*) berbasis tanggal:
+   - Jika belum memasuki tanggal **16 November 2026** (`date('Y-m-d') < '2026-11-16'`), link pengerjaan soal **tidak dimunculkan**, melainkan digantikan dengan kotak informasi informatif bahwa link pretes akan dapat diakses pada **Senin, 16 November 2026**.
+   - Jika sudah tanggal **16 November 2026** ke atas, tombol pengerjaan soal otomatis dimunculkan secara aktif.
+4. Membuat file pengujian otomatis `tests/pretes-peserta-instruksi-test.php` yang memverifikasi sintaks, ke-4 poin instruksi, logika gating tanggal 16, dan ketersediaan tombol soal.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-peserta.php` | 28–34, 43–118 | Logika Gating & CSS Responsif | Menambahkan gating tanggal 16 Nov (`$tglBukaUjian = '2026-11-16'`, `$isUjianDibuka`), layout grid instruksi kartu responsif. |
+| `pages/pretes-peserta.php` | 224–296 | Kartu Instruksi Tata Tertib | Merender 4 poin instruksi tata tertib resmi dengan penomoran badge interaktif. |
+| `pages/pretes-peserta.php` | 297–330 | Tombol & Info Akses Soal Pretes | Menampilkan kotak kunci terkunci sebelum 16 Nov, dan tombol "Kerjakan Soal Pretes" saat tanggal 16 Nov ke atas. |
+| `tests/pretes-peserta-instruksi-test.php` | 1–52 | Unit Test Baru | File pengujian otomatis validasi sintaks, 4 instruksi, gating tanggal 16 Nov, dan notice terkunci. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **26/26 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 08:11:05 +0700 — Penambahan Garis Pemisah & Panduan Ketentuan Pasfoto Saat Kegagalan Verifikasi
 
 **Ringkasan:** Memperbarui tampilan kotak peringatan kegagalan verifikasi foto wajah pada `pages/pretes-daftar.php`. Sesuai instruksi, setiap kali foto gagal diverifikasi, di bawah alasan utama penolakan kini disematkan garis pemisah (*dashed border*) yang rapi dan diikuti oleh daftar instruksi/ketentuan pasfoto resmi yang wajib dipenuhi oleh mahasiswa (foto perorangan sendiri, kedua mata terbuka jelas tanpa masker/kacamata hitam, posisi kepala tegak di tengah panduan oval, pencahayaan terang tanpa silau, dan berbusana rapi jas almamater/muslim), serta tombol aksi untuk mengambil ulang foto.
