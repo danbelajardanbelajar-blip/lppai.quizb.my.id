@@ -12,7 +12,8 @@ args = parser.parse_args()
 with tempfile.TemporaryDirectory(prefix='lppai-pretes-preparation-') as temp:
     root = Path(temp)
     for name in ['pages/pretes-hasil.php', 'includes/pretes-helper.php', 'includes/user-helper.php', 'includes/pretes-face-engine.php',
-                 'includes/pretes-preparation-view.php', 'data/pretes-istighasah.php']:
+                 'includes/pretes-preparation-view.php', 'includes/pretes-learning-reading-view.php',
+                 'data/pretes-istighasah.php', 'data/pretes-learning-readings.json', 'data/pretes-learning-videos.php']:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(repo / name, target)
@@ -69,6 +70,10 @@ function getDBConnection() {
                               'al_bayyinah', 'al_alaq', 'al_dluha', 'istighasah', 'shalat_jenazah']:
                 assert f'data-pretes-component="{component}"' in html
             assert html.index('id="materi-persiapan-pretes"') < html.index('id="bacaan-istighasah"')
+            assert html.count('class="pretes-reading"') == 5
+            assert html.count('class="pretes-video-link"') == 5
+            assert html.count('class="pretes-reading-verse"') == 39  # 11 + 19 + 8 verses and one doa.
+            assert '<iframe' not in html
             assert 'Istighasah' in html and html.count('class="pretes-istighasah-arabic"') == 12
             assert html.count('>40 kali</span>') == 3 and html.count('>11 kali</span>') == 9
             assert 'Surat Yasin' in html and 'lang="ar" dir="rtl"' in html

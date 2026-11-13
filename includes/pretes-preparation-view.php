@@ -1,6 +1,8 @@
 <?php
 $istighasah = require __DIR__ . '/../data/pretes-istighasah.php';
 $preparationComponents = pretesComponents();
+$learningVideos = require __DIR__ . '/../data/pretes-learning-videos.php';
+$learningReadings = json_decode(file_get_contents(__DIR__ . '/../data/pretes-learning-readings.json'), true, 512, JSON_THROW_ON_ERROR);
 ?>
 <style>
 .pretes-preparation{max-width:1040px;margin:0 auto 24px;color:#183a31}
@@ -16,9 +18,9 @@ $preparationComponents = pretesComponents();
 .pretes-preparation-actions{display:flex;flex-wrap:wrap;gap:10px}
 .pretes-preparation-materials{margin-bottom:20px}
 .pretes-material-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 32px;padding-left:24px;margin:20px 0 0}
-.pretes-material-list li{padding:14px 12px 14px 6px;border-bottom:1px solid #e7ede8;line-height:1.6}
-.pretes-material-list li::marker{color:#31705a;font-weight:700}
-.pretes-material-list strong{display:block;font-size:15px;color:#183a31}
+.pretes-material-list > li{padding:14px 12px 14px 6px;border-bottom:1px solid #e7ede8;line-height:1.6}
+.pretes-material-list > li::marker{color:#31705a;font-weight:700}
+.pretes-material-list > li > strong{display:block;font-size:15px;color:#183a31}
 .pretes-material-type{display:block;font-size:12px;color:#64786d;margin-top:4px}
 .pretes-material-list a{display:inline-block;margin-top:6px;color:#176246;font-size:13px;text-decoration:underline}
 .pretes-istighasah{border:1px solid #dfE8df;border-radius:20px;background:#fff;padding:28px}
@@ -31,6 +33,13 @@ $preparationComponents = pretesComponents();
 .pretes-istighasah-count{flex:none;min-width:68px;text-align:center;border-radius:10px;background:#f1f7f2;color:#2e6044;padding:9px 7px;font-size:13px;font-weight:700;white-space:nowrap}
 .pretes-istighasah-closing{padding:16px;border-radius:12px;background:#f5f8f2;margin:22px 0 0}
 @media(max-width:650px){.pretes-preparation-hero,.pretes-istighasah{padding:20px}.pretes-preparation-grid,.pretes-material-list{grid-template-columns:1fr}.pretes-istighasah-list li{gap:12px;align-items:flex-start}.pretes-istighasah-count{min-width:56px;margin-top:10px;font-size:12px}.pretes-istighasah-bismillah{font-size:27px}}
+.pretes-reading{margin-top:12px;border:1px solid #d7e5dd;border-radius:10px;background:#fbfdfb;scroll-margin-top:90px}
+.pretes-reading summary{cursor:pointer;padding:12px;color:#176246;font-size:14px;font-weight:700}
+.pretes-reading summary:focus-visible{outline:2px solid #176246;outline-offset:3px;border-radius:8px}
+.pretes-reading-body{padding:4px 16px 16px}
+.pretes-material-list > li:has(.pretes-reading[open]){grid-column:1/-1}
+.pretes-quran-verses{font-family:"Traditional Arabic","Noto Naskh Arabic","Amiri",serif;text-align:right}
+.pretes-quran-verses .pretes-reading-verse{font-size:clamp(28px,4vw,36px);line-height:2.3;color:#183a31;border-bottom:1px solid #e7ede8;padding:16px 0;margin:0;overflow-wrap:break-word}
 </style>
 <div class="pretes-preparation">
     <section class="pretes-preparation-hero" aria-labelledby="pretesPreparationTitle">
@@ -64,21 +73,23 @@ $preparationComponents = pretesComponents();
                 <li data-pretes-component="<?= sanitize($key) ?>">
                     <strong><?= sanitize($label) ?></strong>
                     <span class="pretes-material-type"><?= $key === 'ujian_tulis' ? 'CBT / Ujian tulis' : 'Lisan / Praktik' ?></span>
-                    <?php if ($key === 'istighasah'): ?><a href="#bacaan-istighasah">Lihat bacaan istighasah</a><?php endif; ?>
+                    <?php if (isset($learningVideos[$key])): ?>
+                        <a class="pretes-video-link" href="https://www.youtube.com/watch?v=<?= sanitize($learningVideos[$key]['id']) ?>" target="_blank" rel="noopener noreferrer">▶ <?= sanitize($learningVideos[$key]['title']) ?> — NU Online ↗</a>
+                    <?php endif; ?>
+                    <?php if ($key === 'istighasah' || isset($learningReadings[$key])): ?>
+                        <?php include __DIR__ . '/pretes-learning-reading-view.php'; ?>
+                    <?php endif; ?>
                 </li>
             <?php endforeach; ?>
         </ol>
     </section>
-    <section id="bacaan-istighasah" class="pretes-istighasah" aria-labelledby="pretesIstighasahTitle">
-        <div class="pretes-preparation-eyebrow">Salah satu dari 12 materi pretes</div>
-        <h3 id="pretesIstighasahTitle">Istighasah</h3>
-        <p class="pretes-istighasah-intro">Bacaan dan jumlah pengulangan berikut mengikuti gambar panduan yang diberikan LPPAI.</p>
-        <div class="pretes-istighasah-bismillah" lang="ar" dir="rtl">بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيمِ</div>
-        <ol class="pretes-istighasah-list" aria-label="Urutan bacaan istighasah">
-            <?php foreach ($istighasah as $i => $reading): ?>
-                <li><span class="pretes-istighasah-count" aria-label="Bacaan <?= $i + 1 ?>, dibaca <?= $reading['count'] ?> kali"><?= $reading['count'] ?> kali</span><span class="pretes-istighasah-arabic" lang="ar" dir="rtl"><?= sanitize($reading['text']) ?></span></li>
-            <?php endforeach; ?>
-        </ol>
-        <p class="pretes-istighasah-closing">Setelah rangkaian bacaan istighasah, lanjutkan dengan membaca <strong>Surat Yasin</strong>, sesuai petunjuk pada gambar panduan.</p>
-    </section>
 </div>
+<script>
+// Open the requested reading only after its shortcut is clicked.
+document.querySelectorAll('.pretes-preparation-actions a[href="#bacaan-istighasah"]').forEach(function(link) {
+    link.addEventListener('click', function() {
+        const reading = document.getElementById('bacaan-istighasah');
+        if (reading) reading.open = true;
+    });
+});
+</script>
