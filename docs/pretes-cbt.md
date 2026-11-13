@@ -34,6 +34,25 @@ Admin kini dapat mengelola **Paket Soal** (`tab=packages`), menyusun butir perta
 - **Paket Aktif:** Satu paket dapat ditetapkan sebagai paket aktif. Saat peserta menekan mulai ujian CBT di portal mahasiswa, server otomatis mengambil soal aktif dari paket yang sedang aktif dan menggunakan durasi serta kuota soal paket tersebut.
 - **Filter & Alokasi:** Pada tab Bank Soal, butir pertanyaan dapat difilter berdasarkan paket soal. Menghapus paket soal akan menghapus seluruh butir soal yang dialokasikan di dalamnya secara berantai.
 
+## Pengatur Sesi Ujian (Exam Sessions)
+
+Tab **Sesi Ujian** (`tab=sessions`) memungkinkan admin mengontrol secara granular parameter pelaksanaan ujian pretes:
+1. **Modal In-Place (Tanpa Pindah Halaman):** Seluruh aksi tambah/edit paket soal, sesi ujian, dan input cepat butir soal dilakukan menggunakan modal popup (`modalSessionForm`, `modalPackageForm`, `modalQuickQuestion`) tanpa me-reload atau berpindah halaman.
+2. **Pilihan Paket Soal:** Admin dapat memilih paket soal mana saja yang diaktifkan dalam sesi tersebut.
+3. **Kadar / Kuota per Kategori:** Admin menentukan jumlah kuota pasti soal untuk setiap kategori materi (misal: Fiqih 10, Al-Qur'an 8, Ubudiyah 7). Mesin CBT menarik butir soal acak sesuai kuota masing-masing kategori secara proporsional.
+4. **Kewajiban Kamera:**
+   - `wajib`: Mewajibkan verifikasi wajah awal (Skenario A) dan pengawasan proctoring AI berkala (Skenario B).
+   - `tidak_aktif`: Membebaskan peserta dari kamera; peserta langsung masuk ruang ujian CBT tanpa webcam.
+   - `opsional`: Kamera dianjurkan namun tidak memblokir ujian jika tidak tersedia webcam.
+5. **Durasi Ujian:** Durasi ujian dalam menit (`duration_minutes`) yang dihitung ketat di server.
+6. **Metode Penilaian:**
+   - `standar`: Nilai proporsional skala 100 (`benar / total * 100`).
+   - `penalti`: Sistem penalti ala UTBK (+4 benar, -1 salah, 0 kosong) lalu diskalakan ke 0–100.
+7. **Jadwal Window Ujian:**
+   - Waktu Mulai (`start_time`): Ujian belum bisa dimulai sebelum waktu ini tiba (menampilkan countdown/notifikasi waktu buka).
+   - Waktu Selesai (`end_time`): Batas akhir di mana peserta baru tidak dapat lagi memulai ujian setelah waktu ini lewat.
+8. **Token Ujian:** Admin dapat mengaktifkan kewajiban token (`token_required`) dan men-generate token acak 6 digit. Peserta wajib menginput token yang valid sebelum CBT dimulai.
+
 ### Excel .xlsx
 
 Tab Bank Soal menyediakan pencarian, filter kategori/status, pagination, tautan

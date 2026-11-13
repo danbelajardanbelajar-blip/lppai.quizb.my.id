@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 21:26:00 +0700 — Pengatur Sesi Ujian (Exam Sessions), Kuota Kategori, Mode Kamera, Window Jadwal, Token, & Modal In-Place
+
+**Ringkasan:** Mengimplementasikan fitur komprehensif Pengatur Sesi Ujian (`tab=sessions`) dan transisi antarmuka Tambah/Edit Paket Soal serta Sesi Ujian ke dialog modal *in-place* tanpa reload/pindah halaman, memenuhi seluruh kebutuhan manajemen CBT:
+1. **Modal In-Place Form:** Tombol "＋ Buat Paket Soal", "Edit Paket", "＋ Tambah Soal Cepat", dan "＋ Buat Sesi Ujian" membuka modal interaktif tanpa memuat ulang tab atau navigasi keluar halaman.
+2. **Pengatur Sesi Ujian (Exam Sessions):** Menambahkan tabel `pretes_cbt_sessions` dengan kontrol paket yang ditampilkan/aktif, durasi ujian independen, dan KKM/passing grade.
+3. **Kadar / Kuota per Kategori:** Admin dapat menetapkan jumlah soal wajib untuk masing-masing kategori (misal: Fiqih 10, Al-Qur'an 8, Ubudiyah 7). Mesin `pretesCbtStart` menarik soal acak sesuai kuota pasti tiap kategori.
+4. **Kewajiban Kamera:** Opsi `wajib` (wajib verifikasi wajah & proctoring AI), `tidak_aktif` (bebas kamera, langsung masuk CBT tanpa webcam), dan `opsional`.
+5. **Metode Penilaian:** Opsi penilaian `standar` (proporsional 0–100) dan `penalti` UTBK (+4 benar, -1 salah, 0 kosong).
+6. **Window Jadwal Ujian:** Waktu mulai (`start_time`) dan batas akhir (`end_time`) yang memblokir ujian bila belum dibuka atau sudah kedaluwarsa.
+7. **Token Ujian:** Token 6 digit acak dengan sakelar `token_required`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-cbt.php` | 20–40, 105–125 | Skema & Seed Session | Tabel `pretes_cbt_sessions`, migrasi kolom `session_id` pada attempts, fungsi CRUD sesi (`pretesCbtGetSessions`, `pretesCbtSaveSession`, dll). |
+| `includes/pretes-cbt.php` | 225–340 | Engine CBT Start | Validasi window jadwal (start/end), validasi token, penarikan butir soal sesuai `category_quotas_json`. |
+| `includes/pretes-cbt.php` | 145–185 | Engine Finalize | Perhitungan skor metode standar vs penalti UTBK (+4, -1, 0). |
+| `admin/pretes-bank-soal.php` | 12–35, 50–120 | Controller Tab & Actions | Tab `sessions`, aksi `save_session`, `activate_session`, `delete_session`, endpoint AJAX token generator & kategori. |
+| `includes/pretes-cbt-admin-view.php` | 60–120, 150–280, 700–840 | View Admin & Modal | Tab navigasi Sesi Ujian, tabel sesi lengkap, modal package, modal session, modal quick question. |
+| `assets/css/pretes-cbt-admin.css` | 380–495 | Styling Modal & Badges | Backdrop modal, flex layout form, tabel kuota kategori, badge mode kamera, badge status sesi, token tag. |
+| `assets/js/pretes-cbt-admin.js` | 90–240 | Controller Modal JS | Fungsi `openPackageModal`, `openQuickQuestionModal`, `openSessionModal`, `generateRandomToken`, kalkulasi kuota live. |
+| `pages/pretes-ujian.php` | 120–150, 530–560, 975–1010 | Integrasi Peserta | Deteksi mode kamera `tidak_aktif` (bypass check-in langsung ke CBT), validasi window waktu sesi, input token ujian. |
+| `api/pretes-cbt.php` | 40–70 | API Gatekeeper | Menerima payload `token`, meloloskan verifikasi wajah jika kamera `tidak_aktif`. |
+| `includes/pretes-cbt-view.php` | 20–35 | View CBT | Kotak input token ujian jika sesi mewajibkan token. |
+| `assets/js/pretes-cbt.js` | 35–65 | JS CBT Peserta | Penanganan input token pada inisialisasi ujian CBT. |
+| `docs/pretes-cbt.md` | 30–60 | Dokumentasi | Panduan teknis Pengatur Sesi Ujian dan parameter kuota kategori. |
+| `tests/pretes-cbt-session-test.php` | 1–160 (baru) | Unit Test Suite | Validasi 7 skenario sesi: CRUD, kuota kategori, penalti skor, token gating, window jadwal, modal markup. |
+
+---
+
 ## 2026-11-13 21:23:37 +0700 — Diktat PDF dimasukkan ke repo (atas permintaan user)
 
 | File | Baris | Bagian | Perubahan |

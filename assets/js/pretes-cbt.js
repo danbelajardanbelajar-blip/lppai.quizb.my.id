@@ -177,11 +177,32 @@
         init(settings) {
             if (config || !el('pretesCbt')) return;
             config = settings;
+            if (window.TOKEN_REQUIRED && el('cbtTokenBox')) {
+                el('cbtTokenBox').style.display = 'block';
+            }
             el('cbtStart').onclick = async () => {
+                let token = '';
+                const tokenInput = el('cbtInputToken');
+                if (tokenInput && (window.TOKEN_REQUIRED || tokenInput.value.trim())) {
+                    token = tokenInput.value.trim();
+                    if (window.TOKEN_REQUIRED && !token) {
+                        message('Silakan masukkan token ujian terlebih dahulu.', true);
+                        tokenInput.focus();
+                        return;
+                    }
+                }
                 el('cbtStart').disabled = true;
                 message('Menyiapkan paket soal…');
-                try { apply(await config.request({ action: 'start' })); }
-                catch (error) { message(error.message, true); el('cbtStart').disabled = false; }
+                try {
+                    apply(await config.request({ action: 'start', token: token }));
+                } catch (error) {
+                    message(error.message, true);
+                    el('cbtStart').disabled = false;
+                    if (el('cbtTokenBox')) {
+                        el('cbtTokenBox').style.display = 'block';
+                        if (tokenInput) tokenInput.focus();
+                    }
+                }
             };
             el('cbtPrevious').onclick = () => { if (position > 0) { position--; renderQuestion(); } };
             el('cbtNext').onclick = () => { if (position < attempt.questions.length - 1) { position++; renderQuestion(); } };

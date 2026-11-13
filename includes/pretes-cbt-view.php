@@ -1,18 +1,23 @@
 <link rel="stylesheet" href="<?= BASE_URL ?>/pretes-ujian.php?cbt_style=exam&amp;v=<?= filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css') ?>">
 <section class="cbt-shell" id="pretesCbt" aria-label="CBT Pretes Ubudiyah">
     <div class="cbt-heading">
-        <div><div class="cbt-eyebrow">LPPAI / Ruang Asesmen</div><h3>CBT Pretes Ubudiyah</h3><p>25 soal acak · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
-        <div class="cbt-time-box"><small>Sisa waktu ujian</small><div class="cbt-timer" id="cbtTimer">30:00</div></div>
+        <div><div class="cbt-eyebrow">LPPAI / Ruang Asesmen</div><h3>CBT Pretes Ubudiyah</h3><p>Soal acak terstandar · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
+        <div class="cbt-time-box"><small>Sisa waktu ujian</small><div class="cbt-timer" id="cbtTimer">--:--</div></div>
     </div>
-    <div class="cbt-completion"><b>Terjawab <span id="cbtAnsweredCount">0/25</span></b><div id="cbtCompletion" class="cbt-progress-track" role="progressbar" aria-label="Soal terjawab" aria-valuemin="0" aria-valuemax="25" aria-valuenow="0"><span id="cbtCompletionFill"></span></div></div>
+    <div class="cbt-completion"><b>Terjawab <span id="cbtAnsweredCount">0/0</span></b><div id="cbtCompletion" class="cbt-progress-track" role="progressbar" aria-label="Soal terjawab" aria-valuemin="0" aria-valuemax="25" aria-valuenow="0"><span id="cbtCompletionFill"></span></div></div>
     <div class="cbt-body">
         <div id="cbtMessage" class="cbt-message" role="status" aria-live="polite">Memuat status ujian…</div>
         <div id="cbtIntro">
             <h4 style="margin-top:0">Ujian berlangsung di halaman ini</h4>
-            <div class="cbt-intro-facts"><span>25 soal pilihan ganda</span><span>Durasi 30 menit</span><span>Satu kali pengumpulan</span></div>
-            <p>Anda mendapat 25 soal dari bank soal dengan urutan soal dan pilihan jawaban yang diacak. Durasi 30 menit dimulai setelah tombol Mulai Ujian ditekan. Waktu tetap berjalan jika halaman ditutup.</p>
-            <p>Gunakan nomor soal untuk berpindah dan tandai soal yang ingin diperiksa kembali. Setelah dikumpulkan, jawaban tidak dapat diubah. Kamera pengawas tetap aktif selama ujian.</p>
-            <button type="button" id="cbtStart" class="btn btn-success" disabled>Mulai Ujian · 25 Soal</button>
+            <div class="cbt-intro-facts"><span>Soal pilihan ganda A–E</span><span>Durasi terhitung server</span><span>Satu kali pengumpulan</span></div>
+            <p>Anda mendapat butir soal dari bank soal terdaftar dengan urutan soal dan pilihan jawaban yang diacak. Waktu pengerjaan dimulai setelah tombol Mulai Ujian ditekan. Waktu tetap berjalan jika halaman ditutup.</p>
+            <p>Gunakan nomor soal untuk berpindah dan tandai soal yang ingin diperiksa kembali. Setelah dikumpulkan, jawaban tidak dapat diubah.</p>
+            <div id="cbtTokenBox" style="display:none;margin:16px auto;background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px;max-width:380px;text-align:left">
+                <label for="cbtInputToken" style="display:block;font-size:12px;font-weight:700;color:#854d0e;margin-bottom:6px">🔑 Masukkan Token Ujian *</label>
+                <input type="text" id="cbtInputToken" maxlength="32" placeholder="TOKEN" style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:2px;text-align:center;text-transform:uppercase;padding:8px 12px;border:1.5px solid #ca8a04;border-radius:8px;width:100%;box-sizing:border-box;background:#fff">
+                <span style="font-size:11px;color:#a16207;display:block;margin-top:5px">Mintalah token ujian kepada proktor atau pengawas di ruangan.</span>
+            </div>
+            <button type="button" id="cbtStart" class="btn btn-success" disabled>Mulai Ujian</button>
         </div>
         <div id="cbtWorkspace" class="cbt-layout" style="display:none">
             <div>

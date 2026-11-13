@@ -1,5 +1,5 @@
 <?php
-define('PAGE_TITLE', 'Bank Soal & Hasil CBT Pretes');
+define('PAGE_TITLE', 'Bank Soal & Pengatur Sesi CBT Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-cbt.php';
@@ -8,6 +8,30 @@ $bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
 if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
 $pdo = getDBConnection();
 ensurePretesCbtTables($pdo);
+
+// Endpoint AJAX untuk kebutuhan data dinamis modal tanpa reload halaman
+if (isset($_GET['ajax'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_GET['ajax'] === 'generate_token') {
+        echo json_encode(['token' => pretesCbtGenerateToken(6)]);
+        exit;
+    }
+    if ($_GET['ajax'] === 'package_categories') {
+        $raw = $_GET['package_ids'] ?? [];
+        $ids = is_array($raw) ? $raw : explode(',', (string)$raw);
+        $cleanIds = array_values(array_filter(array_map('intval', $ids), fn($v) => $v > 0));
+        if (empty($cleanIds)) {
+            echo json_encode(['categories' => []]);
+            exit;
+        }
+        $placeholders = implode(',', array_fill(0, count($cleanIds), '?'));
+        $stmt = $pdo->prepare("SELECT category, COUNT(*) as total, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count FROM pretes_cbt_questions WHERE package_id IN ($placeholders) GROUP BY category ORDER BY category ASC");
+        $stmt->execute($cleanIds);
+        echo json_encode(['categories' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
+}
+
 $expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? ORDER BY deadline_at DESC LIMIT 100');
 $expired->execute([time()]);
 foreach ($expired->fetchAll(PDO::FETCH_ASSOC) as $entry) pretesCbtState($pdo, (int)$entry['user_id'], (int)$entry['registration_id']);
@@ -24,52 +48,119 @@ if (isset($_GET['download'])) {
         exit;
     }
 }
-$message = ''; $errors = []; $form = null; $pkgForm = null;
-$allowedTabs = ['packages', 'bank', 'form', 'import', 'results'];
+
+$message = ''; $errors = []; $form = null; $pkgForm = null; $sesForm = null;
+$allowedTabs = ['sessions', 'packages', 'bank', 'form', 'import', 'results'];
 $activeTab = in_array($_GET['tab'] ?? '', $allowedTabs, true) ? $_GET['tab'] : 'bank';
 $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
 
 $packages = pretesCbtGetPackages($pdo);
 $activePackage = pretesCbtGetActivePackage($pdo);
+$sessions = pretesCbtGetSessions($pdo);
+$activeSession = pretesCbtGetActiveSession($pdo);
+
+$isAjax = isset($_POST['ajax']) || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
     if ($action === 'import_xlsx') {
         $activeTab = 'import';
+    } elseif ($action === 'save_session' || $action === 'activate_session' || $action === 'delete_session') {
+        $activeTab = 'sessions';
     } elseif ($action === 'save_package' || $action === 'activate_package' || $action === 'delete_package') {
         $activeTab = 'packages';
     } elseif ($action === 'delete_attempt' || $action === 'delete_all_attempts') {
         $activeTab = 'results';
     } else {
-        $activeTab = 'form';
+        $activeTab = in_array($_POST['current_tab'] ?? '', $allowedTabs, true) ? $_POST['current_tab'] : 'form';
     }
+
     try {
         if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) {
             http_response_code(403);
             throw new InvalidArgumentException('Sesi tidak valid. Muat ulang halaman.');
         }
-        if ($action === 'save_package') {
-            pretesCbtSavePackage($pdo, $_POST);
-            $_SESSION['cbt_bank_flash'] = 'Paket soal berhasil disimpan.';
+
+        if ($action === 'save_session') {
+            $sesId = pretesCbtSaveSession($pdo, $_POST);
+            $flashMsg = 'Sesi ujian berhasil disimpan.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg, 'session_id' => $sesId]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'activate_session') {
+            $sesId = (int)($_POST['session_id'] ?? 0);
+            if ($sesId <= 0) throw new InvalidArgumentException('ID sesi ujian tidak valid.');
+            if (pretesCbtActivateSession($pdo, $sesId)) {
+                $flashMsg = 'Sesi ujian aktif berhasil diperbarui. Peserta akan diarahkan ke sesi ini.';
+            } else {
+                $flashMsg = 'Sesi ujian tidak ditemukan.';
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'delete_session') {
+            $sesId = (int)($_POST['session_id'] ?? 0);
+            if ($sesId <= 0) throw new InvalidArgumentException('ID sesi ujian tidak valid.');
+            if (pretesCbtDeleteSession($pdo, $sesId)) {
+                $flashMsg = 'Sesi ujian berhasil dihapus.';
+            } else {
+                $flashMsg = 'Sesi ujian gagal dihapus.';
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'save_package') {
+            $pkgId = pretesCbtSavePackage($pdo, $_POST);
+            $flashMsg = 'Paket soal berhasil disimpan.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg, 'package_id' => $pkgId]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
             header('Location: ' . $bankUrl . '&tab=packages'); exit;
         } elseif ($action === 'activate_package') {
             $pkgId = (int)($_POST['package_id'] ?? 0);
             if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
             if (pretesCbtActivatePackage($pdo, $pkgId)) {
-                $_SESSION['cbt_bank_flash'] = 'Paket soal aktif berhasil diubah. Peserta yang memulai ujian berikutnya akan diarahkan ke paket ini.';
+                $flashMsg = 'Paket soal aktif berhasil diubah. Peserta yang memulai ujian berikutnya akan diarahkan ke paket ini.';
             } else {
-                $_SESSION['cbt_bank_flash'] = 'Paket soal tidak ditemukan.';
+                $flashMsg = 'Paket soal tidak ditemukan.';
             }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
             header('Location: ' . $bankUrl . '&tab=packages'); exit;
         } elseif ($action === 'delete_package') {
             $pkgId = (int)($_POST['package_id'] ?? 0);
             if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
             if (pretesCbtDeletePackage($pdo, $pkgId)) {
-                $_SESSION['cbt_bank_flash'] = 'Paket soal beserta butir soal di dalamnya berhasil dihapus.';
+                $flashMsg = 'Paket soal beserta butir soal di dalamnya berhasil dihapus.';
             } else {
-                $_SESSION['cbt_bank_flash'] = 'Paket soal gagal dihapus atau sudah dihapus sebelumnya.';
+                $flashMsg = 'Paket soal gagal dihapus atau sudah dihapus sebelumnya.';
             }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
             header('Location: ' . $bankUrl . '&tab=packages'); exit;
         } elseif ($action === 'import_xlsx') {
             $packageId = (int)($_POST['package_id'] ?? 0);
@@ -96,9 +187,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             if ($packageId <= 0) throw new InvalidArgumentException('Belum ada paket soal. Buat paket soal terlebih dahulu sebelum menambahkan soal.');
             $_POST['package_id'] = $packageId;
-            pretesCbtSaveQuestion($pdo, $_POST);
-            $_SESSION['cbt_bank_flash'] = 'Soal berhasil disimpan. Paket ujian yang sudah dimulai tidak berubah.';
-            header('Location: ' . $bankUrl . '&tab=bank'); exit;
+            $qId = pretesCbtSaveQuestion($pdo, $_POST);
+            $flashMsg = 'Soal berhasil disimpan. Paket ujian yang sudah dimulai tidak berubah.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg, 'question_id' => $qId]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            $targetRedirectTab = in_array($_POST['current_tab'] ?? '', ['packages', 'bank'], true) ? $_POST['current_tab'] : 'bank';
+            header('Location: ' . $bankUrl . '&tab=' . $targetRedirectTab); exit;
         } elseif ($action === 'delete_attempt') {
             $activeTab = 'results';
             $attemptId = (int)($_POST['attempt_id'] ?? 0);
@@ -123,23 +221,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (InvalidArgumentException $error) {
         if (http_response_code() !== 403) http_response_code(422);
         $message = $error->getMessage();
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => $message]);
+            exit;
+        }
         if ($action === 'save_question') $form = $_POST;
         if ($action === 'save_package') $pkgForm = $_POST;
+        if ($action === 'save_session') $sesForm = $_POST;
     } catch (Throwable $error) {
         error_log('CBT bank update: ' . $error->getMessage()); http_response_code(503);
         $message = 'Perubahan belum tersimpan. ' . ($error instanceof RuntimeException && !($error instanceof PDOException) ? $error->getMessage() : 'Coba lagi atau hubungi admin.');
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => false, 'message' => $message]);
+            exit;
+        }
         if ($action === 'save_question') $form = $_POST;
         if ($action === 'save_package') $pkgForm = $_POST;
+        if ($action === 'save_session') $sesForm = $_POST;
     }
-    // Refresh packages list after mutations
+    // Refresh lists after mutations
     $packages = pretesCbtGetPackages($pdo);
     $activePackage = pretesCbtGetActivePackage($pdo);
+    $sessions = pretesCbtGetSessions($pdo);
+    $activeSession = pretesCbtGetActiveSession($pdo);
 }
 
 if ($pkgForm === null && !empty($_GET['edit_pkg'])) {
     $pkgForm = pretesCbtGetPackage($pdo, (int)$_GET['edit_pkg']);
     if ($pkgForm) {
         $activeTab = 'packages';
+    }
+}
+if ($sesForm === null && !empty($_GET['edit_ses'])) {
+    $sesForm = pretesCbtGetSession($pdo, (int)$_GET['edit_ses']);
+    if ($sesForm) {
+        $activeTab = 'sessions';
     }
 }
 if ($form === null && !empty($_GET['edit'])) {
@@ -151,6 +269,15 @@ $form ??= ['is_active'=>1,'category'=>'Umum','package_id'=>$activePackage['id'] 
 $questions = $pdo->query('SELECT q.*, p.name AS package_name FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id ORDER BY q.id DESC')->fetchAll(PDO::FETCH_ASSOC);
 $active = count(array_filter($questions, static fn($question) => (bool)$question['is_active']));
 $categories = array_values(array_unique(array_column($questions, 'category'))); sort($categories);
+
+// Pengelompokan kategori dan hitungan soal per kategori per paket untuk modal sesi
+$packageCategoriesMap = [];
+foreach ($packages as $pkg) {
+    $stmt = $pdo->prepare("SELECT category, COUNT(*) as total, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count FROM pretes_cbt_questions WHERE package_id = ? GROUP BY category ORDER BY category ASC");
+    $stmt->execute([(int)$pkg['id']]);
+    $packageCategoriesMap[(int)$pkg['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 $stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC);
 $attempts = $pdo->query('SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id ORDER BY a.started_at DESC LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
 include __DIR__ . '/../includes/header.php';

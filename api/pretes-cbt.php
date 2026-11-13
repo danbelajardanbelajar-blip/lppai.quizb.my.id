@@ -24,15 +24,27 @@ $stmt = $pdo->prepare('SELECT id FROM pretes_registrations WHERE id = ? AND user
 $stmt->execute([$regId, $userId]);
 $isTester = (string)($user['username'] ?? '') === '12345' || (string)($user['nim'] ?? '') === '12345' || $userId === 12345;
 if (!$stmt->fetchColumn() && !($isTester && $regId === 999999)) cbtReply(403, ['success' => false, 'message' => 'Pendaftaran bukan milik akun Anda.']);
-$verifiedAt = (int)($_SESSION['pretes_cbt_verified_v2_' . $regId] ?? 0);
-if (!$verifiedAt || time() - $verifiedAt > 14400) cbtReply(403, ['success' => false, 'message' => 'Lakukan verifikasi wajah kembali untuk mengakses CBT.']);
+
+ensurePretesCbtTables($pdo);
+$activeSession = pretesCbtGetActiveSession($pdo);
+$cameraRequired = !$activeSession || ($activeSession['camera_mode'] ?? 'wajib') === 'wajib';
+
+if ($cameraRequired) {
+    $verifiedAt = (int)($_SESSION['pretes_cbt_verified_v2_' . $regId] ?? 0);
+    if (!$verifiedAt || time() - $verifiedAt > 14400) cbtReply(403, ['success' => false, 'message' => 'Lakukan verifikasi wajah kembali untuk mengakses CBT.']);
+}
+
 $action = $input['action'] ?? '';
 if (!in_array($action, ['state', 'start', 'save', 'submit'], true)) cbtReply(400, ['success' => false, 'message' => 'Aksi CBT tidak valid.']);
 try {
-    ensurePretesCbtTables($pdo);
-    if ($action === 'state') $data = pretesCbtState($pdo, $userId, $regId);
-    elseif ($action === 'start') $data = pretesCbtStart($pdo, $userId, $regId);
-    else $data = pretesCbtChange($pdo, $userId, $regId, $action, $input);
+    if ($action === 'state') {
+        $data = pretesCbtState($pdo, $userId, $regId);
+    } elseif ($action === 'start') {
+        $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
+        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput);
+    } else {
+        $data = pretesCbtChange($pdo, $userId, $regId, $action, $input);
+    }
     cbtReply(200, ['success' => true] + $data);
 } catch (InvalidArgumentException $e) {
     cbtReply(422, ['success' => false, 'message' => $e->getMessage()]);

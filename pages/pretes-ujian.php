@@ -117,6 +117,38 @@ $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
 $isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_v2_' . $regId])
     && time() - (int)$_SESSION['pretes_cbt_verified_v2_' . $regId] <= 14400);
 
+require_once __DIR__ . '/../includes/pretes-cbt.php';
+ensurePretesCbtTables($pdo);
+$activeSession = pretesCbtGetActiveSession($pdo);
+$isCameraRequired = !$activeSession || ($activeSession['camera_mode'] ?? 'wajib') === 'wajib';
+
+// Jika sesi ujian tidak mewajibkan kamera, mahasiswa langsung masuk ruang ujian CBT
+if (!$isCameraRequired) {
+    $isVerified = true;
+}
+
+$isSessionOpen = true;
+$sessionNotice = '';
+if ($activeSession) {
+    $now = time();
+    if (!empty($activeSession['start_time'])) {
+        $startTs = strtotime($activeSession['start_time']);
+        if ($startTs !== false && $now < $startTs) {
+            $isSessionOpen = false;
+            $startFmt = (new DateTimeImmutable('@' . $startTs))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+            $sessionNotice = "Sesi ujian '{$activeSession['title']}' belum dibuka. Ujian dijadwalkan dapat dimulai pada {$startFmt} WIB.";
+        }
+    }
+    if ($isSessionOpen && !empty($activeSession['end_time'])) {
+        $endTs = strtotime($activeSession['end_time']);
+        if ($endTs !== false && $now > $endTs) {
+            $isSessionOpen = false;
+            $endFmt = (new DateTimeImmutable('@' . $endTs))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+            $sessionNotice = "Sesi ujian '{$activeSession['title']}' telah ditutup sejak {$endFmt} WIB.";
+        }
+    }
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -292,6 +324,19 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
             👉 Daftar Pretes Sekarang
         </a>
+    </div>
+
+<?php elseif (!$isSessionOpen): ?>
+    <!-- ── State: Sesi Ujian Belum Buka / Telah Ditutup ── -->
+    <div class="card" style="border:2px solid #0284c7; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px; background:#f0f9ff;">
+        <span style="font-size:48px; display:block; margin-bottom:12px;">🕒</span>
+        <h3 style="margin:0 0 8px; font-weight:800; color:#0369a1;"><?= sanitize($activeSession['title'] ?? 'Sesi Ujian Pretes') ?></h3>
+        <p style="color:#334155; font-size:14px; max-width:550px; margin:0 auto 16px; line-height:1.6;">
+            <?= sanitize($sessionNotice) ?>
+        </p>
+        <div style="font-size:12.5px; color:#64748b; margin-top:8px;">
+            Hubungi pengawas atau dosen jika jadwal belum sesuai dengan sesi Anda.
+        </div>
     </div>
 
 <?php elseif (empty($refPhoto)): ?>
@@ -491,6 +536,8 @@ const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 const REGISTRATION_ID = <?= (int)$regId ?>;
 const API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?face_api=1') ?>;
 const CBT_API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?cbt_api=1') ?>;
+const IS_CAMERA_REQUIRED = <?= json_encode($isCameraRequired ?? true) ?>;
+const TOKEN_REQUIRED = <?= json_encode(!empty($activeSession['token_required']) && !empty($activeSession['token'])) ?>;
 
 let proctorInterval = null;
 let countdownTimer = null;
@@ -931,7 +978,16 @@ function runInitialCheckin() {
 function initProctoringExamRoom() {
     const video = document.getElementById('proctorVideo');
     mirrorCameraPreview(video);
-    if (video) {
+    if (!IS_CAMERA_REQUIRED) {
+        const title = document.getElementById('proctorStatusTitle');
+        if (title) title.textContent = 'Ujian Mandiri Berlangsung';
+        const freq = document.getElementById('proctorFrequency');
+        if (freq) freq.textContent = 'Tanpa Kamera';
+        const info = document.getElementById('lastCheckInfo');
+        if (info) info.textContent = 'Sesi ujian ini tidak mewajibkan pengawasan kamera web.';
+        const timerDisp = document.getElementById('proctorTimerDisplay');
+        if (timerDisp) timerDisp.textContent = 'Mandiri';
+    } else if (video) {
         if (activeStream) {
             video.srcObject = activeStream;
             video.play();
@@ -950,11 +1006,13 @@ function initProctoringExamRoom() {
         window.PretesCbt.init({
             request: function(payload) { return requestProctoringCheck(payload, CBT_API_URL); },
             onStarted: function() {
-                const title = document.getElementById('proctorStatusTitle');
-                if (title) title.textContent = 'Pengawas Kamera Aktif';
-                const info = document.getElementById('lastCheckInfo');
-                if (info) info.textContent = 'Pemeriksaan wajah setiap 30 detik selama ujian aktif.';
-                startProctoringTimer();
+                if (IS_CAMERA_REQUIRED) {
+                    const title = document.getElementById('proctorStatusTitle');
+                    if (title) title.textContent = 'Pengawas Kamera Aktif';
+                    const info = document.getElementById('lastCheckInfo');
+                    if (info) info.textContent = 'Pemeriksaan wajah setiap 30 detik selama ujian aktif.';
+                    startProctoringTimer();
+                }
             },
             onSubmitted: function() {
                 cbtCompleted = true;
