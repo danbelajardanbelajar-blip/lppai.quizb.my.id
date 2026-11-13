@@ -8,7 +8,7 @@ const clone = value => JSON.parse(JSON.stringify(value));
 
 function environment() {
     function node() {
-        return { style: {}, children: [], textContent: '', className: '', disabled: false,
+        return { style: {}, children: [], textContent: '', className: '', disabled: false, value: '',
             replaceChildren(...children) { this.children = children; },
             append(...children) { this.children.push(...children); },
             appendChild(child) { this.children.push(child); },
@@ -62,7 +62,12 @@ function environment() {
     assert.equal(env.element('cbtTimer').textContent, '30:00');
     const radio = index => env.element('cbtOptions').children[index + 1].children[0];
     env.setMode('defer');
-    radio(0).onchange();
+    const oldRadio = radio(0);
+    oldRadio.onchange();
+    assert.equal(env.element('cbtPosition').textContent, 'Soal 2 dari 25', 'Answer advances immediately while saving');
+    oldRadio.onchange();
+    assert.equal(env.element('cbtPosition').textContent, 'Soal 2 dari 25', 'Detached option cannot skip another question');
+    env.element('cbtPrevious').onclick();
     radio(1).onchange();
     assert.equal(env.deferred.length, 1);
     env.deferred.shift()();
@@ -72,6 +77,20 @@ function environment() {
     await settle();
     assert.equal(env.stored.questions[0].answer, 'B');
     assert.match(env.element('cbtMessage').textContent, /Semua perubahan/);
+    env.setMode('immediate');
+    env.element('cbtFlag').checked = true;
+    env.element('cbtFlag').onchange();
+    await settle();
+    assert.equal(env.element('cbtPosition').textContent, 'Soal 2 dari 25', 'Flagging does not advance');
+    env.element('cbtClear').onclick();
+    await settle();
+    assert.equal(env.element('cbtPosition').textContent, 'Soal 2 dari 25', 'Clearing does not advance');
+    env.element('cbtNumbers').children[24].onclick();
+    radio(4).onchange();
+    await settle();
+    assert.equal(env.element('cbtPosition').textContent, 'Soal 25 dari 25');
+    assert.equal(env.stored.questions[24].answer, 'E');
+    assert.equal(env.submitted, false, 'Last answer must not submit automatically');
     env.setMode('fail');
     radio(3).onchange();
     await settle();
@@ -96,6 +115,8 @@ function environment() {
     await settle();
     await expiry.element('cbtStart').onclick();
     expiry.advance(1800000);
+    expiry.element('cbtOptions').children[1].children[0].onchange();
+    assert.equal(expiry.element('cbtPosition').textContent, 'Soal 1 dari 25', 'Expired answer must not advance');
     expiry.intervals[0]();
     await settle();
     assert.equal(expiry.submitted, true, 'Countdown expiry collects saved answers');

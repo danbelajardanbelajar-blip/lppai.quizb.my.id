@@ -39,6 +39,7 @@
         pending.set(question.position, { position: question.position, answer, flagged });
         navigation();
         flush().catch(() => {});
+        return true;
     }
 
     function renderQuestion() {
@@ -59,7 +60,11 @@
             radio.type = 'radio'; radio.name = 'cbtAnswer'; radio.value = letter;
             radio.checked = question.answer === letter;
             radio.disabled = Date.now() >= target || finishing;
-            radio.onchange = () => edit(letter, question.flagged);
+            radio.onchange = () => {
+                if (attempt.questions[position] !== question || !edit(letter, question.flagged)) return;
+                if (position < attempt.questions.length - 1) position++;
+                renderQuestion();
+            };
             const content = document.createElement('span');
             content.textContent = letter + '. ' + text;
             label.append(radio, content);
