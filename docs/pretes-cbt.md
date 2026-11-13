@@ -83,6 +83,11 @@ hitung mundur. Mesin VPS menerima protokol lama tiga foto dan protokol baru
 sembilan foto; pasang versi layanan yang mendukung `pose-burst-v2` sebelum menarik
 versi halaman ini ke hosting. Pesan gagal menjelaskan langkah gerakan yang belum
 terbaca. Ambang pengenalan identitas tetap sama.
+Pratinjau video check-in dan pengawas memakai mode cermin. Petunjuk mengikuti
+kanan/kiri tubuh peserta; panah kanan berarti kanan peserta pada pratinjau cermin.
+Frame yang dikirim tetap piksel kamera asli, sehingga foto acuan/pencocokan tidak
+ikut dibalik. Tantangan raw `left` ditampilkan sebagai kanan peserta, raw `right`
+sebagai kiri peserta; model VPS dan nonce tetap memvalidasi arah raw semula.
 
 ## Pemeriksaan
 

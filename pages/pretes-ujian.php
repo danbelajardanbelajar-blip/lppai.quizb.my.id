@@ -332,7 +332,7 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="card" style="border:1.5px solid #cbd5e1; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.04);">
             <div style="background:#f8fafc; border-bottom:1.5px solid #e2e8f0; padding:14px 18px; font-size:13px; color:#334155;">
-                <strong>Petunjuk:</strong> Pastikan hanya wajah Anda berada di kamera dengan pencahayaan terang. Klik <strong>Verifikasi Wajah & Buka Ujian</strong>, putar kepala mengikuti panah, lalu kembali ke posisi awal. Kamera mengambil beberapa sampel pada setiap langkah.
+                <strong>Petunjuk:</strong> Pratinjau kamera tampil seperti cermin. <strong>Kanan dan kiri mengikuti tubuh Anda.</strong> Putar kepala mengikuti instruksi, tahan hingga hitung mundur selesai, lalu kembali ke posisi awal. Pastikan hanya Anda berada di kamera dengan pencahayaan terang.
             </div>
 
             <div class="card-body" style="padding:20px;">
@@ -358,6 +358,7 @@ include __DIR__ . '/../includes/header.php';
                         <div style="font-size:12px; font-weight:800; color:#0f766e; text-transform:uppercase; margin-bottom:8px;">
                             Kamera Langsung Peserta (Live Webcam)
                         </div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:10px;">Mode cermin · arah kanan/kiri Anda</div>
                         
                         <div class="camera-guide-box" id="checkinCameraBox" style="position:relative; width:240px; height:320px; margin:0 auto 14px; border-radius:12px; overflow:hidden; background:#0f172a; box-shadow:0 4px 14px rgba(0,0,0,0.15);">
                             <!-- Video Stream: Always in DOM render tree -->
@@ -568,6 +569,18 @@ function captureFaceFrame(video) {
     return canvas.toDataURL('image/jpeg', 0.85);
 }
 
+function mirrorCameraPreview(video) {
+    if (video) video.style.transform = 'scaleX(-1)';
+}
+
+function facePosePrompt(rawDirection) {
+    // The model receives the original camera pixels. The mirrored preview maps
+    // raw-image left to the participant's right, and vice versa.
+    return rawDirection === 'left'
+        ? { symbol: '→', label: 'KANAN Anda', side: 'kanan' }
+        : { symbol: '←', label: 'KIRI Anda', side: 'kiri' };
+}
+
 // ── Global Webcam Handler & Engine Skenario A & B ──
 window.startCheckinCamera = function(isUserAction) {
     console.log("[Webcam] startCheckinCamera dipanggil, userAction:", isUserAction);
@@ -619,6 +632,7 @@ window.startCheckinCamera = function(isUserAction) {
         console.log("[Webcam] Stream berhasil didapatkan:", stream);
         activeStream = stream;
         video.srcObject = stream;
+        mirrorCameraPreview(video);
         video.setAttribute('playsinline', 'true');
         video.setAttribute('autoplay', 'true');
         video.muted = true;
@@ -805,6 +819,7 @@ function runInitialCheckin() {
     const video = document.getElementById('checkinVideo');
     const alertBox = document.getElementById('checkinAlert');
     const btn = document.getElementById('btnRunCheckin');
+    let motionGuide = null;
     if (btn && btn.disabled) return;
 
     if (!video || !video.videoWidth || !activeStream) {
@@ -835,10 +850,9 @@ function runInitialCheckin() {
         const frames = [];
         const sample = function() { frames.push(captureFaceFrame(video)); };
         await guideFacePose('◎', '1/3 · Wajah lurus', 'Hadapkan wajah lurus ke kamera. Tahan posisi; kamera mengambil beberapa sampel selama hitung mundur.', 3, sample);
-        const left = challenge.direction === 'left';
-        const direction = left ? 'KIRI layar' : 'KANAN layar';
-        await guideFacePose(left ? '←' : '→', '2/3 · ' + direction,
-            'Putar kepala perlahan: arahkan hidung pada video ke ' + direction + ', sesuai panah kuning besar. Jangan hanya menggeser badan. Tahan hingga hitung mundur selesai.', 4, sample);
+        motionGuide = facePosePrompt(challenge.direction);
+        await guideFacePose(motionGuide.symbol, '2/3 · ' + motionGuide.label,
+            'Tolehkan kepala ke ' + motionGuide.side + ' Anda, seperti saat bercermin. Ikuti panah kuning dan tahan hingga hitung mundur selesai. Jangan hanya menggeser badan.', 4, sample);
         await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembalikan kepala ke posisi seperti langkah pertama. Tahan hingga hitung mundur selesai.', 3, sample);
         const guide = document.getElementById('facePoseGuide');
         if (guide) guide.style.display = 'none';
@@ -886,7 +900,11 @@ function runInitialCheckin() {
                 alertBox.style.background = '#fef2f2';
                 alertBox.style.border = '1px solid #fca5a5';
                 alertBox.style.color = '#991b1b';
-                alertBox.textContent = 'Verifikasi belum lolos. ' + (data.message || 'Wajah belum sesuai dengan pasfoto pendaftaran.');
+                let reason = data.message || 'Wajah belum sesuai dengan pasfoto pendaftaran.';
+                if (data.status === 'MOTION_REQUIRED' && data.failed_step === 2 && motionGuide) {
+                    reason = 'Langkah 2: gerakan menoleh ke ' + motionGuide.side + ' Anda belum cukup terbaca. Putar kepala seperti saat bercermin dan tahan hingga hitung mundur selesai.';
+                }
+                alertBox.textContent = 'Verifikasi belum lolos. ' + reason;
             }
         }
     })
@@ -912,6 +930,7 @@ function runInitialCheckin() {
  */
 function initProctoringExamRoom() {
     const video = document.getElementById('proctorVideo');
+    mirrorCameraPreview(video);
     if (video) {
         if (activeStream) {
             video.srcObject = activeStream;

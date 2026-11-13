@@ -106,6 +106,13 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(vm.runInContext('API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?face_api=1');
     assert.equal(vm.runInContext('CBT_API_URL', env.sandbox), 'https://example.test/pretes-ujian.php?cbt_api=1');
     env.sandbox.waitForFacePose = () => Promise.resolve();
+    assert.equal(env.sandbox.facePosePrompt('left').symbol, '→');
+    assert.equal(env.sandbox.facePosePrompt('left').label, 'KANAN Anda');
+    assert.equal(env.sandbox.facePosePrompt('right').symbol, '←');
+    assert.equal(env.sandbox.facePosePrompt('right').label, 'KIRI Anda');
+    const poseInstructions = [];
+    const originalGuide = env.sandbox.guideFacePose;
+    env.sandbox.guideFacePose = async function(...args) { poseInstructions.push(args.slice(0,2)); return originalGuide(...args); };
     for (const name of ['startCheckinCamera', 'toggleCameraFace', 'runInitialCheckin']) {
         assert.equal(typeof env.sandbox[name], 'function', name);
     }
@@ -116,6 +123,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     await settle();
     assert.equal(calls, 1, 'Satu klik hanya boleh meminta satu stream');
     assert.equal(env.element('checkinVideo').srcObject, stream);
+    assert.equal(env.element('checkinVideo').style.transform, 'scaleX(-1)');
     assert.equal(env.element('checkinCameraPlaceholder').style.display, 'none');
 
     env.sandbox.toggleCameraFace();
@@ -129,9 +137,23 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     const checkin = env.requests.find(request => request.action === 'initial_checkin');
     assert.equal(checkin.challenge_id, 'nonce-from-server');
     assert.equal(checkin.frames.length, 9);
+    assert.deepEqual(poseInstructions[1], ['→', '2/3 · KANAN Anda']);
     assert.equal(env.element('btnRunCheckin').disabled, false);
     assert.equal(env.element('facePoseGuide').style.display, 'none');
     assert.equal(env.timers.size, 0, 'Timer dibersihkan setelah respons');
+
+    // Raw image left must remain body-right in the failure message too.
+    env.sandbox.fetch = (url, options) => {
+        const action = JSON.parse(options.body).action;
+        const data = action === 'challenge'
+            ? { success: true, challenge_id: 'motion-retry', direction: 'left' }
+            : { verified: false, status: 'MOTION_REQUIRED', failed_step: 2, message: 'Gerakan ke kiri layar belum terbaca.' };
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
+    };
+    env.sandbox.runInitialCheckin();
+    await settle();
+    assert.match(env.element('checkinAlert').textContent, /kanan Anda/);
+    assert.doesNotMatch(env.element('checkinAlert').textContent, /kiri layar/);
 
     // Server tidak merespons: pulihkan tombol dan tampilkan batas waktu.
     env.sandbox.fetch = () => new Promise(() => {});
@@ -182,6 +204,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     vm.runInContext(renderScript(true), verified.sandbox);
     await settle();
     assert.equal(verified.element('proctorVideo').srcObject, stream);
+    assert.equal(verified.element('proctorVideo').style.transform, 'scaleX(-1)');
     assert.equal(typeof cbtSettings.request, 'function');
     cbtSettings.onStarted();
     assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');

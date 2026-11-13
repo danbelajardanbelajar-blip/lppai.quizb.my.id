@@ -219,6 +219,7 @@ if ($action === 'initial_checkin') {
         'event_type' => 'initial_checkin',
         'score'      => $score,
         'status'     => $status,
+        'failed_step' => $compResult['failed_step'] ?? null,
         'message'    => $reason,
         'verified_at'=> date('H:i:s') . ' WIB'
     ]);
