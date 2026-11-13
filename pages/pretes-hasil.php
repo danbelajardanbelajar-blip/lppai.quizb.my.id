@@ -8,6 +8,8 @@ requireLogin();
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/pretes-active-page.php';
+if (renderActivePretesParticipantPage($pdo, $user)) return;
 
 // Pastikan fitur pretes siap
 ensurePretesFeatures($pdo);

@@ -11,7 +11,8 @@ parser.add_argument('--output-dir')
 args = parser.parse_args()
 with tempfile.TemporaryDirectory(prefix='lppai-pretes-preparation-') as temp:
     root = Path(temp)
-    for name in ['pages/pretes-hasil.php', 'includes/pretes-helper.php', 'includes/user-helper.php', 'includes/pretes-face-engine.php',
+    for name in ['pages/pretes-hasil.php', 'pages/pretes-peserta.php', 'includes/pretes-helper.php', 'includes/user-helper.php', 'includes/pretes-face-engine.php',
+                 'includes/pretes-active-page.php', 'includes/pretes-participant-view.php', 'includes/sync_eujian.php',
                  'includes/pretes-preparation-view.php', 'includes/pretes-learning-reading-view.php',
                  'data/pretes-istighasah.php', 'data/pretes-learning-readings.json', 'data/pretes-learning-videos.php']:
         target = root / name
@@ -23,7 +24,7 @@ require_once __DIR__ . '/pretes-helper.php';
 function requireLogin() {}
 function isAdmin() { return false; }
 function isDosen() { return false; }
-function getCurrentUser() { return ['id' => 7, 'role' => 'mahasiswa', 'jenis_program' => 'Reguler']; }
+function getCurrentUser() { global $argv; return ['id' => 7, 'role' => 'mahasiswa', 'jenis_program' => 'Reguler', 'username' => $argv[1] === 'tester' ? '12345' : 'student']; }
 function sanitize($text) { return htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8'); }
 function getDBConnection() {
     global $argv;
@@ -32,8 +33,9 @@ function getDBConnection() {
     $pdo->exec("CREATE TABLE master_pretes (id INTEGER, nama_pretes TEXT, periode TEXT, tahun_ajaran TEXT, status TEXT, target_program TEXT, tanggal_mulai TEXT);
         CREATE TABLE master_gelombang (id INTEGER, status TEXT);
         INSERT INTO master_gelombang VALUES (1, 'aktif');
-        CREATE TABLE pretes_registrations (id INTEGER, user_id INTEGER, periode TEXT, pretes_schedule_id INTEGER, hari_pilihan TEXT, jam TEXT, ruangan TEXT, dosen_penguji TEXT);
-        CREATE TABLE pretes_schedules (id INTEGER, tanggal TEXT, waktu_mulai TEXT, waktu_selesai TEXT, ruangan TEXT, periode TEXT);
+        CREATE TABLE pretes_registrations (id INTEGER, user_id INTEGER, periode TEXT, pretes_schedule_id INTEGER, hari_pilihan TEXT, jam TEXT, ruangan TEXT, dosen_penguji TEXT, tanggal_daftar TEXT DEFAULT '2026-11-13', status TEXT DEFAULT 'terdaftar');
+        CREATE TABLE pretes_schedules (id INTEGER, tanggal TEXT, waktu_mulai TEXT, waktu_selesai TEXT, ruangan TEXT, periode TEXT, status TEXT, terisi INTEGER DEFAULT 0, kuota INTEGER DEFAULT 40);
+        INSERT INTO pretes_schedules (id, tanggal, waktu_mulai, waktu_selesai, ruangan, periode, status) VALUES (4, '2026-11-17', '13:00', '15:00', 'Ruang Periode Lain', '2026 RPL', 'aktif');
         CREATE TABLE pretes_results (id INTEGER, user_id INTEGER, pretes_schedule_id INTEGER, nilai REAL, created_at TEXT);
         INSERT INTO master_pretes VALUES (1, 'Pretes Lama', '2025/2026', '2025/2026', 'selesai', 'Semua', NULL);
         INSERT INTO master_pretes VALUES (2, 'Pretes Aktif', '2026/2027', '2026/2027', 'aktif', 'Semua', NULL);");
@@ -42,8 +44,12 @@ function getDBConnection() {
     if ($case === 'multiple') $pdo->exec("INSERT INTO master_pretes VALUES (3, 'Khusus RPL', '2026 RPL', '2026/2027', 'aktif', 'RPL', NULL)");
     if (!in_array($case, ['none', 'closed_none'])) {
         $period = $case === 'old_only' ? '2025/2026' : '2026/2027';
-        $pdo->prepare('INSERT INTO pretes_registrations VALUES (1, 7, ?, NULL, ?, ?, ?, ?)')->execute([$period, 'Senin', '13.00', '', '']);
-        if ($case === 'priority') $pdo->exec("INSERT INTO pretes_registrations VALUES (9, 7, '2025/2026', NULL, 'Kamis', '13.00', '', '')");
+        $pdo->prepare('INSERT INTO pretes_registrations (id, user_id, periode, pretes_schedule_id, hari_pilihan, jam, ruangan, dosen_penguji) VALUES (1, 7, ?, NULL, ?, ?, ?, ?)')->execute([$period, 'Senin', '13.00', '', '']);
+        if ($case === 'priority') $pdo->exec("INSERT INTO pretes_registrations (id, user_id, periode, hari_pilihan, jam, ruangan, dosen_penguji) VALUES (9, 7, '2025/2026', 'Kamis', '13.00', '', '')");
+        if ($case === 'assigned') {
+            $pdo->exec("INSERT INTO pretes_schedules (id, tanggal, waktu_mulai, waktu_selesai, ruangan, periode, status) VALUES (8, '2026-11-16', '13:00', '15:00', 'Ruang Peserta', '2026/2027', 'aktif'), (9, '2026-11-17', '13:00', '15:00', 'Jadwal Nonaktif', '2026/2027', 'nonaktif');
+                UPDATE pretes_registrations SET pretes_schedule_id = 8, dosen_penguji = 'Penguji Peserta' WHERE id = 1");
+        }
         if (in_array($case, ['old_only', 'full_active', 'closed_pass'])) {
             $scores = array_fill_keys(array_keys(pretesComponents()), 90);
             $pdo->prepare('INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by) VALUES (1, ?, 1)')->execute([json_encode($scores)]);
@@ -55,12 +61,22 @@ function getDBConnection() {
 ''', encoding='utf-8')
     (root / 'includes/header.php').write_text('<!doctype html><html lang="id"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><body>', encoding='utf-8')
     (root / 'includes/footer.php').write_text('</body></html>', encoding='utf-8')
-    for case in ['registered', 'none', 'old_only', 'full_active', 'multiple', 'priority', 'closed_pass', 'closed_fail', 'closed_none']:
+    for case in ['registered', 'none', 'old_only', 'full_active', 'multiple', 'priority', 'assigned', 'tester', 'closed_pass', 'closed_fail', 'closed_none']:
         run = subprocess.run(['php', '-d', 'display_errors=1', 'pages/pretes-hasil.php', case], cwd=root, capture_output=True, text=True, encoding='utf-8')
         assert run.returncode == 0, run.stderr + run.stdout
         html = run.stdout
         assert 'Fatal error' not in html and 'Undefined' not in html and 'Deprecated:' not in html, html
         if not case.startswith('closed'):
+            other = subprocess.run(['php', '-d', 'display_errors=1', 'pages/pretes-peserta.php', case], cwd=root, capture_output=True, text=True, encoding='utf-8')
+            assert other.returncode == 0, other.stderr + other.stdout
+            assert html == other.stdout, 'The two active participant routes must render identical content'
+            assert html.count('id="pretes-active-information"') == 1
+            assert html.index('id="pretes-active-participant"') < html.index('id="pretes-active-preparation"')
+            assert html.count('<html ') == 1 and html.count('</html>') == 1
+            assert 'Ruang Periode Lain' not in html and 'Jadwal Nonaktif' not in html
+            if case == 'assigned':
+                assert 'Ruang Peserta' in html and 'Penguji Peserta' in html
+            if case == 'tester': assert 'id="btn-kerjakan-pretes"' in html
             assert 'Pendaftaran pretes masih aktif' in html
             assert 'Status Akhir:' not in html and 'Rp 50.000' not in html and 'tutorial-pendaftaran.php' not in html
             assert 'Periode Pretes Telah Berakhir' not in html
@@ -86,6 +102,10 @@ function getDBConnection() {
             assert 'Khusus RPL' not in html and '>2026/2027<' in html
         else:
             assert 'pretes-preparation-hero' not in html
+            legacy = subprocess.run(['php', '-d', 'display_errors=1', 'pages/pretes-peserta.php', case], cwd=root, capture_output=True, text=True, encoding='utf-8')
+            assert legacy.returncode == 0 and 'Fatal error' not in legacy.stdout and 'Undefined' not in legacy.stdout, legacy.stderr + legacy.stdout
+            assert 'id="pretes-active-information"' not in legacy.stdout
+            assert legacy.stdout.count('<html ') == 1 and legacy.stdout.count('</html>') == 1
             if case == 'closed_pass': assert 'Selamat, Anda Dinyatakan LULUS Pretes!' in html
             if case == 'closed_fail': assert 'Status Akhir: TIDAK LULUS' in html
             if case == 'closed_none': assert 'Periode Pretes Telah Berakhir' in html

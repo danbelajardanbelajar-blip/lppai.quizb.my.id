@@ -5,6 +5,8 @@
  */
 
 $fileContent = file_get_contents(__DIR__ . '/../pages/pretes-peserta.php');
+$fileContent .= file_get_contents(__DIR__ . '/../includes/pretes-participant-view.php');
+$fileContent .= file_get_contents(__DIR__ . '/../includes/pretes-active-page.php');
 
 $asserts = [
     'Syntax check file' => function() {
