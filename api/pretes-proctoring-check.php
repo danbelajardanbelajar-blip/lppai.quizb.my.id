@@ -39,6 +39,11 @@ if (strlen($rawInput) > 2200000) {
     exit;
 }
 $jsonBody = json_decode($rawInput, true);
+if (!is_array($jsonBody) && empty($_POST)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'verified' => false, 'message' => 'Format permintaan tidak valid.']);
+    exit;
+}
 
 $csrfToken = $_POST['csrf_token'] ?? ($jsonBody['csrf_token'] ?? '');
 if (!verifyCsrf($csrfToken)) {
@@ -51,7 +56,8 @@ if (!verifyCsrf($csrfToken)) {
 }
 
 $action = trim($_POST['action'] ?? ($jsonBody['action'] ?? ''));
-$livePhoto = trim($_POST['live_photo'] ?? ($jsonBody['live_photo'] ?? ''));
+$livePhotoInput = $_POST['live_photo'] ?? ($jsonBody['live_photo'] ?? '');
+$livePhoto = is_string($livePhotoInput) ? trim($livePhotoInput) : '';
 $regIdInput = (int)($_POST['registration_id'] ?? ($jsonBody['registration_id'] ?? 0));
 
 // Ambil data registrasi pretes mahasiswa aktif
@@ -146,6 +152,12 @@ if ($action === 'initial_checkin') {
     exit;
 }
 
+$frames = $action === 'initial_checkin' ? ($jsonBody['frames'] ?? []) : [$livePhoto];
+if (!is_array($frames)) $frames = [];
+if ($action === 'initial_checkin') {
+    // Audit snapshot must come from the frames actually checked by the model.
+    $livePhoto = isset($frames[0]) && is_string($frames[0]) ? $frames[0] : '';
+}
 if (empty($livePhoto)) {
     echo json_encode([
         'success' => false,
@@ -156,8 +168,6 @@ if (empty($livePhoto)) {
 }
 
 // ── Eksekusi Komparasi Wajah (Face Comparison) ──
-$frames = $action === 'initial_checkin' ? ($jsonBody['frames'] ?? []) : [$livePhoto];
-if (!is_array($frames)) $frames = [];
 $compResult = comparePretesFaces($refPhoto, $frames, $challenge);
 $score = (float)($compResult['similarity'] ?? 0.0);
 $status = (string)($compResult['status'] ?? 'NO_FACE');

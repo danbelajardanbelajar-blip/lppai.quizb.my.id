@@ -106,6 +106,7 @@ function comparePretesFaces(string $referencePath, array $frames, ?array $challe
         || !is_bool($result['match'] ?? null) || !is_numeric($result['similarity'] ?? null)
         || !is_string($result['reason'] ?? null) || !is_string($result['status'] ?? null)
         || !is_finite((float)$result['similarity'])
+        || (float)$result['similarity'] < -100 || (float)$result['similarity'] > 100
         || ($result['match'] && (($result['status'] ?? '') !== 'MATCH' || ($challenge && ($result['motion_passed'] ?? false) !== true)))) {
         return pretesFaceEngineError('Respons mesin verifikasi tidak valid. Akses ujian tetap terkunci.');
     }
