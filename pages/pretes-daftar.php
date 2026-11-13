@@ -593,7 +593,11 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
                     var height = canvasOrImage.height || canvasOrImage.naturalHeight || 640;
                     resolve(self.analyzeCanvasFace(canvasOrImage, width, height, mode));
                 } catch(e) {
-                    resolve({ valid: true, faces: [{ x: 100, y: 50, width: 200, height: 260 }], box: { x: 100, y: 50, width: 200, height: 260 }, message: "Pasfoto resmi siap digunakan." });
+                    resolve({
+                        valid: false,
+                        faces: [],
+                        reason: "Wajah tidak dapat diverifikasi dari foto. Silakan coba kembali."
+                    });
                 }
             });
         },
@@ -606,15 +610,15 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
             ctx.drawImage(canvasOrImg, 0, 0, sampleW, sampleH);
             var imgData;
             try { imgData = ctx.getImageData(0, 0, sampleW, sampleH); } catch(e) {
-                return { valid: true, faces: [{ x: Math.round(origW * 0.25), y: Math.round(origH * 0.15), width: Math.round(origW * 0.5), height: Math.round(origH * 0.65) }], box: { x: Math.round(origW * 0.25), y: Math.round(origH * 0.15), width: Math.round(origW * 0.5), height: Math.round(origH * 0.65) }, message: "Pasfoto resmi siap digunakan." };
+                return { valid: false, faces: [], reason: "Gagal membaca data gambar." };
             }
             var pixels = imgData.data;
+            var totalPixels = sampleW * sampleH;
             var skinPixelCount = 0;
             var colCounts = new Uint16Array(sampleW);
             var rowCounts = new Uint16Array(sampleH);
-            var centerLumSum = 0, centerCount = 0;
-            var cMinX = Math.round(sampleW * 0.20), cMaxX = Math.round(sampleW * 0.80);
-            var cMinY = Math.round(sampleH * 0.15), cMaxY = Math.round(sampleH * 0.80);
+            var lumArray = new Uint8Array(totalPixels);
+            var sumLum = 0, sumSqLum = 0;
 
             for (var y = 0; y < sampleH; y++) {
                 for (var x = 0; x < sampleW; x++) {
@@ -624,13 +628,12 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
                     var cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
                     var cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-                    if (x >= cMinX && x <= cMaxX && y >= cMinY && y <= cMaxY) {
-                        centerLumSum += yVal;
-                        centerCount++;
-                    }
+                    lumArray[y * sampleW + x] = yVal;
+                    sumLum += yVal;
+                    sumSqLum += yVal * yVal;
 
-                    var isSkinYCbCr = (cb >= 68 && cb <= 145 && cr >= 122 && cr <= 188 && yVal >= 30 && yVal <= 248);
-                    var isSkinRGB = (r > 50 && g > 30 && b > 20 && r >= g && r >= b && (r - b >= 6));
+                    var isSkinYCbCr = (cb >= 70 && cb <= 140 && cr >= 125 && cr <= 185 && yVal >= 35 && yVal <= 245);
+                    var isSkinRGB = (r > 55 && g > 35 && b > 20 && r >= g && r >= b && (r - b >= 8));
                     if (isSkinYCbCr || isSkinRGB) {
                         skinPixelCount++;
                         colCounts[x]++;
@@ -639,74 +642,73 @@ if (typeof window.PretesFaceVerifier === 'undefined') {
                 }
             }
 
-            var avgCenterLum = centerCount > 0 ? (centerLumSum / centerCount) : 100;
-            if (avgCenterLum < 18) {
+            var meanLum = sumLum / totalPixels;
+            if (meanLum < 18) {
                 return { valid: false, faces: [], reason: "Pencahayaan kamera terlalu gelap. Pastikan ruangan memiliki cahaya yang cukup." };
             }
-            if (avgCenterLum > 252) {
+            if (meanLum > 252) {
                 return { valid: false, faces: [], reason: "Pencahayaan kamera terlalu silau. Harap kurangi cahaya langsung ke arah lensa." };
             }
 
-            if (mode === 'camera') {
-                var maxCol = 0, maxRow = 0;
-                for (var cx = 0; cx < sampleW; cx++) if (colCounts[cx] > maxCol) maxCol = colCounts[cx];
-                for (var ry = 0; ry < sampleH; ry++) if (rowCounts[ry] > maxRow) maxRow = rowCounts[ry];
-
-                var thX = Math.max(3, Math.round(maxCol * 0.12));
-                var thY = Math.max(3, Math.round(maxRow * 0.12));
-                var fMinX = 0; while (fMinX < sampleW && colCounts[fMinX] < thX) fMinX++;
-                var fMaxX = sampleW - 1; while (fMaxX > 0 && colCounts[fMaxX] < thX) fMaxX--;
-                var fMinY = 0; while (fMinY < sampleH && rowCounts[fMinY] < thY) fMinY++;
-                var fMaxY = sampleH - 1; while (fMaxY > 0 && rowCounts[fMaxY] < thY) fMaxY--;
-
-                if (fMinX >= fMaxX || (fMaxX - fMinX) < 30) { fMinX = Math.round(sampleW * 0.22); fMaxX = Math.round(sampleW * 0.78); }
-                if (fMinY >= fMaxY || (fMaxY - fMinY) < 40) { fMinY = Math.round(sampleH * 0.15); fMaxY = Math.round(sampleH * 0.75); }
-
-                var scaleX = origW / sampleW, scaleY = origH / sampleH;
-                var camBox = {
-                    x: Math.round(fMinX * scaleX),
-                    y: Math.round(fMinY * scaleY),
-                    width: Math.round((fMaxX - fMinX) * scaleX),
-                    height: Math.round((fMaxY - fMinY) * scaleY)
-                };
-                return {
-                    valid: true,
-                    faces: [camBox],
-                    box: camBox,
-                    message: "Foto kamera berhasil diverifikasi! Wajah tampak jelas dan proporsional di dalam panduan."
-                };
-            }
-
-            var totalPixels = sampleW * sampleH;
             var skinCoverage = skinPixelCount / totalPixels;
-            if (skinCoverage < 0.015) {
-                return { valid: false, faces: [], reason: "Wajah tidak terdeteksi. Pastikan foto menampakkan wajah dengan jelas, menghadap lurus ke kamera dengan pencahayaan terang." };
+            if (skinCoverage < 0.04) {
+                return { valid: false, faces: [], reason: "Wajah tidak terdeteksi pada foto. Pastikan Anda berada tepat di depan kamera dan seluruh bagian wajah terlihat jelas." };
             }
-            if (skinCoverage > 0.95) {
+            if (skinCoverage > 0.85) {
                 return { valid: false, faces: [], reason: "Wajah terlalu dekat ke kamera atau foto terlalu buram. Harap gunakan foto dari jarak dada ke atas." };
             }
 
-            var maxColUp = 0, maxRowUp = 0;
-            for (var uX = 0; uX < sampleW; uX++) if (colCounts[uX] > maxColUp) maxColUp = colCounts[uX];
-            for (var uY = 0; uY < sampleH; uY++) if (rowCounts[uY] > maxRowUp) maxRowUp = rowCounts[uY];
+            // Variansi tekstur: dinding polos/langit-langit memiliki variansi < 18
+            var variance = (sumSqLum / totalPixels) - (meanLum * meanLum);
+            var stdDev = Math.sqrt(Math.max(0, variance));
+            if (stdDev < 18) {
+                return { valid: false, faces: [], reason: "Wajah tidak terdeteksi pada foto (bidang terlalu polos tanpa fitur wajah). Pastikan seluruh wajah menghadap kamera." };
+            }
 
-            var thXUp = Math.max(3, Math.round(maxColUp * 0.12));
-            var thYUp = Math.max(3, Math.round(maxRowUp * 0.12));
-            var uMinX = 0; while (uMinX < sampleW && colCounts[uMinX] < thXUp) uMinX++;
-            var uMaxX = sampleW - 1; while (uMaxX > 0 && colCounts[uMaxX] < thXUp) uMaxX--;
-            var uMinY = 0; while (uMinY < sampleH && rowCounts[uMinY] < thYUp) uMinY++;
-            var uMaxY = sampleH - 1; while (uMaxY > 0 && rowCounts[uMaxY] < thYUp) uMaxY--;
+            var maxCol = 0, maxRow = 0;
+            for (var cx = 0; cx < sampleW; cx++) if (colCounts[cx] > maxCol) maxCol = colCounts[cx];
+            for (var ry = 0; ry < sampleH; ry++) if (rowCounts[ry] > maxRow) maxRow = rowCounts[ry];
 
-            if (uMinX >= uMaxX) { uMinX = 20; uMaxX = sampleW - 20; }
-            if (uMinY >= uMaxY) { uMinY = 20; uMaxY = sampleH - 20; }
+            var thX = Math.max(4, Math.round(maxCol * 0.15));
+            var thY = Math.max(4, Math.round(maxRow * 0.15));
+            var fMinX = 0; while (fMinX < sampleW && colCounts[fMinX] < thX) fMinX++;
+            var fMaxX = sampleW - 1; while (fMaxX > 0 && colCounts[fMaxX] < thX) fMaxX--;
+            var fMinY = 0; while (fMinY < sampleH && rowCounts[fMinY] < thY) fMinY++;
+            var fMaxY = sampleH - 1; while (fMaxY > 0 && rowCounts[fMaxY] < thY) fMaxY--;
 
-            var boxW = uMaxX - uMinX, boxH = uMaxY - uMinY;
-            var scaleXUp = origW / sampleW, scaleYUp = origH / sampleH;
+            if (fMinX >= fMaxX || (fMaxX - fMinX) < 25 || fMinY >= fMaxY || (fMaxY - fMinY) < 30) {
+                return { valid: false, faces: [], reason: "Bentuk wajah tidak teridentifikasi. Harap posisikan kepala tegak di tengah." };
+            }
+
+            var midX = Math.round((fMinX + fMaxX) / 2);
+            var headH = fMaxY - fMinY;
+            var eyeY = Math.round(fMinY + headH * 0.40);
+            var foreheadY = Math.round(fMinY + headH * 0.20);
+            var cheekY = Math.round(fMinY + headH * 0.65);
+
+            var lumForehead = lumArray[Math.min(sampleH - 1, foreheadY) * sampleW + midX];
+            var lumEye = lumArray[Math.min(sampleH - 1, eyeY) * sampleW + midX];
+            var lumCheek = lumArray[Math.min(sampleH - 1, cheekY) * sampleW + midX];
+
+            if (Math.abs(lumForehead - lumEye) < 1 && Math.abs(lumCheek - lumEye) < 1) {
+                return { valid: false, faces: [], reason: "Fitur wajah tidak terdeteksi. Pastikan seluruh bagian wajah terlihat jelas." };
+            }
+
+            var scaleX = origW / sampleW, scaleY = origH / sampleH;
+            var box = {
+                x: Math.round(fMinX * scaleX),
+                y: Math.round(fMinY * scaleY),
+                width: Math.round((fMaxX - fMinX) * scaleX),
+                height: Math.round((fMaxY - fMinY) * scaleY)
+            };
+
             return {
                 valid: true,
-                faces: [{ x: Math.round(uMinX * scaleXUp), y: Math.round(uMinY * scaleYUp), width: Math.round(boxW * scaleXUp), height: Math.round(boxH * scaleYUp) }],
-                box: { x: Math.round(uMinX * scaleXUp), y: Math.round(uMinY * scaleYUp), width: Math.round(boxW * scaleXUp), height: Math.round(boxH * scaleYUp) },
-                message: "Foto resmi valid! Seluruh bagian wajah terdeteksi jelas dan proporsional."
+                faces: [box],
+                box: box,
+                message: mode === 'camera'
+                    ? "Foto kamera berhasil diverifikasi! Wajah tampak jelas dan proporsional di dalam panduan."
+                    : "Pasfoto resmi valid! Seluruh bagian wajah terdeteksi jelas dan proporsional."
             };
         }
     };
@@ -905,24 +907,22 @@ function processAndVerifyImage(sourceCanvas, mode) {
             }
         }).catch(function(err) {
             console.error("Verification error:", err);
-            // Fallback aman jika terjadi error peramban
             if (statusAlert) {
                 statusAlert.style.display = 'block';
-                statusAlert.style.background = '#f0fdf4';
-                statusAlert.style.borderColor = '#86efac';
-                statusAlert.style.color = '#15803d';
-                statusAlert.innerHTML = '<strong>✅ Foto Resmi Berhasil Dimuat!</strong><br>Pasfoto Anda siap digunakan untuk pendaftaran pretes.';
+                statusAlert.style.background = '#fef2f2';
+                statusAlert.style.borderColor = '#fca5a5';
+                statusAlert.style.color = '#b91c1c';
+                statusAlert.innerHTML = '<strong>❌ Terjadi Kesalahan:</strong><br>Gagal memverifikasi wajah pada foto. Pastikan pencahayaan cukup dan wajah terlihat jelas di depan kamera.';
             }
-            if (badge) badge.style.display = 'block';
-            if (photoBox) photoBox.style.border = '2.5px solid #16a34a';
-            const jpegData = previewCanvas.toDataURL('image/jpeg', 0.92);
-            if (fotoDataInput) fotoDataInput.value = jpegData;
+            if (badge) badge.style.display = 'none';
+            if (photoBox) photoBox.style.border = '2.5px solid #ef4444';
+            if (fotoDataInput) fotoDataInput.value = '';
             if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.style.opacity = '1';
-                submitBtn.style.cursor = 'pointer';
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.55';
+                submitBtn.style.cursor = 'not-allowed';
             }
-            if (lockNotice) lockNotice.style.display = 'none';
+            if (lockNotice) lockNotice.style.display = 'flex';
         });
     } catch (e) {
         console.error("processAndVerifyImage error:", e);

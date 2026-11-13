@@ -34,3 +34,5 @@ uploads/
 # Environment variables
 .env
 .env.*
+
+scratch/

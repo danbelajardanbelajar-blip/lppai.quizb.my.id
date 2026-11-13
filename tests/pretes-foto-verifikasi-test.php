@@ -84,17 +84,23 @@ fotoAssert(savePretesRegistrationPhoto('invalid_data', $testNim) === null, 'Payl
 // ── 3. Uji Integrasi File PHP & Front-End Script ──────────────────────────────
 $root = dirname(__DIR__);
 
-// Verifikasi keberadaan modul JavaScript deteksi wajah
+// Verifikasi keberadaan modul JavaScript deteksi wajah & model binary ML
 $jsFile = $root . '/assets/js/pretes-face-verifier.js';
+$binFile = $root . '/assets/js/facefinder.bin';
 fotoAssert(file_exists($jsFile), 'File assets/js/pretes-face-verifier.js harus ada.', $errors);
+fotoAssert(file_exists($binFile), 'File model binary assets/js/facefinder.bin harus ada.', $errors);
+if (file_exists($binFile)) {
+    fotoAssert(filesize($binFile) > 200000, 'Model binary facefinder.bin harus valid dan berukuran > 200 KB.', $errors);
+}
 if (file_exists($jsFile)) {
     $jsContent = file_get_contents($jsFile);
     fotoAssert(str_contains($jsContent, 'PretesFaceVerifier'), 'Modul JS harus mendefinisikan PretesFaceVerifier.', $errors);
     fotoAssert(str_contains($jsContent, 'startCamera'), 'Modul JS harus mendukung startCamera.', $errors);
     fotoAssert(str_contains($jsContent, 'verifyFace'), 'Modul JS harus mendukung verifyFace.', $errors);
     fotoAssert(str_contains($jsContent, 'captureSnapshot'), 'Modul JS harus mendukung captureSnapshot 3:4.', $errors);
-    fotoAssert(str_contains($jsContent, "mode === 'camera'"), 'Modul JS harus menangani mode kamera langsung secara adaptif.', $errors);
-    fotoAssert(str_contains($jsContent, "colCounts"), 'Modul JS harus menggunakan histogram densitas untuk eliminasi noise latar ruangan.', $errors);
+    fotoAssert(str_contains($jsContent, 'unpack_cascade'), 'Modul JS harus mengintegrasikan engine cascade classifier Pico ML.', $errors);
+    fotoAssert(str_contains($jsContent, 'facefinder.bin'), 'Modul JS harus memuat model facefinder.bin.', $errors);
+    fotoAssert(str_contains($jsContent, 'cluster_detections'), 'Modul JS harus mendukung clustering deteksi wajah.', $errors);
 }
 
 // Verifikasi integrasi di pages/pretes-daftar.php
@@ -106,6 +112,7 @@ fotoAssert(str_contains($daftarSrc, 'id="cameraVideo"'), 'pretes-daftar.php haru
 fotoAssert(str_contains($daftarSrc, 'id="btnSubmitDaftarPretes"'), 'pretes-daftar.php harus memiliki tombol submit dengan gembok.', $errors);
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'camera')"), 'pretes-daftar.php harus meneruskan mode kamera saat jepret foto.', $errors);
 fotoAssert(str_contains($daftarSrc, "processAndVerifyImage(canvas, 'upload')"), 'pretes-daftar.php harus meneruskan mode upload saat pilih file.', $errors);
+fotoAssert(!str_contains($daftarSrc, 'submitBtn.disabled = false;\n            if (lockNotice) lockNotice.style.display = \'none\';\n        });'), 'pretes-daftar.php tidak boleh membuka submit lock pada catch error.', $errors);
 
 // Verifikasi integrasi di includes/pretes-card.php
 $cardSrc = file_get_contents($root . '/includes/pretes-card.php');

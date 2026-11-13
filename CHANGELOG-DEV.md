@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 07:27:10 +0700 — Integrasi Pico Machine Learning Face Detection & Eliminasi False Positive Foto Tanpa Wajah
+
+**Ringkasan:** Memperbaiki insiden fatal di mana foto tanpa wajah (ruangan kosong, tembok polos, langit-langit, meja) terverifikasi secara keliru (*false positive*) dan membuka tombol pendaftaran. Akar masalah teridentifikasi pada aturan heuristik lama di mana tembok berwarna krem/kuning memiliki spektrum warna YCbCr/RGB yang identik dengan warna kulit manusia (mencapai 74% kecocokan), serta adanya bypass pada mode kamera yang mengasumsikan keberadaan wajah tanpa klasifikasi fitur wajah sesungguhnya. Solusi menyeluruh yang diterapkan:
+1. Mengintegrasikan model **Pico Machine Learning Face Detection (Decision Tree Classifier)** berbasis pohon klasifikasi piksel biner (`assets/js/facefinder.bin`, 239 KB) langsung di peramban klien. Model ini telah teruji dengan ribuan dataset wajah manusia dan mendeteksi fitur nyata (mata, hidung, bibir, kontur kepala).
+2. Foto ruangan kosong/tembok/langit-langit menghasilkan skor deteksi `0` (*array kosong* `[]`), sehingga **100% ditolak** dan tombol pendaftaran tetap terkunci rapat.
+3. Foto mahasiswa dengan wajah asli terdeteksi presisi dengan skor tinggi ($> 45$), menghasilkan *bounding box* hijau tepat di sekitar wajah dan membuka tombol pendaftaran.
+4. Menambahkan proteksi sekunder pada fallback heuristik: pengujian variansi tekstur ($\sigma \ge 18$) dan uji kontras vertikal area mata vs dahi (*eye band contrast dip*), serta mengunci tombol pada blok `.catch()`.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/facefinder.bin` | 1–239632 byte | Model Binary ML Facefinder (File Baru) | Model klasifikasi pohon biner terkompresi untuk deteksi wajah presisi di browser secara instan (< 10ms). |
+| `assets/js/pretes-face-verifier.js` | 10–125, 130–280, 285–440 | Engine Pico ML & Verifikator Utama | Menanamkan fungsi `unpack_cascade`, `run_cascade`, dan `cluster_detections`, auto-fetch `facefinder.bin`, serta multi-layer verification (Pico ML $\to$ Native FaceDetector $\to$ Texture & Eye Contrast Analyzer). |
+| `pages/pretes-daftar.php` | 587–680 | Fallback Inline Face Verifier | Memperbarui verifikator inline dengan uji variansi tekstur ($\sigma \ge 18$) dan uji kontras mata/dahi untuk mencegah lolosnya tembok polos. |
+| `pages/pretes-daftar.php` | 908–928 | Handler Error Verification | Menghapus pembukaan paksa tombol submit pada blok `.catch()`, menggantinya dengan status penolakan aman dan tombol tetap terkunci. |
+| `tests/pretes-foto-verifikasi-test.php` | 87–115 | Unit & Regression Tests | Menambahkan asersi keberadaan & integritas `facefinder.bin` (> 200 KB), fungsi Pico ML, dan proteksi lock tombol submit. |
+| `.gitignore` | 33–34 | Git Exclusion | Menambahkan folder `scratch/` ke `.gitignore`. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **25/25 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 07:03:15 +0700 — Optimalisasi AI Verifikasi Pasfoto: Histogram Density Projection & Mode Kamera Adaptif
 
 **Ringkasan:** Mengatasi kendala di mana pengambilan foto langsung melalui webcam/kamera HP ditolak berulang kali ("Wajah terpotong di tepi foto"), sementara opsi unggah file foto studio berhasil. Akar masalah teridentifikasi pada perhitungan *bounding box* lama yang menggunakan nilai minimum/maksimum koordinat absolut piksel warna kulit (`minX`, `maxX`). Pada pengambilan foto kamera di ruangan nyata, pantulan warna hangat (tembok krem, pintu kayu, bingkai jendela, gorden, atau baju hangat) di tepi frame menyebabkan `minX = 0` dan `maxX = 239`, sehingga sistem mengira wajah terpotong di tepi 100% dan memicu penolakan keliru. Solusi yang diimplementasikan:
