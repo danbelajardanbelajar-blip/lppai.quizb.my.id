@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 11:14:49 +0700 — Optimalisasi Eksekusi Kamera WebRTC Ujian Pretes & Feedback Responsif (pages/pretes-ujian.php)
+
+**Ringkasan:** Memperbaiki interaktivitas kamera web pada portal ujian pretes (`pages/pretes-ujian.php`) agar memberikan respon visual seketika saat tombol "Aktifkan Kamera" diklik, meniadakan kesan kamera pasif/pajangan:
+1. **Penyebab Kurangnya Respon Visual:**
+   - Elemen `<video id="checkinVideo">` sebelumnya disetel `display: none`, yang pada peramban berbasis Chromium (Chrome/Edge) menghentikan proses rendering frame dan mencegah event `onloadedmetadata` terpicu.
+   - Tidak adanya indikasi status visual saat pemanggilan `getUserMedia` sedang menunggu konfirmasi izin dari peramban, serta ketiadaan pesan dialog interaktif saat izin ditolak.
+2. **Solusi & Perbaikan:**
+   - **Video Selalu Berada di Render Tree:** Menyetel `<video id="checkinVideo">` menjadi `display: block` secara permanen dengan `object-fit: cover` di dalam viewport frame.
+   - **Integrasi Mesin Kamera Teruji (`PretesFaceVerifier.startCamera`):** Menghubungkan fungsi inisialisasi kamera langsung dengan mesin `PretesFaceVerifier` yang telah terbukti handal pada `pretes-daftar.php`, lengkap dengan fallback mandiri (*self-contained engine*).
+   - **Responsivitas Tombol Seketika (*Immediate Button Feedback*):** Saat tombol diklik, label tombol seketika berubah menjadi `⏳ Menghubungkan Kamera...` sehingga pengguna mendapatkan respon langsung.
+   - **Penanganan Kesalahan Diagnostik Spesifik & Alert Pop-up:** Menampilkan notifikasi visual dan dialog peramban dengan diagnosa persis jika izin diblokir (`NotAllowedError`), kamera sedang digunakan aplikasi lain seperti Zoom/Meet (`NotReadableError`), atau webcam tidak terdeteksi (`NotFoundError`).
+   - **Auto-Start Toleran:** Menjalankan deteksi awal dengan pemeriksaan `document.readyState` untuk memicu kamera secara otomatis bila izin peramban sudah diberikan.
+3. **Verifikasi:**
+   - `php -l pages/pretes-ujian.php` (**No syntax errors**).
+   - Validasi JavaScript Node.js valid (returncode=0).
+   - **27/27 test suites lulus 100%**.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-ujian.php` | 296–345, 475–620 | Viewport Kamera Live & Skrip WebRTC | Memastikan video selalu rendered, menambahkan self-contained PretesFaceVerifier fallback, feedback tombol seketika, dan dialog diagnosa izin kamera. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 11:05:20 +0700 — Penyesuaian Informasi Dashboard Mahasiswa: Transisi Akses Ujian ke Scan Verifikasi Wajah (Face Recognition)
 
 **Ringkasan:** Memperbarui seluruh informasi, instruksi, dan aksi cepat pada Dashboard Mahasiswa (`pages/dashboard.php`) serta Halaman Peserta Pretes (`pages/pretes-peserta.php`) menyusul implementasi sistem ujian berbasis pengenalan wajah (*AI Face Recognition & Proctoring*), meniadakan instruksi manual username/password dan konfigurasi SEB:
