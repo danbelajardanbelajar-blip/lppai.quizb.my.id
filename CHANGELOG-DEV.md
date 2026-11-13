@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 09:12:20 +0700 — Pemberian Privilege Khusus Akun Tester (Username 12345) untuk Uji Coba Pengerjaan Pretes Sebelum 16 November 2026
+
+**Ringkasan:** Memberikan hak akses khusus (*developer/tester privilege*) untuk akun pengguna dengan username atau NIM `12345` agar dapat langsung mencoba, membuka, dan menguji seluruh fungsionalitas halaman ujian pretes (`pages/pretes-ujian.php`) beserta sistem pengawasan AI (Skenario A & B) tanpa dibatasi oleh gating tanggal 16 November:
+1. **Bypass Gating Tanggal di Halaman Peserta Pretes (`pages/pretes-peserta.php`):**
+   - Menambahkan kondisi `$isTesterPrivileged` yang mendeteksi akun dengan `username === '12345'`, `nim === '12345'`, atau `id === 12345`.
+   - Mengaktifkan tombol "Kerjakan Soal Pretes" secara langsung dengan status `$isUjianDibuka = true`.
+   - Menyematkan badge notifikasi pengembang: *"Mode Percobaan Pengembang Aktif (Privilege Khusus Akun 12345)"*.
+   - Menyediakan tombol pintas langsung ke halaman ujian meskipun akun tester belum terdaftar di tabel `pretes_registrations`.
+2. **Panel Kontrol Pengembang di Halaman Ujian (`pages/pretes-ujian.php`):**
+   - Menyediakan mock data pendaftaran otomatis jika tester `12345` belum memiliki rekaman di database.
+   - Menyematkan Toolbar Pengembang khusus akun `12345` dengan tombol aksi:
+     - `🔄 Reset Sesi (Ulang Skenario A)`: Mengosongkan sesi verifikasi untuk mencoba kembali verifikasi wajah live di awal.
+     - `⚡ Buka Skenario B (Ruang Ujian)`: Bypass verifikasi awal untuk langsung membuka ruang ujian dan pengawasan berkala.
+     - `⏱️ Set Timer 15 Detik`: Mengubah interval pengawasan dari 5 menit menjadi 15 detik untuk percepatan pengujian background snapshot.
+     - `📸 Test Snapshot Sekarang`: Memaksa pemicu snapshot pengawasan AI secara instan.
+3. **Penyelarasan API Proctoring (`api/pretes-proctoring-check.php`):**
+   - Mendukung registrasi mock ID `999999` dan fallback foto server untuk akun `12345`.
+4. **Otomatisasi Pengujian:**
+   - Menambahkan asersi pengujian privilege tester akun `12345` pada `tests/pretes-peserta-instruksi-test.php` (27/27 test suites lulus 100%).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/pretes-peserta.php` | 28–34, 300–325, 395–405 | Logika Privilege Tester & UI | Menambahkan `$isTesterPrivileged`, bypass tanggal sebelum 16 Nov untuk `12345`, badge percobaan, dan link langsung. |
+| `pages/pretes-ujian.php` | 28–60, 185–225, 700–710 | Panel & Aksi Pengembang | Menambahkan Toolbar Pengembang, aksi `reset_session`, `bypass_checkin`, dan fungsi `testFastPeriodicTimer()`. |
+| `api/pretes-proctoring-check.php` | 50–75 | Handler API Tester | Menambahkan toleransi mock registration ID `999999` dan fallback referensi foto untuk tester `12345`. |
+| `tests/pretes-peserta-instruksi-test.php` | 36–42 | Unit Test | Menambahkan asersi formal untuk privilege tester akun `12345`. |
+| Seluruh file terubah + test suite | — | `php -l` & `tests/*test*.php` | `No syntax errors` pada seluruh file dan **27/27 file test lulus** (`TOTAL_FAILED=0`). |
+
+---
+
 ## 2026-11-13 09:02:16 +0700 — Implementasi Sistem Pengawas AI Pretes: Skenario A (Check-in Awal) & Skenario B (Pengecekan Berkala 5 Menit Sekali)
 
 **Ringkasan:** Mengimplementasikan sistem pengawasan ujian daring (*AI Proctoring*) lengkap yang menggabungkan Skenario A dan Skenario B secara bersamaan untuk memastikan integritas pengerjaan ujian pretes:

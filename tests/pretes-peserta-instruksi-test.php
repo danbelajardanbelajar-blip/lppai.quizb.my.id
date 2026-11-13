@@ -35,6 +35,9 @@ $asserts = [
     },
     'Link pengerjaan soal mengarah ke portal ujian pretes-ujian.php' => function() use ($fileContent) {
         return strpos($fileContent, 'pretes-ujian.php') !== false;
+    },
+    'Privilege Tester Akun 12345 Terdefinisi' => function() use ($fileContent) {
+        return strpos($fileContent, "'12345'") !== false && strpos($fileContent, '$isTesterPrivileged') !== false;
     }
 ];
 

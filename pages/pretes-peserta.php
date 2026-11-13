@@ -27,10 +27,13 @@ $myReg = $stmtMyReg->fetch();
 
 // ── Logika Gating Tanggal Pengerjaan Soal Pretes ───────────────────────────────
 // Periode resmi pretes: 16 – 20 November 2026
-$tglSekarang    = date('Y-m-d');
-$tglBukaUjian   = '2026-11-16';
-$isUjianDibuka  = ($tglSekarang >= $tglBukaUjian);
-$linkSoalPretes = BASE_URL . '/pretes-ujian.php'; // Mengarahkan ke Portal Ujian Pretes & Pengawas AI (Skenario A & B)
+$tglSekarang        = date('Y-m-d');
+$tglBukaUjian       = '2026-11-16';
+$isTesterPrivileged = (isset($user['username']) && (string)$user['username'] === '12345') 
+                   || (isset($user['nim']) && (string)$user['nim'] === '12345')
+                   || ((int)($user['id'] ?? 0) === 12345);
+$isUjianDibuka      = ($tglSekarang >= $tglBukaUjian) || $isTesterPrivileged;
+$linkSoalPretes     = BASE_URL . '/pretes-ujian.php'; // Mengarahkan ke Portal Ujian Pretes & Pengawas AI (Skenario A & B)
 
 // ── Ambil jadwal pretes aktif untuk informasi sesi ─────────────────────────────
 $schedules = $pdo->query(
@@ -296,21 +299,33 @@ include __DIR__ . '/../includes/header.php';
 
             <!-- ── 3. AKSES SOAL PRETES (GATED MULAI 16 NOVEMBER) ── -->
             <div style="margin-top:24px;">
+                <?php if ($isTesterPrivileged && $tglSekarang < $tglBukaUjian): ?>
+                    <!-- NOTIFIKASI KHUSUS AKUN TESTER 12345 -->
+                    <div style="background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e;padding:12px 16px;border-radius:12px;font-size:13px;margin-bottom:14px;font-weight:700;display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:24px;flex-shrink:0;">🧪</span>
+                        <div>
+                            <div style="font-size:13.5px;color:#78350f;">Mode Percobaan Pengembang Aktif (Privilege Khusus Akun 12345)</div>
+                            <div style="font-weight:500;font-size:12px;color:#92400e;margin-top:2px;line-height:1.4;">
+                                Akun Anda (<strong><?= sanitize($user['username'] ?? $user['nim'] ?? '12345') ?></strong>) diberikan privilege istimewa untuk membuka dan menguji halaman ujian pretes beserta sistem pengawas AI (Skenario A & B) secara langsung sebelum tanggal 16 November 2026.
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($isUjianDibuka): ?>
-                    <!-- KONDISI A: SUDAH TANGGAL 16 NOVEMBER KE ATAS -->
+                    <!-- KONDISI A: SUDAH TANGGAL 16 NOVEMBER KE ATAS / PRIVILEGE TESTER 12345 -->
                     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:22px 18px;text-align:center;box-shadow:0 4px 14px rgba(22,163,74,0.1);">
                         <span style="font-size:36px;display:block;margin-bottom:8px;">🚀</span>
                         <h4 style="margin:0 0 6px;color:#15803d;font-size:16px;font-weight:800;">
-                            Sesi Pengerjaan Soal Pretes Telah Dibuka
+                            <?= ($isTesterPrivileged && $tglSekarang < $tglBukaUjian) ? 'Sesi Uji Coba Halaman Ujian Pretes (Akun 12345)' : 'Sesi Pengerjaan Soal Pretes Telah Dibuka' ?>
                         </h4>
                         <p style="margin:0 auto 16px;color:#166534;font-size:13px;max-width:520px;line-height:1.55;">
-                            Pastikan Anda telah membaca 4 instruksi di atas dan siap memulai ujian. Klik tombol di bawah untuk membuka lembar soal.
+                            Pastikan Anda telah membaca 4 instruksi di atas dan siap memulai ujian. Klik tombol di bawah untuk membuka lembar soal dengan pengawasan AI.
                         </p>
                         <a href="<?= !empty($linkSoalPretes) ? htmlspecialchars($linkSoalPretes) : 'javascript:void(0);' ?>"
                             id="btn-kerjakan-pretes"
                             class="btn btn-success"
-                            style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 32px;font-size:15px;font-weight:800;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(22,163,74,0.3);min-height:46px;"
-                            onclick="<?= empty($linkSoalPretes) ? "alert('Tautan lembar soal pretes akan segera diaktifkan oleh pengawas ujian.'); return false;" : "" ?>">
+                            style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 32px;font-size:15px;font-weight:800;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(22,163,74,0.3);min-height:46px;">
                             📝 Kerjakan Soal Pretes
                         </a>
                     </div>
@@ -379,6 +394,14 @@ include __DIR__ . '/../includes/header.php';
                 style="background:#f59e0b;color:#ffffff;border:none;padding:12px 26px;border-radius:10px;font-size:14px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(245,158,11,0.4);transition:all 0.2s;">
                 👉 Daftar Pretes Sekarang ➔
             </a>
+            <?php if ($isTesterPrivileged): ?>
+                <div style="margin-top:12px;">
+                    <a href="<?= BASE_URL ?>/pretes-ujian.php"
+                        style="background:#0f766e;color:#ffffff;border:none;padding:10px 22px;border-radius:10px;font-size:13px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(15,118,110,0.3);">
+                        🧪 Coba Langsung Halaman Ujian Pretes (Privilege Akun 12345) ➔
+                    </a>
+                </div>
+            <?php endif; ?>
         </div>
 
         <div class="card-body" style="padding:18px 16px;">

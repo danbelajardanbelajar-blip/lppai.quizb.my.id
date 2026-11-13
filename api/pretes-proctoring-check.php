@@ -50,6 +50,10 @@ $livePhoto = trim($_POST['live_photo'] ?? ($jsonBody['live_photo'] ?? ''));
 $regIdInput = (int)($_POST['registration_id'] ?? ($jsonBody['registration_id'] ?? 0));
 
 // Ambil data registrasi pretes mahasiswa aktif
+$isTesterPrivileged = (isset($user['username']) && (string)$user['username'] === '12345') 
+                   || (isset($user['nim']) && (string)$user['nim'] === '12345')
+                   || ((int)($user['id'] ?? 0) === 12345);
+
 if ($regIdInput > 0) {
     $stmtReg = $pdo->prepare("SELECT * FROM pretes_registrations WHERE id = ? AND user_id = ?");
     $stmtReg->execute([$regIdInput, $user['id']]);
@@ -58,6 +62,16 @@ if ($regIdInput > 0) {
     $stmtReg->execute([$user['id']]);
 }
 $myReg = $stmtReg->fetch(PDO::FETCH_ASSOC);
+
+if (!$myReg && $isTesterPrivileged) {
+    $myReg = [
+        'id' => 999999,
+        'user_id' => $user['id'],
+        'foto' => !empty($user['foto']) ? $user['foto'] : '',
+        'hari_pilihan' => 'Senin',
+        'jam' => '13.00 WIB (Jam 1)'
+    ];
+}
 
 if (!$myReg) {
     echo json_encode([
@@ -69,6 +83,14 @@ if (!$myReg) {
 
 $regId = (int)$myReg['id'];
 $refPhoto = trim((string)($myReg['foto'] ?? ''));
+
+// Jika foto masih kosong untuk akun tester 12345, cari foto pasfoto sample di server
+if (empty($refPhoto) && $isTesterPrivileged) {
+    $photos = glob(__DIR__ . '/../uploads/pretes_foto/*.{jpg,png,jpeg,webp}', GLOB_BRACE);
+    if (!empty($photos)) {
+        $refPhoto = 'uploads/pretes_foto/' . basename($photos[0]);
+    }
+}
 
 if ($action === 'fetch_logs') {
     $logs = getStudentProctoringLogs($pdo, $regId);

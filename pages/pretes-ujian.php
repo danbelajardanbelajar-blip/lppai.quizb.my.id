@@ -28,8 +28,56 @@ $stmtMyReg = $pdo->prepare("
 $stmtMyReg->execute([$user['id']]);
 $myReg = $stmtMyReg->fetch(PDO::FETCH_ASSOC);
 
+// ── Privilege Khusus Akun Tester (Username 12345) ────────────────────────────
+$isTesterPrivileged = (isset($user['username']) && (string)$user['username'] === '12345') 
+                   || (isset($user['nim']) && (string)$user['nim'] === '12345')
+                   || ((int)($user['id'] ?? 0) === 12345);
+
 $regId = $myReg ? (int)$myReg['id'] : 0;
+
+// Handle Aksi Pintas Pengembang / Tester 12345
+if ($isTesterPrivileged && isset($_GET['action'])) {
+    if ($_GET['action'] === 'reset_session') {
+        unset($_SESSION['pretes_cbt_verified_' . $regId]);
+        unset($_SESSION['pretes_cbt_verified_999999']);
+        header('Location: ' . BASE_URL . '/pretes-ujian.php');
+        exit;
+    } elseif ($_GET['action'] === 'bypass_checkin') {
+        $bypassId = $regId ?: 999999;
+        $_SESSION['pretes_cbt_verified_' . $bypassId] = time();
+        header('Location: ' . BASE_URL . '/pretes-ujian.php');
+        exit;
+    }
+}
+
+// Mock Registrasi Khusus Tester 12345 Jika Belum Terdaftar
+if (!$myReg && $isTesterPrivileged) {
+    $myReg = [
+        'id'           => 999999,
+        'user_id'      => $user['id'],
+        'hari_pilihan' => 'Senin',
+        'jam'          => '13.00 WIB (Jam 1)',
+        'periode'      => 'Pretes Tutorial Ubudiyah 2026 (Mode Uji Coba)',
+        'foto'         => !empty($user['foto']) ? $user['foto'] : '',
+        'status'       => 'terdaftar',
+        'username_tes' => ($user['nim'] ?? '12345') . '.22205',
+        'password_tes' => '123456',
+        'ruangan'      => 'Lab Komputer (Uji Coba Akun 12345)'
+    ];
+    $regId = 999999;
+}
+
 $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
+
+// Jika foto pendaftaran masih kosong pada tester 12345, ambil sampel foto di server agar bisa langsung coba
+if (empty($refPhoto) && $isTesterPrivileged) {
+    $photos = glob(__DIR__ . '/../uploads/pretes_foto/*.{jpg,png,jpeg,webp}', GLOB_BRACE);
+    if (!empty($photos)) {
+        $refPhoto = 'uploads/pretes_foto/' . basename($photos[0]);
+        $myReg['foto'] = $refPhoto;
+    }
+}
+
 $isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_' . $regId]));
 
 // Portal E-Ujian resmi
@@ -135,6 +183,37 @@ include __DIR__ . '/../includes/header.php';
 </style>
 
 <div class="container-fluid" style="max-width:1100px; margin:0 auto; padding:10px 14px 40px;">
+
+<?php if ($isTesterPrivileged): ?>
+    <!-- ── TOOLBAR PENGEMBANG / TESTER KHUSUS AKUN 12345 ── -->
+    <div style="background:#fffbeb;border:2px dashed #f59e0b;padding:14px 18px;border-radius:14px;margin-bottom:20px;box-shadow:0 2px 10px rgba(245,158,11,0.08);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <span style="font-size:26px;flex-shrink:0;">🧪</span>
+                <div>
+                    <strong style="color:#92400e;font-size:14px;display:block;">Panel Percobaan Ujian Pretes (Hak Akses Akun: <?= sanitize($user['username'] ?? '12345') ?>)</strong>
+                    <div style="color:#b45309;font-size:12px;margin-top:2px;">
+                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan 5 Menit) secara langsung.
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="?action=reset_session" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    🔄 Reset Sesi (Ulang Skenario A)
+                </a>
+                <a href="?action=bypass_checkin" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0f766e;color:#fff;">
+                    ⚡ Buka Skenario B (Ruang Ujian)
+                </a>
+                <button type="button" onclick="testFastPeriodicTimer()" class="btn btn-sm btn-warning" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    ⏱️ Set Timer 15 Detik
+                </button>
+                <button type="button" onclick="runPeriodicProctoringCheck()" class="btn btn-sm btn-success" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    📸 Test Snapshot Sekarang
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
 
 <?php if (!$myReg): ?>
     <!-- ── State: Mahasiswa Belum Terdaftar Pretes ── -->
@@ -621,6 +700,12 @@ function recordProctoringViolation(msg) {
         alertBox.style.display = 'block';
         alertMsg.textContent = msg;
     }
+}
+
+function testFastPeriodicTimer() {
+    secondsRemaining = 15;
+    updateTimerDisplay();
+    alert("⏱️ Timer pengawasan berkala disetel ke 15 detik untuk pengujian cepat!");
 }
 </script>
 
