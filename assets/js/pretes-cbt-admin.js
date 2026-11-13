@@ -18,7 +18,11 @@
         sanitizeBackdrops();
     }
 
-    window.openModal = function (id) {
+    // CATATAN: app.js (dimuat di footer SETELAH file ini) mendeklarasikan fungsi global
+    // openModal()/closeModal() untuk modal .show lain, sehingga window.openModal/closeModal
+    // milik CBT tertimpa dan modal tidak pernah terbuka. Karena itu CBT memakai nama unik
+    // cbtOpenModal/cbtCloseModal dan tidak lagi bergantung pada window.openModal/closeModal.
+    function cbtOpenModal(id) {
         const modal = typeof id === 'string' ? get(id) : id;
         if (modal) {
             modal.style.display = 'flex';
@@ -29,9 +33,9 @@
             const firstInput = modal.querySelector('input:not([type=hidden]), textarea, select');
             if (firstInput) setTimeout(() => firstInput.focus(), 80);
         }
-    };
+    }
 
-    window.closeModal = function (id) {
+    function cbtCloseModal(id) {
         const modal = typeof id === 'string' ? get(id) : id;
         if (modal) {
             modal.classList.remove('open');
@@ -42,17 +46,19 @@
                 document.body.style.overflow = '';
             }
         }
-    };
+    }
+    window.cbtOpenModal = cbtOpenModal;
+    window.cbtCloseModal = cbtCloseModal;
 
     document.addEventListener('click', function (e) {
         const closeBtn = e.target.closest('[data-close-modal]');
         if (closeBtn) {
             const backdrop = closeBtn.closest('.bank-modal-backdrop');
-            if (backdrop) window.closeModal(backdrop);
+            if (backdrop) cbtCloseModal(backdrop);
             return;
         }
         if (e.target.classList && e.target.classList.contains('bank-modal-backdrop')) {
-            window.closeModal(e.target);
+            cbtCloseModal(e.target);
             return;
         }
 
@@ -93,7 +99,7 @@
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             const openBackdrop = document.querySelector('.bank-modal-backdrop.open');
-            if (openBackdrop) window.closeModal(openBackdrop);
+            if (openBackdrop) cbtCloseModal(openBackdrop);
         }
     });
 
@@ -125,7 +131,7 @@
             get('pkgModalDesc').value = '';
             get('pkgModalActive').checked = true;
         }
-        window.openModal('modalPackageForm');
+        cbtOpenModal('modalPackageForm');
     };
 
     // ── Quick Question Modal Controller ──────────────────────────────────────
@@ -141,7 +147,7 @@
         if (subtitle && packageName) {
             subtitle.textContent = 'Paket Soal: ' + packageName;
         }
-        window.openModal('modalQuickQuestion');
+        cbtOpenModal('modalQuickQuestion');
     };
 
     // ── Session Modal Controller ─────────────────────────────────────────────
@@ -278,7 +284,7 @@
             window.refreshCategoryQuotasForSelectedPackages({});
         }
 
-        window.openModal('modalSessionForm');
+        cbtOpenModal('modalSessionForm');
     };
 
     // Listen to package checkbox changes inside session modal
@@ -465,7 +471,7 @@
             container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;"><div style="font-size:24px;margin-bottom:8px">⏳</div>Memuat butir pertanyaan…</div>';
         }
 
-        window.openModal('modalPackageQuestions');
+        cbtOpenModal('modalPackageQuestions');
 
         // Fetch questions from AJAX endpoint
         const fetchUrl = (window.location.pathname || '') + '?cbt_bank=1&ajax=package_questions&package_id=' + (packageId || 0);
@@ -572,7 +578,7 @@
             });
         }
 
-        window.openModal('modalQuestionForm');
+        cbtOpenModal('modalQuestionForm');
     };
 
     // Radio button changes to highlight correct answer in Question Form Modal

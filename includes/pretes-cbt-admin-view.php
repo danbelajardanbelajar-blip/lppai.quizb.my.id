@@ -7,9 +7,9 @@
             <p>Atur sesi pelaksanaan ujian, tentukan paket soal aktif, kadar proporsi kategori materi, waktu, kewajiban kamera, dan token ujian dalam satu sistem terintegrasi.</p>
         </div>
         <div class="bank-actions">
-            <button type="button" class="bank-button gold" data-action="create-package" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal</button>
-            <button type="button" class="bank-button primary" data-action="create-session" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Ujian</button>
-            <button type="button" class="bank-button" data-action="add-question" onclick="openQuestionFormModal(false)">＋ Tambah Soal</button>
+            <button type="button" class="bank-button gold" data-action="create-package">📦 ＋ Buat Paket Soal</button>
+            <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Ujian</button>
+            <button type="button" class="bank-button" data-action="add-question">＋ Tambah Soal</button>
             <a data-no-spa class="bank-button ghost" href="<?= $bankUrl ?>&amp;tab=import">Impor Excel</a>
         </div>
     </header>
@@ -77,7 +77,7 @@
                 <h3>Daftar Paket Soal CBT</h3>
                 <p>Kelola wadah materi soal ujian. Tambah dan edit paket soal dilakukan langsung di jendela modal tanpa berpindah halaman.</p>
             </div>
-            <button type="button" class="bank-button gold" data-action="create-package" onclick="openPackageModal(false)">📦 ＋ Buat Paket Soal Baru</button>
+            <button type="button" class="bank-button gold" data-action="create-package">📦 ＋ Buat Paket Soal Baru</button>
         </div>
         <div class="bank-table-scroll">
             <table class="bank-table no-datatable">
@@ -129,8 +129,8 @@
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan paket ini aktif untuk ujian peserta">Jadikan Aktif</button>
                                 </form>
                             <?php endif; ?>
-                            <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>" data-package-code="<?= htmlspecialchars($pkg['code'], ENT_QUOTES, 'UTF-8') ?>" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>)" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
-                            <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" onclick="openQuestionFormModal(false, null, <?= (int)$pkg['id'] ?>)" title="Tambah soal baru ke paket ini">＋ Soal</button>
+                            <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>" data-package-code="<?= htmlspecialchars($pkg['code'], ENT_QUOTES, 'UTF-8') ?>" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
+                            <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" title="Tambah soal baru ke paket ini">＋ Soal</button>
                             <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-package" data-package-id="<?= (int)$pkg['id'] ?>" onclick='openPackageModal(true, <?= htmlspecialchars(json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 0 0 4px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Paket Soal \'<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>\'?\n\nSemua butir soal (<?= (int)$pkg['total_questions'] ?> butir) di dalam paket ini juga akan dihapus!')">
                                 <input type="hidden" name="action" value="delete_package">
@@ -157,7 +157,7 @@
                 <h3>Pengatur Sesi Ujian CBT</h3>
                 <p>Atur paket soal yang ditampilkan, kadar kuota masing-masing kategori, kewajiban kamera, waktu, penilaian, jadwal mulai/selesai, dan token ujian.</p>
             </div>
-            <button type="button" class="bank-button primary" data-action="create-session" onclick="openSessionModal(false)">🎯 ＋ Buat Sesi Baru</button>
+            <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
         </div>
         <div class="bank-table-scroll">
             <table class="bank-table no-datatable">

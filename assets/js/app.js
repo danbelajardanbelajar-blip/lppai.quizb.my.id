@@ -607,6 +607,10 @@ document.addEventListener('click', function(e) {
 document.addEventListener('submit', function(e) {
     var form = e.target;
 
+    // Submit dibatalkan (mis. onsubmit="return confirm(...)" lalu klik Batal):
+    // jangan kunci tombol menjadi "Memproses..." agar tetap bisa diklik lagi.
+    if (e.defaultPrevented) return;
+
     var submitBtns = form.querySelectorAll('button[type="submit"], input[type="submit"]');
     submitBtns.forEach(function(btn) {
         setTimeout(function() {

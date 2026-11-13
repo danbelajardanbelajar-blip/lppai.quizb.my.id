@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-13 23:04:22 +0700 — Perbaikan akar masalah: tombol & tab Bank Soal CBT tidak bisa diklik
+
+**Akar masalah (direproduksi dengan harness lokal + browser):** `assets/js/app.js` dimuat di footer **setelah** `pretes-cbt-admin.js` dan mendeklarasikan `function openModal(id)` / `function closeModal(id)` global (hanya menambah/menghapus kelas `.show`). Deklarasi ini **menimpa** `window.openModal`/`window.closeModal` milik CBT, sehingga semua tombol yang membuka modal (Buat Paket, Buat Sesi, Tambah Soal, Kelola Soal, Edit Paket/Sesi) tidak memunculkan apa pun, dan tombol tutup/Esc/klik backdrop gagal. Masalah kedua: handler `submit` global di `app.js` mengubah tombol menjadi "Memproses..." + `disabled` meskipun `onsubmit="return confirm(...)"` dibatalkan, sehingga tombol Hapus/Set Aktif/Jadikan Aktif terkunci setelah klik Batal. Perbaikan sebelumnya (22:51:40) hanya menambah `!important`/inline style dan tidak menyentuh bentrokan nama ini.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `assets/js/pretes-cbt-admin.js` | 21–53 | Global Modal Controller | `window.openModal/closeModal` → fungsi lokal unik `cbtOpenModal`/`cbtCloseModal` (+ ekspos `window.cbtOpenModal/cbtCloseModal`), dengan komentar penyebab. |
+| `assets/js/pretes-cbt-admin.js` | 57, 61, 102, 134, 150, 287, 474, 581 | Delegasi tutup/Esc & pembuka modal Paket/Quick/Sesi/Kelola Soal/Form Soal | Seluruh pemanggilan memakai `cbtOpenModal`/`cbtCloseModal`. |
+| `includes/pretes-cbt-admin-view.php` | 10–12, 80, 132–133, 160 | Tombol hero, panel Paket & Sesi | Menghapus `onclick` inline ganda pada 7 tombol `data-action` (create-package, create-session, add-question, manage-questions); ditangani delegasi saja agar handler/fetch tidak terpanggil dua kali. |
+| `assets/js/app.js` | 610–613 | Event delegation FORM SUBMIT | `if (e.defaultPrevented) return;` — submit yang dibatalkan tidak lagi mengunci tombol (berlaku global, aman untuk halaman lain). |
+| `tests/pretes-cbt-admin-buttons-test.php` (baru) | 1–55 | Regression test | Larang `window.openModal/closeModal` di CBT, wajib `cbtOpenModal` untuk 4 modal, tanpa onclick ganda pada tombol `data-action`, guard `defaultPrevented` di `app.js`, 4 tab ada. |
+
+**Verifikasi:** harness lokal (data palsu, header/footer asli) di browser: tab Sesi → Buat Sesi, Acak Token, Edit Sesi, tutup (✕/Esc/backdrop), Hapus+Batal tidak terkunci; tab Paket → Kelola Soal (fetch 1×), Tambah Soal dari pengelola & per paket, Edit Paket, Buat Paket; tab Impor & Hasil → semua kontrol tidak tertutup elemen lain; 4 tab bisa diklik; 0 error JS. `php -l`, `node --check` OK; test baru + 7 test `pretes-cbt*` PHP + 2 test `.cjs` PASS.
+
+---
+
 ## 2026-11-13 22:51:40 +0700 — Perbaikan Tombol Unclickable pada Tab Paket Soal & Relokasi Sesi Ujian ke Sebelah Kanan Paket Soal
 
 **Ringkasan:** Memperbaiki kendala fatal pada `pretes-ujian.php?cbt_bank=1&tab=packages` di mana tombol tidak dapat diklik, serta menata ulang urutan navigasi tab agar Sesi Ujian berada tepat di sebelah kanan Paket Soal:
