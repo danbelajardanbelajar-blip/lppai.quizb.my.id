@@ -69,7 +69,10 @@ function getDBConnection() {
         assert request({**pause, 'csrf_token': 'forged'})[0] == 403
         paused = request(pause)[1]['attempt']
         assert paused['paused'] and paused['revision'] == 1
-        assert paused['questions'][0]['answer'] == 'B'
+        saved_question = saved['attempt']['questions'][0]
+        paused_question = next(q for q in paused['questions'] if q['text'] == saved_question['text'])
+        assert paused_question['options'][paused_question['answer']] == saved_question['options']['B']
+        assert paused_question['flagged'] is True
         assert request({**base, 'action': 'state'})[1]['attempt']['paused']
         assert request({**base, 'action': 'save', 'position': 2, 'answer': 'C', 'revision': 1})[0] == 409
         assert request({**base, 'action': 'resume'})[0] == 409, 'Fresh camera check required'

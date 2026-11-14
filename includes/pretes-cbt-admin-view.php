@@ -79,7 +79,7 @@
             </div>
             <button type="button" class="bank-button gold" data-action="create-package">📦 ＋ Buat Paket Soal Baru</button>
         </div>
-        <form id="bulkDeletePackagesForm" method="post" action="<?= $bankUrl ?>&amp;tab=packages" data-bulk-delete-form="packages">
+        <form id="bulkDeletePackagesForm" method="post" action="<?= $bankUrl ?>&amp;tab=packages" data-bulk-delete-form="packages" data-no-spa>
             <input type="hidden" name="action" value="delete_packages">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <div class="bank-panel-head" data-bulk-toolbar="packages" hidden style="padding-top:10px;padding-bottom:10px">
@@ -169,7 +169,7 @@
             </div>
             <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
         </div>
-        <form id="bulkDeleteSessionsForm" method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-bulk-delete-form="sessions">
+        <form id="bulkDeleteSessionsForm" method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-bulk-delete-form="sessions" data-no-spa>
             <input type="hidden" name="action" value="delete_sessions">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <div class="bank-panel-head" data-bulk-toolbar="sessions" hidden style="padding-top:10px;padding-bottom:10px">

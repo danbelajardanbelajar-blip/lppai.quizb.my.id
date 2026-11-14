@@ -6,6 +6,9 @@ require_once __DIR__ . '/pretes-cbt-interruption.php';
 function ensurePretesCbtTables(PDO $pdo): void {
     $id = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INTEGER PRIMARY KEY AUTO_INCREMENT';
     $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+    $existingPackages = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+        ? $pdo->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'pretes_cbt_packages'")->fetchColumn()
+        : $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'pretes_cbt_packages'")->fetchColumn();
     pretesCbtInterruptionTables($pdo, $engine);
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_packages (
@@ -115,35 +118,55 @@ function ensurePretesCbtTables(PDO $pdo): void {
         }
     } catch (Throwable $e) {}
 
-    // Inisialisasi default package jika tabel packages kosong
-    if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages')->fetchColumn() === 0) {
-        $now = time();
-        $pdo->prepare("INSERT INTO pretes_cbt_packages (id, code, name, description, duration_minutes, question_count, is_active, created_at) VALUES (1, 'PKT-UTAMA', 'Paket Pretes Utama', 'Paket soal standar ujian pretes ubudiyah LPPAI', 30, 25, 1, ?)")
-            ->execute([$now]);
-    }
+    // Initialization is persistent, not inferred from whether the admin emptied a table.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_initialization (
+        seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
+    )$engine");
+    $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+    if ($pdo->query("SELECT seed_key FROM pretes_cbt_initialization WHERE seed_key = 'defaults-v1'")->fetchColumn()) return;
+    $ownsSeedTransaction = !$pdo->inTransaction();
+    if ($ownsSeedTransaction) $pdo->beginTransaction();
+    try {
+        $claim = $pdo->prepare("$insert INTO pretes_cbt_initialization (seed_key, initialized_at) VALUES (?, ?)");
+        $claim->execute(['defaults-v1', time()]);
+        if ($claim->rowCount() === 0) {
+            if ($ownsSeedTransaction) $pdo->commit();
+            return;
+        }
+        // Upgrading an existing database must also preserve intentionally empty lists.
+        if ($existingPackages) {
+            if ($ownsSeedTransaction) $pdo->commit();
+            return;
+        }
+        $seedQuestions = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages')->fetchColumn() === 0;
+        // Inisialisasi default package jika tabel packages kosong
+        if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages')->fetchColumn() === 0) {
+            $now = time();
+            $pdo->prepare("INSERT INTO pretes_cbt_packages (id, code, name, description, duration_minutes, question_count, is_active, created_at) VALUES (1, 'PKT-UTAMA', 'Paket Pretes Utama', 'Paket soal standar ujian pretes ubudiyah LPPAI', 30, 25, 1, ?)")
+                ->execute([$now]);
+        }
 
-    // Inisialisasi default session jika tabel sessions kosong
-    if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions')->fetchColumn() === 0) {
-        $now = time();
-        $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, 1, ?)")
-            ->execute([$now]);
-    }
+        // Inisialisasi default session jika tabel sessions kosong
+        if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions')->fetchColumn() === 0) {
+            $now = time();
+            $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, 1, ?)")
+                ->execute([$now]);
+        }
 
-    if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_questions')->fetchColumn() === 0) {
-        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-        $stmt = $pdo->prepare("$insert INTO pretes_cbt_questions (code, package_id, category, question_text, options_json, correct_answer) VALUES (?, 1, ?, ?, ?, ?)");
-        $pdo->beginTransaction();
-        try {
+        if ($seedQuestions && (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_questions')->fetchColumn() === 0) {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+            $stmt = $pdo->prepare("$insert INTO pretes_cbt_questions (code, package_id, category, question_text, options_json, correct_answer) VALUES (?, 1, ?, ?, ?, ?)");
             foreach (require __DIR__ . '/../data/pretes-cbt-bank.php' as $i => $row) {
                 [$question, $options, $correct, $category] = $row;
                 $stmt->execute(['initial-' . ($i + 1), $category, $question, json_encode(array_combine(range('A', 'E'), $options), JSON_UNESCAPED_UNICODE), $correct]);
             }
-            $pdo->commit();
-        } catch (Throwable $error) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            throw $error;
         }
+        if ($ownsSeedTransaction) $pdo->commit();
+    } catch (Throwable $error) {
+        if ($ownsSeedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+        throw $error;
     }
 }
 

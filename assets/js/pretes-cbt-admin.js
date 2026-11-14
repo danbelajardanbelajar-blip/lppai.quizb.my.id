@@ -2,52 +2,64 @@
     'use strict';
     const get = id => document.getElementById(id);
 
-    // Bulk deletion for the Packages and Sessions tables. Checkboxes are
-    // associated with the submit forms by form=id, even though rows contain
-    // their own single-item forms, so HTML never nests forms.
+    // Use the browser's form ownership: row checkboxes live outside the bulk
+    // form because each row has its own action forms. Never collect modal inputs.
+    function bulkItems(kind) {
+        const form = document.querySelector('[data-bulk-delete-form="' + kind + '"]');
+        return form ? Array.from(form.elements).filter(item => item.matches('[data-bulk-select-item="' + kind + '"]') && !item.disabled) : [];
+    }
     function refreshBulkSelection(kind) {
-        const items = Array.from(document.querySelectorAll('[data-bulk-select-item="' + kind + '"]'));
+        const items = bulkItems(kind);
         const selected = items.filter(item => item.checked);
         const toolbar = document.querySelector('[data-bulk-toolbar="' + kind + '"]');
         const count = document.querySelector('[data-bulk-count="' + kind + '"]');
         const selectAll = document.querySelector('[data-bulk-select-all="' + kind + '"]');
-        if (toolbar) toolbar.hidden = selected.length === 0;
+        if (toolbar) { toolbar.hidden = selected.length === 0; toolbar.style.display = selected.length ? 'flex' : 'none'; }
         if (count) count.textContent = selected.length + (kind === 'packages' ? ' paket dipilih' : ' sesi dipilih');
         if (selectAll) {
             selectAll.checked = items.length > 0 && selected.length === items.length;
             selectAll.indeterminate = selected.length > 0 && selected.length < items.length;
+            selectAll.disabled = items.length === 0;
         }
     }
-
-    document.addEventListener('change', function (event) {
-        const selectAll = event.target.closest('[data-bulk-select-all]');
-        if (selectAll) {
-            const kind = selectAll.dataset.bulkSelectAll;
-            document.querySelectorAll('[data-bulk-select-item="' + kind + '"]').forEach(item => { item.checked = selectAll.checked; });
-            refreshBulkSelection(kind);
-            return;
-        }
-        const item = event.target.closest('[data-bulk-select-item]');
-        if (item) refreshBulkSelection(item.dataset.bulkSelectItem);
-    });
-
-    document.addEventListener('submit', function (event) {
-        const form = event.target.closest('[data-bulk-delete-form]');
-        if (!form) return;
-        const kind = form.dataset.bulkDeleteForm;
-        const selected = Array.from(document.querySelectorAll('[data-bulk-select-item="' + kind + '"]:checked'));
-        if (!selected.length) {
-            event.preventDefault();
-            alert(kind === 'packages' ? 'Pilih paket yang ingin dihapus terlebih dahulu.' : 'Pilih sesi yang ingin dihapus terlebih dahulu.');
-            return;
-        }
-        const labels = selected.map(item => item.dataset.itemLabel || '').filter(Boolean);
-        const preview = labels.slice(0, 5).join(', ') + (labels.length > 5 ? ', dan ' + (labels.length - 5) + ' lainnya' : '');
-        const message = kind === 'packages'
-            ? 'Hapus ' + selected.length + ' paket berikut beserta seluruh soal di dalamnya?\n\n' + preview + '\n\nTindakan ini tidak dapat dibatalkan.'
-            : 'Hapus ' + selected.length + ' sesi ujian berikut?\n\n' + preview + '\n\nRiwayat pengerjaan peserta tetap tersimpan. Tindakan ini tidak dapat dibatalkan.';
-        if (!window.confirm(message)) event.preventDefault();
-    });
+    function refreshBulkTables() { ['packages', 'sessions'].forEach(refreshBulkSelection); }
+    // SPA visits may evaluate this script again. Bind delegated bulk listeners once.
+    if (!window.__pretesCbtBulkBound) {
+        window.__pretesCbtBulkBound = true;
+        document.addEventListener('change', function (event) {
+            const selectAll = event.target.closest('[data-bulk-select-all]');
+            if (selectAll) {
+                const kind = selectAll.dataset.bulkSelectAll;
+                bulkItems(kind).forEach(item => { item.checked = selectAll.checked; });
+                refreshBulkSelection(kind);
+                return;
+            }
+            const item = event.target.closest('[data-bulk-select-item]');
+            if (item) refreshBulkSelection(item.dataset.bulkSelectItem);
+        });
+        // Capture runs before app.js's submit handler: cancel must leave buttons usable.
+        document.addEventListener('submit', function (event) {
+            const form = event.target.closest('[data-bulk-delete-form]');
+            if (!form || event.defaultPrevented) return;
+            const kind = form.dataset.bulkDeleteForm;
+            const selected = bulkItems(kind).filter(item => item.checked);
+            if (!selected.length) {
+                event.preventDefault();
+                alert(kind === 'packages' ? 'Pilih paket yang ingin dihapus terlebih dahulu.' : 'Pilih sesi yang ingin dihapus terlebih dahulu.');
+                return;
+            }
+            const labels = selected.map(item => item.dataset.itemLabel || '').filter(Boolean);
+            const preview = labels.slice(0, 5).join(', ') + (labels.length > 5 ? ', dan ' + (labels.length - 5) + ' lainnya' : '');
+            const message = kind === 'packages'
+                ? 'Hapus ' + selected.length + ' paket berikut beserta seluruh soal di dalamnya?\n\n' + preview + '\n\nTindakan ini tidak dapat dibatalkan.'
+                : 'Hapus ' + selected.length + ' sesi ujian berikut?\n\n' + preview + '\n\nRiwayat pengerjaan peserta tetap tersimpan. Tindakan ini tidak dapat dibatalkan.';
+            if (!window.confirm(message)) event.preventDefault();
+            // Confirmed submissions use native POST/redirect/GET (data-no-spa).
+        }, true);
+        window.addEventListener('pageshow', refreshBulkTables);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refreshBulkTables, { once: true });
+    else refreshBulkTables();
 
     // ── Global Modal Controller ──────────────────────────────────────────────
     function sanitizeBackdrops() {

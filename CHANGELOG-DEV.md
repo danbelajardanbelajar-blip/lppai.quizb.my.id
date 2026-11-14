@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 08:03:27 +0700 — Hapus terpilih CBT tetap terhapus setelah refresh
+
+**ID:** CBT-BULK-DELETE-PERSISTENCE-20261114 · **Parent Git:** `bac6904`.
+**Akar masalah terverifikasi:** `ensurePretesCbtTables()` mengartikan tabel kosong sebagai permintaan membuat ulang paket/sesi/bank contoh pada setiap request. Menghapus semua pilihan berhasil di database, tetapi getter/redirect berikutnya membuat data bawaan lagi. Alur seleksi/konfirmasi juga diperkuat agar hanya kontrol milik form hapus yang dikirim dan pembatalan tidak dikunci handler global.
+
+Waktu pada tabel adalah penyimpanan terakhir berkas (WIB, sampai detik). Baris mengacu versi commit entri ini; gunakan riwayat Git saat nomor baris berubah.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 08:01:29 | `includes/pretes-cbt.php` | 9–11 | Deteksi database lama | Deteksi tabel paket sebelum inisialisasi agar upgrade tidak mengisi ulang daftar kosong milik admin. |
+| 2026-11-14 08:01:29 | `includes/pretes-cbt.php` | 121–178 | Inisialisasi data contoh sekali | Penanda persisten defaults-v1, klaim transaksional, rollback, dan seed khusus instalasi baru. Daftar paket/sesi/soal yang dihapus tetap kosong setelah getter, redirect, refresh, dan request berikutnya. |
+| 2026-11-14 07:56:20 | `assets/js/pretes-cbt-admin.js` | 7–64 | Seleksi dan submit hapus massal | Ambil checkbox dari form.elements; perbarui jumlah/pilih-semua/indeterminate; blok permintaan tanpa pilihan; listener sekali; konfirmasi fase capture sebelum app.js; inisialisasi ulang saat pageshow. |
+| 2026-11-14 07:55:45 | `includes/pretes-cbt-admin-view.php` | 82–82 | Form paket terpilih | Gunakan data-no-spa untuk POST/redirect/GET native dengan checkbox row yang sudah terasosiasi ke form. |
+| 2026-11-14 07:55:45 | `includes/pretes-cbt-admin-view.php` | 172–172 | Form sesi terpilih | Gunakan data-no-spa agar hasil mutasi diperbarui melalui redirect server. |
+| 2026-11-14 08:01:29 | `tests/pretes-cbt-delete-test.php` | 95–114 | Regresi database | Validasi daftar benar-benar kosong lintas inisialisasi, upgrade database lama tanpa marker, serta rollback soal bila penghapusan paket gagal. |
+| 2026-11-14 07:59:26 | `tests/pretes-cbt-bulk-http-test.py` | 1–74 | HTTP nyata dan integrasi browser | Uji admin/CSRF, daftar ID tidak valid, hapus sebagian/semua, refresh, dan snapshot riwayat tetap utuh. Fixture hanya database sementara. |
+| 2026-11-14 07:59:26 | `tests/pretes-cbt-bulk-browser-test.cjs` | 1–61 | Klik browser Chrome | Pilih semua/sebagian, batal konfirmasi tanpa tombol terkunci, satu POST berisi tepat ID terpilih, evaluasi script dua kali, daftar kosong tetap kosong setelah reload, dan tanpa error runtime. |
+| 2026-11-14 08:00:27 | `tests/pretes-cbt-api-test.py` | 72–75 | Asersi jawaban setelah pengacakan | Periksa identitas soal dan isi pilihan jawaban tersimpan setelah posisi/huruf diacak; tidak lagi menganggap jawaban selalu berada pada posisi/huruf B yang sama. |
+
+**Verifikasi:**
+- `python tests/pretes-cbt-bulk-http-test.py --browser`: PASS; PHP HTTP dan Chrome menjalankan penghapusan nyata pada fixture lokal, untuk kedua tab. SPA sengaja diaktifkan dan JS dievaluasi ulang untuk menguji perlindungan handler/form.
+- `php tests/pretes-cbt-delete-test.php`: PASS, termasuk rollback dan upgrade database kosong.
+- `php tests/pretes-cbt-test.php`, `php -d zend.assertions=1 tests/pretes-cbt-package-test.php`, `php -d zend.assertions=1 tests/pretes-cbt-session-test.php`: PASS.
+- `php tests/pretes-cbt-admin-buttons-test.php`, `python tests/pretes-cbt-api-test.py`, `python tests/pretes-cbt-xlsx-http-test.py`, `node tests/pretes-cbt-ui-test.cjs`: PASS.
+- `php -l` helper/view, `node --check assets/js/pretes-cbt-admin.js`, `git diff --check`: PASS.
+
+**Penerapan:** commit `Fix selected CBT deletion persistence and native bulk submission`; push dan pull `--ff-only` lokal. Hosting cPanel memerlukan `git pull --ff-only` di `~/public_html/lppai.quizb.my.id/web`. Tabel penanda dibuat otomatis; tidak perlu perintah migrasi manual. Tidak ada penghapusan data produksi selama pengujian.
+
+---
+
 ## 2026-11-14 07:49:49 +0700 — Perbaikan Hapus Terpilih pada Tab Paket Soal dan Sesi Ujian CBT
 
 **ID perubahan:** CBT-BULK-DELETE-PACKAGES-SESSIONS · **Parent Git:** `6581cbc`.

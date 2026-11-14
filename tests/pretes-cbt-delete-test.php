@@ -92,6 +92,26 @@ delAssert(pretesCbtDeleteSessions($pdo, []) === 0, 'Permintaan tanpa pilihan tid
 delAssert(pretesCbtDeletePackage($pdo, 4) === true, 'Penghapusan satu paket lama tetap kompatibel dengan helper massal.', $errors);
 delAssert(pretesCbtDeleteSession($pdo, 4) === true, 'Penghapusan satu sesi lama tetap kompatibel dengan helper massal.', $errors);
 
+// Empty lists are intentional admin state, not a request to restore sample data.
+$pdo->exec('DELETE FROM pretes_cbt_packages');
+$pdo->exec('DELETE FROM pretes_cbt_questions');
+$pdo->exec('DELETE FROM pretes_cbt_sessions');
+ensurePretesCbtTables($pdo);
+ensurePretesCbtTables($pdo);
+delAssert(pretesCbtGetPackages($pdo) === [], 'Paket terakhir tidak muncul kembali setelah refresh.', $errors);
+delAssert(pretesCbtGetSessions($pdo) === [], 'Sesi terakhir tidak muncul kembali setelah refresh.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_questions')->fetchColumn() === 0, 'Bank soal yang dihapus tidak diisi ulang otomatis.', $errors);
+$pdo->exec('DROP TABLE pretes_cbt_initialization');
+ensurePretesCbtTables($pdo);
+delAssert(pretesCbtGetPackages($pdo) === [] && pretesCbtGetSessions($pdo) === [], 'Upgrade database lama yang sudah kosong tidak membuat contoh baru.', $errors);
+
+$rollback = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+ensurePretesCbtTables($rollback);
+$rollback->exec("CREATE TRIGGER fail_package_delete BEFORE DELETE ON pretes_cbt_packages BEGIN SELECT RAISE(ABORT, 'fixture failure'); END");
+try { pretesCbtDeletePackages($rollback, [1]); } catch (PDOException $expected) {}
+delAssert((int)$rollback->query('SELECT COUNT(*) FROM pretes_cbt_questions')->fetchColumn() === 40, 'Gagal hapus paket me-rollback seluruh soal terkait.', $errors);
+delAssert((int)$rollback->query('SELECT COUNT(*) FROM pretes_cbt_packages')->fetchColumn() === 1, 'Gagal hapus paket tidak menyisakan penghapusan parsial.', $errors);
+
 // 5. Test view/controller wiring for bulk selection and existing results deletion.
 $viewFile = __DIR__ . '/../includes/pretes-cbt-admin-view.php';
 $viewContent = file_get_contents($viewFile);
