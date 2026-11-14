@@ -95,9 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
     if ($action === 'import_xlsx') {
         $activeTab = 'import';
-    } elseif ($action === 'save_session' || $action === 'activate_session' || $action === 'delete_session') {
+    } elseif (in_array($action, ['save_session', 'activate_session', 'delete_session', 'delete_sessions'], true)) {
         $activeTab = 'sessions';
-    } elseif ($action === 'save_package' || $action === 'activate_package' || $action === 'delete_package') {
+    } elseif (in_array($action, ['save_package', 'activate_package', 'delete_package', 'delete_packages'], true)) {
         $activeTab = 'packages';
     } elseif ($action === 'delete_attempt' || $action === 'delete_all_attempts') {
         $activeTab = 'results';
@@ -151,6 +151,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $_SESSION['cbt_bank_flash'] = $flashMsg;
             header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'delete_sessions') {
+            $rawIds = $_POST['session_ids'] ?? null;
+            if (!is_array($rawIds) || empty($rawIds)) throw new InvalidArgumentException('Pilih minimal satu sesi ujian yang ingin dihapus.');
+            $sessionIds = [];
+            foreach ($rawIds as $rawId) {
+                $id = filter_var($rawId, FILTER_VALIDATE_INT);
+                if ($id === false || $id <= 0) throw new InvalidArgumentException('Daftar sesi terpilih tidak valid. Muat ulang halaman lalu coba kembali.');
+                $sessionIds[] = $id;
+            }
+            $deletedCount = pretesCbtDeleteSessions($pdo, $sessionIds);
+            $flashMsg = $deletedCount > 0
+                ? "$deletedCount sesi ujian berhasil dihapus. Riwayat pengerjaan peserta tetap tersimpan."
+                : 'Tidak ada sesi terpilih yang ditemukan; daftar tidak berubah.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => $deletedCount > 0, 'deleted' => $deletedCount, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
         } elseif ($action === 'save_package') {
             $pkgId = pretesCbtSavePackage($pdo, $_POST);
             $flashMsg = 'Paket soal berhasil disimpan.';
@@ -187,6 +207,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=packages'); exit;
+        } elseif ($action === 'delete_packages') {
+            $rawIds = $_POST['package_ids'] ?? null;
+            if (!is_array($rawIds) || empty($rawIds)) throw new InvalidArgumentException('Pilih minimal satu paket soal yang ingin dihapus.');
+            $packageIds = [];
+            foreach ($rawIds as $rawId) {
+                $id = filter_var($rawId, FILTER_VALIDATE_INT);
+                if ($id === false || $id <= 0) throw new InvalidArgumentException('Daftar paket terpilih tidak valid. Muat ulang halaman lalu coba kembali.');
+                $packageIds[] = $id;
+            }
+            $deleted = pretesCbtDeletePackages($pdo, $packageIds);
+            $flashMsg = $deleted['packages'] > 0
+                ? $deleted['packages'] . ' paket soal dan ' . $deleted['questions'] . ' butir soal berhasil dihapus.'
+                : 'Tidak ada paket terpilih yang ditemukan; daftar tidak berubah.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => $deleted['packages'] > 0, 'deleted' => $deleted, 'message' => $flashMsg]);
                 exit;
             }
             $_SESSION['cbt_bank_flash'] = $flashMsg;

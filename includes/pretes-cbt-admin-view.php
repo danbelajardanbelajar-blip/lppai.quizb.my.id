@@ -79,10 +79,19 @@
             </div>
             <button type="button" class="bank-button gold" data-action="create-package">📦 ＋ Buat Paket Soal Baru</button>
         </div>
+        <form id="bulkDeletePackagesForm" method="post" action="<?= $bankUrl ?>&amp;tab=packages" data-bulk-delete-form="packages">
+            <input type="hidden" name="action" value="delete_packages">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <div class="bank-panel-head" data-bulk-toolbar="packages" hidden style="padding-top:10px;padding-bottom:10px">
+                <span data-bulk-count="packages" aria-live="polite">0 paket dipilih</span>
+                <button type="submit" class="bank-button danger" data-bulk-delete-button="packages">🗑️ Hapus Terpilih</button>
+            </div>
+        </form>
         <div class="bank-table-scroll">
             <table class="bank-table no-datatable">
                 <thead>
                     <tr>
+                        <th style="width:38px;text-align:center"><input type="checkbox" aria-label="Pilih semua paket soal" data-bulk-select-all="packages"></th>
                         <th style="width:40px">No.</th>
                         <th>Kode</th>
                         <th>Nama Paket &amp; Deskripsi</th>
@@ -95,10 +104,11 @@
                 </thead>
                 <tbody>
                 <?php if (empty($packages)): ?>
-                    <tr><td colspan="8" class="bank-empty">Belum ada paket soal. Klik tombol <strong>＋ Buat Paket Soal Baru</strong> untuk membuat paket pertama.</td></tr>
+                    <tr><td colspan="9" class="bank-empty">Belum ada paket soal. Klik tombol <strong>＋ Buat Paket Soal Baru</strong> untuk membuat paket pertama.</td></tr>
                 <?php else: ?>
                     <?php foreach ($packages as $idx => $pkg): ?>
                     <tr>
+                        <td style="text-align:center"><input type="checkbox" name="package_ids[]" value="<?= (int)$pkg['id'] ?>" form="bulkDeletePackagesForm" aria-label="Pilih paket <?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>" data-bulk-select-item="packages" data-item-label="<?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>"></td>
                         <td style="color:#8b978e"><?= $idx + 1 ?></td>
                         <td><span class="bank-code"><?= sanitize($pkg['code']) ?></span></td>
                         <td>
@@ -159,10 +169,19 @@
             </div>
             <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
         </div>
+        <form id="bulkDeleteSessionsForm" method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-bulk-delete-form="sessions">
+            <input type="hidden" name="action" value="delete_sessions">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <div class="bank-panel-head" data-bulk-toolbar="sessions" hidden style="padding-top:10px;padding-bottom:10px">
+                <span data-bulk-count="sessions" aria-live="polite">0 sesi dipilih</span>
+                <button type="submit" class="bank-button danger" data-bulk-delete-button="sessions">🗑️ Hapus Terpilih</button>
+            </div>
+        </form>
         <div class="bank-table-scroll">
             <table class="bank-table no-datatable">
                 <thead>
                     <tr>
+                        <th style="width:38px;text-align:center"><input type="checkbox" aria-label="Pilih semua sesi ujian" data-bulk-select-all="sessions"></th>
                         <th style="width:35px">No.</th>
                         <th>Kode Sesi</th>
                         <th>Nama Sesi &amp; Paket Terpilih</th>
@@ -177,10 +196,11 @@
                 </thead>
                 <tbody>
                 <?php if (empty($sessions)): ?>
-                    <tr><td colspan="10" class="bank-empty">Belum ada sesi ujian dibuat. Klik tombol <strong>＋ Buat Sesi Baru</strong> untuk mengatur sesi ujian pertama.</td></tr>
+                    <tr><td colspan="11" class="bank-empty">Belum ada sesi ujian dibuat. Klik tombol <strong>＋ Buat Sesi Baru</strong> untuk mengatur sesi ujian pertama.</td></tr>
                 <?php else: ?>
                     <?php foreach ($sessions as $sIdx => $ses): ?>
                     <tr>
+                        <td style="text-align:center"><input type="checkbox" name="session_ids[]" value="<?= (int)$ses['id'] ?>" form="bulkDeleteSessionsForm" aria-label="Pilih sesi <?= htmlspecialchars($ses['title'], ENT_QUOTES, 'UTF-8') ?>" data-bulk-select-item="sessions" data-item-label="<?= htmlspecialchars($ses['title'], ENT_QUOTES, 'UTF-8') ?>"></td>
                         <td style="color:#8b978e"><?= $sIdx + 1 ?></td>
                         <td><span class="bank-code"><?= sanitize($ses['code']) ?></span></td>
                         <td>

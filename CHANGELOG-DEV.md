@@ -5,6 +5,25 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 07:49:49 +0700 — Perbaikan Hapus Terpilih pada Tab Paket Soal dan Sesi Ujian CBT
+
+**ID perubahan:** CBT-BULK-DELETE-PACKAGES-SESSIONS · **Parent Git:** `6581cbc`.
+**Tujuan:** Membuat tombol hapus benar-benar menghapus baris yang dicentang pada tab `Paket Soal` dan `Sesi Ujian`, dengan konfirmasi, hasil yang jelas, dan tanpa menyentuh baris yang tidak dipilih.
+
+Waktu pada tabel adalah waktu modifikasi terakhir file yang tercatat sistem lokal (WIB, sampai detik). Rentang baris merujuk pada isi perubahan yang diverifikasi sebelum commit.
+
+| Waktu edit file (WIB) | File | Baris snapshot | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 07:45:57 | `admin/pretes-bank-soal.php` | 98–100, 154–173, 214–233 | Pengarah tab dan handler POST | Menambahkan action `delete_sessions` dan `delete_packages`; memvalidasi daftar ID integer positif, menjalankan helper batch, serta menampilkan jumlah yang terhapus melalui flash/JSON. Riwayat pengerjaan peserta tetap dipertahankan saat sesi dihapus. |
+| 2026-11-14 07:45:35 | `includes/pretes-cbt.php` | 576–612, 844–877 | `pretesCbtDeletePackages`, `pretesCbtDeleteSessions`, dan helper tunggal | Menambahkan penghapusan batch atomik. Paket terpilih beserta soal terkait dihapus bersama; sesi/paket aktif dipilih kembali bila entri aktif ikut terhapus. Helper hapus tunggal lama mendelegasikan ke batch agar tetap kompatibel. |
+| 2026-11-14 07:46:29 | `includes/pretes-cbt-admin-view.php` | 82–111, 172–203 | Tabel Paket Soal dan Sesi Ujian | Menambahkan checkbox baris, checkbox pilih semua, form hapus massal terpisah yang terhubung dengan atribut HTML `form`, penghitung pilihan, dan tombol `Hapus Terpilih`. Jumlah kolom kosong diperbarui. |
+| 2026-11-14 07:46:53 | `assets/js/pretes-cbt-admin.js` | 5–51 | Sinkronisasi pilihan dan konfirmasi batch | Menyinkronkan pilih semua/parsial, menampilkan jumlah yang dipilih, dan meminta konfirmasi dengan nama item sebelum mengirim permintaan. |
+| 2026-11-14 07:47:58 | `assets/css/pretes-cbt-admin.css` | 259 | Toolbar hapus massal | Memastikan toolbar tetap tersembunyi sebelum ada checkbox yang dipilih meskipun `.bank-panel-head` menggunakan `display:flex`. |
+| 2026-11-14 07:49:17 | `tests/pretes-cbt-delete-test.php` | 63–128 | Uji penghapusan massal & wiring | Menambah uji pemilihan terpilih vs tidak terpilih, penghapusan soal turunan, pemulihan status aktif, input kosong/duplikat, kompatibilitas helper tunggal, serta keterhubungan view/controller/JS/CSS. |
+
+**Verifikasi:** `php tests/pretes-cbt-delete-test.php`, `php tests/pretes-cbt-session-test.php`, `php tests/pretes-cbt-package-test.php`, dan `php tests/pretes-cbt-admin-buttons-test.php` PASS. `php -l` pada seluruh PHP yang berubah, `node --check assets/js/pretes-cbt-admin.js`, serta `git diff --check` PASS. PHP CLI menampilkan peringatan konfigurasi lokal bahwa modul OpenSSL dimuat dua kali; seluruh skrip uji tetap lulus.
+**Commit:** dicatat pada riwayat Git setelah perubahan diverifikasi.
+
 ## 2026-11-14 07:15:30 +0700 — Pembuatan Master File Bank Soal Pretes 177 Butir Sesuai Format Template Excel CBT
 
 **ID perubahan:** CBT-177-QUESTIONS-TEMPLATE-BUILD · **Awal pengerjaan:** 2026-11-14 07:10:48 +0700 · **Parent Git:** `0ca6a29`.

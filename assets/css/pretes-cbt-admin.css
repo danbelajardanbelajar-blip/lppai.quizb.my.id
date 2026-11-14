@@ -256,3 +256,4 @@
     .bank-modal-body{padding:16px}
     .bank-modal-foot{padding:12px 16px;flex-wrap:wrap}
 }
+.bank-panel-head[data-bulk-toolbar][hidden]{display:none!important}

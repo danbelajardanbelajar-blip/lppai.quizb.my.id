@@ -575,15 +575,25 @@ function pretesCbtActivatePackage(PDO $pdo, int $packageId): bool {
 
 function pretesCbtDeletePackage(PDO $pdo, int $packageId): bool {
     if ($packageId <= 0) return false;
-    ensurePretesCbtTables($pdo);
-    $pdo->beginTransaction();
-    try {
-        $stmtDelQ = $pdo->prepare('DELETE FROM pretes_cbt_questions WHERE package_id = ?');
-        $stmtDelQ->execute([$packageId]);
+    return pretesCbtDeletePackages($pdo, [$packageId])['packages'] > 0;
+}
 
-        $stmt = $pdo->prepare('DELETE FROM pretes_cbt_packages WHERE id = ?');
-        $stmt->execute([$packageId]);
-        $ok = $stmt->rowCount() > 0;
+/** Delete selected packages and their questions in one transaction. */
+function pretesCbtDeletePackages(PDO $pdo, array $packageIds): array {
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', $packageIds), static fn($id) => $id > 0)));
+    if (empty($cleanIds)) return ['packages' => 0, 'questions' => 0];
+    ensurePretesCbtTables($pdo);
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) $pdo->beginTransaction();
+    try {
+        $inClause = implode(',', array_fill(0, count($cleanIds), '?'));
+        $stmtDelQ = $pdo->prepare("DELETE FROM pretes_cbt_questions WHERE package_id IN ($inClause)");
+        $stmtDelQ->execute($cleanIds);
+        $deletedQuestions = $stmtDelQ->rowCount();
+
+        $stmt = $pdo->prepare("DELETE FROM pretes_cbt_packages WHERE id IN ($inClause)");
+        $stmt->execute($cleanIds);
+        $deletedPackages = $stmt->rowCount();
 
         $activeCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE is_active = 1')->fetchColumn();
         if ($activeCount === 0) {
@@ -593,10 +603,10 @@ function pretesCbtDeletePackage(PDO $pdo, int $packageId): bool {
             }
         }
 
-        $pdo->commit();
-        return $ok;
+        if ($ownsTransaction) $pdo->commit();
+        return ['packages' => $deletedPackages, 'questions' => $deletedQuestions];
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 }
@@ -834,12 +844,21 @@ function pretesCbtActivateSession(PDO $pdo, int $sessionId): bool {
 
 function pretesCbtDeleteSession(PDO $pdo, int $sessionId): bool {
     if ($sessionId <= 0) return false;
+    return pretesCbtDeleteSessions($pdo, [$sessionId]) > 0;
+}
+
+/** Delete selected sessions in one transaction and retain a valid active session. */
+function pretesCbtDeleteSessions(PDO $pdo, array $sessionIds): int {
+    $cleanIds = array_values(array_unique(array_filter(array_map('intval', $sessionIds), static fn($id) => $id > 0)));
+    if (empty($cleanIds)) return 0;
     ensurePretesCbtTables($pdo);
-    $pdo->beginTransaction();
+    $ownsTransaction = !$pdo->inTransaction();
+    if ($ownsTransaction) $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare('DELETE FROM pretes_cbt_sessions WHERE id = ?');
-        $stmt->execute([$sessionId]);
-        $ok = $stmt->rowCount() > 0;
+        $inClause = implode(',', array_fill(0, count($cleanIds), '?'));
+        $stmt = $pdo->prepare("DELETE FROM pretes_cbt_sessions WHERE id IN ($inClause)");
+        $stmt->execute($cleanIds);
+        $deleted = $stmt->rowCount();
 
         $activeCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions WHERE is_active = 1')->fetchColumn();
         if ($activeCount === 0) {
@@ -849,10 +868,10 @@ function pretesCbtDeleteSession(PDO $pdo, int $sessionId): bool {
             }
         }
 
-        $pdo->commit();
-        return $ok;
+        if ($ownsTransaction) $pdo->commit();
+        return $deleted;
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
 }

@@ -60,7 +60,39 @@ delAssert($deletedAll === 1, 'pretesCbtDeleteAllAttempts berhasil menghapus sisa
 delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts')->fetchColumn() === 0, 'Seluruh pretes_cbt_attempts kini 0.', $errors);
 delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_items')->fetchColumn() === 0, 'Seluruh pretes_cbt_items kini 0.', $errors);
 
-// 4. Test View Rendering for results tab
+// 4. Bulk deletion must affect only selected packages/sessions and remain atomic.
+$now = time();
+$insertPackage = $pdo->prepare('INSERT INTO pretes_cbt_packages (id, code, name, duration_minutes, question_count, is_active, created_at) VALUES (?, ?, ?, 30, 1, ?, ?)');
+foreach ([[2, 'BULK-PKG-2', 'Paket pilihan 2', 1], [3, 'BULK-PKG-3', 'Paket pilihan 3', 0], [4, 'BULK-PKG-4', 'Paket tetap', 0]] as [$id, $code, $name, $active]) {
+    $insertPackage->execute([$id, $code, $name, $active, $now]);
+}
+$insertQuestion = $pdo->prepare('INSERT INTO pretes_cbt_questions (code, package_id, category, question_text, options_json, correct_answer) VALUES (?, ?, ?, ?, ?, ?)');
+$insertQuestion->execute(['BULK-Q-2', 2, 'Umum', 'Soal paket 2', '{}', 'A']);
+$insertQuestion->execute(['BULK-Q-3', 3, 'Umum', 'Soal paket 3', '{}', 'A']);
+$pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0 WHERE id = 1');
+$deletedPackages = pretesCbtDeletePackages($pdo, [2, 3, 2, 0]);
+delAssert($deletedPackages === ['packages' => 2, 'questions' => 2], 'Hapus paket terpilih mengembalikan jumlah paket dan soal yang benar.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE id IN (2, 3)')->fetchColumn() === 0, 'Kedua paket terpilih terhapus.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE id = 4')->fetchColumn() === 1, 'Paket yang tidak dipilih tetap utuh.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_questions WHERE package_id IN (2, 3)')->fetchColumn() === 0, 'Seluruh soal milik paket terpilih ikut terhapus.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_questions WHERE package_id = 4')->fetchColumn() === 0, 'Soal paket yang tidak dipilih tidak tersentuh.', $errors);
+delAssert((int)$pdo->query('SELECT is_active FROM pretes_cbt_packages WHERE id = 1')->fetchColumn() === 1, 'Paket aktif dipilih kembali jika semua paket aktif terhapus.', $errors);
+
+$insertSession = $pdo->prepare('INSERT INTO pretes_cbt_sessions (id, code, title, is_active, created_at) VALUES (?, ?, ?, ?, ?)');
+foreach ([[2, 'BULK-SES-2', 'Sesi pilihan 2', 1], [3, 'BULK-SES-3', 'Sesi pilihan 3', 0], [4, 'BULK-SES-4', 'Sesi tetap', 0]] as [$id, $code, $title, $active]) {
+    $insertSession->execute([$id, $code, $title, $active, $now]);
+}
+$pdo->exec('UPDATE pretes_cbt_sessions SET is_active = 0 WHERE id = 1');
+$deletedSessions = pretesCbtDeleteSessions($pdo, [2, 3, 2, -1]);
+delAssert($deletedSessions === 2, 'Hapus sesi terpilih mengembalikan jumlah sesi yang benar.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id IN (2, 3)')->fetchColumn() === 0, 'Kedua sesi terpilih terhapus.', $errors);
+delAssert((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id = 4')->fetchColumn() === 1, 'Sesi yang tidak dipilih tetap utuh.', $errors);
+delAssert((int)$pdo->query('SELECT is_active FROM pretes_cbt_sessions WHERE id = 1')->fetchColumn() === 1, 'Sesi aktif dipilih kembali jika sesi aktif terhapus.', $errors);
+delAssert(pretesCbtDeleteSessions($pdo, []) === 0, 'Permintaan tanpa pilihan tidak menghapus sesi apa pun.', $errors);
+delAssert(pretesCbtDeletePackage($pdo, 4) === true, 'Penghapusan satu paket lama tetap kompatibel dengan helper massal.', $errors);
+delAssert(pretesCbtDeleteSession($pdo, 4) === true, 'Penghapusan satu sesi lama tetap kompatibel dengan helper massal.', $errors);
+
+// 5. Test view/controller wiring for bulk selection and existing results deletion.
 $viewFile = __DIR__ . '/../includes/pretes-cbt-admin-view.php';
 $viewContent = file_get_contents($viewFile);
 
@@ -70,6 +102,9 @@ delAssert(strpos($viewContent, '<th>Aksi</th>') !== false, 'Kolom th Aksi tersed
 delAssert(strpos($viewContent, 'bank-button danger-sm') !== false, 'Tombol bank-button danger-sm terpasang pada tiap baris.', $errors);
 delAssert(strpos($viewContent, 'Hapus Semua Hasil') !== false, 'Tombol Hapus Semua Hasil terpasang pada header tabel.', $errors);
 delAssert(strpos($viewContent, 'confirm(') !== false, 'Konfirmasi alert JavaScript terpasang sebelum submit penghapusan.', $errors);
+delAssert(strpos($viewContent, 'name="package_ids[]"') !== false && strpos($viewContent, 'data-bulk-select-item="packages"') !== false, 'Checkbox paket terhubung ke form hapus massal.', $errors);
+delAssert(strpos($viewContent, 'name="session_ids[]"') !== false && strpos($viewContent, 'data-bulk-select-item="sessions"') !== false, 'Checkbox sesi terhubung ke form hapus massal.', $errors);
+delAssert(strpos($viewContent, 'data-bulk-select-all="packages"') !== false && strpos($viewContent, 'data-bulk-select-all="sessions"') !== false, 'Kontrol pilih semua tersedia pada kedua tab.', $errors);
 
 // 5. Test Controller Handling in admin/pretes-bank-soal.php
 $controllerFile = __DIR__ . '/../admin/pretes-bank-soal.php';
@@ -78,12 +113,19 @@ delAssert(strpos($controllerContent, "\$action === 'delete_attempt'") !== false,
 delAssert(strpos($controllerContent, "\$action === 'delete_all_attempts'") !== false, 'Controller menangani action delete_all_attempts.', $errors);
 delAssert(strpos($controllerContent, "pretesCbtDeleteAttempt(") !== false, 'Controller memanggil pretesCbtDeleteAttempt.', $errors);
 delAssert(strpos($controllerContent, "pretesCbtDeleteAllAttempts(") !== false, 'Controller memanggil pretesCbtDeleteAllAttempts.', $errors);
+delAssert(strpos($controllerContent, "\$action === 'delete_packages'") !== false && strpos($controllerContent, 'pretesCbtDeletePackages(') !== false, 'Controller menangani penghapusan paket terpilih.', $errors);
+delAssert(strpos($controllerContent, "\$action === 'delete_sessions'") !== false && strpos($controllerContent, 'pretesCbtDeleteSessions(') !== false, 'Controller menangani penghapusan sesi terpilih.', $errors);
+
+$adminJs = file_get_contents(__DIR__ . '/../assets/js/pretes-cbt-admin.js');
+delAssert(strpos($adminJs, 'refreshBulkSelection') !== false && strpos($adminJs, 'data-bulk-select-all') !== false, 'JavaScript memperbarui hitungan dan pilih semua pada dua daftar.', $errors);
+delAssert(strpos($adminJs, 'window.confirm(message)') !== false, 'Penghapusan massal meminta konfirmasi sebelum dikirim.', $errors);
 
 // 6. Test CSS classes in assets/css/pretes-cbt-admin.css
 $cssFile = __DIR__ . '/../assets/css/pretes-cbt-admin.css';
 $cssContent = file_get_contents($cssFile);
 delAssert(strpos($cssContent, '.bank-button.danger') !== false, 'CSS .bank-button.danger terdefinisi.', $errors);
 delAssert(strpos($cssContent, '.bank-button.danger-sm') !== false, 'CSS .bank-button.danger-sm terdefinisi.', $errors);
+delAssert(strpos($cssContent, '[data-bulk-toolbar][hidden]{display:none!important}') !== false, 'Toolbar terpilih benar-benar tersembunyi sebelum ada checkbox yang dicentang.', $errors);
 
 if (!empty($errors)) {
     echo "\n❌ GAGAL: " . count($errors) . " asersi gagal.\n";
