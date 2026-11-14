@@ -122,6 +122,24 @@ try {
     $isUjianPretesDibuka = pretesExamAccess($pdo, $user)['allowed'] || $isTesterPrivileged;
 } catch (Throwable $e) {}
 
+// Peringatan wajib tryout hanya untuk peserta pretes aktif saat sesi benar-benar dibuka.
+$dashboardTryoutLink = null;
+if (!$hidePretesMenus && !$isPretesLulus) {
+    try {
+        if (pretesExamIsRegisteredActive($pdo, $user)) {
+            require_once __DIR__ . '/../includes/pretes-tryout.php';
+            $openTryouts = array_values(array_filter(pretesTryoutActiveSessions($pdo),
+                static fn($session) => pretesTryoutWindow($session)['open']));
+            if ($openTryouts) {
+                $dashboardTryoutLink = BASE_URL . '/tryout.php'
+                    . (count($openTryouts) === 1 ? '?sesi=' . (int)$openTryouts[0]['id'] : '');
+            }
+        }
+    } catch (Throwable $error) {
+        error_log('Dashboard tryout notice unavailable: ' . $error->getMessage());
+    }
+}
+
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
 $stmt = $pdo->prepare("
     SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan, tc.dosen_pengampu as kelas_dosen_pengampu 
@@ -230,6 +248,19 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<?php if ($dashboardTryoutLink): ?>
+<section class="card" id="dashboard-required-tryout" aria-labelledby="dashboard-required-tryout-title" style="border:1px solid #fcd34d;border-left:5px solid #d97706;background:#fffbeb;margin-bottom:24px;">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+            <h3 id="dashboard-required-tryout-title" style="margin:0 0 8px;color:#92400e;font-size:18px;">⚠️ Wajib Mengikuti Tryout Pretes</h3>
+            <p style="margin:0 0 6px;color:#78350f;line-height:1.6;">Tryout sudah dibuka. <strong>Anda wajib mengikutinya</strong> sebagai persiapan ujian pretes. Segera kerjakan melalui tombol berikut.</p>
+            <p style="margin:0;color:#92400e;font-size:13px;">Tryout adalah latihan, bukan ujian pretes resmi.</p>
+        </div>
+        <a href="<?= sanitize($dashboardTryoutLink) ?>" class="btn btn-warning" data-no-spa style="width:auto;font-weight:800;white-space:normal;">📝 Ikuti Tryout Sekarang</a>
+    </div>
+</section>
+<?php endif; ?>
 
 <!-- Al Khidmah Alert -->
 <?php if ($isFirstFriday && !$hideDashboardAttendance): ?>

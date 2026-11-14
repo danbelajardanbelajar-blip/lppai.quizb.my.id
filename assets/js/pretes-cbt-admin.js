@@ -753,4 +753,265 @@
         });
     };
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // LIVE RESULTS & PROCTORING MONITOR MANAGER (Tab Hasil Ujian)
+    // ═══════════════════════════════════════════════════════════════════════
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function initCbtLiveMonitor() {
+        const table = get('cbtLiveResultsTable');
+        const tbody = get('cbtLiveResultsTbody');
+        if (!table || !tbody) return;
+
+        const ongoingNumEl = get('cbtLiveOngoingNum');
+        const lastUpdatedEl = get('cbtLiveLastUpdated');
+        const autoRefreshToggle = get('cbtLiveAutoRefreshToggle');
+        const refreshIntervalSelect = get('cbtLiveRefreshInterval');
+        const manualRefreshBtn = get('cbtLiveManualRefreshBtn');
+
+        const currentFilter = window.CBT_RESULT_FILTER || 'all';
+        const bankUrl = window.CBT_BANK_URL || (window.location.pathname + '?cbt_bank=1');
+        const csrfToken = window.CBT_CSRF_TOKEN || (document.querySelector('input[name=csrf_token]') || {}).value || '';
+
+        let timerId = null;
+        let isFetching = false;
+
+        // 1-second interval for live countdown clocks
+        setInterval(function () {
+            const now = Math.floor(Date.now() / 1000);
+            document.querySelectorAll('#cbtLiveResultsTbody .live-countdown[data-deadline]').forEach(function (el) {
+                const deadline = parseInt(el.dataset.deadline, 10);
+                const clockEl = el.querySelector('.countdown-clock');
+                if (!clockEl || isNaN(deadline)) return;
+                const diff = deadline - now;
+                if (diff > 0) {
+                    const m = Math.floor(diff / 60);
+                    const s = diff % 60;
+                    clockEl.textContent = m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+                } else {
+                    el.textContent = '⌛ Waktu Habis';
+                    el.classList.remove('live-countdown');
+                    const tr = el.closest('tr');
+                    if (tr && tr.cells && tr.cells[4]) {
+                        tr.cells[4].innerHTML = '<span class="bank-badge inactive">⌛ Waktu Habis</span>';
+                    }
+                }
+            });
+        }, 1000);
+
+        function renderAttemptRow(att) {
+            const isSubmitted = att.is_submitted;
+            const isOngoing = att.is_ongoing;
+            const deadline = att.deadline_at;
+            const totItems = att.total_items || 25;
+            const ansCount = att.answered_count || 0;
+            const pct = att.progress_percent || 0;
+            const flgCount = att.flagged_count || 0;
+            const corCount = att.correct_count || 0;
+            const wrgCount = att.wrong_count || 0;
+            const unansCount = att.unanswered_count || 0;
+
+            let timeCellHtml = '<div>' + escapeHtml(att.started_at_wib) + '</div>';
+            if (isSubmitted) {
+                const durSeconds = att.duration_seconds || 0;
+                const durMins = Math.floor(durSeconds / 60);
+                const durSecs = durSeconds % 60;
+                timeCellHtml += '<div style="margin-top:3px;font-size:11px;color:#64748b" title="Durasi pengerjaan">⏱️ ' + durMins + 'm ' + durSecs + 's</div>';
+            } else if (isOngoing) {
+                const remSeconds = Math.max(0, att.remaining_seconds || 0);
+                const remMins = Math.floor(remSeconds / 60);
+                const remSecs = remSeconds % 60;
+                const padSecs = remSecs < 10 ? '0' + remSecs : remSecs;
+                timeCellHtml += '<div class="live-countdown" data-deadline="' + deadline + '" style="margin-top:3px;font-size:11px;font-weight:700;color:#d97706" title="Sisa waktu pengerjaan">⏳ <span class="countdown-clock">' + remMins + 'm ' + padSecs + 's</span></div>';
+            } else {
+                timeCellHtml += '<div style="margin-top:3px;font-size:11px;color:#94a3b8">⌛ Waktu Habis</div>';
+            }
+
+            let statusCellHtml = '';
+            if (isSubmitted) {
+                statusCellHtml = '<span class="bank-badge active">✓ Selesai</span>';
+            } else if (isOngoing) {
+                statusCellHtml = '<span class="bank-badge live-pulse-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a"><span class="pulse-dot"></span> Berlangsung</span>';
+            } else {
+                statusCellHtml = '<span class="bank-badge inactive">⌛ Waktu Habis</span>';
+            }
+
+            const progressFillColor = isSubmitted ? '#10b981' : '#2563eb';
+            const raguBadge = flgCount > 0
+                ? '<span class="bank-badge" style="background:#fef9c3;color:#854d0e;border:1px solid #fef08a;font-size:10px;padding:2px 6px">🟨 ' + flgCount + ' Ragu</span>'
+                : '<span style="font-size:10.5px;color:#94a3b8">0 Ragu</span>';
+
+            const progressCellHtml =
+                '<div style="min-width:130px">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11.5px">' +
+                        '<span><strong>' + ansCount + '</strong> / ' + totItems + ' Soal</span>' +
+                        '<span style="font-size:10.5px;color:#64748b;font-weight:700">' + pct + '%</span>' +
+                    '</div>' +
+                    '<div style="background:#e2e8f0;border-radius:999px;height:6px;width:100%;overflow:hidden;margin-bottom:5px">' +
+                        '<div style="background:' + progressFillColor + ';height:100%;width:' + pct + '%;border-radius:999px;transition:width .3s"></div>' +
+                    '</div>' +
+                    '<div>' + raguBadge + '</div>' +
+                '</div>';
+
+            let detailCellHtml =
+                '<div style="display:flex;flex-direction:column;gap:2px;font-size:11.5px;min-width:95px">' +
+                    '<span style="color:#059669;font-weight:700">✓ ' + corCount + ' Benar</span>' +
+                    '<span style="color:#dc2626;font-weight:700">✕ ' + wrgCount + ' Salah</span>';
+            if (!isSubmitted && unansCount > 0) {
+                detailCellHtml += '<span style="color:#64748b;font-size:10.5px">⋯ ' + unansCount + ' Belum</span>';
+            }
+            detailCellHtml += '</div>';
+
+            let scoreCellHtml = '';
+            if (isSubmitted) {
+                scoreCellHtml = '<span class="bank-key" title="Nilai Akhir Ujian">' + (att.score !== null ? att.score : '—') + '</span>';
+            } else {
+                scoreCellHtml =
+                    '<span class="bank-key" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;width:auto;padding:0 7px" title="Estimasi nilai sementara saat ini">' +
+                        (att.score !== null ? att.score : '0.0') +
+                        '<span style="font-size:9px;font-weight:600;display:block;line-height:1;margin-top:1px;color:#3b82f6">(Live)</span>' +
+                    '</span>';
+            }
+
+            const jenisStyle = att.jenis_kind === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857';
+            const safeName = escapeHtml(att.nama_lengkap);
+            const safeNim = escapeHtml(att.nim);
+
+            const actionCellHtml =
+                '<form method="post" action="' + bankUrl + '&tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.\')">' +
+                    '<input type="hidden" name="csrf_token" value="' + escapeHtml(csrfToken) + '">' +
+                    '<input type="hidden" name="action" value="delete_attempt">' +
+                    '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
+                    '<button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT peserta ini">🗑️ Hapus</button>' +
+                '</form>';
+
+            return '<tr id="attemptRow_' + att.id + '" data-attempt-id="' + att.id + '">' +
+                '<td><strong>' + safeName + '</strong></td>' +
+                '<td>' + safeNim + '</td>' +
+                '<td><span class="bank-badge" style="' + jenisStyle + '">' + escapeHtml(att.jenis_label) + '</span></td>' +
+                '<td>' + timeCellHtml + '</td>' +
+                '<td>' + statusCellHtml + '</td>' +
+                '<td>' + progressCellHtml + '</td>' +
+                '<td>' + detailCellHtml + '</td>' +
+                '<td>' + scoreCellHtml + '</td>' +
+                '<td style="text-align:center">' + actionCellHtml + '</td>' +
+            '</tr>';
+        }
+
+        function updateTableRows(data) {
+            if (!tbody) return;
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
+                return;
+            }
+
+            const newIds = new Set(data.map(d => String(d.id)));
+
+            // Remove rows that no longer exist
+            Array.from(tbody.querySelectorAll('tr[data-attempt-id]')).forEach(tr => {
+                if (!newIds.has(tr.dataset.attemptId)) {
+                    tr.parentNode.removeChild(tr);
+                }
+            });
+
+            // Update or insert rows
+            data.forEach((att, index) => {
+                const existingRow = document.getElementById('attemptRow_' + att.id);
+                const rendered = renderAttemptRow(att);
+                if (existingRow) {
+                    const tempDiv = document.createElement('tbody');
+                    tempDiv.innerHTML = rendered;
+                    const newRow = tempDiv.firstElementChild;
+                    if (newRow) {
+                        for (let c = 3; c <= 7; c++) {
+                            if (existingRow.cells[c] && newRow.cells[c] && existingRow.cells[c].innerHTML !== newRow.cells[c].innerHTML) {
+                                existingRow.cells[c].innerHTML = newRow.cells[c].innerHTML;
+                            }
+                        }
+                    }
+                } else {
+                    const tempDiv = document.createElement('tbody');
+                    tempDiv.innerHTML = rendered;
+                    const newRow = tempDiv.firstElementChild;
+                    if (newRow) {
+                        newRow.classList.add('cbt-row-flash');
+                        const refRow = tbody.children[index] || null;
+                        tbody.insertBefore(newRow, refRow);
+                    }
+                }
+            });
+        }
+
+        function fetchLiveResults(manual) {
+            if (isFetching) return;
+            if (!manual && document.hidden) return;
+            isFetching = true;
+            if (manualRefreshBtn && manual) {
+                manualRefreshBtn.disabled = true;
+                manualRefreshBtn.textContent = '⏳ Memuat…';
+            }
+
+            const url = bankUrl + '&ajax=live_results&result_filter=' + encodeURIComponent(currentFilter);
+            fetch(url, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (!res || !res.success) return;
+                if (ongoingNumEl && res.ongoing_count !== undefined) {
+                    ongoingNumEl.textContent = res.ongoing_count;
+                }
+                if (lastUpdatedEl && res.timestamp_wib) {
+                    lastUpdatedEl.textContent = 'Pembaruan: ' + res.timestamp_wib;
+                }
+                if (tbody && Array.isArray(res.data)) {
+                    updateTableRows(res.data);
+                }
+            })
+            .catch(err => {
+                console.warn('CBT Live fetch error:', err);
+            })
+            .finally(() => {
+                isFetching = false;
+                if (manualRefreshBtn) {
+                    manualRefreshBtn.disabled = false;
+                    manualRefreshBtn.textContent = '🔄 Segarkan';
+                }
+            });
+        }
+
+        function resetAutoRefresh() {
+            if (timerId) clearInterval(timerId);
+            if (!autoRefreshToggle || !autoRefreshToggle.checked) return;
+            const sec = parseInt(refreshIntervalSelect ? refreshIntervalSelect.value : '5', 10) || 5;
+            timerId = setInterval(() => fetchLiveResults(false), sec * 1000);
+        }
+
+        if (autoRefreshToggle) {
+            autoRefreshToggle.addEventListener('change', resetAutoRefresh);
+        }
+        if (refreshIntervalSelect) {
+            refreshIntervalSelect.addEventListener('change', resetAutoRefresh);
+        }
+        if (manualRefreshBtn) {
+            manualRefreshBtn.addEventListener('click', () => fetchLiveResults(true));
+        }
+
+        resetAutoRefresh();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCbtLiveMonitor);
+    } else {
+        initCbtLiveMonitor();
+    }
+
 })();

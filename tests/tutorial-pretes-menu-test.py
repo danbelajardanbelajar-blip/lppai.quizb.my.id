@@ -1,6 +1,7 @@
 """Render actual sidebar/dashboard against isolated tutorial membership fixtures."""
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -10,7 +11,7 @@ repo = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='lppai-tutorial-menu-') as temp:
     root = Path(temp)
     for name in ['includes/tutorial-membership.php', 'includes/sidebar.php', 'includes/pretes-helper.php',
-                 'includes/pretes-face-engine.php', 'includes/user-helper.php', 'includes/announcement-helper.php', 'pages/dashboard.php']:
+                 'includes/pretes-face-engine.php', 'includes/user-helper.php', 'includes/announcement-helper.php', 'includes/pretes-tryout.php', 'pages/dashboard.php']:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(repo / name, target)
@@ -19,7 +20,19 @@ with tempfile.TemporaryDirectory(prefix='lppai-tutorial-menu-') as temp:
     source = dashboard.read_text(encoding='utf-8')
     assert "$isFirstFriday = (date('w') == 5 && date('j') <= 7);" in source
     dashboard.write_text(source.replace("$isFirstFriday = (date('w') == 5 && date('j') <= 7);", '$isFirstFriday = true;'), encoding='utf-8')
-    (root / 'includes/pretes-exam-access.php').write_text("<?php function pretesExamAccess($pdo, $user) { return ['allowed'=>false]; }", encoding='utf-8')
+    # Use the actual active-period registration rules; isolate the unrelated official exam gate.
+    access_source = (repo / 'includes/pretes-exam-access.php').read_text(encoding='utf-8')
+    registration_functions = []
+    for name in ['pretesExamActivePeriodFor', 'pretesExamActiveRegistration', 'pretesExamIsRegisteredActive']:
+        match = re.search(r'^function ' + name + r'\b.*?^}', access_source, re.M | re.S)
+        assert match, name
+        registration_functions.append(match.group())
+    (root / 'includes/pretes-exam-access.php').write_text("<?php function pretesExamAccess($pdo, $user) { return ['allowed'=>false]; }\n" + '\n'.join(registration_functions), encoding='utf-8')
+    # Keep the real tryout list/window functions; isolate unrelated CBT schema migrations.
+    (root / 'includes/pretes-cbt.php').write_text('''<?php
+function ensurePretesCbtTables($pdo) {}
+function pretesCbtGetSession($pdo, $id) { $s=$pdo->prepare('SELECT * FROM pretes_cbt_sessions WHERE id=?'); $s->execute([$id]); return $s->fetch(PDO::FETCH_ASSOC) ?: null; }
+''', encoding='utf-8')
     (root / 'includes/auth.php').write_text('''<?php
 define('BASE_URL', 'https://example.test'); define('APP_NAME', 'Test LPPAI');
 $_SERVER['PHP_SELF'] = '/dashboard.php';
@@ -54,6 +67,10 @@ function getDBConnection() {
     if (!empty($c['pretes_old'])) $pdo->exec("UPDATE pretes_registrations SET periode='2024/2025'; UPDATE master_pretes SET periode='2024/2025',status='nonaktif'");
     if (!empty($c['no_pretes']) || !empty($c['result_only'])) $pdo->exec('DELETE FROM pretes_registrations');
     if (!empty($c['result_only'])) $pdo->exec("INSERT INTO pretes_results VALUES (1,7,NULL,'2024-11-01','tidak_lulus',60)");
+    if (!empty($c['pretes_passed'])) $pdo->exec("INSERT INTO pretes_results VALUES (1,7,NULL,'2026-11-01','lulus',90)");
+    $pdo->exec('CREATE TABLE pretes_cbt_sessions (id INTEGER, mode TEXT, is_active INTEGER, start_time TEXT, end_time TEXT, title TEXT, max_attempts INTEGER DEFAULT 0)');
+    $sessionInsert = $pdo->prepare('INSERT INTO pretes_cbt_sessions (id,mode,is_active,start_time,end_time,title) VALUES (?,?,?,?,?,?)');
+    foreach (($c['tryout_sessions'] ?? []) as $session) $sessionInsert->execute([$session['id'], $session['mode'] ?? 'tryout', $session['is_active'] ?? 1, $session['start_time'] ?? null, $session['end_time'] ?? null, $session['title'] ?? 'Tryout Pretes']);
     $rows = $c['rows'] ?? [['status'=>'terdaftar','year'=>'2026/2027','wave'=>'gel1','created'=>'2026-11-04']];
     $stmt = $pdo->prepare('INSERT INTO tutorial_registrations (id,user_id,tutorial_class_id,status,tahun_ajaran,gelombang,tipe_nilai,created_at) VALUES (?,?,?,?,?,?,?,?)');
     foreach ($rows as $i=>$r) $stmt->execute([$i+1,$r['user'] ?? 7,$r['class'] ?? null,$r['status'] ?? 'terdaftar',$r['year'] ?? null,$r['wave'] ?? null,$r['type'] ?? '',$r['created'] ?? null]);
@@ -136,4 +153,29 @@ function getDBConnection() {
         if name == 'pretes_inactive':
             assert 'Lihat Nilai & Hasil Pretes' in html
         print('PASS attendance dashboard:', name)
+    open_session = {'id': 11}
+    future_session = {'id': 12, 'start_time': '2099-01-01 00:00:00'}
+    ended_session = {'id': 13, 'end_time': '2000-01-01 00:00:00'}
+    for name, config, expected in [
+        ('one_open', {'rows': [], 'tryout_sessions': [open_session]}, '/tryout.php?sesi=11'),
+        ('many_open', {'rows': [], 'tryout_sessions': [open_session, {'id': 14}]}, '/tryout.php'),
+        ('only_open_link', {'rows': [], 'tryout_sessions': [open_session, future_session, ended_session]}, '/tryout.php?sesi=11'),
+        ('not_started', {'rows': [], 'tryout_sessions': [future_session]}, None),
+        ('ended', {'rows': [], 'tryout_sessions': [ended_session]}, None),
+        ('inactive_session', {'rows': [], 'tryout_sessions': [{'id': 11, 'is_active': 0}]}, None),
+        ('official_session', {'rows': [], 'tryout_sessions': [{'id': 11, 'mode': 'resmi'}]}, None),
+        ('no_sessions', {'rows': []}, None),
+        ('inactive_participant', {'rows': [], 'pretes_inactive': True, 'tryout_sessions': [open_session]}, None),
+        ('unregistered_participant', {'rows': [], 'no_pretes': True, 'tryout_sessions': [open_session]}, None),
+        ('tutorial_participant', {'tryout_sessions': [open_session]}, None),
+        ('already_passed', {'rows': [], 'pretes_passed': True, 'tryout_sessions': [open_session]}, None),
+    ]:
+        html = render('pages/dashboard.php', config)
+        assert ('id="dashboard-required-tryout"' in html) == (expected is not None), name
+        if expected:
+            assert f'href="https://example.test{expected}"' in html, name
+            assert 'Wajib Mengikuti Tryout Pretes' in html and 'Ikuti Tryout Sekarang' in html
+            assert 'Tryout adalah latihan, bukan ujian pretes resmi.' in html
+            assert 'id="pretes-absensi-status-box"' not in html
+        print('PASS required tryout dashboard:', name)
 print('PASS: actual sidebar/dashboard hide pretes only for ongoing membership in an active tutorial period.')

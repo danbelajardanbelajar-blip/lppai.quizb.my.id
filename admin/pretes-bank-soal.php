@@ -54,6 +54,108 @@ if (isset($_GET['ajax'])) {
         echo json_encode(['success' => true, 'question' => $q], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    if ($_GET['ajax'] === 'live_results') {
+        $filter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
+        if (!in_array($filter, ['all', 'resmi', 'tryout'], true)) $filter = 'all';
+
+        $where = '';
+        if ($filter === 'resmi') {
+            $where = 'WHERE a.registration_id > 0';
+        } elseif ($filter === 'tryout') {
+            $where = 'WHERE a.registration_id < 0';
+        }
+
+        $attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $where ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+
+        $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+        $itemStatsMap = [];
+        if (!empty($attemptIds)) {
+            $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+            $stmtStats = $pdo->prepare("
+                SELECT 
+                    attempt_id,
+                    COUNT(*) AS total_items,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+                    SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+                FROM pretes_cbt_items
+                WHERE attempt_id IN ($placeholders)
+                GROUP BY attempt_id
+            ");
+            $stmtStats->execute($attemptIds);
+            foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $itemStatsMap[(int)$row['attempt_id']] = $row;
+            }
+        }
+
+        $tryoutCache = [];
+        $data = [];
+        $now = time();
+        foreach ($attempts as $a) {
+            $attId = (int)$a['id'];
+            $stat = $itemStatsMap[$attId] ?? null;
+            $totalItems = $stat ? (int)$stat['total_items'] : (int)($a['total_questions'] ?? 0);
+            $answered = $stat ? (int)$stat['answered_count'] : 0;
+            $flagged = $stat ? (int)$stat['flagged_count'] : 0;
+            $unanswered = max(0, $totalItems - $answered);
+            $isSubmitted = ($a['submitted_at'] !== null);
+            $deadline = (int)$a['deadline_at'];
+            $isExpired = (!$isSubmitted && $now >= $deadline);
+            $isOngoing = (!$isSubmitted && !$isExpired);
+            $remainingSeconds = max(0, $deadline - $now);
+
+            $correct = $isSubmitted ? (int)($a['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
+            $wrong = $isSubmitted ? max(0, $totalItems - $correct) : ($stat ? (int)$stat['live_wrong_count'] : 0);
+            $score = $isSubmitted ? ($a['score'] !== null ? (float)$a['score'] : null) : ($totalItems > 0 ? round(($correct / $totalItems) * 100, 1) : 0.0);
+
+            $durationSeconds = $isSubmitted ? max(0, (int)$a['submitted_at'] - (int)$a['started_at']) : 0;
+
+            $jenis = pretesTryoutAttemptLabel($pdo, $a, $tryoutCache);
+            $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+
+            $data[] = [
+                'id' => $attId,
+                'nama_lengkap' => $a['nama_lengkap'],
+                'nim' => $a['nim'] ?? '-',
+                'jenis_kind' => $jenis['kind'],
+                'jenis_label' => $jenis['label'],
+                'started_at' => (int)$a['started_at'],
+                'started_at_wib' => $startedWib,
+                'is_submitted' => $isSubmitted,
+                'is_ongoing' => $isOngoing,
+                'is_expired' => $isExpired,
+                'deadline_at' => $deadline,
+                'remaining_seconds' => $remainingSeconds,
+                'duration_seconds' => $durationSeconds,
+                'total_items' => $totalItems,
+                'answered_count' => $answered,
+                'unanswered_count' => $unanswered,
+                'flagged_count' => $flagged,
+                'correct_count' => $correct,
+                'wrong_count' => $wrong,
+                'score' => $score !== null ? number_format($score, 1) : null,
+                'progress_percent' => $totalItems > 0 ? min(100, round(($answered / $totalItems) * 100)) : 0
+            ];
+        }
+
+        $resmiStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts WHERE registration_id > 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+        $tryoutStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts WHERE registration_id < 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+        $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts')->fetchColumn() ?: 0);
+        $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+
+        echo json_encode([
+            'success' => true,
+            'timestamp' => $now,
+            'timestamp_wib' => (new DateTimeImmutable('@' . $now))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i:s') . ' WIB',
+            'ongoing_count' => $ongoingCount,
+            'total_all' => $totalAll,
+            'total_resmi' => (int)($resmiStats['total'] ?? 0),
+            'total_tryout' => (int)($tryoutStats['total'] ?? 0),
+            'data' => $data
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
 
 $expired = $pdo->prepare('SELECT user_id, registration_id FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at <= ? ORDER BY deadline_at DESC LIMIT 100');
@@ -416,7 +518,42 @@ if ($resultFilter === 'resmi') {
     $whereClause = 'WHERE a.registration_id < 0';
 }
 
-$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, (SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = a.id) AS total_items FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+$now = time();
+$ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+
+$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+
+$attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+$itemStatsMap = [];
+if (!empty($attemptIds)) {
+    $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+    $stmtStats = $pdo->prepare("
+        SELECT 
+            attempt_id,
+            COUNT(*) AS total_items,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+            SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+        FROM pretes_cbt_items
+        WHERE attempt_id IN ($placeholders)
+        GROUP BY attempt_id
+    ");
+    $stmtStats->execute($attemptIds);
+    foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $itemStatsMap[(int)$row['attempt_id']] = $row;
+    }
+}
+foreach ($attempts as &$att) {
+    $attId = (int)$att['id'];
+    $stat = $itemStatsMap[$attId] ?? null;
+    $att['total_items'] = $stat ? (int)$stat['total_items'] : (int)($att['total_questions'] ?? 0);
+    $att['answered_count'] = $stat ? (int)$stat['answered_count'] : 0;
+    $att['flagged_count'] = $stat ? (int)$stat['flagged_count'] : 0;
+    $att['live_correct_count'] = $stat ? (int)$stat['live_correct_count'] : 0;
+    $att['live_wrong_count'] = $stat ? (int)$stat['live_wrong_count'] : 0;
+}
+unset($att);
 if (!defined('EXTRA_HEAD')) {
     define('EXTRA_HEAD', '<link rel="stylesheet" href="' . BASE_URL . '/pretes-ujian.php?cbt_style=bank&amp;v=' . (file_exists(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ? filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') : time()) . '">');
 }

@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 06:21:45 +0700 — Implementasi Sempurna Opsi 1: Live Monitoring & Pantauan Realtime Progres Soal CBT Pretes dan Tryout pada Admin
+
+**ID:** CBT-LIVE-MONITORING-OPTION-1 · **Parent Git:** `f8dbab0`.  
+**Permintaan:** Implementasikan Opsi 1 dengan sempurna. Memperkaya tabel Hasil Ujian di admin (`admin/pretes-bank-soal.php?tab=results`) agar sesi pengerjaan yang berstatus "Berlangsung" tidak lagi menampilkan strip (—), melainkan menampilkan metrik live real-time: berapa soal sudah dikerjakan, berapa benar, berapa ragu, berapa salah, hitung mundur sisa waktu, dan estimasi nilai live, lengkap dengan kontrol Auto-refresh via AJAX.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 06:11:18 | `admin/pretes-bank-soal.php` | 57–159 | Endpoint AJAX `live_results` | Menambahkan handler AJAX `?ajax=live_results` dengan filter scope (`all`, `resmi`, `tryout`) untuk mengagregasi data real-time dari `pretes_cbt_items` per batch attempt ID (`answered_count`, `unanswered_count`, `flagged_count`, `live_correct_count`, `live_wrong_count`, `live_score`, `remaining_seconds`, `progress_percent`, `ongoing_count`). |
+| 2026-11-15 06:11:30 | `admin/pretes-bank-soal.php` | 520–556 | Server-Side Rendering Data Agregat | Menambahkan hitungan `$ongoingCount` dan pemetaan agregasi item soal pada query `$attempts` awal sehingga server langsung merender metrik live lengkap tanpa menunggu panggilan AJAX. |
+| 2026-11-15 06:12:40 | `includes/pretes-cbt-admin-view.php` | 424–588 | Toolbar Live & Struktur Tabel 9 Kolom | Menambahkan Toolbar Live Monitor (`#cbtLiveResultsTable`) dengan counter peserta live, waktu update WIB, toggle auto-refresh, select interval (5s, 10s, 30s), tombol segarkan manual, 9 kolom tabel (`Peserta`, `NIM`, `Jenis`, `Waktu & Sisa`, `Status`, `Progres Dikerjakan`, `Benar / Salah`, `Nilai`, `Aksi`), visual progress bar, rincian live benar/salah/ragu/belum, dan countdown timer per detik. |
+| 2026-11-15 06:12:57 | `includes/pretes-cbt-admin-view.php` | 965–972 | Context Variables Global JS | Mengekspos `CBT_CSRF_TOKEN`, `CBT_BANK_URL`, dan `CBT_RESULT_FILTER` ke objek `window` untuk kebutuhan modul live monitor JavaScript. |
+| 2026-11-15 06:13:14 | `assets/css/pretes-cbt-admin.css` | 268–315 | Desain UI Live Monitoring & Animasi Pulse | Menambahkan styling untuk `.cbt-live-toolbar`, badge animasi berkedip `.live-pulse-badge`, titik pulse `.pulse-dot` (`@keyframes livePulseDot`), tabular countdown `.countdown-clock`, dan flash transisi `.cbt-row-flash`. |
+| 2026-11-15 06:14:02 | `assets/js/pretes-cbt-admin.js` | 755–1015 | Modul JavaScript Live Monitor | Menambahkan fungsi `initCbtLiveMonitor()`, tick countdown per detik tanpa lag, fetch AJAX periodik dengan interval fleksibel, DOM row updater bebas flicker, dan penghentian polling saat browser tab tidak aktif (`document.hidden`). |
+| 2026-11-15 06:18:43 | `tests/pretes-cbt-live-monitoring-test.php` | 1–185 | Test Suite Komprehensif Live Monitoring | Membuat unit & integration test suite mandiri berbasis PDO SQLite memory yang menguji agregasi live, perhitungan benar/salah/ragu, estimasi skor, status ongoing vs submitted, view elements, CSS styles, dan JS functions. |
+| 2026-11-15 06:19:41 | `pages/dashboard.php` | 125–142, 252–264 | Banner Peringatan Wajib Tryout | Menampilkan card amber *"Wajib Mengikuti Tryout Pretes"* beserta tombol langsung *"📝 Ikuti Tryout Sekarang"* di dashboard khusus bagi peserta pretes aktif saat sesi tryout dibuka. |
+
+**Verifikasi:**
+1. `php tests/pretes-cbt-live-monitoring-test.php`: PASS 100% (semua 26 assertions lulus tanpa error).
+2. `php tests/pretes-cbt-test.php`: PASS 100%.
+3. `php tests/pretes-cbt-delete-test.php`: PASS 100% (49 assertions).
+4. `php tests/pretes-cbt-export-scope-test.php`: PASS 100% (17 assertions).
+5. `php tests/pretes-cbt-xlsx-test.php`: PASS 100%.
+6. `php tests/pretes-tryout-camera-test.php`: PASS 100%.
+7. `php tests/pretes-tryout-test.php`: PASS 100%.
+8. `php tests/pretes-exam-access-test.php`: PASS 100%.
+9. `python tests/tutorial-pretes-menu-test.py`: PASS 100% (31 skenario).
+10. `php -l` pada seluruh file PHP termodifikasi: PASS (No syntax errors).
+
+---
+
 ## 2026-11-15 06:13:31 +0700 — Sembunyikan card absensi dashboard peserta pretes
 
 **ID:** DASHBOARD-PRETES-HIDE-ATTENDANCE · **Parent Git:** `4677acf`.

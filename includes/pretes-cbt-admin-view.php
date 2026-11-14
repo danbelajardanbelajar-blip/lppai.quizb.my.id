@@ -422,14 +422,14 @@
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TAB 6: HASIL UJIAN
+         TAB 6: HASIL UJIAN & LIVE MONITORING CBT
          ═══════════════════════════════════════════════════════════════════ -->
     <?php else: ?>
     <section class="bank-panel">
         <div class="bank-panel-head">
             <div>
-                <h3>Hasil Ujian Peserta</h3>
-                <p>100 sesi terbaru<?= $resultFilter === 'resmi' ? ' (Filter: Ujian Resmi)' : ($resultFilter === 'tryout' ? ' (Filter: Tryout)' : '') ?>. Ekspor memuat seluruh sesi sesuai filter, maksimal 10.000 baris.</p>
+                <h3>Hasil Ujian Peserta &amp; Live Monitoring CBT</h3>
+                <p>100 sesi terbaru<?= $resultFilter === 'resmi' ? ' (Filter: Ujian Resmi)' : ($resultFilter === 'tryout' ? ' (Filter: Tryout)' : '') ?>. Menampilkan metrik live real-time: progres soal, jawaban benar, ragu, salah, sisa waktu, dan nilai.</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <?php if (!empty($attempts)): ?>
@@ -445,37 +445,161 @@
                 <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=results&amp;filter=all" title="Ekspor gabungan semua sesi">↓ Ekspor Semua (.xlsx)</a>
             </div>
         </div>
-        <div style="display:flex;gap:8px;padding:0 0 14px;flex-wrap:wrap;align-items:center">
-            <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Filter Hasil:</span>
-            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=all" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
-            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=resmi" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
-            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=tryout" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
+
+        <div style="padding:14px 24px 0;">
+            <!-- Live Monitoring Toolbar -->
+            <div class="cbt-live-toolbar" style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 18px;margin-bottom:14px;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#0f172a">
+                        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.2)"></span>
+                        Live Monitoring CBT
+                    </span>
+                    <span id="cbtLiveOngoingCounter" class="bank-badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:11px">
+                        ⚡ <strong id="cbtLiveOngoingNum"><?= $ongoingCount ?? 0 ?></strong> peserta sedang mengerjakan
+                    </span>
+                    <span id="cbtLiveLastUpdated" style="font-size:11.5px;color:#64748b">
+                        Pembaruan: <?= (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('H:i:s') ?> WIB
+                    </span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#334155;cursor:pointer">
+                        <input type="checkbox" id="cbtLiveAutoRefreshToggle" checked style="accent-color:#126147;width:16px;height:16px;cursor:pointer">
+                        Auto-refresh
+                    </label>
+                    <select id="cbtLiveRefreshInterval" class="bank-input" style="width:auto;min-height:30px;padding:4px 8px;font-size:11.5px;margin:0">
+                        <option value="5" selected>Tiap 5 Detik</option>
+                        <option value="10">Tiap 10 Detik</option>
+                        <option value="30">Tiap 30 Detik</option>
+                    </select>
+                    <button type="button" id="cbtLiveManualRefreshBtn" class="bank-button" style="min-height:30px;padding:4px 12px;font-size:11.5px" title="Segarkan data sekarang">
+                        🔄 Segarkan
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;padding:0 0 14px;flex-wrap:wrap;align-items:center">
+                <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Filter Hasil:</span>
+                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=all" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
+                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=resmi" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
+                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=tryout" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
+            </div>
         </div>
+
         <div class="bank-table-scroll">
-            <table class="bank-table no-datatable">
+            <table class="bank-table no-datatable" id="cbtLiveResultsTable">
                 <thead>
                     <tr>
                         <th>Peserta</th>
                         <th>NIM</th>
                         <th>Jenis</th>
-                        <th>Mulai (WIB)</th>
+                        <th>Waktu &amp; Sisa</th>
                         <th>Status</th>
-                        <th>Benar</th>
+                        <th>Progres Dikerjakan</th>
+                        <th>Benar / Salah</th>
                         <th>Nilai</th>
                         <th>Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
-                <?php foreach ($attempts as $attempt): ?>
-                    <tr>
+                <tbody id="cbtLiveResultsTbody">
+                <?php 
+                $nowTs = time();
+                foreach ($attempts as $attempt): 
+                    $isSubmitted = ($attempt['submitted_at'] !== null);
+                    $deadline = (int)$attempt['deadline_at'];
+                    $isExpired = (!$isSubmitted && $nowTs >= $deadline);
+                    $isOngoing = (!$isSubmitted && !$isExpired);
+
+                    $totItems = (int)($attempt['total_items'] ?? 25);
+                    $ansCount = (int)($attempt['answered_count'] ?? 0);
+                    $pct = $totItems > 0 ? min(100, round(($ansCount / $totItems) * 100)) : 0;
+                    $flgCount = (int)($attempt['flagged_count'] ?? 0);
+
+                    $corCount = $isSubmitted ? (int)$attempt['correct_count'] : (int)($attempt['live_correct_count'] ?? 0);
+                    $wrgCount = $isSubmitted ? max(0, $totItems - $corCount) : (int)($attempt['live_wrong_count'] ?? 0);
+                    $unansCount = max(0, $totItems - $ansCount);
+                ?>
+                    <tr id="attemptRow_<?= (int)$attempt['id'] ?>" data-attempt-id="<?= (int)$attempt['id'] ?>">
                         <td><strong><?= sanitize($attempt['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>
                             <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
-                        <td><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></td>
-                        <td><span class="bank-badge <?= $attempt['submitted_at'] !== null ? 'active' : 'inactive' ?>"><?= $attempt['submitted_at'] !== null ? 'Selesai' : 'Berlangsung' ?></span></td>
-                        <td><?= $attempt['correct_count'] !== null ? ((int)$attempt['correct_count'] . ' / ' . ((int)($attempt['total_items'] ?? 25))) : '—' ?></td>
-                        <td><span class="bank-key"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 1) : '—' ?></span></td>
+                        <td>
+                            <div><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></div>
+                            <?php if ($isSubmitted): ?>
+                                <?php 
+                                    $durSeconds = max(0, (int)$attempt['submitted_at'] - (int)$attempt['started_at']);
+                                    $durMins = floor($durSeconds / 60);
+                                    $durSecs = $durSeconds % 60;
+                                ?>
+                                <div style="margin-top:3px;font-size:11px;color:#64748b" title="Durasi pengerjaan">
+                                    ⏱️ <?= $durMins ?>m <?= $durSecs ?>s
+                                </div>
+                            <?php elseif ($isOngoing): ?>
+                                <?php 
+                                    $remSeconds = max(0, $deadline - $nowTs);
+                                    $remMins = floor($remSeconds / 60);
+                                    $remSecs = $remSeconds % 60;
+                                ?>
+                                <div class="live-countdown" data-deadline="<?= $deadline ?>" style="margin-top:3px;font-size:11px;font-weight:700;color:#d97706" title="Sisa waktu pengerjaan">
+                                    ⏳ <span class="countdown-clock"><?= $remMins ?>m <?= sprintf('%02d', $remSecs) ?>s</span>
+                                </div>
+                            <?php else: ?>
+                                <div style="margin-top:3px;font-size:11px;color:#94a3b8">⌛ Waktu Habis</div>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($isSubmitted): ?>
+                                <span class="bank-badge active">✓ Selesai</span>
+                            <?php elseif ($isOngoing): ?>
+                                <span class="bank-badge live-pulse-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">
+                                    <span class="pulse-dot"></span> Berlangsung
+                                </span>
+                            <?php else: ?>
+                                <span class="bank-badge inactive">⌛ Waktu Habis</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <div style="min-width:130px">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11.5px">
+                                    <span><strong><?= $ansCount ?></strong> / <?= $totItems ?> Soal</span>
+                                    <span style="font-size:10.5px;color:#64748b;font-weight:700"><?= $pct ?>%</span>
+                                </div>
+                                <div style="background:#e2e8f0;border-radius:999px;height:6px;width:100%;overflow:hidden;margin-bottom:5px">
+                                    <div style="background:<?= $isSubmitted ? '#10b981' : '#2563eb' ?>;height:100%;width:<?= $pct ?>%;border-radius:999px;transition:width .3s"></div>
+                                </div>
+                                <div>
+                                    <?php if ($flgCount > 0): ?>
+                                        <span class="bank-badge" style="background:#fef9c3;color:#854d0e;border:1px solid #fef08a;font-size:10px;padding:2px 6px">
+                                            🟨 <?= $flgCount ?> Ragu
+                                        </span>
+                                    <?php else: ?>
+                                        <span style="font-size:10.5px;color:#94a3b8">0 Ragu</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div style="display:flex;flex-direction:column;gap:2px;font-size:11.5px;min-width:95px">
+                                <span style="color:#059669;font-weight:700">✓ <?= $corCount ?> Benar</span>
+                                <span style="color:#dc2626;font-weight:700">✕ <?= $wrgCount ?> Salah</span>
+                                <?php if (!$isSubmitted && $unansCount > 0): ?>
+                                    <span style="color:#64748b;font-size:10.5px">⋯ <?= $unansCount ?> Belum</span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td>
+                            <?php if ($isSubmitted): ?>
+                                <span class="bank-key" title="Nilai Akhir Ujian"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 1) : '—' ?></span>
+                            <?php else: ?>
+                                <?php 
+                                    $liveScore = $totItems > 0 ? round(($corCount / $totItems) * 100, 1) : 0.0;
+                                ?>
+                                <span class="bank-key" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;width:auto;padding:0 7px" title="Estimasi nilai sementara saat ini">
+                                    <?= number_format($liveScore, 1) ?>
+                                    <span style="font-size:9px;font-weight:600;display:block;line-height:1;margin-top:1px;color:#3b82f6">(Live)</span>
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td style="text-align:center">
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -486,12 +610,12 @@
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$attempts): ?><tr><td colspan="8" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
+                <?php if (!$attempts): ?><tr><td colspan="9" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
         <div class="bank-footer">
-            <span>Nilai CBT disimpan terpisah dari penilaian praktik dan nilai impor lama.</span>
+            <span>Nilai CBT dan progres pengerjaan disimpan terpisah dari penilaian praktik dan nilai impor lama.</span>
             <?php if (!empty($attempts)): ?><span>Menampilkan <?= count($attempts) ?> sesi pengerjaan CBT terbaru.</span><?php endif; ?>
         </div>
     </section>
@@ -840,5 +964,8 @@
 
 <script>
 window.CBT_PACKAGE_CATEGORIES = <?= json_encode($packageCategoriesMap, JSON_UNESCAPED_UNICODE) ?>;
+window.CBT_CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
+window.CBT_BANK_URL = <?= json_encode($bankUrl) ?>;
+window.CBT_RESULT_FILTER = <?= json_encode($resultFilter) ?>;
 </script>
 <script src="<?= BASE_URL ?>/pretes-ujian.php?cbt_admin_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt-admin.js') ?>"></script>
