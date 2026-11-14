@@ -868,6 +868,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama</th>
                         <th>NIM</th>
                         <th>Prodi</th>
+                        <th>Program</th>
                         <th>Hari / Periode</th>
                         <th>Status Hadir</th>
                         <th style="min-width:140px;">Username Tes</th>
@@ -893,7 +894,8 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </td>
                         <td data-search="<?= sanitize($p['nim']) ?>"><?= sanitize($p['nim']) ?></td>
-                        <td data-search="<?= sanitize(trim(($p['program_studi'] ?? '') . ' ' . $rowJenis)) ?>"><?= formatProdiDisplay($p['program_studi'] ?? '', $rowJenis, true) ?></td>
+                        <td data-search="<?= sanitize($p['program_studi'] ?? '') ?>"><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                        <td data-order="<?= sanitize($rowJenis) ?>" data-search="<?= sanitize($rowJenis) ?>"><?= renderJenisProgramBadge($rowJenis, true) ?></td>
                         <?php 
                         $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                         $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
@@ -1210,30 +1212,31 @@ function applyPretesFilters() {
     // Kolom 2: NIM
     dt.column(2).search(nimVal);
 
-    // Kolom 3: Prodi & Jenis Program disaring lewat custom DataTables ext.search agar akurat terhadap badge
+    // Kolom 3: Prodi & Kolom 4: Jenis Program disaring lewat custom DataTables ext.search agar akurat terhadap badge
     dt.column(3).search('');
+    dt.column(4).search('');
 
-    // Kolom 4: Hari (Exact match jika dipilih)
+    // Kolom 5: Hari (Exact match jika dipilih)
     if (hariVal) {
-        dt.column(4).search('^' + $.fn.dataTable.util.escapeRegex(hariVal) + '$', true, false);
-    } else {
-        dt.column(4).search('');
-    }
-
-    // Kolom 5: Status Hadir (Exact match jika dipilih)
-    if (statusVal) {
-        dt.column(5).search('^' + $.fn.dataTable.util.escapeRegex(statusVal) + '$', true, false);
+        dt.column(5).search('^' + $.fn.dataTable.util.escapeRegex(hariVal) + '$', true, false);
     } else {
         dt.column(5).search('');
     }
 
-    // Kolom 6: Credentials (has_cred / no_cred)
-    if (credVal === 'has_cred') {
-        dt.column(6).search('has_cred');
-    } else if (credVal === 'no_cred') {
-        dt.column(6).search('no_cred');
+    // Kolom 6: Status Hadir (Exact match jika dipilih)
+    if (statusVal) {
+        dt.column(6).search('^' + $.fn.dataTable.util.escapeRegex(statusVal) + '$', true, false);
     } else {
         dt.column(6).search('');
+    }
+
+    // Kolom 7: Credentials (has_cred / no_cred)
+    if (credVal === 'has_cred') {
+        dt.column(7).search('has_cred');
+    } else if (credVal === 'no_cred') {
+        dt.column(7).search('no_cred');
+    } else {
+        dt.column(7).search('');
     }
 
     dt.draw();

@@ -5,6 +5,47 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 06:52:30 +0700 — Penambahan Kolom Program (RPL / Reguler) pada Seluruh Halaman Tabel Role Admin
+
+**ID:** ADMIN-TABLES-PROGRAM-COLUMN · **Parent Git:** `84d0602`.
+**Permintaan:** Pada semua halaman yang berisi tabel pada role admin yang mengandung kolom nama mahasiswa, tambahkan kolom program apakah dia RPL atau Reguler.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 06:43:45 | `admin/aktivasi-mahasiswa.php` | 86-93 | Tabel Detail Persetujuan Aktivasi Mahasiswa | Memisahkan baris Program Studi dan menambahkan baris khusus `<th>Program</th>` dengan badge status RPL/Reguler menggunakan `renderJenisProgramBadge($userData['jenis_program'] ?? 'Reguler', false)`. |
+| 2026-11-15 06:44:02 | `admin/dashboard.php` | 303-324, 383-404 | Tabel Pendaftar Tutorial & Pendaftar Pretes Terbaru | Menambahkan header `<th style="padding:10px 14px;">Program</th>` dan sel `renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true)` setelah kolom Program Studi pada kedua tabel pendaftaran terbaru di dashboard admin. |
+| 2026-11-15 06:44:26 | `admin/kelola-nilai.php` | 243-245, 448-450 | Tabel Master Data Nilai & Transkrip Kelulusan | Menambahkan header `<th>Program</th>` pada indeks kolom ke-5 setelah Jurusan. Memperbarui `columnDefs` DataTables: non-orderable targets disesuaikan menjadi `[0, 1, 16]` dan text-center targets menjadi `[0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]`. |
+| 2026-11-15 06:44:52 | `admin/ajax-kelola-nilai.php` | 36-38, 218-220 | Endpoint AJAX DataTables Kelola Nilai | Menambahkan mapping `5 => 'u.jenis_program'` pada array `$columns` server-side sorting, dan menyisipkan kolom badge `renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true)` pada payload baris JSON DataTables. |
+| 2026-11-15 06:45:08 | `admin/pengambilan-sertifikat.php` | 871-873, 889-891, 961-963, 986-988 | Tabel Pengambilan Sertifikat & Riwayat Penyerahan | Menambahkan header `<th>Program</th>` dan badge `renderJenisProgramBadge()` pada Tabel Daftar Pengambilan Sertifikat (`#tableSertifikat`) dan Tabel Riwayat Aktivitas Penyerahan (menyesuaikan colspan empty row menjadi 10). |
+| 2026-11-15 06:45:34 | `admin/pretes-peserta.php` | 869-871, 898-900, 1213-1238 | Tabel Peserta Pretes & Filter DataTables | Menambahkan `<th>Program</th>` setelah `<th>Prodi</th>` dan merender badge RPL/Reguler. Memperbarui mapping kolom di fungsi JavaScript `applyPretesFilters()`: indeks kolom Hari (5), Status Hadir (6), dan Credentials (7). |
+| 2026-11-15 06:45:53 | `admin/pretes-jadwal.php` | 836-838, 871-873 | Tabel Hasil Plotting & Jadwal Pretes | Menambahkan header `<th>Program</th>` setelah `<th>Prodi</th>` pada `#table-pretes-peserta` dan merender badge jenis program pada setiap baris data peserta terjadwal. |
+| 2026-11-15 06:46:05 | `admin/pretes-absensi-export.php` | 165-175 | Lembar Cetak Daftar Hadir Peserta Pretes | Memisahkan kolom Program Studi dan Program pada `<colgroup>` dan `<thead>` lembar cetak absensi A4, serta menampilkan badge/label program di kolom tersendiri. |
+| 2026-11-15 06:46:23 | `admin/pretes-rekap-nilai.php` | 966-968, 999-1002, 1416-1418, 1458-1460 | Tabel Web Rekap Nilai 12 Komponen & Lembar Cetak | Menambahkan header `<th>Program</th>` pada Lembar Cetak Rekapitulasi (colspan empty row menjadi 21) dan Tabel Web Rekap (`#table-rekap-pretes`, colspan empty row menjadi 23) dengan rendering badge RPL/Reguler. |
+| 2026-11-15 06:46:59 | `admin/pretes-bank-soal.php` | 68, 120-123, 524 | Live Monitoring CBT & SSR Agregasi | Menyertakan `u.program_studi, u.jenis_program` pada query `$attempts` (baik di endpoint AJAX `live_results` maupun query SSR), serta mengirimkan `program_studi`, `jenis_program`, dan `jenis_program_badge` pada respons JSON. |
+| 2026-11-15 06:47:23 | `includes/pretes-cbt-admin-view.php` | 493-495, 525-527, 615 | Tampilan Tabel Hasil Ujian CBT Admin | Menambahkan kolom `<th>Program</th>` di antara `NIM` dan `Jenis` pada `#cbtLiveResultsTable`, merender badge jenis program pada baris SSR, dan memperbarui colspan baris kosong menjadi 10. |
+| 2026-11-15 06:47:57 | `assets/js/pretes-cbt-admin.js` | 886-905, 912, 934 | Real-time DOM Updater CBT Admin | Memperbarui generator baris `renderAttemptRow(att)` untuk menyisipkan kolom Program, memperbarui colspan empty state menjadi 10, dan menyesuaikan range sel dinamis yang diperbarui saat polling live (`cells[2]` sampai `cells[8]`). |
+| 2026-11-15 06:48:11 | `admin/tutorial-data-pendaftar.php` | 1164-1166, 1205-1207, 1297-1299, 1324-1326 | Tabel Pendaftar Tutorial & Peserta Belum Daftar | Menambahkan `<th>Program</th>` dan badge status RPL/Reguler pada Tabel Data Pendaftar (`#tablePendaftar`) dan Tabel Peserta Pretes Belum Mendaftar (`#tablePretesBelumDaftar`). |
+| 2026-11-15 06:48:42 | `admin/tutorial-hasil-plotting.php` | 487, 545, 875-877, 890-892 | Query & Tabel Peserta Plotting Tutorial | Memastikan `u.jenis_program` di-select pada query pendaftar aktif dan fallback, menambahkan header `<th>Program</th>` setelah `Nama Mahasiswa` pada `#participantTable`, dan merender badge jenis program. |
+| 2026-11-15 06:49:10 | `admin/tutorial-pendaftaran-kolektif.php` | 670-672, 686-688 | Tabel Semua Mahasiswa Pendaftaran Kolektif | Menambahkan header `<th>Program</th>` setelah `<th>Jurusan</th>` pada `#tableSemuaMahasiswa` dan merender badge jenis program. |
+| 2026-11-15 06:49:34 | `admin/jaminan.php` | 110, 201-203, 218-220 | Query & Tabel Jaminan Mahasiswa | Menambahkan `u.jenis_program` pada query `$stmtData`, menyisipkan header `<th>Program</th>` setelah `<th>Mahasiswa</th>` pada `#tableJaminan`, dan merender badge jenis program. |
+| 2026-11-15 06:51:38 | `tests/admin-tables-jenis-program-test.php` | 1-118 | Test Suite Otomatis Kolom Program Admin | Test suite komprehensif memvalidasi ke-17 file dan 38 pattern konsistensi kolom Program di role admin. |
+| 2026-11-15 06:51:20 | `tests/pretes-rekap-nilai-test.php` | 121-126 | Penyesuaian Colspan Rekap Nilai | Memperbarui pengujian colspan baris kosong rekap nilai dari 22 menjadi 23 sesuai penambahan kolom Program pada tabel. |
+
+**Verifikasi:**
+1. Linting seluruh file (`php -l`): PASS 100% tanpa error syntax.
+2. `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file lulus 100%).
+3. `php tests/user-jenis-program-test.php`: PASS (24 file verified).
+4. `php tests/pretes-rekap-nilai-test.php`: PASS (151 skenario kelulusan & tabel).
+5. `php tests/pretes-cbt-live-monitoring-test.php`: PASS (seluruh 32 pengujian live monitoring).
+6. `php tests/pretes-cbt-test.php`: PASS.
+7. `php tests/pretes-target-program-test.php`: PASS.
+
+**Penerapan:** commit `Add Program (RPL/Reguler) column across all admin tables with student names`; push ke `origin/main` lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 06:49:14 +0700 — Tutup pendaftaran mahasiswa setelah plotting tutorial
 
 **ID:** TUTORIAL-REGISTRATION-CLOSE-AFTER-PLOTTING · **Parent Git:** `827cc99`.

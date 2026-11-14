@@ -107,7 +107,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'search_mahasiswa') {
 
 // Fetch Jaminan data
 $stmtData = $pdo->query("
-    SELECT j.*, u.nama_lengkap 
+    SELECT j.*, u.nama_lengkap, u.jenis_program 
     FROM jaminan_mahasiswa j 
     JOIN users u ON j.nim = u.nim 
     ORDER BY j.status_pengambilan ASC, j.created_at DESC
@@ -198,6 +198,7 @@ include __DIR__ . '/../includes/header.php';
                     <thead>
                         <tr>
                             <th style="border-bottom:2px solid #e2e8f0; padding:10px;">Mahasiswa</th>
+                            <th style="border-bottom:2px solid #e2e8f0; padding:10px;">Program</th>
                             <th style="border-bottom:2px solid #e2e8f0; padding:10px;">Keperluan</th>
                             <th style="border-bottom:2px solid #e2e8f0; padding:10px;">Jaminan</th>
                             <th style="border-bottom:2px solid #e2e8f0; padding:10px;">Foto</th>
@@ -212,6 +213,9 @@ include __DIR__ . '/../includes/header.php';
                                 <td style="padding:12px 10px; vertical-align:middle;">
                                     <strong><?= htmlspecialchars($row['nama_lengkap']) ?></strong><br>
                                     <small class="text-muted"><?= htmlspecialchars($row['nim']) ?></small>
+                                </td>
+                                <td style="padding:12px 10px; vertical-align:middle;">
+                                    <?= renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true) ?>
                                 </td>
                                 <td style="padding:12px 10px; vertical-align:middle;">
                                     <?= htmlspecialchars($row['jaminan_atas']) ?>

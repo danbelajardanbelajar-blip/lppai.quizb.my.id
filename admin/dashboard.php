@@ -301,6 +301,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th style="padding:10px 14px;">Nama Mahasiswa</th>
                                 <th style="padding:10px 14px;">NIM</th>
                                 <th style="padding:10px 14px;">Program Studi</th>
+                                <th style="padding:10px 14px;">Program</th>
                                 <th style="padding:10px 14px;">Pilihan Hari / Kelas</th>
                                 <th style="padding:10px 14px;">Tgl Daftar</th>
                                 <th style="padding:10px 14px;">Status Plotting</th>
@@ -319,7 +320,8 @@ include __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['nim']) ?></td>
-                                <td style="padding:10px 14px; color:#475569;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true, true) ?></td>
+                                <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['program_studi'] ?: '-') ?></td>
+                                <td style="padding:10px 14px;"><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td style="padding:10px 14px;">
                                     <?php if (!empty($r['nama_kelas'])): ?>
                                         <span class="badge" style="background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:6px; font-weight:600; font-size:12px;">
@@ -379,6 +381,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th style="padding:10px 14px;">Nama Mahasiswa</th>
                                 <th style="padding:10px 14px;">NIM</th>
                                 <th style="padding:10px 14px;">Program Studi</th>
+                                <th style="padding:10px 14px;">Program</th>
                                 <th style="padding:10px 14px;">Periode Pretes</th>
                                 <th style="padding:10px 14px;">Pilihan Hari</th>
                                 <th style="padding:10px 14px;">Tgl Daftar</th>
@@ -398,7 +401,8 @@ include __DIR__ . '/../includes/header.php';
                                     <?php endif; ?>
                                 </td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['nim']) ?></td>
-                                <td style="padding:10px 14px; color:#475569;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true, true) ?></td>
+                                <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['program_studi'] ?: '-') ?></td>
+                                <td style="padding:10px 14px;"><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td style="padding:10px 14px; color:#475569;"><?= sanitize($r['periode']) ?></td>
                                 <td style="padding:10px 14px;">
                                     <?php if (!empty($r['hari_pilihan'])): ?>

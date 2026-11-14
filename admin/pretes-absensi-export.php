@@ -162,15 +162,16 @@ foreach ($groups as $group) {
             <div><strong>Jumlah Peserta Kelompok:</strong> <?= $page['total'] ?> mahasiswa</div>
         </div>
         <table>
-            <colgroup><col style="width:6%"><col style="width:16%"><col style="width:30%"><col style="width:24%"><col style="width:16%"><col style="width:8%"></colgroup>
-            <thead><tr><th>No.</th><th>NIM</th><th>Nama Mahasiswa</th><th>Program Studi</th><th>Tanda Tangan</th><th>Ket.</th></tr></thead>
+            <colgroup><col style="width:5%"><col style="width:15%"><col style="width:28%"><col style="width:20%"><col style="width:8%"><col style="width:16%"><col style="width:8%"></colgroup>
+            <thead><tr><th>No.</th><th>NIM</th><th>Nama Mahasiswa</th><th>Program Studi</th><th>Program</th><th>Tanda Tangan</th><th>Ket.</th></tr></thead>
             <tbody>
                 <?php foreach ($page['rows'] as $i => $row): ?>
                 <tr>
                     <td class="center"><?= $i + 1 ?></td>
                     <td><?= sanitize($row['nim']) ?></td>
                     <td><?= sanitize($row['nama_lengkap']) ?></td>
-                    <td><?= sanitize(trim(($row['program_studi'] ?? '') !== '' ? $row['program_studi'] . ' (' . normalizeJenisProgram($row['jenis_program'] ?? 'Reguler') . ')' : normalizeJenisProgram($row['jenis_program'] ?? 'Reguler'))) ?></td>
+                    <td><?= sanitize($row['program_studi'] ?: '-') ?></td>
+                    <td class="center" style="font-weight:bold;"><?= sanitize(normalizeJenisProgram($row['jenis_program'] ?? 'Reguler')) ?></td>
                     <td></td><td></td>
                 </tr>
                 <?php endforeach; ?>

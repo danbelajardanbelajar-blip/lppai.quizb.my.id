@@ -884,6 +884,7 @@
             const jenisStyle = att.jenis_kind === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857';
             const safeName = escapeHtml(att.nama_lengkap);
             const safeNim = escapeHtml(att.nim);
+            const programBadge = att.jenis_program_badge || ('<span class="badge-jenis-program badge-jenis-' + (att.jenis_program || 'reguler').toLowerCase() + '">' + escapeHtml(att.jenis_program || 'Reguler') + '</span>');
 
             const actionCellHtml =
                 '<form method="post" action="' + bankUrl + '&tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.\')">' +
@@ -896,6 +897,7 @@
             return '<tr id="attemptRow_' + att.id + '" data-attempt-id="' + att.id + '">' +
                 '<td><strong>' + safeName + '</strong></td>' +
                 '<td>' + safeNim + '</td>' +
+                '<td>' + programBadge + '</td>' +
                 '<td><span class="bank-badge" style="' + jenisStyle + '">' + escapeHtml(att.jenis_label) + '</span></td>' +
                 '<td>' + timeCellHtml + '</td>' +
                 '<td>' + statusCellHtml + '</td>' +
@@ -909,7 +911,7 @@
         function updateTableRows(data) {
             if (!tbody) return;
             if (!data.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
                 return;
             }
 
@@ -931,7 +933,7 @@
                     tempDiv.innerHTML = rendered;
                     const newRow = tempDiv.firstElementChild;
                     if (newRow) {
-                        for (let c = 3; c <= 7; c++) {
+                        for (let c = 2; c <= 8; c++) {
                             if (existingRow.cells[c] && newRow.cells[c] && existingRow.cells[c].innerHTML !== newRow.cells[c].innerHTML) {
                                 existingRow.cells[c].innerHTML = newRow.cells[c].innerHTML;
                             }

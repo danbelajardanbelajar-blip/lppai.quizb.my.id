@@ -484,7 +484,7 @@ if ($current_gel) {
 
     // 2. Ambil data pendaftar yang sudah diplot ke kelas HANYA dari periode aktif
     $stmtRegs = $pdo->prepare("
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -542,7 +542,7 @@ if ($current_gel) {
     // Mode fallback jika semua periode
     $classes  = $pdo->query("SELECT * FROM tutorial_classes ORDER BY gelombang, hari, nama_kelas")->fetchAll(PDO::FETCH_ASSOC);
     $registrations = $pdo->query("
-        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
+        SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.gelombang, tc.hari, tc.dosen_pengampu, tc.ruangan
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -873,6 +873,7 @@ $chartData = json_encode(array_values($statsKelas));
                         <th>Nama Kelas</th>
                         <th>Nama Dosen</th>
                         <th>Nama Mahasiswa</th>
+                        <th>Program</th>
                         <th>Nama Ruang</th>
                         <th>Aksi</th>
                     </tr>
@@ -886,6 +887,7 @@ $chartData = json_encode(array_values($statsKelas));
                         <td><strong><?= sanitize($r['nama_kelas']) ?></strong></td>
                         <td><?= sanitize($r['dosen_pengampu'] ?: '-') ?></td>
                         <td><?= sanitize($r['nama_lengkap']) ?></td>
+                        <td><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><span class="badge badge-success"><?= sanitize($r['ruangan'] ?: 'Belum Ada Ruang') ?></span></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-warning" style="margin-right:4px;"

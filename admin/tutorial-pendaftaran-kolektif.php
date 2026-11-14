@@ -668,6 +668,7 @@ include __DIR__ . '/../includes/header.php';
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Angkatan</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Nama Lengkap</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Jurusan</th>
+                        <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px;">Program</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Status</th>
                         <th style="padding: 10px 16px; border-bottom: 2px solid #cbd5e1; font-size: 13px; text-align: center;">Aksi</th>
                     </tr>
@@ -681,7 +682,8 @@ include __DIR__ . '/../includes/header.php';
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['nim'] ?: '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize((strlen(trim($m['nim'])) >= 2) ? "20" . substr(trim($m['nim']), 0, 2) : '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><strong><?= sanitize($m['nama_lengkap']) ?></strong></td>
-                            <td style="padding: 10px 16px; font-size: 13px;"><?= formatProdiDisplay($m['program_studi'] ?? '', $m['jenis_program'] ?? 'Reguler', true) ?></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['program_studi'] ?: '-') ?></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><?= renderJenisProgramBadge($m['jenis_program'] ?? 'Reguler', true) ?></td>
                             <td style="padding: 10px 16px; text-align: center;">
                                 <?php if ($isReg): ?>
                                     <span class="badge badge-success" style="font-size:11px;">Sudah Terdaftar (<?= sanitize($m['hari_pilihan']) ?>)</span>

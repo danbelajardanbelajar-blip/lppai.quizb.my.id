@@ -870,6 +870,7 @@ include __DIR__ . '/../includes/header.php';
                             <th style="width:35px;">No</th>
                             <th>Mahasiswa</th>
                             <th>Program Studi</th>
+                            <th>Program</th>
                             <th>No. Sertifikat</th>
                             <th>Status</th>
                             <th>Waktu Pengambilan</th>
@@ -886,7 +887,8 @@ include __DIR__ . '/../includes/header.php';
                                     <strong><?= sanitize($c['nama_lengkap']) ?></strong><br>
                                     <small class="text-muted">NIM: <?= sanitize($c['nim']) ?></small>
                                 </td>
-                                <td><?= formatProdiDisplay($c['program_studi'] ?? '', $c['jenis_program'] ?? 'Reguler', true) ?></td>
+                                <td><?= sanitize($c['program_studi'] ?: '-') ?></td>
+                                <td><?= renderJenisProgramBadge($c['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td>
                                     <strong style="color:#1a5632;"><?= sanitize($c['nomor_sertifikat']) ?></strong><br>
                                     <small class="text-muted"><?= sanitize($c['tahun_ajaran'] ?: '-') ?></small>
@@ -959,6 +961,7 @@ include __DIR__ . '/../includes/header.php';
                             <th>Waktu Penyerahan</th>
                             <th>NIM & Nama Mahasiswa</th>
                             <th>Jurusan / Prodi</th>
+                            <th>Program</th>
                             <th>No. Sertifikat</th>
                             <th>Penerima</th>
                             <th>Metode</th>
@@ -970,7 +973,7 @@ include __DIR__ . '/../includes/header.php';
                     <tbody>
                         <?php if (empty($recentLogs)): ?>
                             <tr>
-                                <td colspan="9" style="text-align:center; padding:30px; color:#94a3b8;">
+                                <td colspan="10" style="text-align:center; padding:30px; color:#94a3b8;">
                                     Belum ada catatan aktivitas penyerahan sertifikat.
                                 </td>
                             </tr>
@@ -982,7 +985,8 @@ include __DIR__ . '/../includes/header.php';
                                     <strong><?= sanitize($log['nama_mahasiswa']) ?></strong><br>
                                     <small class="text-muted"><?= sanitize($log['nim']) ?></small>
                                 </td>
-                                <td><?= formatProdiDisplay($log['program_studi'] ?: ($log['jurusan_asli'] ?? ''), $log['jenis_program'] ?? 'Reguler', true) ?></td>
+                                <td><?= sanitize($log['program_studi'] ?: ($log['jurusan_asli'] ?? '-')) ?></td>
+                                <td><?= renderJenisProgramBadge($log['jenis_program'] ?? 'Reguler', true) ?></td>
                                 <td><span style="color:#1a5632; font-weight:600;"><?= sanitize($log['nomor_sertifikat']) ?></span></td>
                                 <td>
                                     <?= sanitize($log['nama_penerima']) ?>

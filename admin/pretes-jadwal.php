@@ -834,6 +834,7 @@ function addQETutorRow(day) {
                         <th>Nama</th>
                         <th>NIM</th>
                         <th>Prodi</th>
+                        <th>Program</th>
                         <th>Hari & Jam</th>
                         <th>Dosen Penguji</th>
                         <th>Ruangan</th>
@@ -867,7 +868,8 @@ function addQETutorRow(day) {
                             </div>
                         </td>
                         <td><?= sanitize($p['nim']) ?></td>
-                        <td><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
+                        <td><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                        <td><?= renderJenisProgramBadge($p['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?>">
                             <span class="badge badge-info" style="font-size:12px;">
                                 <?= sanitize($curHari ?: 'Senin') ?>

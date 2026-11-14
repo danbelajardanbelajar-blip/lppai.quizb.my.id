@@ -1162,6 +1162,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Nama Mahasiswa</th>
                         <th>NIM</th>
                         <th>Jurusan</th>
+                        <th>Program</th>
                         <th>Pilihan Hari</th>
                         <th>Status Kelas</th>
                         <th>Tanggal &amp; Waktu Daftar</th>
@@ -1200,7 +1201,8 @@ include __DIR__ . '/../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td><?= sanitize($reg['nim'] ?: '-') ?></td>
-                        <td><?= formatProdiDisplay($reg['program_studi'] ?? '', $reg['jenis_program'] ?? 'Reguler', true) ?></td>
+                        <td><?= sanitize($reg['program_studi'] ?: '-') ?></td>
+                        <td><?= renderJenisProgramBadge($reg['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><span class="badge <?= $badgeClass ?>"><?= sanitize($h) ?></span></td>
                         <td>
                             <?php if (!empty($reg['tutorial_class_id'])): ?>
@@ -1293,6 +1295,7 @@ include __DIR__ . '/../includes/header.php';
                             <th>Nama Mahasiswa</th>
                             <th>NIM</th>
                             <th>Jurusan</th>
+                            <th>Program</th>
                             <th>Periode Pretes</th>
                             <th>Status Pretes</th>
                             <th>Kontak / WA</th>
@@ -1317,7 +1320,8 @@ include __DIR__ . '/../includes/header.php';
                                 <strong style="color: #1e293b;"><?= sanitize($p['nama_lengkap']) ?></strong>
                             </td>
                             <td><?= sanitize($p['nim'] ?: '-') ?></td>
-                            <td><?= formatProdiDisplay($p['program_studi'] ?? '', $p['jenis_program'] ?? 'Reguler', true) ?></td>
+                            <td><?= sanitize($p['program_studi'] ?: '-') ?></td>
+                            <td><?= renderJenisProgramBadge($p['jenis_program'] ?? 'Reguler', true) ?></td>
                             <td>
                                 <span class="badge badge-info" style="font-size: 11px;">
                                     <?= sanitize($p['pretes_periode'] ?: '-') ?>

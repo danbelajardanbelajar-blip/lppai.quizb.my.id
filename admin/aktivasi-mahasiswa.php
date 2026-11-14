@@ -84,7 +84,11 @@ include __DIR__ . '/../includes/header.php';
                 </tr>
                 <tr>
                     <th>Program Studi</th>
-                    <td><?= formatProdiDisplay($userData['program_studi'] ?? '', $userData['jenis_program'] ?? 'Reguler', true, true) ?></td>
+                    <td><?= sanitize($userData['program_studi'] ?: '-') ?></td>
+                </tr>
+                <tr>
+                    <th>Program</th>
+                    <td><?= renderJenisProgramBadge($userData['jenis_program'] ?? 'Reguler', false) ?></td>
                 </tr>
                 <tr>
                     <th>No. WhatsApp</th>

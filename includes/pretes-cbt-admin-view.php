@@ -491,6 +491,7 @@
                     <tr>
                         <th>Peserta</th>
                         <th>NIM</th>
+                        <th>Program</th>
                         <th>Jenis</th>
                         <th>Waktu &amp; Sisa</th>
                         <th>Status</th>
@@ -521,6 +522,7 @@
                     <tr id="attemptRow_<?= (int)$attempt['id'] ?>" data-attempt-id="<?= (int)$attempt['id'] ?>">
                         <td><strong><?= sanitize($attempt['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
+                        <td><?= renderJenisProgramBadge($attempt['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>
                             <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
                         <td>
@@ -610,7 +612,7 @@
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$attempts): ?><tr><td colspan="9" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
+                <?php if (!$attempts): ?><tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>

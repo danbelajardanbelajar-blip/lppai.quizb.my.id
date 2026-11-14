@@ -964,6 +964,7 @@ if ($isPrint) {
                     <th rowspan="2" style="width:75px;">NIM</th>
                     <th rowspan="2">Nama Mahasiswa</th>
                     <th rowspan="2" style="width:70px;">Prodi</th>
+                    <th rowspan="2" style="width:50px;">Program</th>
                     <th rowspan="2" style="width:50px;">Hari / Ruang</th>
                     <th colspan="12">Komponen Nilai Pretes</th>
                     <th rowspan="2" style="width:40px;">Rata-rata</th>
@@ -988,7 +989,7 @@ if ($isPrint) {
             <tbody>
                 <?php if (empty($roster)): ?>
                 <tr>
-                    <td colspan="20" style="padding:20px; font-style:italic;">Tidak ada data peserta yang sesuai dengan filter.</td>
+                    <td colspan="21" style="padding:20px; font-style:italic;">Tidak ada data peserta yang sesuai dengan filter.</td>
                 </tr>
                 <?php else: ?>
                 <?php foreach ($roster as $idx => $r): ?>
@@ -996,7 +997,8 @@ if ($isPrint) {
                     <td><?= $idx + 1 ?></td>
                     <td><?= sanitize($r['nim']) ?></td>
                     <td class="text-left" style="font-weight:600;"><?= sanitize($r['nama_lengkap']) ?></td>
-                    <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
+                    <td><?= sanitize($r['program_studi'] ?: '-') ?></td>
+                    <td><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                     <td><?= sanitize($r['hari_pilihan']) ?><br><small style="color:#475569;"><?= sanitize($r['ruangan']) ?></small></td>
                     
                     <?php foreach ($componentKeys as $ck): 
@@ -1413,6 +1415,7 @@ include __DIR__ . '/../includes/header.php';
                     <th rowspan="2" class="col-sticky-left" style="width:40px;">No</th>
                     <th rowspan="2" class="col-sticky-left" style="left:40px; min-width:200px; text-align:left;">Nama & NIM</th>
                     <th rowspan="2" style="min-width:130px; text-align:left;">Prodi</th>
+                    <th rowspan="2" style="min-width:80px; text-align:center;">Program</th>
                     <th rowspan="2" style="min-width:110px;">Jadwal & Ruang</th>
                     <th rowspan="2" style="min-width:150px; text-align:left;">Dosen Penguji</th>
                     <th rowspan="2" style="width:75px;">Absensi</th>
@@ -1442,7 +1445,7 @@ include __DIR__ . '/../includes/header.php';
             <tbody>
                 <?php if (empty($roster)): ?>
                 <tr>
-                    <td colspan="22" style="padding:32px; text-align:center; color:#64748b;">
+                    <td colspan="23" style="padding:32px; text-align:center; color:#64748b;">
                         Tidak ada data mahasiswa yang ditemukan untuk filter yang dipilih.
                     </td>
                 </tr>
@@ -1454,7 +1457,8 @@ include __DIR__ . '/../includes/header.php';
                         <strong style="color:#0f172a; font-size:13.5px;"><?= sanitize($r['nama_lengkap']) ?></strong>
                         <div style="font-size:11.5px; color:#64748b; font-family:monospace;"><?= sanitize($r['nim']) ?></div>
                     </td>
-                    <td style="text-align:left; font-size:12.5px;"><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
+                    <td style="text-align:left; font-size:12.5px;"><?= sanitize($r['program_studi'] ?: '-') ?></td>
+                    <td style="text-align:center;"><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                     <td style="font-size:12px;">
                         <span style="font-weight:700; color:#0f172a;"><?= sanitize($r['hari_pilihan']) ?></span>
                         <div style="color:#64748b;"><?= sanitize($r['ruangan']) ?></div>

@@ -118,11 +118,11 @@ function runPretesRekapNilaiTests() {
         if (strpos($adminContent, 'table-rekap-pretes') === false) {
             $failures[] = "Elemen tabel id #table-rekap-pretes tidak ditemukan";
         }
-        if (strpos($adminContent, 'colspan="22"') === false) {
-            $failures[] = "Baris data kosong harus memiliki colspan=\"22\" sesuai jumlah kolom header 22 komponen";
+        if (strpos($adminContent, 'colspan="23"') === false) {
+            $failures[] = "Baris data kosong harus memiliki colspan=\"23\" sesuai jumlah kolom header 23 komponen (termasuk Program)";
         }
-        if (strpos($adminContent, 'colspan="23"') !== false) {
-            $failures[] = "Ditemukan colspan=\"23\" yang melebihi jumlah kolom header (22), menyebabkan Tech Note 18 DataTables warning";
+        if (strpos($adminContent, 'colspan="24"') !== false) {
+            $failures[] = "Ditemukan colspan=\"24\" yang melebihi jumlah kolom header (23), menyebabkan Tech Note 18 DataTables warning";
         }
         if (strpos($adminContent, "no-datatable") === false) {
             $failures[] = "Kelas no-datatable saat roster kosong tidak ditemukan";

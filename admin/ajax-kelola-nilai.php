@@ -32,16 +32,19 @@ $orderDir = (strtolower($orderDir) === 'desc') ? 'DESC' : 'ASC';
 $columns = [
     0 => 'u.nim',
     1 => 'u.nim',
-    2 => 'u.nama_lengkap',
-    3 => 'u.program_studi',
-    4 => 'tr.tahun_ajaran',
-    5 => 'nilai_thaharah',
-    6 => 'nilai_shalat',
-    7 => 'nilai_surat_pendek',
-    8 => 'nilai_amaliyah',
-    9 => 'nilai_jenazah',
-    10 => 'nilai_ujian_tulis',
-    11 => '((IFNULL(tr.nilai_thaharah,0) + IFNULL(tr.nilai_shalat,0) + IFNULL(tr.nilai_surat_pendek,0) + IFNULL(tr.nilai_amaliyah,0) + IFNULL(tr.nilai_jenazah,0) + IFNULL(tr.nilai_ujian_tulis,0)) / NULLIF((IF(tr.nilai_thaharah IS NULL,0,1) + IF(tr.nilai_shalat IS NULL,0,1) + IF(tr.nilai_surat_pendek IS NULL,0,1) + IF(tr.nilai_amaliyah IS NULL,0,1) + IF(tr.nilai_jenazah IS NULL,0,1) + IF(tr.nilai_ujian_tulis IS NULL,0,1)), 0))'
+    2 => 'u.nim',
+    3 => 'u.nama_lengkap',
+    4 => 'u.program_studi',
+    5 => 'u.jenis_program',
+    6 => 'tr.tahun_ajaran',
+    7 => 'tr.tipe_nilai',
+    8 => 'nilai_thaharah',
+    9 => 'nilai_shalat',
+    10 => 'nilai_surat_pendek',
+    11 => 'nilai_amaliyah',
+    12 => 'nilai_jenazah',
+    13 => 'nilai_ujian_tulis',
+    14 => '((IFNULL(tr.nilai_thaharah,0) + IFNULL(tr.nilai_shalat,0) + IFNULL(tr.nilai_surat_pendek,0) + IFNULL(tr.nilai_amaliyah,0) + IFNULL(tr.nilai_jenazah,0) + IFNULL(tr.nilai_ujian_tulis,0)) / NULLIF((IF(tr.nilai_thaharah IS NULL,0,1) + IF(tr.nilai_shalat IS NULL,0,1) + IF(tr.nilai_surat_pendek IS NULL,0,1) + IF(tr.nilai_amaliyah IS NULL,0,1) + IF(tr.nilai_jenazah IS NULL,0,1) + IF(tr.nilai_ujian_tulis IS NULL,0,1)), 0))'
 ];
 
 $orderBy = $columns[$orderColIndex] ?? 'u.nama_lengkap';
@@ -215,7 +218,8 @@ foreach ($data as $i => $row) {
         $start + $i + 1, // Nomor urut
         htmlspecialchars($row['nim'] ?: '-'),
         '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
-        formatProdiDisplay($row['program_studi'] ?? '', $row['jenis_program'] ?? 'Reguler', true),
+        htmlspecialchars($row['program_studi'] ?: '-'),
+        renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true),
         htmlspecialchars($row['tahun_ajaran'] ?: '-'),
         htmlspecialchars(ucwords($row['tipe_nilai'] ?? '-')),
         $row['nilai_thaharah'] ?? '-',

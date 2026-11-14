@@ -65,7 +65,7 @@ if (isset($_GET['ajax'])) {
             $where = 'WHERE a.registration_id < 0';
         }
 
-        $attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $where ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+        $attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $where ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
 
         $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
         $itemStatsMap = [];
@@ -118,6 +118,9 @@ if (isset($_GET['ajax'])) {
                 'id' => $attId,
                 'nama_lengkap' => $a['nama_lengkap'],
                 'nim' => $a['nim'] ?? '-',
+                'program_studi' => $a['program_studi'] ?? '',
+                'jenis_program' => normalizeJenisProgram($a['jenis_program'] ?? 'Reguler'),
+                'jenis_program_badge' => renderJenisProgramBadge($a['jenis_program'] ?? 'Reguler', true),
                 'jenis_kind' => $jenis['kind'],
                 'jenis_label' => $jenis['label'],
                 'started_at' => (int)$a['started_at'],
@@ -521,7 +524,7 @@ if ($resultFilter === 'resmi') {
 $now = time();
 $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
 
-$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
 
 $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
 $itemStatsMap = [];
