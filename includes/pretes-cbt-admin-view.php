@@ -167,7 +167,10 @@
                 <h3>Pengatur Sesi Ujian CBT</h3>
                 <p>Atur paket soal yang ditampilkan, kadar kuota masing-masing kategori, kewajiban kamera, waktu, penilaian, jadwal mulai/selesai, dan token ujian.</p>
             </div>
-            <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
+                <button type="button" class="bank-button" data-action="create-tryout" style="background:#eff6ff;color:#1e3a8a;border-color:#bfdbfe">📝 ＋ Buat Tryout</button>
+            </div>
         </div>
         <form id="bulkDeleteSessionsForm" method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-bulk-delete-form="sessions" data-no-spa>
             <input type="hidden" name="action" value="delete_sessions">
@@ -276,6 +279,11 @@
                                 <span class="bank-badge session-active">● AKTIF</span>
                             <?php else: ?>
                                 <span class="bank-badge session-inactive">Tidak Aktif</span>
+                            <?php endif; ?>
+                            <?php if (($ses['mode'] ?? 'resmi') === 'tryout'): ?>
+                                <div style="margin-top:4px"><span class="bank-badge" style="background:#dbeafe;color:#1e3a8a">📝 TRYOUT · <?= (int)($ses['max_attempts'] ?? 0) === 0 ? 'ulang ∞' : ('maks ' . (int)$ses['max_attempts'] . '×') ?></span></div>
+                            <?php else: ?>
+                                <div style="margin-top:4px"><span class="bank-badge" style="background:#ecfdf5;color:#047857">🎓 RESMI</span></div>
                             <?php endif; ?>
                         </td>
                         <td style="text-align:right;white-space:nowrap">
@@ -397,6 +405,7 @@
                     <tr>
                         <th>Peserta</th>
                         <th>NIM</th>
+                        <th>Jenis</th>
                         <th>Mulai (WIB)</th>
                         <th>Status</th>
                         <th>Benar</th>
@@ -409,9 +418,11 @@
                     <tr>
                         <td><strong><?= sanitize($attempt['nama_lengkap']) ?></strong></td>
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
+                        <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>
+                            <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
                         <td><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></td>
                         <td><span class="bank-badge <?= $attempt['submitted_at'] !== null ? 'active' : 'inactive' ?>"><?= $attempt['submitted_at'] !== null ? 'Selesai' : 'Berlangsung' ?></span></td>
-                        <td><?= $attempt['correct_count'] !== null ? (int)$attempt['correct_count'] . ' / 25' : '—' ?></td>
+                        <td><?= $attempt['correct_count'] !== null ? (int)$attempt['correct_count'] : '—' ?></td>
                         <td><span class="bank-key"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 0) : '—' ?></span></td>
                         <td style="text-align:center">
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
@@ -423,7 +434,7 @@
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$attempts): ?><tr><td colspan="7" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
+                <?php if (!$attempts): ?><tr><td colspan="8" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
@@ -507,6 +518,23 @@
                     <div class="bank-field">
                         <label class="bank-label" for="sesModalCode">Kode Sesi</label>
                         <input id="sesModalCode" class="bank-input" name="code" maxlength="64" placeholder="Otomatis jika kosong">
+                    </div>
+                </div>
+
+                <!-- 1b. Jenis Sesi: Resmi / Tryout -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px">
+                    <div class="bank-field" style="margin:0">
+                        <label class="bank-label" for="sesModalMode" style="color:#1e3a8a">Jenis Sesi *</label>
+                        <select id="sesModalMode" class="bank-input" name="mode">
+                            <option value="resmi">🎓 Ujian Resmi (1× pengerjaan, butuh pendaftaran pretes)</option>
+                            <option value="tryout">📝 Tryout / Latihan (terpisah dari ujian resmi)</option>
+                        </select>
+                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">Tryout tampil di menu <strong>Tryout CBT</strong> mahasiswa, tanpa verifikasi wajah, dan tidak memakan jatah ujian resmi. Beberapa tryout boleh aktif bersamaan dengan sesi resmi.</span>
+                    </div>
+                    <div class="bank-field" id="sesModalMaxAttemptsWrap" style="margin:0">
+                        <label class="bank-label" for="sesModalMaxAttempts" style="color:#1e3a8a">Batas Pengerjaan Tryout</label>
+                        <input type="number" id="sesModalMaxAttempts" class="bank-input" name="max_attempts" min="0" max="99" value="0">
+                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">0 = boleh diulang tanpa batas; 1 = sekali saja.</span>
                     </div>
                 </div>
 

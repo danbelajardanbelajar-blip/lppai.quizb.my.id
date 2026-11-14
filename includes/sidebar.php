@@ -231,6 +231,23 @@ if (!function_exists('menuActive')) {
             </a>
             <?php endif; ?>
 
+            <?php
+            // Menu Tryout CBT: terbuka untuk semua mahasiswa (tanpa syarat daftar pretes),
+            // tampil bila ada sesi tryout aktif atau halaman tryout sedang dibuka
+            $showTryoutMenu = $currentPage === 'tryout.php';
+            if (!$showTryoutMenu && function_exists('getDBConnection')) {
+                try {
+                    $showTryoutMenu = (bool)getDBConnection()->query("SELECT 1 FROM pretes_cbt_sessions WHERE is_active = 1 AND mode = 'tryout' LIMIT 1")->fetchColumn();
+                } catch (Throwable $e) { $showTryoutMenu = false; }
+            }
+            ?>
+            <?php if ($showTryoutMenu): ?>
+            <div class="menu-label">Tryout</div>
+            <a href="<?= BASE_URL ?>/tryout.php" class="page-nav <?= menuActive('tryout.php') ?>">
+                <span class="icon">📝</span> Tryout CBT
+            </a>
+            <?php endif; ?>
+
             <?php if ($showTutorialMenus): ?>
             <div class="menu-label">Tutorial</div>
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">

@@ -118,6 +118,24 @@ function ensurePretesCbtTables(PDO $pdo): void {
         }
     } catch (Throwable $e) {}
 
+    // Mode sesi: 'resmi' (ujian pretes resmi) atau 'tryout' (latihan, attempt terpisah, bisa diulang)
+    foreach ([
+        ['mode', "VARCHAR(20) NOT NULL DEFAULT 'resmi'"],
+        ['max_attempts', 'INTEGER NOT NULL DEFAULT 1'],
+    ] as [$colName, $colDef]) {
+        try {
+            $hasCol = false;
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                foreach ($pdo->query("PRAGMA table_info(pretes_cbt_sessions)")->fetchAll(PDO::FETCH_ASSOC) as $col) {
+                    if (strtolower((string)($col['name'] ?? '')) === $colName) { $hasCol = true; break; }
+                }
+            } else {
+                $hasCol = !empty($pdo->query("SHOW COLUMNS FROM pretes_cbt_sessions LIKE '$colName'")->fetchAll(PDO::FETCH_ASSOC));
+            }
+            if (!$hasCol) $pdo->exec("ALTER TABLE pretes_cbt_sessions ADD COLUMN $colName $colDef");
+        } catch (Throwable $e) {}
+    }
+
     // Initialization is persistent, not inferred from whether the admin emptied a table.
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_initialization (
         seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
@@ -269,13 +287,14 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
     }
 }
 
-function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null): array {
+function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null): array {
     $now ??= time();
     $pdo->beginTransaction();
     try {
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if (!$attempt) {
-            $session = pretesCbtGetActiveSession($pdo);
+            // Tryout memakai sesinya sendiri; ujian resmi memakai sesi resmi yang aktif
+            $session = $forcedSession ?? pretesCbtGetActiveSession($pdo);
             $sessionId = $session ? (int)$session['id'] : null;
 
             // Validasi Jadwal Waktu Mulai & Selesai Sesi
@@ -706,7 +725,7 @@ function pretesCbtGetSession(PDO $pdo, int $sessionId): ?array {
 
 function pretesCbtGetActiveSession(PDO $pdo): ?array {
     ensurePretesCbtTables($pdo);
-    $ses = $pdo->query('SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 ORDER BY id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
+    $ses = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if (!$ses) return null;
     $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
     $ses['package_ids'] = array_map('intval', $pkgIds);
@@ -808,35 +827,41 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
     }
     $isActive = isset($input['is_active']) && (int)$input['is_active'] === 1 ? 1 : 0;
     $sessionId = (int)($input['id'] ?? 0);
+    $mode = (($input['mode'] ?? 'resmi') === 'tryout') ? 'tryout' : 'resmi';
+    // max_attempts: resmi selalu 1; tryout 0 = tanpa batas, 1–99 = batas jumlah pengerjaan
+    $maxAttempts = $mode === 'tryout' ? max(0, min(99, (int)($input['max_attempts'] ?? 0))) : 1;
 
     $pdo->beginTransaction();
     try {
-        if ($isActive === 1) {
-            $pdo->exec('UPDATE pretes_cbt_sessions SET is_active = 0');
-        } else {
-            $otherCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != ' . $sessionId)->fetchColumn();
-            if ($otherCount === 0) {
-                $isActive = 1;
+        if ($mode === 'resmi') {
+            if ($isActive === 1) {
+                // Hanya satu sesi RESMI aktif; sesi tryout tidak ikut dinonaktifkan
+                $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
+            } else {
+                $otherCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != " . $sessionId . " AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
+                if ($otherCount === 0) {
+                    $isActive = 1;
+                }
             }
         }
 
         if ($sessionId > 0) {
-            $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, shuffle_on_violation = ?, is_active = ? WHERE id = ?');
+            $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, shuffle_on_violation = ?, is_active = ?, mode = ?, max_attempts = ? WHERE id = ?');
             $stmt->execute([
                 $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
-                $token, $tokenRequired, $shuffleOnViolation, $isActive, $sessionId
+                $token, $tokenRequired, $shuffleOnViolation, $isActive, $mode, $maxAttempts, $sessionId
             ]);
         } else {
             $code = trim((string)($input['code'] ?? ''));
             if ($code === '') {
                 $code = 'SESI-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
             }
-            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at, mode, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([
                 $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
-                $token, $tokenRequired, $shuffleOnViolation, $isActive, time()
+                $token, $tokenRequired, $shuffleOnViolation, $isActive, time(), $mode, $maxAttempts
             ]);
             $sessionId = (int)$pdo->lastInsertId();
         }
@@ -853,7 +878,11 @@ function pretesCbtActivateSession(PDO $pdo, int $sessionId): bool {
     ensurePretesCbtTables($pdo);
     $pdo->beginTransaction();
     try {
-        $pdo->exec('UPDATE pretes_cbt_sessions SET is_active = 0');
+        $modeStmt = $pdo->prepare('SELECT mode FROM pretes_cbt_sessions WHERE id = ?');
+        $modeStmt->execute([$sessionId]);
+        if ((string)$modeStmt->fetchColumn() !== 'tryout') {
+            $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
+        }
         $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id = ?');
         $stmt->execute([$sessionId]);
         $ok = $stmt->rowCount() > 0;
@@ -883,9 +912,9 @@ function pretesCbtDeleteSessions(PDO $pdo, array $sessionIds): int {
         $stmt->execute($cleanIds);
         $deleted = $stmt->rowCount();
 
-        $activeCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions WHERE is_active = 1')->fetchColumn();
+        $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
         if ($activeCount === 0) {
-            $firstSes = $pdo->query('SELECT id FROM pretes_cbt_sessions ORDER BY id ASC LIMIT 1')->fetchColumn();
+            $firstSes = $pdo->query("SELECT id FROM pretes_cbt_sessions WHERE (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id ASC LIMIT 1")->fetchColumn();
             if ($firstSes) {
                 $pdo->prepare('UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id = ?')->execute([(int)$firstSes]);
             }

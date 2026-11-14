@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 22:19:51 +0700 — Mode Tryout CBT Pretes (terpisah dari ujian resmi)
+
+**Ringkasan:** Tryout memakai mesin CBT yang sama (bank/paket, kuota kategori, acak soal & pilihan, timer server, nilai otomatis) tetapi attempt-nya terpisah dari ujian resmi, bisa diulang dengan batas, tanpa syarat daftar pretes & tanpa verifikasi wajah, dan dapat aktif bersamaan dengan sesi resmi. Sebelumnya `UNIQUE(user_id, registration_id)` membuat tryout memakan jatah ujian resmi dan hanya satu sesi yang bisa aktif.
+
+**Desain attempt:** attempt tryout memakai `registration_id` sintetis **negatif** = `-(session_id × 1000 + nomor_percobaan)` di tabel `pretes_cbt_attempts` yang sama → tidak bentrok dengan attempt resmi (`registration_id > 0`), tanpa mengubah index produksi.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-cbt.php` | 121–138 | `ensurePretesCbtTables()` | Auto-migrasi kolom `pretes_cbt_sessions.mode` (`'resmi'` default / `'tryout'`) dan `max_attempts` (default 1). |
+| `includes/pretes-cbt.php` | 290, 296–297 | `pretesCbtStart()` | Parameter baru `?array $forcedSession` (tryout memakai sesinya sendiri). |
+| `includes/pretes-cbt.php` | 728 | `pretesCbtGetActiveSession()` | Hanya sesi aktif ber-mode resmi. |
+| `includes/pretes-cbt.php` | 830–853, 860–864 | `pretesCbtSaveSession()` | Simpan `mode` & `max_attempts` (resmi = 1; tryout 0–99, 0 = tanpa batas); eksklusivitas aktif hanya antar sesi resmi. |
+| `includes/pretes-cbt.php` | 881–885 | `pretesCbtActivateSession()` | Aktivasi sesi resmi hanya menonaktifkan sesi resmi lain; tryout tidak menonaktifkan apa pun. |
+| `includes/pretes-cbt.php` | 915–917 | `pretesCbtDeleteSessions()` | Cadangan sesi aktif dipilih dari sesi resmi saja. |
+| `includes/pretes-tryout.php` (baru) | 1–122 | Helper tryout | `pretesTryoutRegId/DecodeRegId`, `GetSession`, `Window` (jadwal), `ActiveSessions`, `Attempts` (riwayat), `ResolveRegId` (lanjutkan/ke-1/ulangi + batas), `CanRetake`, `AttemptLabel` (label admin). |
+| `pages/tryout.php` (baru) | 1–254 | Halaman & API mahasiswa | `tryout.php` daftar tryout aktif (durasi, batas, token, nilai terbaik); `?sesi=ID` ruang ujian (view & JS CBT yang sama) + riwayat + tombol Ulangi (`&baru=1`); `?api=1` JSON (state/start/save/submit/interrupt/resume, CSRF, cek jadwal, `fresh`). Reload pasca-kumpul hanya bila pengerjaan dimulai di halaman tsb (cegah loop). |
+| `assets/js/pretes-cbt.js` | 108 | `apply()` | Pesan siap dapat diganti `config.readyMessage` (tryout tidak menyebut verifikasi wajah). |
+| `includes/sidebar.php` | 234–250 | Menu mahasiswa | Grup **Tryout › Tryout CBT** di luar blok Pretes (terlihat walau belum daftar pretes), tampil bila ada sesi tryout aktif. |
+| `includes/pretes-cbt-admin-view.php` | 170–173 | Panel Sesi | Tombol **📝 ＋ Buat Tryout** (`data-action="create-tryout"`). |
+| `includes/pretes-cbt-admin-view.php` | 283–287 | Kolom Status sesi | Badge **🎓 RESMI** / **📝 TRYOUT · ulang ∞ / maks N×**. |
+| `includes/pretes-cbt-admin-view.php` | 408, 421–422, 425, 437 | Tab Hasil | Kolom **Jenis** (Resmi / Tryout · nama sesi · ke-N); kolom Benar tanpa "/ 25" tetap; colspan 8. |
+| `includes/pretes-cbt-admin-view.php` | 524–540 | Modal Sesi | Field **Jenis Sesi** (`#sesModalMode`) & **Batas Pengerjaan Tryout** (`#sesModalMaxAttempts`). |
+| `assets/js/pretes-cbt-admin.js` | 143–150, 331–333, 360–363, 374–384 | Delegasi & modal sesi | Delegasi `create-tryout`, isi/reset mode & batas saat edit/buat, `syncSessionModeFields()`. |
+| `admin/pretes-bank-soal.php` | 6–7 | Bootstrap | `require pretes-tryout.php` + `$tryoutLabelCache`. |
+| `tests/pretes-tryout-test.php` (baru) | 1–103 | Test SQLite (mesin asli) | Tryout & resmi aktif bersamaan, aktivasi per mode, attempt tryout negatif & tercatat di sesi tryout, ujian resmi tetap bisa dimulai & tidak tertimpa, ulangi ke-2, batas 2× ditolak, jadwal, label admin, integrasi halaman/sidebar. |
+
+**Verifikasi:** `php -l` OK (7 file PHP), `node --check` OK; `tests/pretes-tryout-test.php` PASS; 10 test `pretes-cbt*` + `pretes-peserta-aktif`, `pretes-stage`, `tutorial-waiting`, 2 test `.cjs` CBT PASS. Harness browser (SQLite): daftar tryout → mulai → jawab → kumpulkan → riwayat → Ulangi (ke-2) → tombol hilang setelah batas; API menolak percobaan ke-3 dan sesi resmi. Render admin tab Sesi & Hasil tanpa error.
+**Catatan:** tryout tidak memakai verifikasi wajah (pengaturan kamera sesi tryout diabaikan); jeda saat meninggalkan halaman tetap aktif.
+
+---
+
 ## 2026-11-14 21:49:00 +0700 — Perbaikan layout kontrol DataTables length dan isolasi tabel dashboard
 
 **ID:** UI-DATATABLES-LENGTH-LAYOUT-FIX · **Parent Git:** `16ec314`.

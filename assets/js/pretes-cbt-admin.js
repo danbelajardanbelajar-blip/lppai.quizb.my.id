@@ -140,6 +140,14 @@
             return;
         }
 
+        const btnCreateTryout = e.target.closest('[data-action="create-tryout"]');
+        if (btnCreateTryout) {
+            e.preventDefault();
+            window._cbtNewSessionMode = 'tryout';
+            window.openSessionModal(false);
+            return;
+        }
+
         const btnAddQ = e.target.closest('[data-action="add-question"]');
         if (btnAddQ) {
             e.preventDefault();
@@ -320,6 +328,9 @@
                 get('sesModalShuffleOnViolation').value = data.shuffle_on_violation !== undefined ? String(data.shuffle_on_violation) : '1';
             }
             get('sesModalActive').checked = Number(data.is_active) === 1;
+            if (get('sesModalMode')) get('sesModalMode').value = data.mode === 'tryout' ? 'tryout' : 'resmi';
+            if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = data.mode === 'tryout' ? String(Number(data.max_attempts) || 0) : '0';
+            syncSessionModeFields();
 
             const pkgIds = data.package_ids || [];
             pkgIds.forEach(id => {
@@ -346,6 +357,10 @@
                 get('sesModalShuffleOnViolation').value = '1';
             }
             get('sesModalActive').checked = true;
+            if (get('sesModalMode')) get('sesModalMode').value = window._cbtNewSessionMode === 'tryout' ? 'tryout' : 'resmi';
+            if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = '0';
+            window._cbtNewSessionMode = null;
+            syncSessionModeFields();
 
             // Default check first package
             const firstCb = document.querySelector('input[name="package_ids[]"]');
@@ -355,6 +370,17 @@
 
         cbtOpenModal('modalSessionForm');
     };
+
+    // Jenis sesi: kolom batas pengerjaan hanya relevan untuk tryout
+    function syncSessionModeFields() {
+        const mode = get('sesModalMode') ? get('sesModalMode').value : 'resmi';
+        const wrap = get('sesModalMaxAttemptsWrap');
+        if (wrap) wrap.style.opacity = mode === 'tryout' ? '1' : '0.45';
+        if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').disabled = mode !== 'tryout';
+    }
+    document.addEventListener('change', function (e) {
+        if (e.target && e.target.id === 'sesModalMode') syncSessionModeFields();
+    });
 
     // Listen to package checkbox changes inside session modal
     document.addEventListener('change', function (e) {

@@ -3,6 +3,8 @@ define('PAGE_TITLE', 'Bank Soal & Pengatur Sesi CBT Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-cbt.php';
+require_once __DIR__ . '/../includes/pretes-tryout.php';
+$tryoutLabelCache = [];
 require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
 $bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
 if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');

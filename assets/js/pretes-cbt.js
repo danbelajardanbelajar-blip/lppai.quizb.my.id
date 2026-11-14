@@ -105,7 +105,7 @@
         if (!data.attempt) {
             el('cbtIntro').style.display = 'block';
             el('cbtStart').disabled = false;
-            message('Verifikasi wajah berhasil. Tekan Mulai Ujian ketika Anda siap.');
+            message(config.readyMessage || 'Verifikasi wajah berhasil. Tekan Mulai Ujian ketika Anda siap.');
             return;
         }
         if (data.attempt.submitted) { showResult(data.attempt); return; }
