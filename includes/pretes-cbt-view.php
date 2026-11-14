@@ -43,12 +43,11 @@
         <div id="cbtResult" class="cbt-result" style="display:none" aria-live="polite"></div>
     </div>
 </section>
-<dialog id="cbtInterruption" class="cbt-interruption" aria-labelledby="cbtInterruptionTitle" aria-describedby="cbtInterruptionReason cbtInterruptionStatus">
+<dialog id="cbtInterruption" class="cbt-interruption" aria-labelledby="cbtInterruptionTitle" aria-describedby="cbtInterruptionReason cbtInterruptionAction cbtInterruptionStatus">
     <div class="cbt-interruption-card">
-        <div class="cbt-eyebrow">Pengawasan ujian</div>
         <h2 id="cbtInterruptionTitle">Ujian dijeda</h2>
         <p id="cbtInterruptionReason"></p>
-        <p>Kembali ke halaman ujian. Jika sesi mewajibkan kamera, hadapkan wajah ke kamera. Soal tertutup selama popup tampil.</p>
+        <p id="cbtInterruptionAction"></p>
         <p id="cbtInterruptionStatus" role="status" aria-live="polite"></p>
         <button type="button" id="cbtResume" class="btn btn-success">Lanjutkan Ujian</button>
     </div>

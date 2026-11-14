@@ -231,7 +231,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     verified.sandbox.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: false, status: 'NO_FACE', message: 'Tidak ada wajah' }) });
     await verified.sandbox.runPeriodicProctoringCheck();
     assert.deepEqual(interruptions, ['face_missing']);
-    await assert.rejects(cbtSettings.verifyAttention(), /Tidak ada wajah/);
+    await assert.rejects(cbtSettings.verifyAttention(), error => error.code === 'NO_FACE' && /Tidak ada wajah/.test(error.message));
     verified.sandbox.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: true, status: 'MATCH' }) });
     await cbtSettings.verifyAttention();
     verified.sandbox.PretesCbt.isPaused = () => true;

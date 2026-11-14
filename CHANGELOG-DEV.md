@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 09:22:15 +0700 — Popup ujian ringkas sesuai penyebab
+
+**ID:** CBT-CONCISE-CAUSE-POPUP · **Parent Git:** `f35d208`.
+**Permintaan:** popup hanya menjelaskan pelanggaran/error yang terjadi dengan teks singkat. Instruksi meninggalkan halaman tidak lagi disertai arahan kamera; error baru saat lanjut menggantikan penyebab lama.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB, sampai detik). Baris merujuk versi commit yang memuat entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 09:20:31 | `assets/js/pretes-cbt.js` | 189–227 | Pesan popup sesuai penyebab | Pisahkan penyebab dan satu arahan singkat; pemetaan error kamera, wajah, koneksi, sesi, server. Error baru menggantikan penyebab lama, tanpa detail teknis/pengacakan yang berulang. |
+| 2026-11-14 09:20:31 | `assets/js/pretes-cbt.js` | 222–234 | Status jeda singkat | Tampilkan hanya Waktu dijeda atau Mengonfirmasi jeda; hapus paragraf panjang dari popup. |
+| 2026-11-14 09:20:31 | `assets/js/pretes-cbt.js` | 275–300 | Error saat lanjut | Gunakan kode penyebab terbaru dan arahan terkait saat lanjut gagal; popup tetap memblokir ujian. |
+| 2026-11-14 09:20:31 | `includes/pretes-cbt-view.php` | 46–54 | Struktur dan aksesibilitas popup | Hapus teks instruksi kamera umum dan label berulang. Tambahkan elemen tindakan dinamis ke aria-describedby. |
+| 2026-11-14 09:19:19 | `pages/pretes-ujian.php` | 553–558 | Metadata error frontend | Tambahkan code/status pada Error tanpa mengganti pesan lama atau perilaku timeout/request. |
+| 2026-11-14 09:19:19 | `pages/pretes-ujian.php` | 1016–1032 | Penyebab verifikasi saat lanjut | Teruskan status hasil wajah dan kode kamera agar popup tidak memberi instruksi yang tidak sesuai. |
+| 2026-11-14 09:20:31 | `tests/pretes-cbt-ui-test.cjs` | 199–232 | Regresi pesan popup | Uji empat penyebab awal dan sepuluh error lanjutan, pesan ringkas, penyebab lama terganti, dan tidak ada paragraf teknis/pengacakan. |
+| 2026-11-14 09:20:31 | `tests/pretes-ujian-camera-test.cjs` | 234–234 | Integrasi kode wajah | Pastikan kegagalan pemeriksaan meneruskan NO_FACE beserta pesan aslinya. |
+
+**Verifikasi:** `node tests/pretes-cbt-ui-test.cjs`, `node tests/pretes-ujian-camera-test.cjs`, `php tests/pretes-ujian-route-test.php`, `node --check assets/js/pretes-cbt.js`, lint PHP kedua view/page, dan `git diff --check`: PASS. Chrome 390×844 dan 1366×844: pesan singkat, penyebab berubah dari halaman ditinggalkan menjadi wajah tidak terdeteksi saat pengecekan lanjut gagal, tidak ada instruksi lama/teks teknis, tombol tetap aktif dan popup tetap memblokir soal.
+**Lingkup:** tampilan pesan dan metadata error frontend. Aturan jeda, waktu, penyimpanan jawaban dan pengacakan tidak diubah.
+**Penerapan:** commit `Show concise cause-specific CBT interruption messages`; push lalu pull lokal `--ff-only`. Hosting: tarik pembaruan di `~/public_html/lppai.quizb.my.id/web`, lalu muat ulang browser.
+
+---
+
 ## 2026-11-14 08:03:27 +0700 — Hapus terpilih CBT tetap terhapus setelah refresh
 
 **ID:** CBT-BULK-DELETE-PERSISTENCE-20261114 · **Parent Git:** `bac6904`.

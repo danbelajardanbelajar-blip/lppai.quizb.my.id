@@ -550,13 +550,20 @@ let activeStream = null;
 let currentFacingMode = 'user';
 let cbtCompleted = false;
 
+function pretesRequestError(message, code, status) {
+    const error = new Error(message);
+    error.code = code;
+    if (status) error.status = status;
+    return error;
+}
+
 // Batasi seluruh request, termasuk pembacaan body respons, agar UI selalu pulih.
 function requestProctoringCheck(payload, endpoint) {
     const controller = new AbortController();
     let timeoutId;
     const timeout = new Promise(function(resolve, reject) {
         timeoutId = setTimeout(function() {
-            reject(new Error('Server belum merespons dalam 20 detik. Silakan coba lagi. Jika berulang, hubungi admin.'));
+            reject(pretesRequestError('Server belum merespons dalam 20 detik. Silakan coba lagi. Jika berulang, hubungi admin.', 'TIMEOUT'));
             controller.abort();
         }, 20000);
     });
@@ -574,10 +581,10 @@ function requestProctoringCheck(payload, endpoint) {
         try {
             data = await response.json();
         } catch (error) {
-            throw new Error('Respons server tidak valid (HTTP ' + response.status + '). Muat ulang halaman atau hubungi admin.');
+            throw pretesRequestError('Respons server tidak valid (HTTP ' + response.status + '). Muat ulang halaman atau hubungi admin.', 'INVALID_RESPONSE', response.status);
         }
         if (!response.ok) {
-            throw new Error(data.message || 'Server gagal memproses verifikasi (HTTP ' + response.status + ').');
+            throw pretesRequestError(data.message || 'Server gagal memproses verifikasi (HTTP ' + response.status + ').', 'HTTP_ERROR', response.status);
         }
         if (!data || typeof data !== 'object') throw new Error('Data verifikasi server tidak valid.');
         return data;
@@ -608,7 +615,7 @@ async function guideFacePose(symbol, title, instruction, seconds, sample) {
 }
 
 function captureFaceFrame(video) {
-    if (!video.videoWidth || !video.videoHeight) throw new Error('Kamera belum siap. Silakan nyalakan ulang kamera.');
+    if (!video.videoWidth || !video.videoHeight) throw pretesRequestError('Kamera belum siap. Silakan nyalakan ulang kamera.', 'CAMERA_UNAVAILABLE');
     const canvas = document.createElement('canvas');
     const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
     canvas.width = Math.round(video.videoWidth * scale);
@@ -1009,9 +1016,9 @@ function initProctoringExamRoom() {
             verifyAttention: async function() {
                 if (!IS_CAMERA_REQUIRED) return;
                 const camera = document.getElementById('proctorVideo');
-                if (!camera) throw new Error('Kamera ujian tidak tersedia. Muat ulang halaman.');
+                if (!camera) throw pretesRequestError('Kamera ujian tidak tersedia. Muat ulang halaman.', 'CAMERA_UNAVAILABLE');
                 if (!camera.videoWidth || !activeStream || activeStream.getVideoTracks?.().some(track => track.readyState === 'ended')) {
-                    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Aktifkan izin kamera untuk melanjutkan ujian.');
+                    if (!navigator.mediaDevices?.getUserMedia) throw pretesRequestError('Aktifkan izin kamera untuk melanjutkan ujian.', 'CAMERA_UNAVAILABLE');
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
                     if (activeStream) activeStream.getTracks().forEach(track => track.stop());
                     activeStream = stream;
@@ -1019,7 +1026,7 @@ function initProctoringExamRoom() {
                     await camera.play();
                 }
                 const result = await requestProctoringCheck({ action: 'periodic_check', live_photo: captureFaceFrame(camera) });
-                if (!result.verified) throw new Error(result.message || 'Hadapkan wajah ke kamera untuk melanjutkan ujian.');
+                if (!result.verified) throw pretesRequestError(result.message || 'Hadapkan wajah ke kamera untuk melanjutkan ujian.', result.status || 'VERIFICATION_ERROR');
             },
             onStarted: function() {
                 if (IS_CAMERA_REQUIRED) {

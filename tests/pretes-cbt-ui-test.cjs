@@ -134,7 +134,7 @@ function environment(settings = {}) {
     assert.equal(expiry.element('cbtTimer').textContent, 'Selesai');
 
     let cameraReady = false;
-    const paused = environment({ verifyAttention: async () => { if (!cameraReady) throw new Error('Wajah belum sesuai'); } });
+    const paused = environment({ verifyAttention: async () => { if (!cameraReady) throw Object.assign(new Error('Wajah belum sesuai'), { code: 'MISMATCH' }); } });
     await settle();
     paused.setHidden(true);
     assert.equal(paused.requests.filter(r => r.action === 'interrupt').length, 0, 'No penalty before starting exam');
@@ -156,7 +156,8 @@ function environment(settings = {}) {
     assert.equal(paused.requests.filter(r => r.action === 'resume').length, 0, 'Hidden page cannot resume');
     paused.setHidden(false);
     await paused.element('cbtResume').onclick();
-    assert.match(paused.element('cbtInterruptionStatus').textContent, /Wajah belum sesuai/);
+    assert.equal(paused.element('cbtInterruptionReason').textContent, 'Wajah belum sesuai pasfoto.');
+    assert.equal(paused.element('cbtInterruptionStatus').textContent, 'Waktu dijeda.');
     assert.equal(paused.element('cbtWorkspace').inert, true, 'Failed camera check keeps popup');
     cameraReady = true;
     await paused.element('cbtResume').onclick();
@@ -195,5 +196,37 @@ function environment(settings = {}) {
     assert.equal(slow.requests.filter(r => r.action === 'save').length, 1, 'Old autosave queue stops when positions change');
     await slow.element('cbtResume').onclick();
     assert.equal(slow.element('cbtInterruption').style.display, 'none', 'Delayed old autosave does not prevent resume');
+    for (const [reason, expected, action] of [
+        ['page_hidden', 'Anda meninggalkan halaman ujian.', 'Kembali ke halaman ujian, lalu lanjutkan.'],
+        ['face_missing', 'Wajah tidak terdeteksi.', 'Hadapkan wajah ke kamera, lalu coba lagi.'],
+        ['face_mismatch', 'Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera, lalu coba lagi.'],
+        ['camera_unavailable', 'Kamera tidak aktif.', 'Aktifkan kamera, lalu coba lagi.']
+    ]) {
+        const notice = environment(); await settle(); await notice.element('cbtStart').onclick();
+        notice.interrupt(reason); await settle();
+        assert.equal(notice.element('cbtInterruptionReason').textContent, expected);
+        assert.equal(notice.element('cbtInterruptionAction').textContent, action);
+        assert.equal(notice.element('cbtInterruptionStatus').textContent, 'Waktu dijeda.');
+    }
+    for (const [properties, expected] of [
+        [{ code: 'NO_FACE' }, 'Wajah tidak terdeteksi.'],
+        [{ code: 'MISMATCH' }, 'Wajah belum sesuai pasfoto.'],
+        [{ code: 'MULTIPLE_FACES' }, 'Lebih dari satu wajah terdeteksi.'],
+        [{ code: 'TIMEOUT' }, 'Koneksi ke server terganggu.'],
+        [{ name: 'TypeError' }, 'Koneksi ke server terganggu.'],
+        [{ name: 'NotAllowedError' }, 'Izin kamera belum diberikan.'],
+        [{ name: 'NotReadableError' }, 'Kamera tidak aktif.'],
+        [{ status: 403 }, 'Sesi halaman perlu diperbarui.'],
+        [{ status: 503 }, 'Server belum dapat memproses permintaan.'],
+        [{ code: 'ERROR' }, 'Pemeriksaan wajah belum tersedia.']
+    ]) {
+        const notice = environment({ verifyAttention: async () => { throw Object.assign(new Error('Pesan teknis yang panjang dan tidak perlu ditampilkan'), properties); } });
+        await settle(); await notice.element('cbtStart').onclick(); notice.interrupt('page_hidden'); await settle();
+        await notice.element('cbtResume').onclick();
+        assert.equal(notice.element('cbtInterruptionReason').textContent, expected, 'Show latest failure instead of stale original violation');
+        const text = ['cbtInterruptionReason', 'cbtInterruptionAction', 'cbtInterruptionStatus'].map(id => notice.element(id).textContent).join(' ');
+        assert.ok(text.length < 180, 'Popup copy must remain concise');
+        assert.doesNotMatch(text, /Pesan teknis|diacak|jawaban Anda/);
+    }
     console.log('PASS: CBT navigation, text safety, serialized autosave, stale responses, offline retry, safe manual submit, server result, and time expiry.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

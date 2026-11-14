@@ -186,18 +186,44 @@
         }
     }
 
-    function showInterruption(reason) {
-        const descriptions = {
-            page_hidden: 'Halaman ujian ditinggalkan atau jendelanya tidak aktif.',
-            face_missing: 'Wajah tidak terdeteksi dengan jelas di kamera.',
-            face_mismatch: 'Wajah di kamera belum sesuai dengan peserta terdaftar.',
-            camera_unavailable: 'Kamera terputus atau tidak dapat dibaca.'
+    function setInterruptionNotice(reason) {
+        const notices = {
+            page_hidden: ['Anda meninggalkan halaman ujian.', 'Kembali ke halaman ujian, lalu lanjutkan.'],
+            face_missing: ['Wajah tidak terdeteksi.', 'Hadapkan wajah ke kamera, lalu coba lagi.'],
+            multiple_faces: ['Lebih dari satu wajah terdeteksi.', 'Pastikan hanya peserta ujian di depan kamera.'],
+            face_mismatch: ['Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera, lalu coba lagi.'],
+            camera_unavailable: ['Kamera tidak aktif.', 'Aktifkan kamera, lalu coba lagi.'],
+            camera_denied: ['Izin kamera belum diberikan.', 'Izinkan akses kamera, lalu coba lagi.'],
+            network: ['Koneksi ke server terganggu.', 'Periksa internet, lalu coba lagi.'],
+            session: ['Sesi halaman perlu diperbarui.', 'Muat ulang halaman untuk melanjutkan.'],
+            server: ['Server belum dapat memproses permintaan.', 'Coba lagi beberapa saat.'],
+            verification: ['Pemeriksaan wajah belum tersedia.', 'Coba lagi beberapa saat.'],
+            retry: ['Ujian belum dapat dilanjutkan.', 'Coba lagi atau hubungi pengawas.']
         };
+        const notice = notices[reason] || notices.retry;
+        el('cbtInterruptionReason').textContent = notice[0];
+        el('cbtInterruptionAction').textContent = notice[1];
+    }
+
+    function showInterruptionError(error) {
+        const codes = { NO_FACE: 'face_missing', MISMATCH: 'face_mismatch', MULTIPLE_FACES: 'multiple_faces',
+            CAMERA_UNAVAILABLE: 'camera_unavailable', TIMEOUT: 'network', PAGE_HIDDEN: 'page_hidden',
+            ERROR: 'verification', VERIFICATION_ERROR: 'verification', INVALID_RESPONSE: 'server' };
+        let reason = codes[error.code] || 'retry';
+        if (error.name === 'NotAllowedError' || error.name === 'SecurityError') reason = 'camera_denied';
+        else if (['NotFoundError', 'NotReadableError', 'OverconstrainedError'].includes(error.name)) reason = 'camera_unavailable';
+        else if (error.name === 'TypeError' || error.name === 'AbortError') reason = 'network';
+        if (error.status === 401 || error.status === 403) reason = 'session';
+        else if (error.status >= 500) reason = 'server';
+        setInterruptionNotice(reason);
+        el('cbtInterruptionStatus').textContent = interruption?.confirmed ? 'Waktu dijeda.' : 'Jeda belum terkonfirmasi.';
+    }
+
+    function showInterruption(reason) {
         const dialog = el('cbtInterruption');
-        el('cbtInterruptionReason').textContent = descriptions[reason] || 'Pengawasan memerlukan perhatian Anda.';
+        setInterruptionNotice(reason);
         el('cbtInterruptionStatus').textContent = interruption.confirmed
-            ? 'Waktu dijeda di server. Soal yang belum dijawab diperbarui & diacak sistem; jawaban Anda yang telah tersimpan tetap aman.'
-            : 'Mengonfirmasi jeda ke server… Jangan tutup halaman.';
+            ? 'Waktu dijeda.' : 'Mengonfirmasi jeda…';
         el('cbtWorkspace').inert = true;
         if (dialog.showModal && !dialog.open) dialog.showModal();
         dialog.style.display = 'flex';
@@ -227,7 +253,7 @@
             showInterruption(attempt.pause_reason);
             renderQuestion();
         }).catch(error => {
-            el('cbtInterruptionStatus').textContent = 'Jeda server belum terkonfirmasi: ' + error.message + ' Sambungkan internet, lalu tekan Lanjutkan Ujian untuk mencoba lagi.';
+            showInterruptionError(error);
             throw error;
         }).finally(() => { interruptionRequest = null; });
         return interruptionRequest;
@@ -254,16 +280,20 @@
             await confirmInterruption();
             if (!interruption) return;
             if (savePromise) await savePromise.catch(() => {});
-            el('cbtInterruptionStatus').textContent = 'Memeriksa kesiapan kamera dan halaman…';
+            el('cbtInterruptionStatus').textContent = config.verifyAttention ? 'Memeriksa kesiapan ujian…' : 'Melanjutkan ujian…';
             if (config.verifyAttention) await config.verifyAttention();
-            if (document.hidden || (document.hasFocus && !document.hasFocus())) throw new Error('Kembali ke halaman ujian terlebih dahulu.');
+            if (document.hidden || (document.hasFocus && !document.hasFocus())) {
+                const error = new Error('Kembali ke halaman ujian terlebih dahulu.');
+                error.code = 'PAGE_HIDDEN';
+                throw error;
+            }
             const data = await config.request({ action: 'resume' });
             if (!data.success) throw new Error(data.message || 'Ujian belum dapat dilanjutkan.');
             hideInterruption();
             apply(data);
             if (document.hidden) interrupt('page_hidden');
         } catch (error) {
-            el('cbtInterruptionStatus').textContent = error.message;
+            showInterruptionError(error);
         } finally {
             resuming = false;
             el('cbtResume').disabled = false;
