@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:55:44 +0700 — Edit ruangan pada jadwal dosen tutorial aktif
+
+**ID:** TUTORIAL-LECTURER-SCHEDULE-ROOM-EDIT · **Parent Git:** `bd0ce1b`.
+**Permintaan:** modal Edit pada tabel dosen terjadwal dapat mengubah ruangan. Ruangan baru berlaku bagi kelas dan seluruh pesertanya, ditampilkan pada tabel dan cetak absensi.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:47:21 | `admin/tutorial-hasil-plotting.php` | 156, 564 | Pilihan ruangan dan pesan simpan | Siapkan daftar ruangan untuk dialog jadwal aktif; perbarui pesan berhasil agar mencakup ruangan. |
+| 2026-11-14 16:47:21 | `includes/tutorial-scheduled-lecturers.php` | 33-40, 44-53, 74-82 | Opsi dan penyimpanan ruangan | Gabungkan master rooms dengan ruangan legacy pada kelas aktif; trim, deduplikasi dan urutkan. Validasi input ruangan scalar serta pilihan yang tersedia, lalu UPDATE nama_kelas/hari/ruangan dalam transaksi yang sama. Pilihan kosong menyimpan NULL (belum ditentukan). |
+| 2026-11-14 16:47:21 | `includes/tutorial-scheduled-lecturers-view.php` | 34, 46, 66-77, 93 | Modal Edit Jadwal Tutorial | Tambahkan dropdown Ruangan, data-room pada tombol Edit, prefill ruangan yang tersimpan; judul modal mencakup jadwal secara umum. Ruang yang belum terdaftar di master tetap tersedia jika sedang dipakai kelas aktif. |
+| 2026-11-14 16:49:52 | `tests/tutorial-scheduled-lecturers-test.py` | 37, 75-130 | Integrasi HTTP ruangan | Uji perubahan R1 ke R2 tersimpan, cetak mengikuti R2, ruangan kosong/legacy diterima, pilihan palsu dan array ditolak, serta kelas lain/roster/dosen/jam tetap. |
+| 2026-11-14 16:49:52 | `tests/tutorial-scheduled-lecturers-browser-test.cjs` | 23-65 | Chrome desktop dan mobile | Uji prefill dan opsi legacy, ubah ruangan ke R2 melalui POST aktual, tabel dan dialog setelah reload mengikuti perubahan, Batal tidak menyimpan perubahan, serta modal tetap muat layar 390px. |
+
+**Verifikasi:** `python tests/tutorial-scheduled-lecturers-test.py`, `python tests/tutorial-absensi-http-test.py`, `php tests/tutorial-hasil-plotting-filter-test.php`, lint 3 file PHP dan `git diff --check`: PASS. Chrome headless `node tests/tutorial-scheduled-lecturers-browser-test.cjs <fixture-url>`: PASS; screenshot modal 390px diperiksa, seluruh field dan tombol terlihat. Fixture memakai PDO SQLite terisolasi, tidak mengubah database produksi. Penguncian MySQL mengikuti implementasi existing; tidak diuji pada database MySQL produksi.
+**Penerapan:** kode fitur ruangan tersimpan di `bd0ce1b`; commit `Document verified tutorial schedule room editing` melengkapi log khusus perubahan ini. Push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-14 16:51:30 +0700 — Penetapan batas minimal kelulusan tutorial 70 dan pretes 80
 
 **ID:** TUTORIAL-PASSING-THRESHOLD-70-PRETES-80 · **Parent Git:** `77f52c0`.
