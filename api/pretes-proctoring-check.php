@@ -70,11 +70,23 @@ $isTesterPrivileged = (isset($user['username']) && (string)$user['username'] ===
 if ($regIdInput > 0) {
     $stmtReg = $pdo->prepare("SELECT * FROM pretes_registrations WHERE id = ? AND user_id = ?");
     $stmtReg->execute([$regIdInput, $user['id']]);
+    $myReg = $stmtReg->fetch(PDO::FETCH_ASSOC);
+} elseif ($regIdInput < 0) {
+    // Skenario Tryout CBT: registration_id sintetis negatif
+    // Ambil pasfoto resmi mahasiswa dari pendaftaran pretes periode aktif
+    require_once __DIR__ . '/../includes/pretes-exam-access.php';
+    $activeReg = pretesExamActiveRegistration($pdo, $user);
+    $myReg = $activeReg ?: null;
+    if (!$myReg) {
+        $stmtReg = $pdo->prepare("SELECT * FROM pretes_registrations WHERE user_id = ? ORDER BY tanggal_daftar DESC, id DESC LIMIT 1");
+        $stmtReg->execute([$user['id']]);
+        $myReg = $stmtReg->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 } else {
     $stmtReg = $pdo->prepare("SELECT * FROM pretes_registrations WHERE user_id = ? ORDER BY tanggal_daftar DESC, id DESC LIMIT 1");
     $stmtReg->execute([$user['id']]);
+    $myReg = $stmtReg->fetch(PDO::FETCH_ASSOC);
 }
-$myReg = $stmtReg->fetch(PDO::FETCH_ASSOC);
 
 if (!$myReg && $isTesterPrivileged) {
     $myReg = [
@@ -94,8 +106,8 @@ if (!$myReg) {
     exit;
 }
 
-$regId = (int)$myReg['id'];
 $refPhoto = trim((string)($myReg['foto'] ?? ''));
+$regId = $regIdInput < 0 ? $regIdInput : (int)$myReg['id'];
 
 // Foto acuan harus milik peserta; jangan mengambil foto peserta lain sebagai sampel.
 

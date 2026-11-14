@@ -5,6 +5,42 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 23:43:26 +0700 — Implementasi Opsi A Tryout CBT: Kesetaraan Penuh Proctoring Kamera (Skenario A & B) dengan Ujian Resmi
+
+**Ringkasan:**
+1. **Kesetaraan Penuh Proctoring Ruang Ujian CBT Tryout**: Ruang pengerjaan Tryout CBT (`pages/tryout.php`) kini mengimplementasikan arsitektur pengawasan AI yang identik dengan ujian pretes resmi (`pages/pretes-ujian.php`) saat aturan sesi menetapkan `camera_mode = 'wajib'`.
+   - **Skenario A (Check-in Verifikasi Wajah di Awal)**: Sebelum soal tryout dibuka, mahasiswa wajib melewati proses verifikasi identitas di awal (`#sectionCheckin`) yang membandingkan wajah live via webcam terhadap pasfoto pendaftaran resmi di periode pretes aktif, dilengkapi motion challenge (wajah lurus -> toleh arah tantangan -> kembali lurus) dan integrasi mesin face engine.
+   - **Skenario B (Ruang Ujian dengan Floating Proctoring Bar & Pengawasan Berkala 30 Detik)**: Setelah check-in lolos, antarmuka bertransisi otomatis ke `#sectionExamRoom` dengan Floating Proctoring Bar (`.proctoring-monitor-bar`), indikator status aktif, hitung mundur pemeriksaan berikutnya (tiap 30 detik), dan mini video preview kamera background. Jika peserta memalingkan wajah, tidak terdeteksi, atau mismatch, sistem memicu interupsi jeda (`interrupt`), mengacak ulang butir soal yang belum dijawab, dan mewajibkan verifikasi perhatian wajah (`verifyAttention`) sebelum diizinkan melanjutkan (`resume`).
+   - **Mode Sesi Mandiri Tanpa Kamera**: Jika aturan sesi tryout diatur dengan `camera_mode = 'tidak_aktif'`, sistem secara anggun langsung membuka ruang ujian tanpa meminta izin kamera atau check-in wajah, persis seperti perilaku ujian resmi saat kamera nonaktif.
+2. **Penyelarasan API & Dukungan Registration ID Sintetis Negatif**:
+   - `api/pretes-proctoring-check.php`: Menangani pendaftaran sintetis negatif (`registration_id < 0`) milik tryout dengan mengambil foto acuan resmi peserta dari pendaftaran pretes periode aktif (`pretesExamActiveRegistration`), menyimpan token verifikasi sesi `$_SESSION['pretes_cbt_verified_v2_' . $regId]` dan perhatian wajah `$_SESSION['pretes_cbt_attention_' . $regId]`, serta mencatat log audit ke `pretes_proctoring_logs` tanpa mencemari log ujian resmi.
+   - `pages/tryout.php?api=1`: Memvalidasi token verifikasi wajah pada aksi `start` dan token perhatian wajah pada aksi `resume` saat `camera_mode = 'wajib'`.
+   - Menyediakan route API pengawas `tryout.php?face_api=1` yang memetakan ke `api/pretes-proctoring-check.php`.
+   - Toolbar tester khusus akun 12345 terintegrasi untuk pengujian reset sesi, bypass checkin, timer 15 detik, dan snapshot langsung.
+3. **Pembedaan Alur & Letak Tombol di Halaman Mahasiswa**:
+   - Satu-satunya perbedaan antara Tryout CBT dan Ujian Resmi berada pada penempatan tombol dan pelabelan di pengumuman halaman mahasiswa (`includes/pretes-participant-view.php`): tombol tryout `#btn-tryout-pretes` terletak di dalam kartu tersendiri (`#pretes-tryout-box`) saat ujian resmi belum tiba jadwalnya, serta sebagai link sekunder saat ujian resmi telah dibuka.
+   - Attempt tryout tetap terisolasi dan tidak mengurangi kuota atau memengaruhi kelulusan ujian resmi.
+4. **Verifikasi & Test Suite Baru**:
+   - Dibuat test suite baru `tests/pretes-tryout-camera-test.php` yang menguji start ditolak sebelum verifikasi, start diterima sesudah verifikasi, jeda dan resume dengan attention check, bypass otomatis pada sesi mandiri tanpa kamera, isolasi log audit, serta keterhubungan modul UI dan API.
+   - Seluruh 58 unit & integration test suites PHP lulus 100% (58 passed, 0 failed).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `pages/tryout.php` | 12–15 | Router API Kamera | Menambahkan dispatch route `tryout.php?face_api=1` yang mengarah ke `api/pretes-proctoring-check.php`. |
+| `pages/tryout.php` | 68–74 | API Start Gating | Memeriksa token `$_SESSION['pretes_cbt_verified_v2_' . $regId]` saat `camera_mode = 'wajib'`, menolak aksi start jika belum check-in wajah. |
+| `pages/tryout.php` | 78–90 | API Resume Gating | Memeriksa token `$_SESSION['pretes_cbt_attention_' . $regId]` saat `camera_mode = 'wajib'`, menolak resume jika belum memeriksa wajah di kamera setelah interupsi. |
+| `pages/tryout.php` | 134–192 | Setup Sesi & Evaluasi Kamera | Memeriksa foto referensi resmi peserta, status verifikasi 4 jam, aksi developer tester 12345 (`reset_session` & `bypass_checkin`), serta membebaskan verifikasi saat hanya melihat hasil attempt yang telah dikumpulkan. |
+| `pages/tryout.php` | 280–315 | Toolbar Tester 12345 | Menampilkan tombol pengujian cepat developer (reset sesi, buka ruang ujian, timer 15 detik, snapshot manual, diagnosa kamera). |
+| `pages/tryout.php` | 380–488 | Skenario A (Check-in UI) | Menambahkan `#sectionCheckin` dengan kartu foto referensi, kartu live video stream, panduan oval wajah, motion challenge guide, status badge, dan kontrol kamera WebRTC. |
+| `pages/tryout.php` | 490–540 | Skenario B (Ruang Ujian UI) | Menambahkan `#sectionExamRoom` dengan Floating Proctoring Bar (`.proctoring-monitor-bar`), timer hitung mundur 30 detik, mini video background, alert pelanggaran proctoring, tata tertib pengawasan, dan riwayat nilai. |
+| `pages/tryout.php` | 550–875 | Mesin JS Proctoring | Fungsi helper kamera, WebRTC permissions, motion guide tantangan wajah, `runInitialCheckin()`, timer interval 30 detik `runPeriodicProctoringCheck()`, integrasi `PretesCbt.init` dengan `verifyAttention`, `onStarted`, dan `onSubmitted`. |
+| `api/pretes-proctoring-check.php` | 73–84 | Dukungan RegID Negatif | Menangani `$regIdInput < 0` dengan mengambil pasfoto resmi mahasiswa dari pendaftaran periode aktif (`pretesExamActiveRegistration`). |
+| `api/pretes-proctoring-check.php` | 110 | Penyimpanan Session RegID | Menyimpan token verifikasi dan attention dengan key registration_id sintetis negatif tryout (`$regIdInput`). |
+| `includes/pretes-tryout.php` | 11–12 | Docstring Header | Memperbarui deskripsi aturan kamera sesi tryout (mengikuti `camera_mode = 'wajib'`). |
+| `tests/pretes-tryout-camera-test.php` (baru) | 1–180 | Test Suite Skenario A & B | Pengujian komprehensif alur kamera tryout wajib vs tidak aktif, rejection & allowance API start/resume, isolasi log audit, dan integritas antarmuka. |
+
+---
+
 ## 2026-11-14 23:27:15 +0700 — Penghapusan Menu Tryout CBT di Sidebar Seluruh Role & Status
 
 **Ringkasan:**

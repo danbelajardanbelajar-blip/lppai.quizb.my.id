@@ -8,7 +8,8 @@
  *  - Attempt tryout disimpan di pretes_cbt_attempts dengan registration_id sintetis NEGATIF
  *    = -(session_id * 1000 + nomor_percobaan), sehingga tidak bentrok dengan UNIQUE(user_id,
  *    registration_id) milik ujian resmi (registration_id > 0) dan bisa diulang hingga max_attempts.
- *  - Wajib terdaftar sebagai peserta pada periode pretes yang sedang berlangsung; tanpa verifikasi wajah.
+ *  - Wajib terdaftar sebagai peserta pada periode pretes yang sedang berlangsung; mengikuti aturan
+ *    kamera sesi (camera_mode = 'wajib' mewajibkan verifikasi wajah Skenario A & pengawasan berkala Skenario B).
  */
 require_once __DIR__ . '/pretes-cbt.php';
 
