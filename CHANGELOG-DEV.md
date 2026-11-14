@@ -5,6 +5,23 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 06:13:31 +0700 — Sembunyikan card absensi dashboard peserta pretes
+
+**ID:** DASHBOARD-PRETES-HIDE-ATTENDANCE · **Parent Git:** `4677acf`.
+**Permintaan:** card absensi tidak tampil di dashboard peserta pretes aktif maupun nonaktif. Deteksi mencakup riwayat pendaftaran atau hasil pretes pada semua periode, menggunakan helper existing. Perubahan hanya pada tampilan dashboard; halaman absensi mandiri, data kehadiran, menu sidebar, akses ujian, jadwal dan hasil tidak diubah.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 06:10:40 | `pages/dashboard.php` | 25-26, 235, 308-315, 373-444, 495-499, 688-962 | Visibilitas card absensi dashboard | Gunakan studentHasPretesRegistration untuk semua riwayat pendaftaran/hasil, tanpa pembatasan status atau tahun. Sembunyikan banner Al Khidmah, panel/scanner pretes, badge kehadiran, tombol scan cepat dan JavaScript scanner bagi peserta pretes aktif maupun nonaktif. |
+| 2026-11-15 06:11:33 | `tests/tutorial-pretes-menu-test.py` | 17-22, 32, 39, 53-56, 118-139 | Regresi render dashboard aktual | Simulasikan Jumat awal bulan; uji peserta aktif, nonaktif, periode 2024/2025, hasil saja, tutorial saja dan belum terdaftar. Pastikan card/scanner/badge tidak dirender bagi peserta pretes, jadwal/hasil tetap tersedia dan banner tetap tampil bagi nonpeserta. Perbarui schema dosen_pengampu dan stub akses ujian/kontak dosen agar fixture mengikuti dependensi dashboard saat ini. |
+
+**Verifikasi:** `python tests/tutorial-pretes-menu-test.py`: PASS (20 skenario membership/sidebar, 5 dashboard existing, 6 skenario visibilitas absensi dengan simulasi Jumat pertama). `php -l pages/dashboard.php`, `php -d zend.assertions=1 -d assert.exception=1 tests/absensi-pretes-integration-test.php`, dan `git diff --check -- pages/dashboard.php tests/tutorial-pretes-menu-test.py`: PASS. Fixture schema/dependensi lama sempat gagal karena kolom dosen_pengampu belum tersedia; sudah diperbarui dan seluruh skenario lulus. Pengujian memakai render PHP dan PDO SQLite terisolasi; data produksi tidak diubah. Peringatan openssl ganda berasal dari konfigurasi PHP lokal yang sudah ada.
+**Penerapan:** commit `Hide attendance cards on dashboards of current and former pretes participants`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 04:34:22 +0700 — Penjadwalan Akun Tester 12345 Hari Minggu Pukul 04.25 WIB untuk Simulasi Tampilan Peserta Saat Jadwal Ujian Tiba
 
 **Ringkasan:**

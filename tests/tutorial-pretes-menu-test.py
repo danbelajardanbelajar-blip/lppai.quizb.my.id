@@ -14,6 +14,12 @@ with tempfile.TemporaryDirectory(prefix='lppai-tutorial-menu-') as temp:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(repo / name, target)
+    # Simulate the first Friday so attendance-banner visibility is actually exercised.
+    dashboard = root / 'pages/dashboard.php'
+    source = dashboard.read_text(encoding='utf-8')
+    assert "$isFirstFriday = (date('w') == 5 && date('j') <= 7);" in source
+    dashboard.write_text(source.replace("$isFirstFriday = (date('w') == 5 && date('j') <= 7);", '$isFirstFriday = true;'), encoding='utf-8')
+    (root / 'includes/pretes-exam-access.php').write_text("<?php function pretesExamAccess($pdo, $user) { return ['allowed'=>false]; }", encoding='utf-8')
     (root / 'includes/auth.php').write_text('''<?php
 define('BASE_URL', 'https://example.test'); define('APP_NAME', 'Test LPPAI');
 $_SERVER['PHP_SELF'] = '/dashboard.php';
@@ -23,13 +29,14 @@ function csrfToken() { return 'fixture-token'; }
 function getCurrentUser() { $c = json_decode(getenv('CASE_JSON'), true); return ['id'=>7,'role'=>$c['role'] ?? 'mahasiswa','nama_lengkap'=>'Peserta','nim'=>'2300007','jenis_program'=>'Reguler','program_studi'=>'PAI','fakultas'=>'Agama Islam']; }
 function isAdmin() { return getCurrentUser()['role'] === 'admin'; }
 function sanitize($text) { return htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8'); }
+function renderDosenWithWa($pdo, $name, $user, $scope = null, $fallback = '-') { return sanitize($name ?: $fallback); }
 function getDBConnection() {
     static $pdo = null; if ($pdo) return $pdo;
     $c = json_decode(getenv('CASE_JSON'), true);
     $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
     $pdo->exec("CREATE TABLE master_gelombang (id INTEGER, status TEXT, tahun_ajaran TEXT, semester TEXT, gelombang TEXT, created_at TEXT);
         INSERT INTO master_gelombang VALUES (1,'aktif','2026-2027','Ganjil','gel1','2026-11-01');
-        CREATE TABLE tutorial_classes (id INTEGER, gelombang TEXT, semester TEXT, nama_kelas TEXT, hari TEXT DEFAULT '', jam TEXT DEFAULT '', ruangan TEXT DEFAULT '');
+        CREATE TABLE tutorial_classes (id INTEGER, gelombang TEXT, semester TEXT, nama_kelas TEXT, hari TEXT DEFAULT '', jam TEXT DEFAULT '', ruangan TEXT DEFAULT '', dosen_pengampu TEXT DEFAULT '');
         INSERT INTO tutorial_classes (id,gelombang,semester,nama_kelas) VALUES (1,'gel1','2026/2027-Ganjil','Kelas Aktif'),(2,'gel1','2026-2027-Genap','Kelas Beda Semester');
         CREATE TABLE tutorial_registrations (id INTEGER PRIMARY KEY, user_id INTEGER, tutorial_class_id INTEGER, status TEXT, tahun_ajaran TEXT, gelombang TEXT, tipe_nilai TEXT, created_at TEXT, nomor_sertifikat TEXT DEFAULT NULL, hari_pilihan TEXT DEFAULT 'Senin', hari TEXT DEFAULT '', jam TEXT DEFAULT '', ruangan TEXT DEFAULT '', nilai_akhir REAL DEFAULT NULL);
         CREATE TABLE master_pretes (id INTEGER, periode TEXT, status TEXT, target_program TEXT, tanggal_mulai TEXT);
@@ -43,6 +50,10 @@ function getDBConnection() {
         INSERT INTO announcements VALUES (1,'Info pretes','Belajar pretes','hasil_pretes','/pretes-hasil.php','2026-11-13',1,'Semua','semua'),(2,'Tautan pretes','Panduan','info','/pages/pretes-peserta.php','2026-11-13',1,'Semua','semua'),(3,'Informasi umum','Belajar tutorial','info','/tutorial-info.php','2026-11-13',1,'Semua','semua');");
     if (!empty($c['inactive'])) $pdo->exec("UPDATE master_gelombang SET status='nonaktif'");
     if (!empty($c['multi'])) $pdo->exec("INSERT INTO master_gelombang VALUES (2,'aktif','2026-2027','Genap','gel2','2026-11-01')");
+    if (!empty($c['pretes_inactive'])) $pdo->exec("UPDATE master_pretes SET status='nonaktif'");
+    if (!empty($c['pretes_old'])) $pdo->exec("UPDATE pretes_registrations SET periode='2024/2025'; UPDATE master_pretes SET periode='2024/2025',status='nonaktif'");
+    if (!empty($c['no_pretes']) || !empty($c['result_only'])) $pdo->exec('DELETE FROM pretes_registrations');
+    if (!empty($c['result_only'])) $pdo->exec("INSERT INTO pretes_results VALUES (1,7,NULL,'2024-11-01','tidak_lulus',60)");
     $rows = $c['rows'] ?? [['status'=>'terdaftar','year'=>'2026/2027','wave'=>'gel1','created'=>'2026-11-04']];
     $stmt = $pdo->prepare('INSERT INTO tutorial_registrations (id,user_id,tutorial_class_id,status,tahun_ajaran,gelombang,tipe_nilai,created_at) VALUES (?,?,?,?,?,?,?,?)');
     foreach ($rows as $i=>$r) $stmt->execute([$i+1,$r['user'] ?? 7,$r['class'] ?? null,$r['status'] ?? 'terdaftar',$r['year'] ?? null,$r['wave'] ?? null,$r['type'] ?? '',$r['created'] ?? null]);
@@ -104,4 +115,25 @@ function getDBConnection() {
         assert ('Pretes Terdaftar</p>' in html) != hide
         assert 'Informasi umum' in html and 'Kelas Tutorial Saya' in html
         print('PASS dashboard:', name)
+    for name, config, hide in [
+        ('pretes_active', {'rows': []}, True),
+        ('pretes_inactive', {'rows': [], 'pretes_inactive': True}, True),
+        ('pretes_old_year', {'rows': [], 'pretes_old': True}, True),
+        ('pretes_result_only', {'rows': [], 'result_only': True}, True),
+        ('tutorial_only', {'no_pretes': True}, False),
+        ('unregistered', {'no_pretes': True, 'rows': []}, False),
+    ]:
+        html = render('pages/dashboard.php', config)
+        assert ('<h3 style="margin:0;font-size:18px;color:#065f46;">Absensi Al Khidmah</h3>' in html) != hide, name
+        if hide:
+            for marker in ['id="pretes-absensi-status-box"', 'id="pretes-scanner-wrapper"',
+                           'id="btn-toggle-pretes-scanner"', 'onclick="togglePretesScanner()"',
+                           'function togglePretesScanner()', 'id="badge-pretes-status-hadir"']:
+                assert marker not in html, (name, marker)
+        assert 'welcome-card' in html and 'Informasi umum' in html
+        if name == 'pretes_active':
+            assert 'Jadwal &amp; Panduan Pretes' in html
+        if name == 'pretes_inactive':
+            assert 'Lihat Nilai & Hasil Pretes' in html
+        print('PASS attendance dashboard:', name)
 print('PASS: actual sidebar/dashboard hide pretes only for ongoing membership in an active tutorial period.')

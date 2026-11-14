@@ -22,6 +22,8 @@ $user = getCurrentUser();
 $pdo = getDBConnection();
 require_once __DIR__ . '/../includes/tutorial-membership.php';
 $hidePretesMenus = studentHasActiveTutorialRegistration($pdo, $user);
+// Riwayat pretes aktif maupun nonaktif: card absensi tidak ditampilkan di dashboard.
+$hideDashboardAttendance = studentHasPretesRegistration($pdo, $user);
 
 // Get pretes status
 $stmt = $pdo->prepare("SELECT pr.*, ps.tanggal, ps.ruangan FROM pretes_results pr LEFT JOIN pretes_schedules ps ON pr.pretes_schedule_id = ps.id WHERE pr.user_id = ? ORDER BY pr.created_at DESC LIMIT 1");
@@ -230,7 +232,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Al Khidmah Alert -->
-<?php if ($isFirstFriday): ?>
+<?php if ($isFirstFriday && !$hideDashboardAttendance): ?>
 <div class="card" style="border-left: 4px solid #10b981; margin-bottom: 24px; background-color: #f0fdf4;">
     <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px;">
         <div style="display:flex;align-items:center;gap:15px;">
@@ -303,10 +305,12 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <?php if (!$hideDashboardAttendance): ?>
             <?php if ($isHadirPretes): ?>
                 <span id="badge-pretes-status-hadir" class="badge badge-success" style="font-size:13px; padding:6px 14px;">✅ Hadir Pretes</span>
             <?php else: ?>
                 <span id="badge-pretes-status-hadir" class="badge badge-warning" style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:13px; padding:6px 14px;">⏳ Belum Absen</span>
+            <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'lulus'): ?>
@@ -366,6 +370,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <?php if (!$hideDashboardAttendance): ?>
         <!-- ===================================================
              BANNER & MODUL SCANNER ABSENSI PRETES
              =================================================== -->
@@ -435,6 +440,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
 
+        <?php endif; ?>
         <!-- Status Metode Masuk Pretes: Scan Verifikasi Wajah (Face Recognition) -->
         <div style="background: <?= !empty($myPretesReg['foto']) ? '#f0fdf4' : '#fffbeb' ?>; border: 1.5px solid <?= !empty($myPretesReg['foto']) ? '#86efac' : '#fde68a' ?>; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; align-items:center; gap:12px;">
@@ -486,9 +492,11 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Tombol Aksi Cepat -->
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <?php if (!$hideDashboardAttendance): ?>
             <button type="button" class="btn btn-primary" onclick="togglePretesScanner()" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:700; background:#0284c7; border-color:#0284c7; cursor:pointer;">
                 📷 Scan Absensi Pretes
             </button>
+            <?php endif; ?>
             <?php if ($isUjianPretesDibuka): ?>
                 <a href="<?= BASE_URL ?>/pretes-ujian.php" class="btn btn-success" style="width:auto; display:inline-flex; align-items:center; gap:8px; padding:9px 18px; font-size:13px; font-weight:800; text-decoration:none; background:#16a34a; border-color:#16a34a; box-shadow:0 2px 8px rgba(22,163,74,0.3);">
                     📝 Kerjakan Pretes (Scan Wajah)
@@ -677,6 +685,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<?php if (!$hideDashboardAttendance): ?>
 <script>
 var html5QrCodePretes = null;
 var isScanningPretes = false;
@@ -950,6 +959,7 @@ window.addEventListener('beforeunload', function() {
 });
 </script>
 
+<?php endif; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
 
