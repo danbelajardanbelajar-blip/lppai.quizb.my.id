@@ -179,8 +179,11 @@ function cbtWriteXlsx(iterable $rows, string $name, array $widths): string {
         foreach ($widths as $i => $width) fwrite($handle, '<col min="' . ($i + 1) . '" max="' . ($i + 1) . '" width="' . (float)$width . '" customWidth="1"/>');
         fwrite($handle, '</cols><sheetData>');
         $number = 0;
+        $maxCols = count($widths);
         foreach ($rows as $values) {
             if (++$number > 10001 || ftell($handle) > 32 * 1024 * 1024) throw new RuntimeException('Ekspor terlalu besar. Maksimal 10.000 baris atau 32 MB data.');
+            $valCount = count($values);
+            if ($valCount > $maxCols) $maxCols = $valCount;
             fwrite($handle, '<row r="' . $number . '" ht="' . ($number === 1 ? 30 : 70) . '" customHeight="1">');
             foreach (array_values($values) as $i => $value) {
                 $ref = chr(65 + $i) . $number;
@@ -192,7 +195,7 @@ function cbtWriteXlsx(iterable $rows, string $name, array $widths): string {
             }
             fwrite($handle, '</row>');
         }
-        fwrite($handle, '</sheetData><autoFilter ref="A1:' . chr(64 + count($widths)) . max(1, $number) . '"/></worksheet>');
+        fwrite($handle, '</sheetData><autoFilter ref="A1:' . chr(64 + $maxCols) . max(1, $number) . '"/></worksheet>');
         fclose($handle); $handle = null;
         if ($zip->open($file, ZipArchive::OVERWRITE) !== true) throw new RuntimeException('File Excel belum dapat dibuat.');
         $opened = true;
@@ -224,15 +227,52 @@ function cbtBankExportRows(PDO $pdo): Generator {
     }
 }
 
-function cbtResultsExportRows(PDO $pdo): Generator {
-    yield ['NIM', 'Nama Peserta', 'Mulai (WIB)', 'Selesai (WIB)', 'Status', 'Jawaban Benar', 'Jumlah Soal', 'Nilai'];
-    $stmt = $pdo->query('SELECT a.*, u.nim, u.nama_lengkap FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id ORDER BY a.started_at DESC');
+function cbtResultsExportRows(PDO $pdo, string $filter = 'all'): Generator {
+    yield ['NIM', 'Nama Peserta', 'Jenis Ujian', 'Sesi Ujian', 'Mulai (WIB)', 'Selesai (WIB)', 'Status', 'Jawaban Benar', 'Jumlah Soal', 'Nilai'];
+
+    $where = '';
+    if ($filter === 'resmi') {
+        $where = 'WHERE a.registration_id > 0';
+    } elseif ($filter === 'tryout') {
+        $where = 'WHERE a.registration_id < 0';
+    }
+
+    $sql = "SELECT a.*, u.nim, u.nama_lengkap, s.title AS session_title,
+                   (SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = a.id) AS total_items
+            FROM pretes_cbt_attempts a
+            JOIN users u ON u.id = a.user_id
+            LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+            $where
+            ORDER BY a.started_at DESC";
+    $stmt = $pdo->query($sql);
+    $tryoutLabelCache = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        yield [(string)$row['nim'], $row['nama_lengkap'], ['style' => 2, 'value' => ((int)$row['started_at'] + 25200) / 86400 + 25569],
+        $isTryout = ((int)$row['registration_id'] < 0);
+        $jenisLabel = 'Ujian Resmi';
+        if ($isTryout) {
+            if (function_exists('pretesTryoutAttemptLabel')) {
+                $lbl = pretesTryoutAttemptLabel($pdo, $row, $tryoutLabelCache);
+                $jenisLabel = $lbl['label'] ?? 'Tryout';
+            } else {
+                $jenisLabel = 'Tryout';
+            }
+        }
+        $sessionTitle = $row['session_title'] ?? ($isTryout ? $jenisLabel : 'Ujian Pretes');
+        $itemCount = (int)($row['total_items'] ?? 0);
+        if ($itemCount <= 0) $itemCount = 25;
+
+        yield [
+            (string)$row['nim'],
+            $row['nama_lengkap'],
+            $jenisLabel,
+            $sessionTitle,
+            ['style' => 2, 'value' => ((int)$row['started_at'] + 25200) / 86400 + 25569],
             $row['submitted_at'] !== null ? ['style' => 2, 'value' => ((int)$row['submitted_at'] + 25200) / 86400 + 25569] : null,
             $row['submitted_at'] !== null ? 'Selesai' : (time() >= (int)$row['deadline_at'] ? 'Waktu habis; menunggu finalisasi' : 'Berlangsung'),
-            $row['correct_count'] !== null ? (int)$row['correct_count'] : null, 25,
-            $row['score'] !== null ? ['style' => 3, 'value' => (float)$row['score']] : null];
+            $row['correct_count'] !== null ? (int)$row['correct_count'] : null,
+            $itemCount,
+            $row['score'] !== null ? ['style' => 3, 'value' => (float)$row['score']] : null
+        ];
     }
 }
 

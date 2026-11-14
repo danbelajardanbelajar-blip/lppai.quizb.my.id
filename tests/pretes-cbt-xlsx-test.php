@@ -48,7 +48,7 @@ try {
         copy($safe, $argv[1] . '/native-bank.xlsx'); unlink($safe);
         $pdo->exec("CREATE TABLE users (id INTEGER, nim TEXT, nama_lengkap TEXT); INSERT INTO users VALUES (7,'001234','Peserta Uji')");
         pretesCbtChange($pdo, 7, 42, 'submit', [], 1200);
-        $results = cbtWriteXlsx(cbtResultsExportRows($pdo), 'Hasil CBT', [20,34,24,24,18,18,16,14]);
+        $results = cbtWriteXlsx(cbtResultsExportRows($pdo), 'Hasil CBT', [16,28,16,26,20,20,16,16,14,12]);
         copy($results, $argv[1] . '/native-results.xlsx'); unlink($results);
     }
     echo "PASS: actual XLSX template, export/reimport, explicit updates, duplicate protection, atomic validation, Unicode, snapshot safety, and formula/entity rejection.\n";

@@ -45,7 +45,7 @@
         <div class="bank-stat">
             <small>Peserta CBT Selesai</small>
             <strong><?= (int)$stats['finished'] ?></strong>
-            <span>Dari <?= (int)$stats['total'] ?> sesi pengerjaan (Rata-rata: <?= $stats['average_score'] !== null ? number_format((float)$stats['average_score'], 1) : '—' ?>)</span>
+            <span>Dari <?= (int)$stats['total'] ?> ujian resmi<?= $stats['average_score'] !== null ? (' (Rerata: ' . number_format((float)$stats['average_score'], 1) . ')') : '' ?><?= !empty($tryoutStats['total']) ? ('<br><span style="color:#1d4ed8;font-size:11px">+' . (int)$tryoutStats['total'] . ' sesi tryout (' . (int)$tryoutStats['finished'] . ' selesai)</span>') : '' ?></span>
         </div>
     </div>
 
@@ -429,18 +429,27 @@
         <div class="bank-panel-head">
             <div>
                 <h3>Hasil Ujian Peserta</h3>
-                <p>100 sesi terbaru. Ekspor memuat seluruh sesi yang tersedia, maksimal 10.000 baris.</p>
+                <p>100 sesi terbaru<?= $resultFilter === 'resmi' ? ' (Filter: Ujian Resmi)' : ($resultFilter === 'tryout' ? ' (Filter: Tryout)' : '') ?>. Ekspor memuat seluruh sesi sesuai filter, maksimal 10.000 baris.</p>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <?php if (!empty($attempts)): ?>
-                    <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline;" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus SEMUA sesi CBT peserta (<?= count($attempts) ?> sesi)?\n\nSemua riwayat pengerjaan, jawaban, dan nilai CBT peserta akan dihapus sehingga peserta dapat mengulang ujian kembali.')">
+                    <form method="post" action="<?= $bankUrl ?>&amp;tab=results<?= $resultFilter !== 'all' ? '&amp;result_filter=' . urlencode($resultFilter) : '' ?>" style="margin:0;display:inline;" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus <?= $resultFilter === 'tryout' ? 'SEMUA sesi Tryout' : ($resultFilter === 'resmi' ? 'SEMUA sesi Ujian Resmi' : 'SEMUA sesi CBT (resmi & tryout)') ?> peserta?\n\nSemua riwayat pengerjaan, jawaban, dan nilai sesuai filter akan dihapus.')">
                         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                         <input type="hidden" name="action" value="delete_all_attempts">
-                        <button type="submit" class="bank-button danger" title="Hapus semua sesi hasil CBT peserta">🗑️ Hapus Semua Hasil</button>
+                        <input type="hidden" name="delete_scope" value="<?= sanitize($resultFilter) ?>">
+                        <button type="submit" class="bank-button danger" title="Hapus Semua Hasil CBT peserta sesuai filter">🗑️ Hapus Semua Hasil (<?= $resultFilter === 'tryout' ? 'Tryout' : ($resultFilter === 'resmi' ? 'Resmi' : 'Semua') ?>)</button>
                     </form>
                 <?php endif; ?>
-                <a data-no-spa class="bank-button primary" href="<?= $bankUrl ?>&amp;download=results">↓ Ekspor Hasil .xlsx</a>
+                <a data-no-spa class="bank-button primary" href="<?= $bankUrl ?>&amp;download=results&amp;filter=resmi" title="Ekspor data nilai ujian resmi pretes">🎓 Ekspor Resmi (.xlsx)</a>
+                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=results&amp;filter=tryout" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe" title="Ekspor data riwayat latihan tryout">📝 Ekspor Tryout (.xlsx)</a>
+                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=results&amp;filter=all" title="Ekspor gabungan semua sesi">↓ Ekspor Semua (.xlsx)</a>
             </div>
+        </div>
+        <div style="display:flex;gap:8px;padding:0 0 14px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Filter Hasil:</span>
+            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=all" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
+            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=resmi" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
+            <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=tryout" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
         </div>
         <div class="bank-table-scroll">
             <table class="bank-table no-datatable">
@@ -465,8 +474,8 @@
                             <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
                         <td><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></td>
                         <td><span class="bank-badge <?= $attempt['submitted_at'] !== null ? 'active' : 'inactive' ?>"><?= $attempt['submitted_at'] !== null ? 'Selesai' : 'Berlangsung' ?></span></td>
-                        <td><?= $attempt['correct_count'] !== null ? (int)$attempt['correct_count'] : '—' ?></td>
-                        <td><span class="bank-key"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 0) : '—' ?></span></td>
+                        <td><?= $attempt['correct_count'] !== null ? ((int)$attempt['correct_count'] . ' / ' . ((int)($attempt['total_items'] ?? 25))) : '—' ?></td>
+                        <td><span class="bank-key"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 1) : '—' ?></span></td>
                         <td style="text-align:center">
                             <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -572,7 +581,7 @@
                             <option value="resmi">🎓 Ujian Resmi (1× pengerjaan, butuh pendaftaran pretes)</option>
                             <option value="tryout">📝 Tryout / Latihan (terpisah dari ujian resmi)</option>
                         </select>
-                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">Tryout tampil di menu <strong>Tryout CBT</strong> mahasiswa, tanpa verifikasi wajah, dan tidak memakan jatah ujian resmi. Beberapa tryout boleh aktif bersamaan dengan sesi resmi.</span>
+                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">Tryout tampil di menu <strong>Tryout CBT</strong> mahasiswa yang terdaftar periode pretes aktif, tanpa verifikasi wajah, dan tidak memakan jatah ujian resmi. Beberapa tryout boleh aktif bersamaan dengan sesi resmi.</span>
                     </div>
                     <div class="bank-field" id="sesModalMaxAttemptsWrap" style="margin:0">
                         <label class="bank-label" for="sesModalMaxAttempts" style="color:#1e3a8a">Batas Pengerjaan Tryout</label>

@@ -6,8 +6,8 @@
  * - tryout.php?sesi=ID         : ruang pengerjaan tryout (mesin CBT yang sama dengan ujian resmi)
  * - tryout.php?api=1 (POST)    : API JSON tryout (state/start/save/submit/interrupt/resume/retake)
  *
- * Attempt tryout terpisah dari ujian resmi (lihat includes/pretes-tryout.php), tanpa syarat
- * pendaftaran pretes dan tanpa verifikasi wajah.
+ * Attempt tryout terpisah dari ujian resmi (lihat includes/pretes-tryout.php), wajib terdaftar
+ * sebagai peserta pada periode pretes yang sedang berlangsung dan tanpa verifikasi wajah.
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-tryout.php';

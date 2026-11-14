@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 23:22:10 +0700 — Penegasan Syarat Peserta Tryout Pretes, Pemisahan Ekspor Excel & Statistik Admin CBT
+
+**Ringkasan:**
+1. **Penegasan Syarat Peserta Tryout Pretes**: Memperbaiki seluruh komentar, docstring, dan petunjuk yang menyatakan tryout tanpa syarat pendaftaran; kini seluruh berkas konsisten dengan aturan bahwa **mahasiswa wajib terdaftar sebagai peserta pretes aktif** untuk dapat mengakses tryout CBT (halaman `tryout.php`, menu sidebar, dan mesin tryout).
+2. **Pemisahan Ekspor Excel Hasil CBT**: `cbtResultsExportRows()` kini mendukung parameter filter (`'all'`, `'resmi'`, `'tryout'`). Header ekspor diperluas menjadi 10 kolom dengan menyertakan `Jenis Ujian` dan `Sesi Ujian`. Jumlah butir soal dihitung secara dinamis dari tabel item attempt (`total_items`), sehingga sesi tryout 70 soal (atau sesi kustom lainnya) tidak lagi terdistorsi dengan nilai statis 25 butir.
+3. **Pemisahan Statistik Dashboard Bank Soal Admin**: Statistik ringkasan (Total Peserta, Peserta Selesai, Rerata Nilai) difilter khusus untuk ujian pretes resmi (`registration_id > 0`), dilengkapi rincian sesi tryout (`registration_id < 0`). Tabel hasil pengerjaan admin dilengkapi filter tab (`Semua`, `🎓 Ujian Resmi`, `📝 Tryout`), tampilan rasio benar per total butir (`correct / total_items`), serta opsi cakupan aman (`delete_scope`) pada tombol "Hapus Semua Hasil".
+4. **Verifikasi & Test Suite Baru**: Menambahkan unit test `tests/pretes-cbt-export-scope-test.php` dan memperbarui `tests/pretes-cbt-xlsx-test.php`. Seluruh 10 test suite CBT lolos 100%.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-tryout.php` | 11 | Docstring header | Mengganti klausa "tanpa syarat pendaftaran" menjadi "Wajib terdaftar sebagai peserta pada periode pretes yang sedang berlangsung; tanpa verifikasi wajah." |
+| `pages/tryout.php` | 9–10 | Docstring header | Menyelaraskan deskripsi alur tryout agar wajib terdaftar periode pretes aktif. |
+| `includes/pretes-cbt-admin-view.php` | 575 | Modal Pengatur Sesi | Penjelasan teks modal diperbarui: tryout tampil di menu mahasiswa yang terdaftar pretes aktif. |
+| `includes/pretes-cbt-admin-view.php` | 45–50 | Stat Card Admin | Menampilkan capaian ujian resmi secara terpisah dari capaian sesi latihan tryout. |
+| `includes/pretes-cbt-admin-view.php` | 430–485 | Panel Hasil Ujian | Menambahkan tab filter hasil (`Semua`, `Resmi`, `Tryout`), tombol unduh terpisah (`🎓 Ekspor Resmi`, `📝 Ekspor Tryout`, `↓ Ekspor Semua`), kolom butir benar/total dinamis, dan parameter `delete_scope` pada form hapus massal. |
+| `includes/pretes-cbt-xlsx.php` | 182–196 | `cbtWriteXlsx()` | Deteksi jumlah kolom dinamis untuk autoFilter dan pemformatan sel. |
+| `includes/pretes-cbt-xlsx.php` | 230–274 | `cbtResultsExportRows()` | Dukungan parameter filter (`'all'`, `'resmi'`, `'tryout'`), penambahan kolom jenis & sesi ujian, serta penghitungan jumlah soal riil per attempt. |
+| `includes/pretes-cbt.php` | 1019–1047 | `pretesCbtDeleteAllAttempts()` | Dukungan parameter `$scope` (`'all'`, `'resmi'`, `'tryout'`) untuk penghapusan terpilih tanpa risiko menghapus data resmi. |
+| `admin/pretes-bank-soal.php` | 65–72 | Routing Unduhan Excel | Menangani unduhan hasil terfilter (`hasil-cbt-resmi-...`, `hasil-cbt-tryout-...`, `hasil-cbt-...`). |
+| `admin/pretes-bank-soal.php` | 325–334 | Action `delete_all_attempts` | Menerima parameter `delete_scope` dan mengarahkan kembali ke tab filter terkait dengan pesan flash informatif. |
+| `admin/pretes-bank-soal.php` | 394–420 | Query Statistik & Attempts | Agregasi terpisah untuk resmi dan tryout, query attempts dengan filter `result_filter` dan subquery `total_items`. |
+| `tests/pretes-cbt-xlsx-test.php` | 51 | Assertion Ekspor | Menyesuaikan lebar kolom ekspor hasil 10 kolom. |
+| `tests/pretes-cbt-export-scope-test.php` (baru) | 1–85 | Test Suite Ekspor & Scope | Validasi ekspor resmi/tryout/all, verifikasi jumlah soal dinamis, dan scoped deletion. |
+
+---
+
 ## 2026-11-14 22:52:05 +0700 — Akses CBT hanya peserta terdaftar, jadwal pribadi hari pilihan 13.00 WIB, & link TRY OUT di kotak akses soal
 
 **Ringkasan:**

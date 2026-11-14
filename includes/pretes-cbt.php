@@ -1016,7 +1016,7 @@ function pretesCbtDeleteAttempt(PDO $pdo, int $attemptId): bool {
     }
 }
 
-function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int {
+function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null, string $scope = 'all'): int {
     $tx = false;
     if (!$pdo->inTransaction()) {
         $pdo->beginTransaction();
@@ -1024,6 +1024,33 @@ function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null): int {
     }
     try {
         if ($attemptIds === null) {
+            $where = '';
+            if ($scope === 'resmi') {
+                $where = 'WHERE registration_id > 0';
+            } elseif ($scope === 'tryout') {
+                $where = 'WHERE registration_id < 0';
+            }
+
+            if ($where !== '') {
+                $ids = $pdo->query("SELECT id FROM pretes_cbt_attempts $where")->fetchAll(PDO::FETCH_COLUMN);
+                if (empty($ids)) {
+                    if ($tx) $pdo->commit();
+                    return 0;
+                }
+                $cleanIds = array_map('intval', $ids);
+                $inClause = implode(',', array_fill(0, count($cleanIds), '?'));
+                $stmtItems = $pdo->prepare("DELETE FROM pretes_cbt_items WHERE attempt_id IN ($inClause)");
+                $stmtItems->execute($cleanIds);
+                foreach (['pretes_cbt_interruptions', 'pretes_cbt_interruption_events'] as $table) {
+                    $pdo->prepare("DELETE FROM $table WHERE attempt_id IN ($inClause)")->execute($cleanIds);
+                }
+                $stmtAttempts = $pdo->prepare("DELETE FROM pretes_cbt_attempts WHERE id IN ($inClause)");
+                $stmtAttempts->execute($cleanIds);
+                $count = (int)$stmtAttempts->rowCount();
+                if ($tx) $pdo->commit();
+                return $count;
+            }
+
             $pdo->exec('DELETE FROM pretes_cbt_interruptions');
             $pdo->exec('DELETE FROM pretes_cbt_interruption_events');
             $pdo->exec('DELETE FROM pretes_cbt_items');

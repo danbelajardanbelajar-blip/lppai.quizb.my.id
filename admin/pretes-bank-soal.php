@@ -62,7 +62,14 @@ foreach ($expired->fetchAll(PDO::FETCH_ASSOC) as $entry) pretesCbtState($pdo, (i
 if (isset($_GET['download'])) {
     try {
         if ($_GET['download'] === 'bank') cbtSendXlsx(cbtWriteXlsx(cbtBankExportRows($pdo), 'Bank Soal', [24,22,60,28,28,28,28,28,12,16]), 'bank-soal-cbt-' . date('Ymd') . '.xlsx', true);
-        elseif ($_GET['download'] === 'results') cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo), 'Hasil CBT', [20,34,24,24,18,18,16,14]), 'hasil-cbt-' . date('Ymd') . '.xlsx', true);
+        elseif ($_GET['download'] === 'results') {
+            $filter = isset($_GET['filter']) ? trim((string)$_GET['filter']) : 'all';
+            if (!in_array($filter, ['all', 'resmi', 'tryout'], true)) $filter = 'all';
+            $prefix = 'hasil-cbt-';
+            if ($filter === 'resmi') $prefix = 'hasil-cbt-resmi-';
+            elseif ($filter === 'tryout') $prefix = 'hasil-cbt-tryout-';
+            cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo, $filter), 'Hasil CBT', [16,28,16,26,20,20,16,16,14,12]), $prefix . date('Ymd') . '.xlsx', true);
+        }
         elseif ($_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
         elseif ($_GET['download'] === 'pretes177') cbtSendXlsx(__DIR__ . '/../downloads/bank-soal-pretes-177-soal.xlsx', 'bank-soal-pretes-177-soal.xlsx');
         throw new InvalidArgumentException('Jenis unduhan tidak dikenal.');
@@ -317,9 +324,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . $bankUrl . '&tab=results'); exit;
         } elseif ($action === 'delete_all_attempts') {
             $activeTab = 'results';
-            $count = pretesCbtDeleteAllAttempts($pdo);
-            $_SESSION['cbt_bank_flash'] = "Berhasil menghapus seluruh data sesi CBT ($count sesi dihapus).";
-            header('Location: ' . $bankUrl . '&tab=results'); exit;
+            $scope = isset($_POST['delete_scope']) ? trim((string)$_POST['delete_scope']) : 'all';
+            if (!in_array($scope, ['all', 'resmi', 'tryout'], true)) $scope = 'all';
+            $count = pretesCbtDeleteAllAttempts($pdo, null, $scope);
+            $scopeLabel = $scope === 'tryout' ? 'tryout ' : ($scope === 'resmi' ? 'ujian resmi ' : '');
+            $_SESSION['cbt_bank_flash'] = "Berhasil menghapus seluruh data sesi CBT {$scopeLabel}($count sesi dihapus).";
+            header('Location: ' . $bankUrl . '&tab=results' . ($scope !== 'all' ? '&result_filter=' . urlencode($scope) : '')); exit;
         } else throw new InvalidArgumentException('Aksi bank soal tidak valid.');
     } catch (InvalidArgumentException $error) {
         if (http_response_code() !== 403) http_response_code(422);
@@ -381,8 +391,32 @@ foreach ($packages as $pkg) {
     $packageCategoriesMap[(int)$pkg['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-$stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC);
-$attempts = $pdo->query('SELECT a.*, u.nama_lengkap, u.nim FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id ORDER BY a.started_at DESC LIMIT 100')->fetchAll(PDO::FETCH_ASSOC);
+$stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts WHERE registration_id > 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+$stats['total'] = (int)($stats['total'] ?? 0);
+$stats['finished'] = (int)($stats['finished'] ?? 0);
+$stats['average_score'] = $stats['average_score'] !== null ? (float)$stats['average_score'] : null;
+
+$tryoutStats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts WHERE registration_id < 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+$tryoutStats['total'] = (int)($tryoutStats['total'] ?? 0);
+$tryoutStats['finished'] = (int)($tryoutStats['finished'] ?? 0);
+$tryoutStats['average_score'] = $tryoutStats['average_score'] !== null ? (float)$tryoutStats['average_score'] : null;
+
+$allStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC) ?: [];
+$totalAttemptCount = (int)($allStats['total'] ?? 0);
+
+$resultFilter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
+if (!in_array($resultFilter, ['all', 'resmi', 'tryout'], true)) {
+    $resultFilter = 'all';
+}
+
+$whereClause = '';
+if ($resultFilter === 'resmi') {
+    $whereClause = 'WHERE a.registration_id > 0';
+} elseif ($resultFilter === 'tryout') {
+    $whereClause = 'WHERE a.registration_id < 0';
+}
+
+$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, (SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = a.id) AS total_items FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
 if (!defined('EXTRA_HEAD')) {
     define('EXTRA_HEAD', '<link rel="stylesheet" href="' . BASE_URL . '/pretes-ujian.php?cbt_style=bank&amp;v=' . (file_exists(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ? filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') : time()) . '">');
 }

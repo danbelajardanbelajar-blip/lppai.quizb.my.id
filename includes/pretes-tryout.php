@@ -8,7 +8,7 @@
  *  - Attempt tryout disimpan di pretes_cbt_attempts dengan registration_id sintetis NEGATIF
  *    = -(session_id * 1000 + nomor_percobaan), sehingga tidak bentrok dengan UNIQUE(user_id,
  *    registration_id) milik ujian resmi (registration_id > 0) dan bisa diulang hingga max_attempts.
- *  - Tidak memerlukan pendaftaran pretes maupun verifikasi wajah.
+ *  - Wajib terdaftar sebagai peserta pada periode pretes yang sedang berlangsung; tanpa verifikasi wajah.
  */
 require_once __DIR__ . '/pretes-cbt.php';
 
