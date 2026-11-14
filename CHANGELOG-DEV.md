@@ -48,6 +48,19 @@ Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris mer
 
 ---
 
+## 2026-11-14 22:27:53 +0700 — 70 soal Tryout level mudah (11 tema pretes) + skrip impor otomatis
+
+| File | Baris | Bagian | Perubahan |
+|---|---|---|---|
+| `data/pretes-tryout-mudah.php` (baru) | 1–74 | Data soal | 70 soal dasar `[kode TRY-MDH-001..070, kategori, pertanyaan, [A..E], kunci]` untuk 11 tema: Praktik Wudlu (7), Doa Setelah Wudlu (6), Praktik Tayammum (7), Niat Mandi Besar (7), Niat Jamak Qashar (6), Bacaan Shalat Subuh (7), Surah Al-Bayyinah (6), Surah Al-'Alaq (6), Surah Ad-Dhuha (6), Istighasah (6, mengikuti `data/pretes-istighasah.php`), Shalat Jenazah (6). Kunci merata 14× per huruf A–E. Fikih mengikuti mazhab Syafi'i; data surah sesuai `data/pretes-learning-readings.json`. |
+| `tools/import-tryout-mudah.php` (baru) | 1–110 | Skrip CLI | `lppaiImportTryoutMudah()`: buat paket `PKT-TRYOUT-MUDAH` (tidak aktif sebagai paket resmi), upsert 70 soal berdasarkan kode, buat sesi `TRYOUT-MUDAH-2026` (mode tryout, 70 soal, 70 menit, tanpa kamera, ulang ∞, aktif). Idempoten; `--tanpa-sesi` opsional; menolak akses non-CLI. |
+| `tests/tryout-mudah-import-test.php` (baru) | 1–78 | Test SQLite | Validasi 70 soal/11 tema/kunci merata/tanpa duplikat, impor idempoten, paket & sesi resmi tidak berubah, sesi tryout aktif, attempt 70 soal dengan kunci tepat setelah pilihan diacak, semua benar → 100. |
+| (di luar repo) `OneDrive/.../pretes rpl/Tryout_Pretes_Level_Mudah_70_Soal.xlsx` | — | Excel template | Versi Excel untuk impor manual via UI (lolos `cbtReadQuestionXlsx` + `cbtImportQuestions`: 70 ditambahkan, 0 error). |
+
+**Verifikasi:** `php -l` OK; `tests/tryout-mudah-import-test.php` & `tests/pretes-tryout-test.php` PASS.
+
+---
+
 ## 2026-11-14 22:19:51 +0700 — Mode Tryout CBT Pretes (terpisah dari ujian resmi)
 
 **Ringkasan:** Tryout memakai mesin CBT yang sama (bank/paket, kuota kategori, acak soal & pilihan, timer server, nilai otomatis) tetapi attempt-nya terpisah dari ujian resmi, bisa diulang dengan batas, tanpa syarat daftar pretes & tanpa verifikasi wajah, dan dapat aktif bersamaan dengan sesi resmi. Sebelumnya `UNIQUE(user_id, registration_id)` membuat tryout memakan jatah ujian resmi dan hanya satu sesi yang bisa aktif.
