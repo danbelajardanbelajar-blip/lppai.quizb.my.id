@@ -398,7 +398,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                     </div>
                     <div>
                         <strong style="color:var(--text-muted);font-size:12px;">DOSEN</strong>
-                        <p><?= renderDosenWithWa($pdo, $myClass['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></p>
+                        <p><?= renderDosenWithWa($pdo, $myClass['dosen_pengampu'] ?? null, $user, null, '-') ?></p>
                     </div>
                     <div>
                         <strong style="color:var(--text-muted);font-size:12px;">JADWAL</strong>
@@ -435,7 +435,7 @@ function renderAnnouncementPage($tipe, $gelombang, $title) {
                             <tr>
                                 <td><?= sanitize($c['nama_kelas']) ?></td>
 
-                                <td><?= renderDosenWithWa($pdo, $c['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></td>
+                                <td><?= renderDosenWithWa($pdo, $c['dosen_pengampu'] ?? null, $user, null, '-') ?></td>
                                 <td><?= sanitize($c['hari']) ?></td>
                                 <td><?= sanitize($c['jam']) ?></td>
                                 <td><?= sanitize($c['ruangan']) ?></td>

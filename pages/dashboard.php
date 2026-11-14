@@ -110,12 +110,15 @@ if ($myPretesReg) {
 }
 
 // Gating & Privilege Ujian Pretes
-$tglSekarangPretes   = date('Y-m-d');
-$tglBukaUjianPretes  = '2026-11-16';
+// Link ujian dibuka/ditutup admin (Bank Soal CBT › Sesi Ujian › Buka/Tutup Ujian), bukan tanggal di kode
 $isTesterPrivileged  = (isset($user['username']) && (string)$user['username'] === '12345') 
                     || (isset($user['nim']) && (string)$user['nim'] === '12345')
                     || ((int)($user['id'] ?? 0) === 12345);
-$isUjianPretesDibuka = ($tglSekarangPretes >= $tglBukaUjianPretes) || $isTesterPrivileged;
+$isUjianPretesDibuka = $isTesterPrivileged;
+try {
+    require_once __DIR__ . '/../includes/pretes-cbt.php';
+    $isUjianPretesDibuka = pretesCbtExamStatus($pdo)['open'] || $isTesterPrivileged;
+} catch (Throwable $e) {}
 
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
 $stmt = $pdo->prepare("
@@ -358,7 +361,7 @@ include __DIR__ . '/../includes/header.php';
                     <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Dosen Penguji</span>
                 </div>
                 <div style="font-size:15px; font-weight:600; color:#1e293b;">
-                    <?= renderDosenWithWa($pdo, $myPretesReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?>
+                    <?= renderDosenWithWa($pdo, $myPretesReg['dosen_penguji'] ?? null, $user, null, 'Menunggu pembagian') ?>
                 </div>
             </div>
         </div>
@@ -559,7 +562,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php foreach ($tutorialRegs as $reg): ?>
                     <tr>
                         <td><strong><?= sanitize($reg['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></strong></td>
-                        <td><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? ($reg['kelas_dosen_pengampu'] ?? null), $user, 'Konfirmasi Kelas Tutorial', '-') ?></td>
+                        <td><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? ($reg['kelas_dosen_pengampu'] ?? null), $user, null, '-') ?></td>
                         <td>
                             <?php
                             $gelLabels = ['gel1' => 'Gelombang 1', 'gel2' => 'Gelombang 2', 'mandiri' => 'Mandiri'];

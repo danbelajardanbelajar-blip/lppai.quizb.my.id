@@ -254,7 +254,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <strong style="font-size:12px; color:#166534; letter-spacing:0.5px;">DOSEN PENGUJI</strong>
                     <p style="margin:4px 0 0; font-size:14px; font-weight:600;">
-                        <?= renderDosenWithWa($pdo, $existingReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?>
+                        <?= renderDosenWithWa($pdo, $existingReg['dosen_penguji'] ?? null, $user, null, 'Menunggu pembagian') ?>
                     </p>
                 </div>
                 <div>

@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 22:40:00 +0700 — Penyesuaian Field Keperluan Template WhatsApp Dosen agar Tidak Diisi Otomatis (Tetap Titik-Titik Sesuai Format Resmi)
+
+**ID:** FIX-DOSEN-WA-TEMPLATE-KEPERLUAN · **Parent Git:** `8acd9cc`.
+**Permintaan:** Mengapa keperluan kamu isi? Field "Keperluan" tidak boleh diisi otomatis oleh asumsi sistem ("Konfirmasi Ujian Pretes" / "Konfirmasi Kelas Tutorial") dan harus tetap sesuai format permintaan asli: `Keperluan : ..........................................`.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 22:39:13 | `includes/user-helper.php` | 619–622 | `getDosenWaMessageTemplate()` | Mengubah logika nilai default `$keperluanVal` agar jika `$keperluan` tidak ditentukan/null, nilainya selalu `..........................................` (titik-titik sesuai template resmi asli) dan tidak mengosongkan atau mengisi teks asumsi. |
+| 2026-11-14 22:39:13 | `pages/dashboard.php` | 361, 562 | Dashboard Mahasiswa | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` dan `'Konfirmasi Kelas Tutorial'` menjadi `null` pada pemanggilan `renderDosenWithWa`. |
+| 2026-11-14 22:39:13 | `pages/pretes-daftar.php` | 257 | Pendaftaran Pretes | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `pages/pretes-hasil.php` | 659 | Hasil Pretes | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `includes/pretes-participant-view.php` | 151 | Peserta Aktif Pretes | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `includes/pretes-stage.php` | 149 | Kartu Tahap Pretes | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `pages/tutorial-info.php` | 300 | Info Tutorial | Mengganti parameter keperluan `'Konfirmasi Kelas Tutorial'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `pages/tutorial-pembagian.php` | 82 | Pembagian Kelas | Mengganti parameter keperluan `'Konfirmasi Kelas Tutorial'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `pages/tutorial-pendaftaran.php` | 244 | Pendaftaran Tutorial | Mengganti parameter keperluan `'Konfirmasi Kelas Tutorial'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `pages/tutorial-pengumuman.php` | 215 | Pengumuman Tutorial | Mengganti parameter keperluan `'Konfirmasi Kelas Tutorial'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `includes/announcement-helper.php` | 401, 438 | Pengumuman Universal | Mengganti parameter keperluan `'Konfirmasi Kelas Tutorial'` menjadi `null`. |
+| 2026-11-14 22:39:13 | `includes/pretes-card.php` | 862 | Kartu Digital Pretes | Mengganti parameter keperluan `'Konfirmasi Ujian Pretes'` menjadi `null`. |
+| 2026-11-14 22:39:40 | `tests/dosen-wa-link-test.php` | 44–112 | Pengujian Unit WhatsApp Dosen | Memperbarui assertions untuk memvalidasi bahwa template secara default menghasilkan `Keperluan : ..........................................`, dan seluruh file view bebas dari teks asumsi keperluan otomatis. |
+
+**Alasan:** Keperluan menghubungi dosen bersifat personal dan spesifik tergantung kebutuhan masing-masing mahasiswa (misal: permohonan dispensasi, kendala teknis, konfirmasi nilai, izin sakit, dll.), sehingga sistem tidak boleh memaksakan asumsi isi keperluan secara otomatis dan wajib mengikuti template asli yang diminta pengguna.
+**Dampak:** Pesan WhatsApp yang dibuat otomatis kini menampilkan identitas mahasiswa (nama, nim, program studi) dengan field `Keperluan : ..........................................` murni siap diisi atau disesuaikan oleh mahasiswa sendiri.
+**Verifikasi:**
+- `php -l` pada seluruh 12 file PHP yang diubah -> No syntax errors detected.
+- `php tests/dosen-wa-link-test.php` -> 5 tahap pengujian LOLOS 100%.
+**Penerapan:** Commit dan push ke `origin/main`. Pada cPanel terminal hosting jalankan `cd ~/public_html/lppai.quizb.my.id/web && git pull origin main`.
+
+---
+
 ## 2026-11-14 22:21:00 +0700 — Tombol Ikon WhatsApp Direct Message Dosen & Template Pesan Resmi Mahasiswa
 
 **ID:** FEAT-STUDENT-DOSEN-WA-DIRECT-MESSAGE · **Parent Git:** `673ecc2`.

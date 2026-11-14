@@ -859,7 +859,7 @@ $cardValue = static function ($value, $fallback = 'Belum tersedia') {
                                 </div>
                                 <div class="full">
                                     <dt>Dosen penguji</dt>
-                                    <dd><?= (function_exists('renderDosenWithWa') && isset($pdo)) ? renderDosenWithWa($pdo, $registration['dosen_penguji'] ?? null, $user ?? null, 'Konfirmasi Ujian Pretes', $cardValue($registration['dosen_penguji'] ?? null, 'Menunggu pembagian')) : sanitize($cardValue($registration['dosen_penguji'] ?? null, 'Menunggu pembagian')) ?></dd>
+                                    <dd><?= (function_exists('renderDosenWithWa') && isset($pdo)) ? renderDosenWithWa($pdo, $registration['dosen_penguji'] ?? null, $user ?? null, null, $cardValue($registration['dosen_penguji'] ?? null, 'Menunggu pembagian')) : sanitize($cardValue($registration['dosen_penguji'] ?? null, 'Menunggu pembagian')) ?></dd>
                                 </div>
                             </dl>
                         </section>

@@ -616,9 +616,10 @@ if (!function_exists('getDosenWaMessageTemplate')) {
             ? trim((string)$prodiRaw)
             : '................................';
 
+        // Keperluan dibiarkan titik-titik sesuai template resmi agar diisi sendiri oleh mahasiswa
         $keperluanVal = ($keperluan !== null && trim($keperluan) !== '')
             ? trim($keperluan)
-            : ($useDots ? '..........................................' : '');
+            : '..........................................';
 
         return "Assalamu'alaikum wr wb\n\n"
             . "Perkenalkan nama saya : " . $nama . "\n"

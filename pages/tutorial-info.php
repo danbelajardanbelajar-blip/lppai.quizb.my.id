@@ -297,7 +297,7 @@ include __DIR__ . '/../includes/header.php';
         <?php else: ?>
             <div class="ti-grid">
                 <div class="ti-item"><div class="ti-ico">🏫</div><div><div class="ti-lbl">Kelas</div><div class="ti-val"><?= sanitize($reg['nama_kelas']) ?></div></div></div>
-                <div class="ti-item"><div class="ti-ico">👨‍🏫</div><div><div class="ti-lbl">Tutor</div><div class="ti-val"><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></div></div></div>
+                <div class="ti-item"><div class="ti-ico">👨‍🏫</div><div><div class="ti-lbl">Tutor</div><div class="ti-val"><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? null, $user, null, '-') ?></div></div></div>
                 <div class="ti-item"><div class="ti-ico">🗓️</div><div><div class="ti-lbl">Jadwal</div><div class="ti-val"><?= sanitize($reg['hari'] ?: '-') ?><?= !empty($reg['jam']) ? ', ' . sanitize($reg['jam']) : '' ?></div></div></div>
                 <div class="ti-item"><div class="ti-ico">📍</div><div><div class="ti-lbl">Ruangan</div><div class="ti-val"><?= sanitize($reg['ruangan'] ?: '-') ?></div></div></div>
             </div>

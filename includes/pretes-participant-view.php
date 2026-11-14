@@ -148,7 +148,7 @@
                 <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">👨‍🏫 Dosen Penguji</div>
                     <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
-                        <?= renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?>
+                        <?= renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, null, 'Menunggu pembagian') ?>
                     </div>
                 </div>
             </div>
@@ -244,27 +244,27 @@
 
             </div>
 
-            <!-- ── 3. AKSES SOAL PRETES (GATED MULAI 16 NOVEMBER) ── -->
+            <!-- ── 3. AKSES SOAL PRETES (DIATUR ADMIN: Bank Soal CBT › Sesi Ujian › Buka/Tutup Ujian) ── -->
             <div style="margin-top:24px;">
-                <?php if ($isTesterPrivileged && $tglSekarang < $tglBukaUjian): ?>
+                <?php if (!empty($isTesterPreview)): ?>
                     <!-- NOTIFIKASI KHUSUS AKUN TESTER 12345 -->
                     <div style="background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e;padding:12px 16px;border-radius:12px;font-size:13px;margin-bottom:14px;font-weight:700;display:flex;align-items:center;gap:10px;">
                         <span style="font-size:24px;flex-shrink:0;">🧪</span>
                         <div>
                             <div style="font-size:13.5px;color:#78350f;">Mode Percobaan Pengembang Aktif (Privilege Khusus Akun 12345)</div>
                             <div style="font-weight:500;font-size:12px;color:#92400e;margin-top:2px;line-height:1.4;">
-                                Akun Anda (<strong><?= sanitize($user['username'] ?? $user['nim'] ?? '12345') ?></strong>) diberikan privilege istimewa untuk membuka dan menguji halaman ujian pretes beserta sistem pengawas AI (Skenario A & B) secara langsung sebelum tanggal 16 November 2026.
+                                Akun Anda (<strong><?= sanitize($user['username'] ?? $user['nim'] ?? '12345') ?></strong>) diberikan privilege istimewa untuk membuka dan menguji halaman ujian pretes beserta sistem pengawas AI (Skenario A & B) secara langsung walaupun pengerjaan ujian belum dibuka admin.
                             </div>
                         </div>
                     </div>
                 <?php endif; ?>
 
                 <?php if ($isUjianDibuka): ?>
-                    <!-- KONDISI A: SUDAH TANGGAL 16 NOVEMBER KE ATAS / PRIVILEGE TESTER 12345 -->
+                    <!-- KONDISI A: PENGERJAAN DIBUKA ADMIN (sesuai jadwal sesi) / PRIVILEGE TESTER 12345 -->
                     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:22px 18px;text-align:center;box-shadow:0 4px 14px rgba(22,163,74,0.1);">
                         <span style="font-size:36px;display:block;margin-bottom:8px;">🚀</span>
                         <h4 style="margin:0 0 6px;color:#15803d;font-size:16px;font-weight:800;">
-                            <?= ($isTesterPrivileged && $tglSekarang < $tglBukaUjian) ? 'Sesi Uji Coba Halaman Ujian Pretes (Akun 12345)' : 'Sesi Pengerjaan Soal Pretes Telah Dibuka' ?>
+                            <?= !empty($isTesterPreview) ? 'Sesi Uji Coba Halaman Ujian Pretes (Akun 12345)' : 'Sesi Pengerjaan Soal Pretes Telah Dibuka' ?>
                         </h4>
                         <p style="margin:0 auto 16px;color:#166534;font-size:13px;max-width:520px;line-height:1.55;">
                             Pastikan Anda telah membaca 4 instruksi di atas dan siap memulai ujian. Klik tombol di bawah untuk membuka lembar soal dengan pengawasan AI.
@@ -277,14 +277,15 @@
                         </a>
                     </div>
                 <?php else: ?>
-                    <!-- KONDISI B: BELUM TANGGAL 16 NOVEMBER -->
+                    <!-- KONDISI B: PENGERJAAN BELUM DIBUKA / DITUTUP ADMIN / DI LUAR JADWAL SESI -->
                     <div style="background:#eff6ff;border:1.5px dashed #93c5fd;border-radius:14px;padding:18px 20px;display:flex;align-items:flex-start;gap:14px;">
                         <span style="font-size:30px;line-height:1;flex-shrink:0;">🔒</span>
                         <div style="font-size:13.5px;color:#1e40af;line-height:1.6;min-width:0;">
                             <strong style="display:block;font-size:15px;margin-bottom:4px;color:#1e3a8a;">
                                 Link Pengerjaan Soal Pretes Belum Dibuka
                             </strong>
-                            Link <strong>"Kerjakan Soal Pretes"</strong> akan dapat diakses pada <strong>Senin, 16 November 2026</strong> saat periode ujian pretes resmi dimulai. Silakan persiapkan diri dengan berdoa dan mempelajari materi tutorial ubudiyah.
+                            <?= sanitize($examClosedNotice ?? 'Pengerjaan ujian pretes belum dibuka oleh admin.') ?>
+                            Link <strong>"Kerjakan Soal Pretes"</strong> akan muncul di halaman ini begitu admin membuka pengerjaan ujian. Silakan persiapkan diri dengan berdoa dan mempelajari materi tutorial ubudiyah.
                         </div>
                     </div>
                 <?php endif; ?>

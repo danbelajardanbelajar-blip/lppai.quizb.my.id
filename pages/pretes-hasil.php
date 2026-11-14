@@ -656,7 +656,7 @@ include __DIR__ . '/../includes/header.php';
                             </h4>
                             <p style="margin:0; font-size:13.5px; color:#475569; line-height:1.55;">
                                 Ruangan: <strong><?= sanitize($myReg['ruangan'] ?: 'Menunggu pembagian') ?></strong> | 
-                                Dosen Penguji: <strong><?= renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?></strong>.
+                                Dosen Penguji: <strong><?= renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, null, 'Menunggu pembagian') ?></strong>.
                                 Pastikan Anda membaca instruksi resmi ujian dan mempersiapkan diri dengan baik.
                             </p>
                         </div>

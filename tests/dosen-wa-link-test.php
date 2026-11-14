@@ -41,18 +41,18 @@ $student = [
     'role' => 'mahasiswa'
 ];
 
-echo "=== TEST 1: Template Pesan WhatsApp ===\n";
-$msg = getDosenWaMessageTemplate($student, 'Konfirmasi Ujian Pretes');
+echo "=== TEST 1: Template Pesan WhatsApp Default (Keperluan Tidak Diisi Otomatis / Tetap Titik-Titik) ===\n";
+$msg = getDosenWaMessageTemplate($student);
 echo $msg . "\n\n";
 
 assert(str_contains($msg, "Assalamu'alaikum wr wb"), 'Template harus memiliki salam resmi');
 assert(str_contains($msg, "Perkenalkan nama saya : Muhammad Zaidan"), 'Harus menyertakan nama mahasiswa');
 assert(str_contains($msg, "nim : 21010101"), 'Harus menyertakan nim');
 assert(str_contains($msg, "jurursan/ prodi : Pendidikan Agama Islam"), 'Harus menyertakan jurusan/prodi');
-assert(str_contains($msg, "Keperluan : Konfirmasi Ujian Pretes"), 'Harus menyertakan keperluan');
+assert(str_contains($msg, "Keperluan : .........................................."), 'Keperluan harus tetap titik-titik dan tidak boleh diisi asumsi otomatis');
 assert(str_contains($msg, "terima kasih"), 'Harus menyertakan penutup terima kasih');
 
-echo "=== TEST 2: Template Kosong / Fallback Dots ===\n";
+echo "=== TEST 2: Template Kosong / Fallback Dots Keseluruhan ===\n";
 $msgDots = getDosenWaMessageTemplate(null, null, true);
 echo $msgDots . "\n\n";
 assert(str_contains($msgDots, "Perkenalkan nama saya : ........................"), 'Fallback dots nama');
@@ -88,10 +88,11 @@ assert(getDosenPhoneByName($pdo, '-') === null, "- must return null");
 assert(getDosenPhoneByName($pdo, '') === null, "Empty must return null");
 
 echo "=== TEST 4: Render Tombol dan HTML ===\n";
-$html1 = renderDosenWithWa($pdo, 'Dr. H. Ahmad Khoiri, M.Pd.', $student, 'Konfirmasi Ujian Pretes');
+$html1 = renderDosenWithWa($pdo, 'Dr. H. Ahmad Khoiri, M.Pd.', $student);
 echo "HTML with WA: " . $html1 . "\n";
 assert(str_contains($html1, 'Dr. H. Ahmad Khoiri, M.Pd.'), 'Harus menampilkan nama dosen');
 assert(str_contains($html1, 'https://wa.me/6281234567890?text='), 'Harus memiliki URL wa.me yang benar');
+assert(str_contains($html1, rawurlencode("Keperluan : ..........................................")), 'URL text harus memuat Keperluan : ..........................................');
 assert(str_contains($html1, 'btn-wa-dosen'), 'Harus memiliki kelas btn-wa-dosen');
 assert(str_contains($html1, '<svg'), 'Harus menyertakan SVG icon');
 
@@ -121,7 +122,8 @@ foreach ($filesToCheck as $relPath) {
     assert(file_exists($fullPath), "File $relPath harus ada");
     $content = file_get_contents($fullPath);
     assert(str_contains($content, 'renderDosenWithWa'), "File $relPath harus memanggil renderDosenWithWa");
-    echo " [OK] $relPath terintegrasi dengan renderDosenWithWa\n";
+    assert(!str_contains($content, 'Konfirmasi Ujian Pretes') && !str_contains($content, 'Konfirmasi Kelas Tutorial'), "File $relPath tidak boleh mengisi keperluan dengan asumsi teks otomatis");
+    echo " [OK] $relPath terintegrasi bersih tanpa teks keperluan asumsi\n";
 }
 
 $cssPath = __DIR__ . '/../assets/css/style.css';

@@ -241,7 +241,7 @@ foreach ($gelombangs as $gelKey => $g):
                     <?php if ($sudahDaftar['tutorial_class_id']): ?>
                         <div><strong style="font-size:12px;color:#166534;">KELAS</strong><p style="margin:4px 0 0;font-weight:bold;"><?= sanitize($sudahDaftar['nama_kelas']) ?></p></div>
 
-                        <div><strong style="font-size:12px;color:#166534;">DOSEN</strong><p style="margin:4px 0 0;"><?= renderDosenWithWa($pdo, $sudahDaftar['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></p></div>
+                        <div><strong style="font-size:12px;color:#166534;">DOSEN</strong><p style="margin:4px 0 0;"><?= renderDosenWithWa($pdo, $sudahDaftar['dosen_pengampu'] ?? null, $user, null, '-') ?></p></div>
                         <div><strong style="font-size:12px;color:#166534;">JADWAL</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['hari']) ?>, <?= sanitize($sudahDaftar['jam']) ?></p></div>
                         <div><strong style="font-size:12px;color:#166534;">RUANGAN</strong><p style="margin:4px 0 0;"><?= sanitize($sudahDaftar['ruangan'] ?: '-') ?></p></div>
                     <?php else: ?>
