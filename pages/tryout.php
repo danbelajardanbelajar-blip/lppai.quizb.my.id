@@ -154,8 +154,8 @@ if ($session) {
         $myReg = [
             'id'           => 999999,
             'user_id'      => $userId,
-            'hari_pilihan' => 'Senin',
-            'jam'          => '13.00 WIB (Jam 1)',
+            'hari_pilihan' => 'Minggu',
+            'jam'          => '04.25 WIB',
             'periode'      => 'Pretes Tutorial Ubudiyah 2026 (Mode Uji Coba Tryout)',
             'foto'         => !empty($user['foto']) ? $user['foto'] : '',
             'status'       => 'terdaftar',
@@ -163,6 +163,9 @@ if ($session) {
             'password_tes' => '123456',
             'ruangan'      => 'Lab Komputer (Uji Coba Tryout Akun 12345)'
         ];
+    } elseif ($myReg && $isTesterPrivileged) {
+        $myReg['hari_pilihan'] = 'Minggu';
+        $myReg['jam'] = '04.25 WIB';
     }
     $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
     $regId = pretesTryoutResolveRegId($pdo, $userId, $session, $isFresh);

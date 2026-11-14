@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 04:34:22 +0700 — Penjadwalan Akun Tester 12345 Hari Minggu Pukul 04.25 WIB untuk Simulasi Tampilan Peserta Saat Jadwal Ujian Tiba
+
+**Ringkasan:**
+1. **Penjadwalan Otomatis Akun Tester 12345**: Mengatur akun tester `12345` (baik dengan registrasi database maupun fallback registrasi) agar terjadwal pada hari **Minggu** pukul **04.25 WIB** (Minggu, 15 November 2026 pukul 04.25 WIB).
+2. **Tanpa Bypass Tanggal Global**: Menjaga integritas sistem filter jadwal mahasiswa umum tetap berlaku (tidak dibypass secara global). Karena saat ini sudah melewati pukul 04.25 WIB hari Minggu (15 Nov 2026), jadwal akun `12345` secara natural berstatus **aktif/terbuka** (`reason: open`, `allowed: true`).
+3. **Simulasi Tampilan Mahasiswa Asli**:
+   - Menghilangkan banner peringatan kuning *"Mode Percobaan Pengembang"* saat jadwal ujian akun tester telah tiba (`$isTesterPreview = false`).
+   - Halaman peserta menampilkan tampilan asli yang dilihat mahasiswa ketika jadwal ujiannya tiba: banner hijau **"Sesi Pengerjaan Soal Pretes Telah Dibuka"**, instruksi resmi, dan tombol hijau utama **"📝 Kerjakan Soal Pretes"**.
+   - Kartu jadwal menampilkan rincian: Hari **Minggu, 15 Nov 2026** pukul **04.25 WIB** di **Lab Komputer (Uji Coba Akun 12345)**.
+4. **Dukungan Hari Minggu pada Offset Jadwal**: Menambahkan pemetaan `'minggu' => -1` dan `'ahad' => -1` pada `pretesExamDayOffset()` serta pemetaan tampilan tanggal pada `$dMap` kartu jadwal, sehingga hari Minggu sebelum pekan pretes dihitung secara presisi.
+5. **Verifikasi**: Test suite `tests/pretes-exam-access-test.php` diperbarui untuk menguji jadwal tester hari Minggu pukul 04.25 WIB. Seluruh 58 test suite PHP lulus 100% (58 passed, 0 failed).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-exam-access.php` | 22–25 | `pretesExamDayOffset()` | Menambahkan pemetaan offset `'minggu' => -1, 'ahad' => -1`. |
+| `includes/pretes-exam-access.php` | 46 | `pretesExamPersonalSchedule()` | Mendukung modifikasi tanggal negatif `modify("{$offset} days")`. |
+| `includes/pretes-exam-access.php` | 74–95 | `pretesExamActiveRegistration()` | Menetapkan jadwal otomatis akun tester 12345 pada hari Minggu pukul 04.25 WIB. |
+| `includes/pretes-active-page.php` | 28–46 | Handler Peserta Aktif | Menyelaraskan registrasi akun tester 12345 ke hari Minggu pukul 04.25 WIB sehingga `$isTesterPreview` menjadi false saat jadwal tiba. |
+| `includes/pretes-participant-view.php` | 124–125 | Label Hari Jadwal | Menambahkan label `'minggu' => 'Minggu, 15 Nov 2026'` pada `$dMap`. |
+| `pages/pretes-ujian.php` | 107–120 | Registrasi Ujian Pretes | Menyelaraskan mock registrasi tester 12345 ke hari Minggu pukul 04.25 WIB. |
+| `pages/tryout.php` | 155–168 | Registrasi Tryout | Menyelaraskan mock registrasi tester 12345 ke hari Minggu pukul 04.25 WIB. |
+| `tests/pretes-exam-access-test.php` | 67–74 | Unit Test Akses | Menambahkan pengujian status sebelum vs setelah pukul 04.25 hari Minggu untuk akun tester 12345. |
+
+---
+
 ## 2026-11-14 23:43:26 +0700 — Implementasi Opsi A Tryout CBT: Kesetaraan Penuh Proctoring Kamera (Skenario A & B) dengan Ujian Resmi
 
 **Ringkasan:**

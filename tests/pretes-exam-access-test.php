@@ -65,6 +65,14 @@ $check(pretesExamAccess($pdo, $mhs(4), $at('2026-11-18 13:30:00'))['reason'] ===
 // Syarat melihat link & tryout
 $check(pretesExamIsRegisteredActive($pdo, $mhs(1)) && !pretesExamIsRegisteredActive($pdo, $mhs(2)) && !pretesExamIsRegisteredActive($pdo, $mhs(3)), 'Hanya terdaftar periode aktif yang boleh melihat link/try out');
 
+// Akun tester 12345: jadwal otomatis Minggu 15 Nov 2026 pukul 04.25 WIB
+$testerUser = ['id' => 12345, 'username' => '12345', 'nim' => '12345', 'role' => 'mahasiswa', 'jenis_program' => 'Reguler'];
+$tPre = pretesExamAccess($pdo, $testerUser, $at('2026-11-15 04:24:00'));
+$check(!$tPre['allowed'] && $tPre['reason'] === 'before_schedule', 'Tester 12345 sebelum 04.25 Minggu → belum dibuka');
+$tOpen = pretesExamAccess($pdo, $testerUser, $at('2026-11-15 04:26:00'));
+$check($tOpen['allowed'] === true && $tOpen['reason'] === 'open', 'Tester 12345 setelah 04.25 Minggu → dibuka');
+$check(strpos($tOpen['schedule']['label'] ?? '', 'Minggu, 15 November 2026 pukul 04.25 WIB') !== false, 'Label jadwal tester 12345 Minggu 15 Nov 04.25 WIB');
+
 // Link Try Out
 $check(pretesExamTryoutLink($pdo) === null, 'Tanpa tryout aktif → tidak ada link');
 $tid = pretesCbtSaveSession($pdo, ['title' => 'TO 1', 'package_ids' => [1], 'mode' => 'tryout', 'is_active' => 1]);

@@ -120,7 +120,9 @@
                             'selasa' => 'Selasa, 17 Nov 2026',
                             'rabu' => 'Rabu, 18 Nov 2026',
                             'kamis' => 'Kamis, 19 Nov 2026',
-                            'jumat' => 'Jumat, 20 Nov 2026'
+                            'jumat' => 'Jumat, 20 Nov 2026',
+                            'minggu' => 'Minggu, 15 Nov 2026',
+                            'ahad' => 'Minggu, 15 Nov 2026'
                         ];
                         $hClean = strtolower(trim((string)($myReg['hari_pilihan'] ?? '')));
                         echo sanitize($dMap[$hClean] ?? ($myReg['hari_pilihan'] ?: 'Belum ditentukan'));

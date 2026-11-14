@@ -12,8 +12,10 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     $activePretes = null;
     try {
         $periods = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $isTesterPrivileged = (string)($user['username'] ?? '') === '12345'
+            || (string)($user['nim'] ?? '') === '12345' || (int)($user['id'] ?? 0) === 12345;
         foreach ($periods as $period) {
-            if (isUserEligibleForPretesPeriod($user, $period)) { $activePretes = $period; break; }
+            if ($isTesterPrivileged || isUserEligibleForPretesPeriod($user, $period)) { $activePretes = $period; break; }
         }
     } catch (PDOException $e) {
         return false;
@@ -28,6 +30,26 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
         WHERE pr.user_id = ? AND pr.periode = ? ORDER BY pr.id DESC LIMIT 1');
     $stmt->execute([$user['id'], $activePretes['periode']]);
     $myReg = $stmt->fetch(PDO::FETCH_ASSOC);
+    $isTesterPrivileged = (string)($user['username'] ?? '') === '12345'
+        || (string)($user['nim'] ?? '') === '12345' || (int)($user['id'] ?? 0) === 12345;
+    if (!$myReg && $isTesterPrivileged) {
+        $myReg = [
+            'id'           => 999999,
+            'user_id'      => $user['id'],
+            'hari_pilihan' => 'Minggu',
+            'jam'          => '04.25 WIB',
+            'periode'      => $activePretes['periode'],
+            'foto'         => !empty($user['foto']) ? $user['foto'] : '',
+            'status'       => 'terdaftar',
+            'username_tes' => ($user['nim'] ?? '12345') . '.22205',
+            'password_tes' => '123456',
+            'ruangan'      => 'Lab Komputer (Uji Coba Akun 12345)',
+            'ruangan_tes'  => 'Lab Komputer (Uji Coba Akun 12345)',
+        ];
+    } elseif ($myReg && $isTesterPrivileged) {
+        $myReg['hari_pilihan'] = 'Minggu';
+        $myReg['jam'] = '04.25 WIB';
+    }
     // Belum terdaftar di periode aktif → bukan peserta aktif (tampilkan Hasil Pretes)
     if (!$myReg) return false;
     $registeredForActivePretes = (bool)$myReg;
