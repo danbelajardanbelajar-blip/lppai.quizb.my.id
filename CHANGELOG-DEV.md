@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:38:00 +0700 — Desain modern & responsif halaman rekapitulasi nilai terpadu
+
+**ID:** REKAP-NILAI-MODERN-REDESIGN · **Parent Git:** `841e943`.
+**Permintaan:** Perbaiki halaman https://lppai.quizb.my.id/rekap-nilai.php agar lebih cantik, modern dan bagus design tampilannya di desktop dan mobile.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:32:53 | `rekap-nilai.php` | 335-356, 361-2050 | UI/UX & Query Seleksi | 1. Query Mahasiswa: sertakan `tc.hari, tc.jam, tc.ruangan` untuk menampilkan informasi lengkap jadwal dan lokasi tutorial.<br>2. Helper `getTutorialScoreMeta()` & `$tutorialComponents`: standardisasi warna tema Emerald Royale & Champagne Prestige, predikat (A, B, C, D, E), persentase progress, dan deskripsi 6 komponen ubudiyah (Thaharah, Shalat, Surat Pendek, Amaliyah, Jenazah, Ujian Tulis).<br>3. Executive Hero Banner: gradient bernuansa hijau LPPAI dengan badge status periode aktif yang berdenyut (pulsing dot) dan deskripsi dinamis per role.<br>4. Ringkasan Statistik Admin/Dosen: grid 4 kartu metrik (Total Peserta, Nilai Lengkap 6/6, Penilaian Berjalan, dan Rata-rata Nilai Keseluruhan).<br>5. Modern Filter Bar: dropdown custom select, tombol Reset elegan, dan tombol Export Excel bernuansa hijau gradien.<br>6. Desktop Table: tabel data modern dengan zebra striping halus, hover elevation, dan badge nilai terpetakan warna tier.<br>7. Mobile Cards View: tampilan khusus layar `<= 768px` yang menyusun data peserta ke dalam kartu responsif 3x2 chip nilai tanpa perlu horizontal scrolling.<br>8. View Mahasiswa: spotlight card nilai akhir dengan circular score badge, predikat, progress bar, 4 kartu ringkasan penilaian, 6 kartu komponen ubudiyah responsif, rubrik skala nilai LPPAI, dan tombol konsultasi WhatsApp Bu Umami.<br>9. Modal Edit Nilai: desain modern berlatar belakang blur, preview rata-rata nilai real-time saat mengetik/klik, dan quick-fill score chips (60-100). |
+| 2026-11-14 16:37:18 | `tests/tutorial-rekap-nilai-ui-test.php` | 1-89 | Test Suite UI & Responsif | 38 asersi pengujian mencakup lint sintaks, elemen hero, pulsing dot, 4 stat cards, filter bar, export action, desktop table, mobile cards, 6 komponen nilai, spotlight card, circular score, rubrik, tombol WhatsApp, live average modal, score chips, media queries (1024px, 768px, 480px), serta unit test evaluasi `getTutorialScoreMeta`. |
+
+**Verifikasi:**
+1. `php -l rekap-nilai.php` dan `php -l tests/tutorial-rekap-nilai-ui-test.php`: No syntax errors detected (PASS).
+2. `php tests/tutorial-rekap-nilai-ui-test.php`: 38/38 asersi PASS 100%.
+3. `php tests/tutorial-rekap-nilai-active-period-test.php`: Pengujian periode aktif PASS 100%.
+4. `php tests/user-jenis-program-test.php`: Pengujian referensi jenis_program PASS (24 files verified).
+5. `php tests/tutorial-waiting-test.php`: Pengujian integrasi waiting gate tutorial PASS.
+6. `php tests/tutorial-info-test.php`: Pengujian UI info tutorial PASS.
+7. `php tests/pretes-aktif-hide-tutorial-menu-test.php`: Pengujian isolasi menu pretes aktif PASS.
+8. `php tests/pretes-cbt-anti-cheat-violation-test.php`: Pengujian anti-cheat CBT PASS.
+
+**Penerapan:** commit `feat(ui): modernize rekap-nilai page with responsive executive design for desktop and mobile`; push `origin main` lalu `git pull` di cPanel server hosting.
+
+---
+
 ## 2026-11-14 16:29:48 +0700 — Card dosen terjadwal tutorial aktif dan edit kelas/hari
 
 **ID:** TUTORIAL-ACTIVE-LECTURER-SCHEDULE · **Parent Git:** `215358b`.
