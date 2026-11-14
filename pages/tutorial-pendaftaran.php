@@ -14,6 +14,12 @@ if (isAdmin()) {
 
 $user = getCurrentUser();
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/tutorial-registration.php';
+$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch();
+if ($active_gel && tutorialRegistrationHasPlotting($pdo, $active_gel)) {
+    require __DIR__ . '/../includes/tutorial-registration-closed.php';
+    exit;
+}
 
 // Mahasiswa yang sedang di tahap pretes aktif → tampilkan kartu Tahap Pretes (juga menolak POST pendaftaran)
 require_once __DIR__ . '/../includes/pretes-stage.php';
@@ -42,7 +48,6 @@ $gelombangs = [
 ];
 
 // Ambil data kuota dari master_gelombang aktif
-$active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch();
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
     $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
@@ -72,82 +77,101 @@ if ($active_gel) {
 
 // Handle Form Submit
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gelombang'])) {
-    if ($isLulusPretes) {
-        $message = 'Alhamdulillah, Anda telah dinyatakan LULUS Pretes dan dibebaskan dari kewajiban mengikuti program Tutorial LPPAI, sehingga tidak perlu mendaftar.';
-        $msgType = 'info';
-    } else {
-        $token        = $_POST['csrf_token'] ?? '';
-        $hari_pilihan = $_POST['hari_pilihan'] ?? '';
-        $gelombang    = $_POST['gelombang'] ?? '';
-        $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
-
-        if (!verifyCsrf($token)) {
-            $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
-            $msgType = 'danger';
-        } elseif (!in_array($hari_pilihan, $validDays) || !isset($gelombangs[$gelombang])) {
-            $message = 'Pilih hari yang valid.';
-            $msgType = 'danger';
-        } elseif (!$active_gel || ($active_gel['status'] ?? '') !== 'aktif' || $active_gel['gelombang'] !== $gelombang) {
-            $message = 'Pendaftaran untuk gelombang ini sedang ditutup atau dinonaktifkan.';
-            $msgType = 'danger';
+    $pdo->beginTransaction();
+    try {
+        // Gunakan kunci periode yang sama dengan generator agar tidak mendaftar di tengah plotting.
+        if ($active_gel && $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $lock = $pdo->prepare('SELECT id FROM master_gelombang WHERE id = ? FOR UPDATE');
+            $lock->execute([$active_gel['id']]);
+        }
+        if ($active_gel && tutorialRegistrationHasPlotting($pdo, $active_gel)) {
+            $pdo->rollBack();
+            require __DIR__ . '/../includes/tutorial-registration-closed.php';
+            exit;
+        }
+        if ($isLulusPretes) {
+            $message = 'Alhamdulillah, Anda telah dinyatakan LULUS Pretes dan dibebaskan dari kewajiban mengikuti program Tutorial LPPAI, sehingga tidak perlu mendaftar.';
+            $msgType = 'info';
         } else {
-            // Cek pengumuman aktif
-            $stmtAnn = $pdo->prepare("SELECT id FROM announcements WHERE tipe = ? AND is_active = 1 LIMIT 1");
-            $stmtAnn->execute([$gelombangs[$gelombang]['annType']]);
-            if (!$stmtAnn->fetch()) {
-                $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
+            $token        = $_POST['csrf_token'] ?? '';
+            $hari_pilihan = $_POST['hari_pilihan'] ?? '';
+            $gelombang    = $_POST['gelombang'] ?? '';
+            $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+
+            if (!verifyCsrf($token)) {
+                $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
+                $msgType = 'danger';
+            } elseif (!in_array($hari_pilihan, $validDays) || !isset($gelombangs[$gelombang])) {
+                $message = 'Pilih hari yang valid.';
+                $msgType = 'danger';
+            } elseif (!$active_gel || ($active_gel['status'] ?? '') !== 'aktif' || $active_gel['gelombang'] !== $gelombang) {
+                $message = 'Pendaftaran untuk gelombang ini sedang ditutup atau dinonaktifkan.';
                 $msgType = 'danger';
             } else {
-                $dayLower = strtolower($hari_pilihan);
-                $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
-                
-                // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
-                $stmtCurrent = $pdo->prepare("
-                    SELECT COUNT(*) 
-                    FROM tutorial_registrations 
-                    WHERE LOWER(hari_pilihan) = LOWER(?)
-                      AND gelombang = ?
-                      AND (
-                          REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
-                          OR tahun_ajaran LIKE ?
-                          OR (
-                              (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
-                              AND created_at >= ?
-                          )
-                      )
-                ");
-                $stmtCurrent->execute([$hari_pilihan, $targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
-                $terisi = (int)$stmtCurrent->fetchColumn();
-                
-                if ($totalKuota <= 0 || $terisi >= $totalKuota) {
-                    $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                // Cek pengumuman aktif
+                $stmtAnn = $pdo->prepare("SELECT id FROM announcements WHERE tipe = ? AND is_active = 1 LIMIT 1");
+                $stmtAnn->execute([$gelombangs[$gelombang]['annType']]);
+                if (!$stmtAnn->fetch()) {
+                    $message = 'Pendaftaran untuk gelombang ini sedang ditutup.';
                     $msgType = 'danger';
                 } else {
-                    // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
-                    $stmtReg = $pdo->prepare("
-                        SELECT tr.id FROM tutorial_registrations tr 
-                        LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
-                        WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
+                    $dayLower = strtolower($hari_pilihan);
+                    $totalKuota = (int)($active_gel["kuota_$dayLower"] ?? 0);
+
+                    // Hitung ulang secara realtime pendaftar hari pilihan untuk mencegah race-condition
+                    $stmtCurrent = $pdo->prepare("
+                        SELECT COUNT(*)
+                        FROM tutorial_registrations
+                        WHERE LOWER(hari_pilihan) = LOWER(?)
+                          AND gelombang = ?
+                          AND (
+                              REPLACE(TRIM(tahun_ajaran), '/', '-') = ?
+                              OR tahun_ajaran LIKE ?
+                              OR (
+                                  (tahun_ajaran IS NULL OR TRIM(tahun_ajaran) = '')
+                                  AND created_at >= ?
+                              )
+                          )
                     ");
-                    $stmtReg->execute([$user['id'], $gelombang, $gelombang]);
-                    if ($stmtReg->fetch()) {
-                        $message = 'Anda sudah terdaftar di gelombang ini.';
-                        $msgType = 'warning';
+                    $stmtCurrent->execute([$hari_pilihan, $targetGelombang, $targetYear, '%' . $targetYear . '%', $active_gel['created_at']]);
+                    $terisi = (int)$stmtCurrent->fetchColumn();
+
+                    if ($totalKuota <= 0 || $terisi >= $totalKuota) {
+                        $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
+                        $msgType = 'danger';
                     } else {
-                        $tahun_ajaran = $active_gel['tahun_ajaran'] ?? (date('Y') . '/' . (date('Y') + 1));
-                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?, ?)");
-                        $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang, $tahun_ajaran]);
-                        $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
-                        $msgType = 'success';
-                        
-                        // Update counter lokal agar UI segera merefleksikan perubahan
-                        if (isset($registeredCounts[$hari_pilihan])) {
-                            $registeredCounts[$hari_pilihan]++;
+                        // Cek apakah sudah daftar di gelombang ini (cek dari kolom gelombang atau fallback ke class)
+                        $stmtReg = $pdo->prepare("
+                            SELECT tr.id FROM tutorial_registrations tr
+                            LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+                            WHERE tr.user_id = ? AND (tr.gelombang = ? OR tc.gelombang = ?)
+                        ");
+                        $stmtReg->execute([$user['id'], $gelombang, $gelombang]);
+                        if ($stmtReg->fetch()) {
+                            $message = 'Anda sudah terdaftar di gelombang ini.';
+                            $msgType = 'warning';
+                        } else {
+                            $tahun_ajaran = $active_gel['tahun_ajaran'] ?? (date('Y') . '/' . (date('Y') + 1));
+                            $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang, tahun_ajaran) VALUES (?, 'terdaftar', ?, ?, ?)");
+                            $stmtInsert->execute([$user['id'], $hari_pilihan, $gelombang, $tahun_ajaran]);
+                            $message = 'Pendaftaran tutorial berhasil! Pilihan hari Anda telah disimpan.';
+                            $msgType = 'success';
+
+                            // Update counter lokal agar UI segera merefleksikan perubahan
+                            if (isset($registeredCounts[$hari_pilihan])) {
+                                $registeredCounts[$hari_pilihan]++;
+                            }
                         }
                     }
                 }
             }
         }
+        $pdo->commit();
+    } catch (Throwable $error) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log('Tutorial registration failed: ' . $error->getMessage());
+        $message = 'Pendaftaran belum tersimpan. Silakan muat ulang halaman dan coba lagi.';
+        $msgType = 'danger';
     }
 }
 

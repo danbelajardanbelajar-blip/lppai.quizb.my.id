@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 06:49:14 +0700 — Tutup pendaftaran mahasiswa setelah plotting tutorial
+
+**ID:** TUTORIAL-REGISTRATION-CLOSE-AFTER-PLOTTING · **Parent Git:** `827cc99`.
+**Permintaan:** halaman tutorial-pendaftaran.php menolak pendaftaran baru dan menampilkan Pendaftaran telah ditutup ketika jadwal tutorial sudah diplot. Penutupan berlaku bagi seluruh calon pendaftar pada periode aktif sejak ada peserta yang sudah ditempatkan ke kelas, tanpa mengubah data peserta yang ada. Penempatan kolektif/admin dan plotting tidak diubah.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 06:48:02 | `pages/tutorial-pendaftaran.php` | 17-22, 49, 79-176 | Penutupan halaman dan POST pendaftaran | Pilih periode aktif deterministik; periksa plotting sebelum stage gate, patch schema dan form. Jika sudah ada plotting, tampilkan halaman ditutup lalu exit. Pada POST, transaksi dan kunci master_gelombang yang sama dengan generator, periksa ulang plotting sebelum INSERT; rollback bila gagal. Validasi CSRF, kuota, gelombang dan duplikat existing tetap berlaku. Indent blok handler disesuaikan dengan try/catch. |
+| 2026-11-15 06:44:22 | `includes/tutorial-registration.php` | 1-19 | Deteksi plotting periode aktif | EXISTS pendaftaran yang benar-benar terhubung ke kelas pada gelombang, tahun ajaran dan semester yang sesuai. Dukung format tahun slash/hyphen dan semester legacy dengan bukti tahun/tanggal pendaftaran. Kelas kosong atau plotting histori/semester/gelombang lain tidak menutup periode aktif. |
+| 2026-11-15 06:47:27 | `includes/tutorial-registration-closed.php` | 1-23 | Halaman Pendaftaran telah ditutup | Tampilkan penjelasan bahwa jadwal sudah diplot, periode, tautan Info Tutorial dan Dashboard. Tidak ada form pendaftaran; POST ditolak HTTP 403, respons no-store. |
+| 2026-11-15 06:47:27 | `tests/tutorial-registration-closed-test.py` | 1-168 | Integrasi HTTP route aktual | Uji pendaftaran sebelum plotting berhasil; sepuluh skenario scope/legacy; GET ditutup, POST ditolak dan dump database tetap; form lama ditolak, plotting yang muncul di antara pemeriksaan awal dan POST ditolak; CSRF, kuota nol, stage gate serta rollback kegagalan INSERT tetap efektif. |
+| 2026-11-15 06:48:02 | `tests/tutorial-registration-closed-browser-test.cjs` | 1-30 | Chrome desktop dan mobile | Uji route aktual menampilkan judul/penjelasan ditutup, tidak ada form, tautan navigasi muat pada 1366px dan 390px, serta tidak ada error JavaScript. |
+
+**Verifikasi:** `python tests/tutorial-registration-closed-test.py`, `php tests/tutorial-kuota-pendaftaran-test.php`, lint 3 file PHP, dan `git diff --check` pada file perubahan ini: PASS. Chrome headless `node tests/tutorial-registration-closed-browser-test.cjs <fixture-url>`: PASS. Screenshot halaman ditutup 390px diperiksa visual; judul, penjelasan dan navigasi terlihat tanpa form. Artefak di `scratch/tutorial-registration-closed-preview/` (diabaikan Git). Pengujian memakai PDO SQLite terisolasi, tidak mengubah database produksi. Pemeriksaan ulang setelah plotting ditambahkan melalui hook fixture dan berhasil menolak INSERT; cabang FOR UPDATE MySQL diperiksa secara kode, belum diuji concurrency pada server MySQL. Tidak ada migrasi database baru.
+**Penerapan:** commit `Close student tutorial registration once active-period plotting exists`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5.
+
+---
+
 ## 2026-11-15 06:24:35 +0700 — Peringatan wajib mengikuti tryout yang sudah dibuka
 
 **ID:** DASHBOARD-ACTIVE-PRETES-REQUIRED-TRYOUT · **Parent Git / kode fitur:** `84d0602`.
