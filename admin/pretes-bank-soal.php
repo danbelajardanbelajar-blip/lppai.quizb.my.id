@@ -61,6 +61,8 @@ if (isset($_GET['download'])) {
     try {
         if ($_GET['download'] === 'bank') cbtSendXlsx(cbtWriteXlsx(cbtBankExportRows($pdo), 'Bank Soal', [24,22,60,28,28,28,28,28,12,16]), 'bank-soal-cbt-' . date('Ymd') . '.xlsx', true);
         elseif ($_GET['download'] === 'results') cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo), 'Hasil CBT', [20,34,24,24,18,18,16,14]), 'hasil-cbt-' . date('Ymd') . '.xlsx', true);
+        elseif ($_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
+        elseif ($_GET['download'] === 'pretes177') cbtSendXlsx(__DIR__ . '/../downloads/bank-soal-pretes-177-soal.xlsx', 'bank-soal-pretes-177-soal.xlsx');
         throw new InvalidArgumentException('Jenis unduhan tidak dikenal.');
     } catch (Throwable $error) {
         error_log('CBT XLSX download: ' . $error->getMessage());

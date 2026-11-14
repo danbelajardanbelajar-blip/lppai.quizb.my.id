@@ -293,7 +293,10 @@
                 <h3>Impor Bank Soal dari Excel</h3>
                 <p>Validasi seluruh baris sebelum menyimpan ke paket soal target.</p>
             </div>
-            <a data-no-spa class="bank-button primary" href="<?= $bankUrl ?>&amp;download=template">↓ Unduh Template .xlsx</a>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <a data-no-spa class="bank-button gold" href="<?= $bankUrl ?>&amp;download=pretes177" title="Unduh master bank soal 177 butir yang sudah terformat sesuai template siap impor">📥 Unduh File Soal Pretes (177 Soal) .xlsx</a>
+                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=template" title="Unduh format template kosong">↓ Unduh Template Kosong .xlsx</a>
+            </div>
         </div>
         <div class="bank-panel-body bank-import-grid">
             <?php if (empty($packages)): ?>

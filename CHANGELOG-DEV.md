@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 07:15:30 +0700 — Pembuatan Master File Bank Soal Pretes 177 Butir Sesuai Format Template Excel CBT
+
+**ID perubahan:** CBT-177-QUESTIONS-TEMPLATE-BUILD · **Awal pengerjaan:** 2026-11-14 07:10:48 +0700 · **Parent Git:** `0ca6a29`.
+**Tujuan & Konteks Kebutuhan:**
+Membuat file master Excel baru (`bank-soal-pretes-177-soal.xlsx`) berdasarkan template resmi CBT LPPAI (`Bank Soal` + `Panduan`) yang memuat seluruh 177 butir soal pretes lengkap dengan pertanyaan, pilihan A s.d. E, kunci jawaban ('A'), status ('Aktif'), dan kategori yang diambil dari kelompok soal (`KODE GRUP SOAL`):
+- `BAB I – THAHARAH`: 58 butir
+- `BAB II – SHALAT FARDHU`: 85 butir
+- `BAB III – PENGURUSAN JENAZAH`: 24 butir
+- `BAB IV – AMALIYAH MASYARAKAT`: 10 butir
+Total: 177 butir soal utuh, 100% valid tanpa terpotong, tanpa duplikasi, dan siap diimpor langsung ke sistem CBT.
+
+Waktu tabel adalah waktu penyimpanan berkas (WIB, sampai detik).
+
+| Waktu edit file (WIB) | File | Baris snapshot | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 07:13:50 | `downloads/bank-soal-pretes-177-soal.xlsx` | 1–178 | Master Spreadsheet Bank Soal | File Excel format OpenXML (.xlsx) berisi 177 butir soal pretes ubudiyah lengkap dengan kolom: Kode Soal (dikosongkan untuk soal baru sesuai panduan), Kategori (grup bab), Pertanyaan, Pilihan A–E, Kunci, dan Status Aktif. |
+| 2026-11-14 07:14:58 | `admin/pretes-bank-soal.php` | 64–65 | Handler unduhan berkas | Menambahkan route unduhan aman admin untuk `download=template` (`template-bank-soal-cbt.xlsx`) dan `download=pretes177` (`bank-soal-pretes-177-soal.xlsx`). |
+| 2026-11-14 07:14:58 | `includes/pretes-cbt-admin-view.php` | 296–299 | Tampilan Tab Impor Excel | Menambahkan tombol unduh langsung master file 177 soal (`📥 Unduh File Soal Pretes (177 Soal) .xlsx`) dan template kosong. |
+| 2026-11-14 07:14:22 | `tests/pretes-cbt-177-soal-import-test.php` | 1–45 | Uji validasi impor otomatis | Script pengujian integrasi yang membaca `bank-soal-pretes-177-soal.xlsx` menggunakan `cbtReadQuestionXlsx` dan mengeksekusi `cbtImportQuestions`: memvalidasi 177 soal sukses masuk tanpa error. |
+
+**Verifikasi:**
+- `php ..\tests\pretes-cbt-177-soal-import-test.php`: PASS (177 added, 0 updated, 0 skipped, 0 errors).
+- `php ..\tests\pretes-cbt-anti-cheat-violation-test.php`: PASS.
+- `php -l` seluruh file yang diubah: PASS (tanpa syntax error).
+
 ## 2026-11-14 07:07:45 +0700 — Fitur Anti-Contek CBT: Penggantian Soal Belum Dijawab Dari Bank Cadangan & Pengacakan Abjad Opsi Saat Terjadi Pelanggaran
 
 **ID perubahan:** CBT-ANTI-CHEAT-VIOLATION-SWAP · **Awal pengerjaan:** 2026-11-14 06:56:42 +0700 · **Parent Git:** `34f3d5c`.
