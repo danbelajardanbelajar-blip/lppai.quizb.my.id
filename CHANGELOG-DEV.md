@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 17:32:15 +0700 — Penelusuran halaman pretes-peserta & pembersihan info berulang istighasah / menu atas
+
+**ID:** PRETES-PESERTA-CLEANUP-ISTIGHASAH · **Parent Git:** origin/main.
+**Permintaan:** Telusur halaman https://lppai.quizb.my.id/pretes-peserta.php dari atas sampai ke bawah; pastikan tidak ada informasi yang berulang seperti istighasah (hapus menu di atas).
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 17:26:58 | includes/pretes-preparation-view.php | 8–35 | CSS Tampilan Persiapan Pretes | Menghapus aturan CSS lama yang tidak terpakai (.pretes-preparation-grid, .pretes-preparation-step, .pretes-preparation-actions) serta menyederhanakan media query responsif mobile. |
+| 2026-11-14 17:26:58 | includes/pretes-preparation-view.php | 44–71 | Kontainer Materi Persiapan Pretes | Menyatukan kartu ganda yang terpecah menjadi satu kontainer utuh #materi-persiapan-pretes; menghapus menu tindakan di bagian atas (Buka 12 Materi Pretes dan Bacaan Istighasah) yang melompat dan mengulang referensi Istighasah; menghapus 3 kartu ringkasan langkah (01 CBT, 02 Praktik, 03 Surah & Istighasah) yang menduplikasi isi daftar 12 materi; menghapus kalimat redundan menunggu pembagian kelas dan penguji yang sudah tertera di kartu jadwal peserta di atasnya; merapikan teks pengantar 12 materi pretes agar profesional dan tidak berulang; menjaga komponen ke-10 Istighasah beserta bacaan teks Arab lengkap dan petunjuk Surat Yasin tetap utuh dan fungsional. |
+
+**Verifikasi:**
+- php -l includes/pretes-preparation-view.php -> No syntax errors detected.
+- python tests/pretes-hasil-preparation-test.py -> PASS (11 skenario: registered, none, old_only, full_active, multiple, priority, assigned, tester, closed_pass, closed_fail, closed_none).
+- php tests/pretes-peserta-aktif-test.php -> PASS.
+- php tests/pretes-peserta-instruksi-test.php -> PASS.
+- php tests/tutorial-rekap-nilai-ui-test.php -> PASS.
+**Penerapan:** Commit dan push ke origin/main. Pada cPanel terminal hosting jalankan cd ~/public_html/lppai.quizb.my.id/web && git pull origin main.
+
+---
+
 ## 2026-11-14 17:13:51 +0700 — Export PDF jadwal mengajar dosen tutorial
 
 **ID:** TUTORIAL-LECTURER-SCHEDULE-PDF · **Parent Git:** `5314529`.
