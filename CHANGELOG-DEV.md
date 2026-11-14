@@ -5,6 +5,23 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 06:24:35 +0700 — Peringatan wajib mengikuti tryout yang sudah dibuka
+
+**ID:** DASHBOARD-ACTIVE-PRETES-REQUIRED-TRYOUT · **Parent Git / kode fitur:** `84d0602`.
+**Permintaan:** dashboard peserta pretes aktif menampilkan card peringatan wajib mengikuti tryout yang sudah dibuka, beserta tautan. Kode fitur dan pengujiannya tersimpan pada commit parent bersama pekerjaan paralel; entri ini melengkapi log khusus perubahan dashboard.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 06:20:22 | `pages/dashboard.php` | 125-141, 252-263 | Peringatan wajib tryout dashboard | Tampilkan card Wajib Mengikuti Tryout Pretes dan tautan Ikuti Tryout Sekarang hanya untuk mahasiswa terdaftar pretes aktif, belum lulus, tidak sedang tutorial aktif, dan memiliki sesi tryout dengan window open. Satu sesi terbuka menuju ID sesi langsung; beberapa sesi menuju daftar tryout. Pesan menjelaskan tryout merupakan latihan, bukan ujian resmi, tanpa menambahkan penalti atau syarat akses ujian. |
+| 2026-11-15 06:22:16 | `tests/tutorial-pretes-menu-test.py` | 14-37, 70-72, 152-180 | Regresi tryout pada render dashboard aktual | Gunakan body fungsi registrasi aktif aktual dari pretes-exam-access.php, fungsi daftar/window tryout aktual, dan fixture sesi CBT terisolasi. Tambahkan 12 skenario: satu/banyak sesi terbuka, campuran open/future/ended, future saja, ended saja, nonaktif, mode resmi, tanpa sesi, peserta nonaktif/tidak terdaftar/tutorial/sudah lulus. |
+
+**Verifikasi:** `python tests/tutorial-pretes-menu-test.py`: seluruh 43 skenario PASS (20 membership/sidebar, 5 dashboard existing, 6 absensi, 12 tryout). `php -l pages/dashboard.php` dan `git diff --check -- pages/dashboard.php tests/tutorial-pretes-menu-test.py`: PASS. Fixture awal sempat memakai stub membership umum yang menganggap mahasiswa eligible tetapi belum terdaftar sebagai aktif; diganti dengan body fungsi registrasi aktual dan seluruh skenario lulus. Chrome headless merender template PHP card aktual dengan stylesheet aplikasi pada lebar 1366px dan 390px; tombol terlihat, tidak meluber, tautan langsung ke sesi yang benar. Screenshot mobile diperiksa visual; artefak di `scratch/dashboard-tryout-preview/` (diabaikan Git). Data produksi tidak diubah; pengujian data memakai PDO SQLite terisolasi. Card absensi tetap tersembunyi untuk peserta pretes.
+**Penerapan:** commit `Document mandatory tryout warning on active pretes dashboards`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 06:21:45 +0700 — Implementasi Sempurna Opsi 1: Live Monitoring & Pantauan Realtime Progres Soal CBT Pretes dan Tryout pada Admin
 
 **ID:** CBT-LIVE-MONITORING-OPTION-1 · **Parent Git:** `f8dbab0`.  
