@@ -285,8 +285,35 @@
                                 Link Pengerjaan Soal Pretes Belum Dibuka
                             </strong>
                             <?= sanitize($examClosedNotice ?? 'Pengerjaan ujian pretes belum dibuka oleh admin.') ?>
-                            Link <strong>"Kerjakan Soal Pretes"</strong> akan muncul di halaman ini begitu admin membuka pengerjaan ujian. Silakan persiapkan diri dengan berdoa dan mempelajari materi tutorial ubudiyah.
+                            <?php if (!empty($examSchedule['label'])): ?>
+                                <span style="display:block;margin-top:6px;font-weight:700;color:#1e3a8a;">🗓️ Jadwal ujian CBT Anda: <?= sanitize($examSchedule['label']) ?> (sesuai hari pilihan Anda).</span>
+                            <?php endif; ?>
+                            <span style="display:block;margin-top:6px;">Link <strong>"Kerjakan Soal Pretes"</strong> akan muncul di halaman ini begitu jadwal ujian Anda tiba dan admin membuka pengerjaan ujian. Silakan persiapkan diri dengan berdoa dan mempelajari materi tutorial ubudiyah.</span>
+
+                            <!-- LINK TRY OUT (latihan CBT, bukan ujian resmi) -->
+                            <div id="pretes-tryout-box" style="margin-top:14px;background:#ffffff;border:1.5px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                                    <span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:900;letter-spacing:.06em;padding:3px 10px;border-radius:999px;">TRY OUT</span>
+                                    <strong style="color:#1e3a8a;font-size:14px;">Latihan CBT Pretes</strong>
+                                </div>
+                                <div style="font-size:12.5px;color:#334155;line-height:1.55;margin-bottom:10px;">
+                                    Link di bawah ini adalah <strong>TRY OUT (latihan)</strong>, <u>bukan</u> ujian pretes resmi. Soal dan sistemnya sama seperti CBT pretes; nilai try out <strong>tidak memengaruhi</strong> kelulusan pretes dan boleh dikerjakan ulang.
+                                </div>
+                                <?php if (!empty($tryoutLink)): ?>
+                                    <a href="<?= htmlspecialchars($tryoutLink['url']) ?>" id="btn-tryout-pretes" class="btn btn-primary"
+                                       style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;font-size:14px;font-weight:800;border-radius:10px;text-decoration:none;">
+                                        📝 Kerjakan Try Out CBT
+                                    </a>
+                                <?php else: ?>
+                                    <span style="font-size:12.5px;color:#64748b;font-style:italic;">Belum ada try out yang dibuka admin. Silakan cek kembali nanti.</span>
+                                <?php endif; ?>
+                            </div>
                         </div>
+                    </div>
+                <?php endif; ?>
+                <?php if ($isUjianDibuka && !empty($tryoutLink)): ?>
+                    <div style="margin-top:10px;text-align:center;font-size:12.5px;color:#475569;">
+                        Ingin latihan dulu? <a href="<?= htmlspecialchars($tryoutLink['url']) ?>" style="font-weight:700;color:#1d4ed8;">Kerjakan TRY OUT (latihan, bukan ujian resmi)</a>
                     </div>
                 <?php endif; ?>
             </div>

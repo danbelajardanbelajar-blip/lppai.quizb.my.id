@@ -69,7 +69,7 @@ $check(pretesCbtExamStatus($pdo)['reason'] === 'no_session', 'Tanpa sesi resmi a
 $root = dirname(__DIR__);
 foreach (['includes/pretes-active-page.php', 'pages/dashboard.php', 'pages/pretes-ujian.php'] as $f) {
     $src = file_get_contents("$root/$f");
-    $check(strpos($src, 'pretesCbtExamStatus(') !== false, "$f memakai pretesCbtExamStatus");
+    $check(strpos($src, 'pretesCbtExamStatus(') !== false || strpos($src, 'pretesExamAccess(') !== false, "$f memakai pretesCbtExamStatus / pretesExamAccess");
     $check(strpos($src, "'2026-11-16'") === false, "$f tidak lagi memakai tanggal tertanam");
 }
 $view = file_get_contents("$root/includes/pretes-cbt-admin-view.php");

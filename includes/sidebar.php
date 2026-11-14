@@ -232,12 +232,14 @@ if (!function_exists('menuActive')) {
             <?php endif; ?>
 
             <?php
-            // Menu Tryout CBT: terbuka untuk semua mahasiswa (tanpa syarat daftar pretes),
-            // tampil bila ada sesi tryout aktif atau halaman tryout sedang dibuka
-            $showTryoutMenu = $currentPage === 'tryout.php';
-            if (!$showTryoutMenu && function_exists('getDBConnection')) {
+            // Menu Tryout CBT: hanya untuk mahasiswa yang terdaftar pada periode pretes aktif,
+            // tampil bila ada sesi tryout aktif
+            $showTryoutMenu = false;
+            if (function_exists('getDBConnection')) {
                 try {
-                    $showTryoutMenu = (bool)getDBConnection()->query("SELECT 1 FROM pretes_cbt_sessions WHERE is_active = 1 AND mode = 'tryout' LIMIT 1")->fetchColumn();
+                    require_once __DIR__ . '/pretes-exam-access.php';
+                    $showTryoutMenu = pretesExamIsRegisteredActive(getDBConnection(), $currentUser ?? null)
+                        && (bool)getDBConnection()->query("SELECT 1 FROM pretes_cbt_sessions WHERE is_active = 1 AND mode = 'tryout' LIMIT 1")->fetchColumn();
                 } catch (Throwable $e) { $showTryoutMenu = false; }
             }
             ?>

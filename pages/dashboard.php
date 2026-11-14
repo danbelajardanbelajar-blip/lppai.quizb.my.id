@@ -116,8 +116,8 @@ $isTesterPrivileged  = (isset($user['username']) && (string)$user['username'] ==
                     || ((int)($user['id'] ?? 0) === 12345);
 $isUjianPretesDibuka = $isTesterPrivileged;
 try {
-    require_once __DIR__ . '/../includes/pretes-cbt.php';
-    $isUjianPretesDibuka = pretesCbtExamStatus($pdo)['open'] || $isTesterPrivileged;
+    require_once __DIR__ . '/../includes/pretes-exam-access.php';
+    $isUjianPretesDibuka = pretesExamAccess($pdo, $user)['allowed'] || $isTesterPrivileged;
 } catch (Throwable $e) {}
 
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)

@@ -40,6 +40,15 @@ try {
     if ($action === 'state') {
         $data = pretesCbtState($pdo, $userId, $regId);
     } elseif ($action === 'start') {
+        // Hanya peserta terdaftar periode aktif, sesuai jadwal pribadinya (hari pilihan 13.00 WIB) & sakelar admin
+        if (!$isTester) {
+            require_once __DIR__ . '/../includes/pretes-exam-access.php';
+            $examAccess = pretesExamAccess($pdo, $user);
+            if (!$examAccess['allowed']) throw new RuntimeException($examAccess['notice']);
+            if ((int)($examAccess['registration']['id'] ?? 0) !== (int)$regId) {
+                throw new RuntimeException('Ujian hanya dapat dimulai untuk pendaftaran pretes pada periode yang sedang berlangsung.');
+            }
+        }
         $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
         $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester);
     } else {

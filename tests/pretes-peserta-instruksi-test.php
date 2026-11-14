@@ -26,11 +26,11 @@ $asserts = [
         return stripos($fileContent, 'Pastikan tidak menggunakan HP lain') !== false;
     },
     'Gating oleh admin: link dibuka via pretesCbtExamStatus (tanpa tanggal tertanam)' => function() use ($fileContent) {
-        return strpos($fileContent, 'pretesCbtExamStatus(') !== false && strpos($fileContent, '$isUjianDibuka') !== false
+        return strpos($fileContent, 'pretesExamAccess(') !== false && strpos($fileContent, '$isUjianDibuka') !== false
             && strpos($fileContent, "'2026-11-16'") === false;
     },
     'Teks info saat pengerjaan belum dibuka admin muncul' => function() use ($fileContent) {
-        return strpos($fileContent, 'akan muncul di halaman ini begitu admin membuka pengerjaan ujian') !== false
+        return strpos($fileContent, 'akan muncul di halaman ini begitu jadwal ujian Anda tiba dan admin membuka pengerjaan ujian') !== false
             && strpos($fileContent, '$examClosedNotice') !== false;
     },
     'Tombol Kerjakan Soal Pretes Tersedia Saat Buka' => function() use ($fileContent) {

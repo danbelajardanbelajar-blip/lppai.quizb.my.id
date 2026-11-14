@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 22:52:05 +0700 — Akses CBT hanya peserta terdaftar, jadwal pribadi hari pilihan 13.00 WIB, & link TRY OUT di kotak akses soal
+
+**Ringkasan:**
+1. Ujian CBT pretes resmi (halaman, API, tombol peserta, dashboard) kini hanya bagi **mahasiswa terdaftar pada periode pretes aktif yang sesuai target programnya**, belum lulus pretes. Sebelumnya halaman/API hanya mensyaratkan pendaftaran pretes apa saja (termasuk periode lama) bila URL dibuka langsung.
+2. **Jadwal pribadi**: link & start aktif otomatis pada **tanggal hari pilihan** (master_pretes.tanggal_mulai + hari_pilihan) **mulai jam pendaftaran (default 13.00 WIB / Jam 1) sampai akhir hari itu**, selama sakelar admin **🟢 Buka Ujian** terbuka & jadwal sesi terpenuhi.
+3. **Link TRY OUT** ditempatkan di kotak "🔒 Link Pengerjaan Soal Pretes Belum Dibuka" dengan label **TRY OUT** dan penjelasan bahwa itu latihan, bukan ujian resmi. Try out (halaman, API, menu) kini juga khusus peserta terdaftar periode aktif (+ admin & tester 12345).
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-exam-access.php` (baru) | 1–139 | Aturan akses terpusat | `pretesExamDayOffset`, `pretesExamParseTime` (default 13.00), `pretesExamPersonalSchedule` (label "Senin, 16 November 2026 pukul 13.00 WIB", buka jam pendaftaran s.d. 23:59:59 WIB), `pretesExamActivePeriodFor`, `pretesExamActiveRegistration`, `pretesExamIsRegisteredActive`, `pretesExamAccess` (reason: open/not_student/no_period/not_registered/already_passed/closed/no_session/not_started/ended/before_schedule/after_schedule), `pretesExamTryoutLink`. |
+| `includes/pretes-active-page.php` | 38–49 | Halaman peserta aktif | `$isUjianDibuka` dari `pretesExamAccess()`; `$examSchedule`, `$tryoutLink`. |
+| `includes/pretes-participant-view.php` | 288–310 | Kotak 🔒 akses soal | Baris "🗓️ Jadwal ujian CBT Anda: …", teks link muncul saat jadwal tiba, **kartu TRY OUT** (`#pretes-tryout-box`, badge TRY OUT, "bukan ujian pretes resmi", tombol `#btn-tryout-pretes` / info belum ada try out). |
+| `includes/pretes-participant-view.php` | 314–318 | Setelah tombol resmi | Tautan kecil "Kerjakan TRY OUT (latihan, bukan ujian resmi)" saat ujian resmi terbuka. |
+| `pages/pretes-ujian.php` | 60–75 | Data pendaftaran | Hanya pendaftaran periode aktif dari `pretesExamAccess()` (bukan pendaftaran terbaru apa saja). |
+| `pages/pretes-ujian.php` | 135–139 | Gerbang halaman | `$isSessionOpen = pretesExamAccess()['allowed'] || tester` (+ tetap boleh bila sudah punya attempt). |
+| `pages/pretes-ujian.php` | 318–320 | State belum terdaftar | Judul/teks "Belum Terdaftar pada Periode Pretes yang Berlangsung" + alasan. |
+| `api/pretes-cbt.php` | 43–51 | Aksi start | Non-tester: wajib `pretesExamAccess()['allowed']` dan `registration_id` = pendaftaran periode aktif. |
+| `pages/dashboard.php` | 119–120 | Tombol dashboard | Memakai `pretesExamAccess()`. |
+| `pages/tryout.php` | 14–22, 50–52, 95, 100–101, 129–136 | Akses tryout | `tryoutUserAllowed()` (peserta terdaftar aktif / admin / tester); API 403; halaman menampilkan kartu 🔒 "Try Out Khusus Peserta Pretes". |
+| `includes/sidebar.php` | 235–242 | Menu Tryout | Hanya untuk mahasiswa terdaftar periode aktif bila ada tryout aktif. |
+| `tests/pretes-exam-access-test.php` (baru) | 1–88 | Test | Jadwal 12:59/13:00/hari berikut/hari lain, jam default, sakelar tertutup, periode lama, tidak terdaftar, program tidak sesuai, dosen, lulus, link try out, integrasi 7 file. |
+| `tests/pretes-peserta-instruksi-test.php` | 29, 33 | Assertion | Mengikuti `pretesExamAccess` & teks baru. |
+| `tests/pretes-exam-open-test.php` | 72 | Assertion | Terima `pretesCbtExamStatus` atau `pretesExamAccess`. |
+
+**Verifikasi:** `php -l` OK (9 file); `pretes-exam-access-test`, `pretes-exam-open-test`, `pretes-peserta-instruksi-test`, 10 test `pretes-cbt*`, tryout (2), peserta-aktif, stage, hasil-active-period, target-program, tutorial-waiting, 2 test `.cjs` PASS; render kotak akses peserta (tertutup: jadwal + kartu TRY OUT; terbuka: tombol resmi + tautan try out) tanpa error.
+
+---
+
 ## 2026-11-14 22:43:25 +0700 — Sakelar admin "🟢 Buka / 🔴 Tutup Ujian" pretes & hapus tanggal 16 Nov yang tertanam
 
 **Ringkasan:** Admin kini membuka/menutup pengerjaan ujian pretes resmi kapan saja dari **Bank Soal CBT › Sesi Ujian** (banner status + tombol, juga per baris sesi dan checkbox di modal Edit Sesi). Tanggal `'2026-11-16'` yang tertanam di kode dihapus; semua titik (halaman peserta, dashboard, halaman ujian, API/mesin) memakai satu fungsi status `pretesCbtExamStatus()` = sakelar + jadwal mulai/batas sesi.

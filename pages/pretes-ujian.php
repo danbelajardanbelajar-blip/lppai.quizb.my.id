@@ -57,17 +57,22 @@ $pdo  = getDBConnection();
 require_once __DIR__ . '/../includes/pretes-helper.php';
 ensurePretesProctoringTables($pdo);
 
-// Ambil pendaftaran pretes mahasiswa aktif
-$stmtMyReg = $pdo->prepare("
-    SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_tes
-    FROM pretes_registrations pr
-    LEFT JOIN pretes_schedules ps ON pr.periode = ps.periode AND ps.status = 'aktif'
-    WHERE pr.user_id = ?
-    ORDER BY pr.tanggal_daftar DESC, pr.id DESC
-    LIMIT 1
-");
-$stmtMyReg->execute([$user['id']]);
-$myReg = $stmtMyReg->fetch(PDO::FETCH_ASSOC);
+// Ambil pendaftaran pretes mahasiswa pada PERIODE PRETES AKTIF yang sesuai programnya saja
+// (pendaftaran periode lama / di luar target program tidak dapat membuka ujian resmi)
+require_once __DIR__ . '/../includes/pretes-exam-access.php';
+$examAccess = pretesExamAccess($pdo, $user);
+$myReg = false;
+if (!empty($examAccess['registration'])) {
+    $stmtMyReg = $pdo->prepare("
+        SELECT pr.*, ps.tanggal, ps.waktu_mulai, ps.waktu_selesai, ps.ruangan as ruangan_tes
+        FROM pretes_registrations pr
+        LEFT JOIN pretes_schedules ps ON pr.periode = ps.periode AND ps.status = 'aktif'
+        WHERE pr.id = ? AND pr.user_id = ?
+        LIMIT 1
+    ");
+    $stmtMyReg->execute([(int)$examAccess['registration']['id'], $user['id']]);
+    $myReg = $stmtMyReg->fetch(PDO::FETCH_ASSOC);
+}
 
 // ── Privilege Khusus Akun Tester (Username 12345) ────────────────────────────
 $isTesterPrivileged = (isset($user['username']) && (string)$user['username'] === '12345') 
@@ -127,10 +132,11 @@ if (!$isCameraRequired) {
     $isVerified = true;
 }
 
-// Status pengerjaan: sakelar admin Buka/Tutup Ujian + jadwal sesi (pretesCbtExamStatus)
+// Status pengerjaan per mahasiswa: terdaftar periode aktif + sakelar admin + jadwal sesi
+// + jadwal pribadi hari pilihan pukul 13.00 WIB (pretesExamAccess)
 $examStatus = pretesCbtExamStatus($pdo);
-$isSessionOpen = $examStatus['open'] || $isTesterPrivileged;
-$sessionNotice = $examStatus['open'] ? '' : $examStatus['notice'];
+$isSessionOpen = $examAccess['allowed'] || $isTesterPrivileged;
+$sessionNotice = $isSessionOpen ? '' : $examAccess['notice'];
 // Peserta yang sudah memulai (sedang mengerjakan / sudah selesai) tetap bisa masuk untuk melanjutkan
 // atau melihat hasil walaupun admin menutup pengerjaan; yang diblokir hanya memulai ujian baru.
 if (!$isSessionOpen && $regId > 0) {
@@ -309,9 +315,9 @@ include __DIR__ . '/../includes/header.php';
     <!-- ── State: Mahasiswa Belum Terdaftar Pretes ── -->
     <div class="card" style="border:2px solid #0f766e; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px;">
         <span style="font-size:48px; display:block; margin-bottom:12px;">⚠️</span>
-        <h3 style="margin:0 0 8px; font-weight:800; color:#0f172a;">Anda Belum Terdaftar pada Sesi Pretes</h3>
-        <p style="color:#64748b; font-size:14px; max-width:500px; margin:0 auto 20px; line-height:1.5;">
-            Untuk dapat mengikuti ujian pretes dengan pengawasan AI, Anda wajib mendaftar dan mengunggah pasfoto resmi terlebih dahulu.
+        <h3 style="margin:0 0 8px; font-weight:800; color:#0f172a;">Anda Belum Terdaftar pada Periode Pretes yang Berlangsung</h3>
+        <p style="color:#64748b; font-size:14px; max-width:520px; margin:0 auto 20px; line-height:1.5;">
+            <?= sanitize($examAccess['notice'] ?? '') ?> Ujian CBT pretes hanya dapat diakses oleh mahasiswa yang terdaftar pada periode pretes aktif.
         </p>
         <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
             👉 Daftar Pretes Sekarang

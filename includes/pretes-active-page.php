@@ -35,15 +35,18 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     $stmt->execute([$activePretes['periode']]);
     $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Akses link pengerjaan diatur admin (Bank Soal CBT › Sesi Ujian › Buka/Tutup Ujian + jadwal sesi),
-    // tidak lagi memakai tanggal yang tertanam di kode.
-    require_once __DIR__ . '/pretes-cbt.php';
-    $examStatus = pretesCbtExamStatus($pdo);
+    // Akses link ujian resmi per mahasiswa: terdaftar periode aktif + sakelar admin + jadwal sesi
+    // + jadwal pribadi (hari pilihan pukul 13.00 WIB). Lihat includes/pretes-exam-access.php.
+    require_once __DIR__ . '/pretes-exam-access.php';
+    $examAccess = pretesExamAccess($pdo, $user);
     $isTesterPrivileged = (string)($user['username'] ?? '') === '12345'
         || (string)($user['nim'] ?? '') === '12345' || (int)$user['id'] === 12345;
-    $isUjianDibuka = $examStatus['open'] || $isTesterPrivileged;
-    $isTesterPreview = $isTesterPrivileged && !$examStatus['open'];
-    $examClosedNotice = $examStatus['notice'];
+    $isUjianDibuka = $examAccess['allowed'] || $isTesterPrivileged;
+    $isTesterPreview = $isTesterPrivileged && !$examAccess['allowed'];
+    $examClosedNotice = $examAccess['notice'];
+    $examSchedule = $examAccess['schedule'];
+    // Link Try Out ditampilkan di kotak akses soal untuk peserta terdaftar
+    $tryoutLink = $examAccess['registered'] || $isTesterPrivileged ? pretesExamTryoutLink($pdo) : null;
     $linkSoalPretes = BASE_URL . '/pretes-ujian.php';
 
     define('PAGE_TITLE', 'Peserta, Jadwal & Persiapan Pretes');

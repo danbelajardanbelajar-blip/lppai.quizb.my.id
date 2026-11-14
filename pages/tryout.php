@@ -11,6 +11,15 @@
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-tryout.php';
+require_once __DIR__ . '/../includes/pretes-exam-access.php';
+
+/** Tryout hanya untuk mahasiswa terdaftar periode pretes aktif (admin & akun tester 12345 untuk uji coba). */
+function tryoutUserAllowed(PDO $pdo, array $user): bool {
+    $role = strtolower((string)($user['role'] ?? 'mahasiswa'));
+    if ($role === 'admin') return true;
+    if ((string)($user['username'] ?? '') === '12345' || (string)($user['nim'] ?? '') === '12345' || (int)($user['id'] ?? 0) === 12345) return true;
+    return $role === 'mahasiswa' && pretesExamIsRegisteredActive($pdo, $user);
+}
 
 // ── API JSON ────────────────────────────────────────────────────────────────
 if (isset($_GET['api'])) {
@@ -38,6 +47,9 @@ if (isset($_GET['api'])) {
     $session = $sessionId ? pretesTryoutGetSession($pdo, (int)$sessionId) : null;
     if (!$session) $reply(404, ['success' => false, 'message' => 'Tryout tidak ditemukan.']);
     $userId = (int)getCurrentUser()['id'];
+    if (!tryoutUserAllowed($pdo, getCurrentUser())) {
+        $reply(403, ['success' => false, 'message' => 'Try out hanya untuk mahasiswa yang terdaftar pada periode pretes yang sedang berlangsung.']);
+    }
 
     try {
         $window = pretesTryoutWindow($session);
@@ -80,11 +92,13 @@ requireLogin();
 $user = getCurrentUser();
 $pdo  = getDBConnection();
 $userId = (int)$user['id'];
+$tryoutAllowed = tryoutUserAllowed($pdo, $user);
 
 $selectedId = filter_var($_GET['sesi'] ?? null, FILTER_VALIDATE_INT);
 $isFresh = !empty($_GET['baru']);
 $session = $selectedId ? pretesTryoutGetSession($pdo, (int)$selectedId) : null;
-$sessions = $session ? [] : pretesTryoutActiveSessions($pdo);
+if (!$tryoutAllowed) { $session = null; }
+$sessions = ($session || !$tryoutAllowed) ? [] : pretesTryoutActiveSessions($pdo);
 
 $fmtTime = static fn($ts) => $ts ? date('d/m/Y H:i', (int)$ts) : '-';
 $scoreText = static fn($a) => $a['submitted_at'] !== null ? number_format((float)$a['score'], 1) : 'Berlangsung';
@@ -112,7 +126,14 @@ include __DIR__ . '/../includes/header.php';
 .to-retake{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
 </style>
 
-<?php if (!$session): ?>
+<?php if (!$tryoutAllowed): ?>
+    <div class="to-empty">
+        <div style="font-size:40px">🔒</div>
+        <h3 style="margin:8px 0 6px">Try Out Khusus Peserta Pretes</h3>
+        <p style="margin:0 0 14px">Try out CBT hanya dapat dikerjakan oleh mahasiswa yang <strong>terdaftar pada periode pretes yang sedang berlangsung</strong>.</p>
+        <a class="btn btn-primary" href="<?= BASE_URL ?>/pretes-daftar.php">Daftar Pretes</a>
+    </div>
+<?php elseif (!$session): ?>
     <div class="to-hero">
         <h2>📝 Tryout CBT Pretes</h2>
         <p>Latihan ujian dengan sistem yang sama seperti CBT pretes resmi: soal dan pilihan acak, waktu dihitung server, nilai keluar otomatis. Nilai tryout <strong>tidak memengaruhi</strong> nilai atau kelulusan pretes resmi.</p>
