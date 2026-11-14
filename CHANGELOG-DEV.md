@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 17:13:51 +0700 — Export PDF jadwal mengajar dosen tutorial
+
+**ID:** TUTORIAL-LECTURER-SCHEDULE-PDF · **Parent Git:** `5314529`.
+**Permintaan:** export jadwal pada halaman hasil plotting untuk dibagikan kepada para dosen. Tombol di card dosen aktif membawa periode card secara eksplisit; tersedia filter satu dosen di pratinjau. Pengguna memilih Cetak / Simpan PDF dan tujuan Simpan sebagai PDF di browser, mengikuti pola cetak aplikasi yang sudah ada.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 17:07:08 | `includes/tutorial-scheduled-lecturers-view.php` | 10-16 | Tombol export pada card dosen aktif | Tambah tautan Export Jadwal Dosen / PDF di header card, membuka tab baru dan membawa ID periode aktif secara eksplisit. |
+| 2026-11-14 17:07:08 | `admin/tutorial-jadwal-dosen-export.php` | 1-43 | Endpoint export khusus admin | Validasi GET, ID periode dan filter dosen; periode eksplisit atau aktif, scope kelas memakai helper yang sama dengan card dosen, header no-store, tanpa mutasi database dan tanpa data mahasiswa. |
+| 2026-11-14 17:07:08 | `includes/tutorial-jadwal-dosen-export-view.php` | 1-92 | Pratinjau jadwal siap dibagikan | Kop/logo LPPAI, tahun ajaran/semester/gelombang, jumlah dosen/kelas, jadwal kelas/hari/jam/ruangan dan tanggal cetak. Pilihan semua/satu dosen, tombol Cetak / Simpan PDF melalui browser. A4 landscape, thead berulang, baris tidak terpotong, toolbar tidak dicetak, empty state dan escaping HTML. |
+| 2026-11-14 17:09:10 | `tests/tutorial-jadwal-dosen-export-test.py` | 1-77 | Integrasi HTTP export | Uji akses admin, GET-only, periode aktif/histori dan semester/gelombang yang tepat, legacy, filter dosen, perubahan kelas/hari/ruangan terbaru, escaping, input invalid, tanpa periode aktif, serta dump database tidak berubah saat export. |
+| 2026-11-14 17:12:46 | `tests/tutorial-jadwal-dosen-export-browser-test.cjs` | 1-53 | Chrome dan PDF | Uji tombol export aktual membuka periode aktif walau halaman utama melihat histori; logo, print, filter dosen, toolbar mobile, PDF A4 landscape satu halaman. Mode multi menguji 63 kelas/nama panjang menjadi 6 halaman dengan seluruh row dan thead berulang. |
+
+**Verifikasi:** `python tests/tutorial-jadwal-dosen-export-test.py`, `python tests/tutorial-scheduled-lecturers-test.py`, lint 3 file PHP, `node --check tests/tutorial-jadwal-dosen-export-browser-test.cjs` dan `git diff --check`: PASS. Chrome headless `node tests/tutorial-jadwal-dosen-export-browser-test.cjs <fixture-url>` serta mode `<fixture-url> multi`: PASS. PDF normal tepat 1 halaman landscape; fixture 63 kelas dengan teks panjang menghasilkan 6 halaman. Screenshot pratinjau diperiksa visual. Artefak lokal: `scratch/tutorial-jadwal-dosen-preview/schedule.png` dan `schedule.pdf` (diabaikan Git). Database fixture SQLite terisolasi; data produksi tidak diubah. Export memakai helper seleksi kelas yang sama dengan card dosen aktif.
+**Penerapan:** commit `Add shareable PDF teaching schedules for tutorial lecturers`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-14 16:55:44 +0700 — Edit ruangan pada jadwal dosen tutorial aktif
 
 **ID:** TUTORIAL-LECTURER-SCHEDULE-ROOM-EDIT · **Parent Git:** `bd0ce1b`.

@@ -7,7 +7,12 @@ if (!isset($scheduledLecturerClasses)) {
 <div class="card" id="scheduledTutorialLecturers" style="margin-top:24px;">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <span>👨‍🏫 Dosen Terjadwal Tutorial Aktif</span>
-        <span style="font-size:13px;"><?= count($scheduledLecturerClasses) ?> jadwal kelas</span>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span style="font-size:13px;"><?= count($scheduledLecturerClasses) ?> jadwal kelas</span>
+            <?php if ($scheduledTutorialPeriod && $scheduledLecturerClasses): ?>
+            <a class="btn btn-sm btn-primary" href="tutorial-jadwal-dosen-export.php?gelombang_id=<?= (int)$scheduledTutorialPeriod['id'] ?>" target="_blank" rel="noopener" data-no-spa>Export Jadwal Dosen / PDF</a>
+            <?php endif; ?>
+        </div>
     </div>
     <div class="card-body">
         <?php if (!$scheduledTutorialPeriod): ?>
