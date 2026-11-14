@@ -148,7 +148,7 @@
                 <div class="pretes-info-box">
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">👨‍🏫 Dosen Penguji</div>
                     <div style="font-size:13.5px;font-weight:700;color:#0f172a;word-break:break-word;">
-                        <?= sanitize($myReg['dosen_penguji'] ?: 'Menunggu pembagian') ?>
+                        <?= renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?>
                     </div>
                 </div>
             </div>

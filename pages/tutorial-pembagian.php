@@ -79,7 +79,7 @@ include __DIR__ . '/../includes/header.php';
 
                         <div>
                             <strong style="color:var(--text-muted);font-size:12px;">DOSEN</strong>
-                            <p style="font-size:15px;margin-top:4px;"><?= sanitize($reg['dosen_pengampu'] ?: '-') ?></p>
+                            <p style="font-size:15px;margin-top:4px;"><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></p>
                         </div>
                         <div>
                             <strong style="color:var(--text-muted);font-size:12px;">JADWAL</strong>

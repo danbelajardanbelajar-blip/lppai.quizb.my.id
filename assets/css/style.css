@@ -1382,3 +1382,43 @@ table tbody tr.removing {
     background: #ecfdf5 !important;
     color: var(--primary) !important;
 }
+
+/* WhatsApp Dosen Direct Button for Students */
+.btn-wa-dosen {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    padding: 2px 8px;
+    background: #25D366;
+    color: #ffffff !important;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none !important;
+    vertical-align: middle;
+    box-shadow: 0 1px 3px rgba(37, 211, 102, 0.35);
+    transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+}
+.btn-wa-dosen:hover {
+    background: #1eb954;
+    color: #ffffff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(30, 185, 84, 0.45);
+}
+.btn-wa-dosen svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: -1px;
+}
+@media print {
+    .btn-wa-dosen {
+        display: none !important;
+    }
+}
+

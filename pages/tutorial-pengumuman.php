@@ -212,7 +212,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
                         <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">👨‍🏫 TUTOR</div>
-                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= sanitize($latestReg['dosen_pengampu'] ?: '-') ?></div>
+                        <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= renderDosenWithWa($pdo, $latestReg['dosen_pengampu'] ?? null, $user, 'Konfirmasi Kelas Tutorial', '-') ?></div>
                     </div>
                     <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
                         <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">🗓️ JADWAL</div>

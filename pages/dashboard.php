@@ -119,7 +119,7 @@ $isUjianPretesDibuka = ($tglSekarangPretes >= $tglBukaUjianPretes) || $isTesterP
 
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
 $stmt = $pdo->prepare("
-    SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan 
+    SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan, tc.dosen_pengampu as kelas_dosen_pengampu 
     FROM tutorial_registrations tr 
     LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
     WHERE tr.user_id = ? AND (tr.tahun_ajaran LIKE '%2026%' OR tr.tahun_ajaran LIKE '%2027%' OR tr.tahun_ajaran LIKE '%2028%' OR tr.tahun_ajaran LIKE '%2029%' OR tr.tahun_ajaran LIKE '%2030%') 
@@ -358,7 +358,7 @@ include __DIR__ . '/../includes/header.php';
                     <span style="font-size:11px; font-weight:700; color:var(--text-muted); letter-spacing:0.5px; text-transform:uppercase;">Dosen Penguji</span>
                 </div>
                 <div style="font-size:15px; font-weight:600; color:#1e293b;">
-                    <?= sanitize($myPretesReg['dosen_penguji'] ?: 'Menunggu pembagian') ?>
+                    <?= renderDosenWithWa($pdo, $myPretesReg['dosen_penguji'] ?? null, $user, 'Konfirmasi Ujian Pretes', 'Menunggu pembagian') ?>
                 </div>
             </div>
         </div>
@@ -546,6 +546,7 @@ include __DIR__ . '/../includes/header.php';
                 <thead>
                     <tr>
                         <th>Kelas</th>
+                        <th>Tutor / Dosen</th>
                         <th>Gelombang</th>
                         <th>Jadwal / Hari Pilihan</th>
                         <th>Ruangan</th>
@@ -558,6 +559,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php foreach ($tutorialRegs as $reg): ?>
                     <tr>
                         <td><strong><?= sanitize($reg['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></strong></td>
+                        <td><?= renderDosenWithWa($pdo, $reg['dosen_pengampu'] ?? ($reg['kelas_dosen_pengampu'] ?? null), $user, 'Konfirmasi Kelas Tutorial', '-') ?></td>
                         <td>
                             <?php
                             $gelLabels = ['gel1' => 'Gelombang 1', 'gel2' => 'Gelombang 2', 'mandiri' => 'Mandiri'];

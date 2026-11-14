@@ -549,3 +549,241 @@ if (!function_exists('updateAngkatan2026ToRpl')) {
     }
 }
 
+if (!function_exists('normalizePhoneWa')) {
+    /**
+     * Menormalkan nomor HP menjadi format standar internasional WhatsApp (diawali 62 tanpa +).
+     */
+    function normalizePhoneWa($noHp): string {
+        if (function_exists('formatNoHp')) {
+            $formatted = formatNoHp($noHp);
+            if (!empty($formatted)) {
+                return (string)$formatted;
+            }
+        }
+        $clean = preg_replace('/[^0-9]/', '', (string)$noHp);
+        if (empty($clean)) {
+            return '';
+        }
+        if (str_starts_with($clean, '62')) {
+            return $clean;
+        }
+        if (str_starts_with($clean, '0')) {
+            return '62' . substr($clean, 1);
+        }
+        if (str_starts_with($clean, '8')) {
+            return '62' . $clean;
+        }
+        return $clean;
+    }
+}
+
+if (!function_exists('getDosenWaMessageTemplate')) {
+    /**
+     * Menghasilkan teks template pesan WhatsApp untuk menghubungi dosen dari role mahasiswa.
+     *
+     * Format:
+     * Assalamu'alaikum wr wb
+     *
+     * Perkenalkan nama saya : [Nama Mahasiswa]
+     * nim : [NIM Mahasiswa]
+     * jurursan/ prodi : [Jurusan/Prodi Mahasiswa]
+     * Keperluan : [Keperluan / Kosong untuk diisi mahasiswa]
+     *
+     *
+     * terima kasih
+     *
+     * @param array|null $student
+     * @param string|null $keperluan
+     * @param bool $useDots
+     * @return string
+     */
+    function getDosenWaMessageTemplate(?array $student = null, ?string $keperluan = null, bool $useDots = false): string {
+        if ($student === null && function_exists('getCurrentUser')) {
+            $student = getCurrentUser();
+        }
+
+        $nama = (!$useDots && !empty($student['nama_lengkap']))
+            ? trim((string)$student['nama_lengkap'])
+            : '........................';
+
+        $nimRaw = !empty($student['nim']) ? $student['nim'] : (!empty($student['username']) ? $student['username'] : '');
+        $nim = (!$useDots && !empty($nimRaw))
+            ? trim((string)$nimRaw)
+            : '.................................';
+
+        $prodiRaw = !empty($student['program_studi']) ? $student['program_studi'] : (!empty($student['jurusan']) ? $student['jurusan'] : '');
+        $prodi = (!$useDots && !empty($prodiRaw))
+            ? trim((string)$prodiRaw)
+            : '................................';
+
+        $keperluanVal = ($keperluan !== null && trim($keperluan) !== '')
+            ? trim($keperluan)
+            : ($useDots ? '..........................................' : '');
+
+        return "Assalamu'alaikum wr wb\n\n"
+            . "Perkenalkan nama saya : " . $nama . "\n"
+            . "nim : " . $nim . "\n"
+            . "jurursan/ prodi : " . $prodi . "\n"
+            . "Keperluan : " . $keperluanVal . "\n\n\n"
+            . "terima kasih";
+    }
+}
+
+if (!function_exists('getDosenPhoneByName')) {
+    /**
+     * Mencari nomor WhatsApp dosen dari tabel users berdasarkan nama dosen / tutor / penguji.
+     * Menggunakan in-memory cache dan pencocokan cerdas (exact, substring, dan title-stripped).
+     *
+     * @param PDO $pdo
+     * @param string|null $dosenName
+     * @param bool $forceRefresh
+     * @return string|null Nomor telepon format 62... atau null jika tidak ditemukan
+     */
+    function getDosenPhoneByName(PDO $pdo, ?string $dosenName, bool $forceRefresh = false): ?string {
+        static $lecturersCache = null;
+        static $resolvedCache = [];
+
+        if ($forceRefresh) {
+            $lecturersCache = null;
+            $resolvedCache = [];
+        }
+
+        $name = trim((string)($dosenName ?? ''));
+        if ($name === '') {
+            return null;
+        }
+
+        $lower = mb_strtolower($name);
+        $ignoreList = [
+            '-', 'menunggu pembagian', 'menunggu plotting', 'belum ditentukan',
+            'dosen penguji', 'dosen pengampu', 'tutor', 'no_tutor'
+        ];
+        if (in_array($lower, $ignoreList, true) || str_contains($lower, 'menunggu') || str_contains($lower, 'belum ditentukan')) {
+            return null;
+        }
+
+        if (isset($resolvedCache[$lower])) {
+            return $resolvedCache[$lower];
+        }
+
+        if ($lecturersCache === null) {
+            try {
+                $stmt = $pdo->query("SELECT id, nama_lengkap, no_hp, nim, username FROM users WHERE role = 'dosen' AND no_hp IS NOT NULL AND TRIM(no_hp) != ''");
+                $lecturersCache = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            } catch (Throwable $e) {
+                $lecturersCache = [];
+            }
+        }
+
+        if (empty($lecturersCache)) {
+            $resolvedCache[$lower] = null;
+            return null;
+        }
+
+        // 1. Exact match (case-insensitive)
+        foreach ($lecturersCache as $lec) {
+            $lecName = mb_strtolower(trim((string)($lec['nama_lengkap'] ?? '')));
+            if ($lecName !== '' && $lecName === $lower) {
+                $phone = normalizePhoneWa($lec['no_hp'] ?? '');
+                if (!empty($phone) && strlen($phone) >= 9) {
+                    $resolvedCache[$lower] = $phone;
+                    return $phone;
+                }
+            }
+        }
+
+        // 2. Substring match
+        foreach ($lecturersCache as $lec) {
+            $lecName = mb_strtolower(trim((string)($lec['nama_lengkap'] ?? '')));
+            if ($lecName === '') continue;
+            if (mb_strpos($lecName, $lower) !== false || mb_strpos($lower, $lecName) !== false) {
+                $phone = normalizePhoneWa($lec['no_hp'] ?? '');
+                if (!empty($phone) && strlen($phone) >= 9) {
+                    $resolvedCache[$lower] = $phone;
+                    return $phone;
+                }
+            }
+        }
+
+        // 3. Normalized / Title-stripped match
+        $stripTitles = static function(string $str): string {
+            $clean = preg_replace('/[,.]/', ' ', mb_strtolower($str));
+            $titles = [
+                'dr', 'dra', 'drs', 'prof', 'h', 'hj', 'lc', 'm pd', 's pd',
+                'm ag', 's ag', 'm si', 's si', 'm hum', 's hum', 'm kom',
+                's kom', 'm thi', 's thi', 'm pd i', 's pd i', 'ph d', 'mag'
+            ];
+            foreach ($titles as $t) {
+                $clean = preg_replace('/\b' . preg_quote($t, '/') . '\b/u', ' ', $clean);
+            }
+            return trim(preg_replace('/\s+/', ' ', $clean));
+        };
+
+        $targetClean = $stripTitles($name);
+        if ($targetClean !== '') {
+            foreach ($lecturersCache as $lec) {
+                $lecClean = $stripTitles((string)($lec['nama_lengkap'] ?? ''));
+                if ($lecClean !== '' && ($lecClean === $targetClean || mb_strpos($lecClean, $targetClean) !== false || mb_strpos($targetClean, $lecClean) !== false)) {
+                    $phone = normalizePhoneWa($lec['no_hp'] ?? '');
+                    if (!empty($phone) && strlen($phone) >= 9) {
+                        $resolvedCache[$lower] = $phone;
+                        return $phone;
+                    }
+                }
+            }
+        }
+
+        $resolvedCache[$lower] = null;
+        return null;
+    }
+}
+
+if (!function_exists('buildDosenWaUrl')) {
+    /**
+     * Membangun URL tautan wa.me dengan pesan template resmi.
+     */
+    function buildDosenWaUrl(string $phone, ?array $student = null, ?string $keperluan = null): string {
+        $cleanPhone = normalizePhoneWa($phone);
+        $msg = getDosenWaMessageTemplate($student, $keperluan);
+        return 'https://wa.me/' . $cleanPhone . '?text=' . rawurlencode($msg);
+    }
+}
+
+if (!function_exists('renderDosenWaButton')) {
+    /**
+     * Merender tombol ikon WhatsApp dengan SVG dan label WA.
+     */
+    function renderDosenWaButton(PDO $pdo, ?string $dosenName, ?array $student = null, ?string $keperluan = null, string $extraClass = ''): string {
+        $phone = getDosenPhoneByName($pdo, $dosenName);
+        if (empty($phone)) {
+            return '';
+        }
+
+        $url = buildDosenWaUrl($phone, $student, $keperluan);
+        $escapedUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
+        $classes = 'btn-wa-dosen' . ($extraClass !== '' ? ' ' . htmlspecialchars($extraClass, ENT_QUOTES, 'UTF-8') : '');
+        $style = 'display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 8px;background:#25D366;color:#ffffff!important;border-radius:9999px;font-size:11px;font-weight:700;line-height:1.4;text-decoration:none!important;vertical-align:middle;box-shadow:0 1px 3px rgba(37,211,102,0.35);white-space:nowrap;';
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="12" height="12" style="fill:currentColor;flex-shrink:0;vertical-align:-1px;" aria-hidden="true"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>';
+
+        return '<a href="' . $escapedUrl . '" target="_blank" rel="noopener noreferrer" class="' . $classes . '" style="' . $style . '" title="Chat WhatsApp dengan Dosen" aria-label="Chat WhatsApp Dosen">'
+            . $svg . '<span>WA</span></a>';
+    }
+}
+
+if (!function_exists('renderDosenWithWa')) {
+    /**
+     * Merender nama dosen yang disanitasi disertai tombol ikon pesan WhatsApp di sebelahnya jika nomor ditemukan.
+     */
+    function renderDosenWithWa(PDO $pdo, ?string $dosenName, ?array $student = null, ?string $keperluan = null, string $fallback = '-'): string {
+        $raw = trim((string)($dosenName ?? ''));
+        if ($raw === '' || in_array(strtolower($raw), ['-', 'menunggu pembagian', 'menunggu plotting', 'belum ditentukan'], true)) {
+            $displayFallback = $fallback !== '' ? $fallback : ($raw !== '' ? $raw : '-');
+            return htmlspecialchars($displayFallback, ENT_QUOTES, 'UTF-8');
+        }
+
+        $escaped = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
+        $btn = renderDosenWaButton($pdo, $raw, $student, $keperluan);
+        return $btn !== '' ? ($escaped . ' ' . $btn) : $escaped;
+    }
+}
+

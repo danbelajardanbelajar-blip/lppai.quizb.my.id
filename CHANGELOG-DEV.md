@@ -5,6 +5,49 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 22:21:00 +0700 — Tombol Ikon WhatsApp Direct Message Dosen & Template Pesan Resmi Mahasiswa
+
+**ID:** FEAT-STUDENT-DOSEN-WA-DIRECT-MESSAGE · **Parent Git:** `673ecc2`.
+**Permintaan:** Pada semua nama dosen yang ditampilkan di role mahasiswa, beri icon pesan WhatsApp agar mahasiswa bisa langsung chat wa.me ke dosen dengan template pesan resmi:
+Assalamu'alaikum wr wb
+
+Perkenalkan nama saya : ........................
+nim : .................................
+jurursan/ prodi : ................................
+Keperluan : ..........................................
+
+
+terima kasih
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 22:15:08 | `includes/user-helper.php` | 552–720 | Helper WhatsApp Dosen | Menambahkan 5 fungsi terpusat: `normalizePhoneWa($noHp)` (standarisasi 62...), `getDosenWaMessageTemplate($student, $keperluan, $useDots)` (format salam, nama, nim, jurursan/ prodi, keperluan, terima kasih otomatis dari sesi mahasiswa), `getDosenPhoneByName($pdo, $dosenName)` (in-memory cache cerdas dengan pencocokan exact, substring, dan title-stripped dari tabel `users` dengan `role = 'dosen'`), `buildDosenWaUrl($phone, ...)` (generasi tautan `https://wa.me/...` dengan `rawurlencode`), `renderDosenWaButton($pdo, ...)` (merender tombol badge SVG WhatsApp resmi), dan `renderDosenWithWa($pdo, $dosenName, ...)` (merender nama dosen tersanitasi disertai ikon WhatsApp jika nomor ditemukan, aman dari placeholder). |
+| 2026-11-14 22:16:12 | `assets/css/style.css` | 1385–1424 | Styling Tombol Ikon WhatsApp Dosen | Menambahkan CSS `.btn-wa-dosen` (background WhatsApp green `#25D366`, hover `#1eb954`, pill badge rounded 9999px, box shadow lembut, SVG icon inline, dan `@media print` display none agar rapi saat dicetak). |
+| 2026-11-14 22:17:38 | `pages/dashboard.php` | 122, 361, 549, 562 | Dashboard Mahasiswa | Menambahkan `tc.dosen_pengampu as kelas_dosen_pengampu` pada query SELECT pendaftaran tutorial, merender tombol WA pada Dosen Penguji pretes (`renderDosenWithWa`), serta menambahkan kolom "Tutor / Dosen" pada tabel "Kelas Tutorial Saya" lengkap dengan tombol WhatsApp. |
+| 2026-11-14 22:18:09 | `pages/pretes-daftar.php` | 257 | Halaman Pendaftaran Pretes | Mengganti tampilan statis Dosen Penguji dengan `renderDosenWithWa` pada kartu rincian pendaftaran mahasiswa. |
+| 2026-11-14 22:18:09 | `pages/pretes-hasil.php` | 659 | Halaman Hasil & Pengumuman Pretes | Mengganti tampilan nama Dosen Penguji dengan `renderDosenWithWa` pada banner informasi jadwal dan pelaksanaan ujian mahasiswa. |
+| 2026-11-14 22:18:09 | `includes/pretes-participant-view.php` | 151 | Tampilan Peserta Aktif Pretes | Mengganti tampilan nama Dosen Penguji dengan `renderDosenWithWa` pada info box kartu peserta aktif pretes. |
+| 2026-11-14 22:18:09 | `includes/pretes-stage.php` | 149 | Kartu Tahap Pretes Universal | Menghubungkan penguji pada kartu tahap pretes terintegrasi dengan `renderDosenWithWa`. |
+| 2026-11-14 22:18:09 | `pages/tutorial-info.php` | 300 | Halaman Informasi & Bimbingan Tutorial | Menambahkan tombol pesan WhatsApp pada item Tutor di grid informasi kelas tutorial mahasiswa. |
+| 2026-11-14 22:18:09 | `pages/tutorial-pembagian.php` | 82 | Halaman Pembagian Kelas Tutorial | Mengganti teks dosen menjadi `renderDosenWithWa` pada kartu kelas tutorial mahasiswa. |
+| 2026-11-14 22:18:09 | `pages/tutorial-pendaftaran.php` | 244 | Halaman Pendaftaran Tutorial | Mengganti teks Dosen menjadi `renderDosenWithWa` pada kartu ringkasan kelas pendaftaran tutorial mahasiswa. |
+| 2026-11-14 22:18:09 | `pages/tutorial-pengumuman.php` | 215 | Halaman Pengumuman Tutorial | Mengganti teks Tutor menjadi `renderDosenWithWa` pada grid informasi plotting tutorial mahasiswa. |
+| 2026-11-14 22:19:51 | `includes/announcement-helper.php` | 401, 438 | Helper Pengumuman Tutorial | Mengganti tampilan Dosen pada kartu kelas personal dan tabel daftar kelas tutorial dengan `renderDosenWithWa`. |
+| 2026-11-14 22:18:09 | `includes/pretes-card.php` | 862 | Kartu Peserta Pretes Digital | Menampilkan tombol WhatsApp di samping nama dosen penguji pada tampilan layar (otomatis disembunyikan saat dicetak via media print). |
+| 2026-11-14 22:18:36 | `tests/dosen-wa-link-test.php` | 1–110 | Suite Pengujian Otomatis WhatsApp Dosen | Pengujian komprehensif: verifikasi format template pesan (nama, nim, jurursan/ prodi, keperluan, salam & penutup), fallback dots jika kosong, pencocokan nomor telepon dosen (exact, title-stripped, +62 prefix, null phone, placeholder handling), pembentukan tag button SVG, verifikasi integrasi 11 file tampilan mahasiswa, dan styling CSS. |
+
+**Alasan:** Memudahkan mahasiswa berkomunikasi secara langsung, santun, dan terstruktur dengan dosen penguji pretes maupun dosen tutor kelas tutorial melalui tautan WhatsApp wa.me resmi, sekaligus mengeliminasi kebingungan mahasiswa dalam menyusun format perkenalan dan identitas akademik.
+**Dampak:** Setiap nama dosen yang ditampilkan pada antarmuka role mahasiswa kini memiliki tombol hijau ikon pesan WhatsApp interaktif yang rapi. Ketika diklik, WhatsApp langsung terbuka dengan pesan yang sudah terisi otomatis nama lengkap, NIM, serta program studi mahasiswa yang bersangkutan, sehingga mahasiswa hanya perlu melengkapi keperluan dan mengirimkannya.
+**Verifikasi:**
+- `php -l` pada 12 file PHP yang diubah -> No syntax errors detected.
+- `php tests/dosen-wa-link-test.php` -> 5 tahap pengujian (template, fallback dots, lookup telepon, render HTML, integrasi file) LOLOS 100%.
+- Seluruh unit tests PHP di repositori -> PASS tanpa regresi.
+**Penerapan:** Commit dan push ke `origin/main`. Pada cPanel terminal hosting jalankan `cd ~/public_html/lppai.quizb.my.id/web && git pull origin main`.
+
+---
+
 ## 2026-11-14 22:19:51 +0700 — Mode Tryout CBT Pretes (terpisah dari ujian resmi)
 
 **Ringkasan:** Tryout memakai mesin CBT yang sama (bank/paket, kuota kategori, acak soal & pilihan, timer server, nilai otomatis) tetapi attempt-nya terpisah dari ujian resmi, bisa diulang dengan batas, tanpa syarat daftar pretes & tanpa verifikasi wajah, dan dapat aktif bersamaan dengan sesi resmi. Sebelumnya `UNIQUE(user_id, registration_id)` membuat tryout memakan jatah ujian resmi dan hanya satu sesi yang bisa aktif.

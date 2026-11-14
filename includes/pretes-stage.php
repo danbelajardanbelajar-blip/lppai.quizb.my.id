@@ -146,7 +146,7 @@ if (!function_exists('renderPretesStageCard')) {
             </div>
             <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
                 <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">👨‍🏫 PENGUJI</div>
-                <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= $e(($reg['dosen_penguji'] ?? '') ?: 'Menunggu plotting') ?></div>
+                <div style="font-weight:700; color:#0f172a; margin-top:4px;"><?= (function_exists('renderDosenWithWa') && function_exists('getDBConnection')) ? renderDosenWithWa(getDBConnection(), $reg['dosen_penguji'] ?? null, null, 'Konfirmasi Ujian Pretes', 'Menunggu plotting') : $e(($reg['dosen_penguji'] ?? '') ?: 'Menunggu plotting') ?></div>
             </div>
             <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; padding:12px;">
                 <div style="font-size:11px; font-weight:800; color:#64748b; letter-spacing:.05em;">📊 PENILAIAN</div>
