@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:04:16 +0700 — Cetak absensi tutorial dari hasil plotting
+
+**ID:** TUTORIAL-PLOTTING-PRINT-ATTENDANCE · **Parent Git:** `7df404d`.
+**Permintaan:** sediakan tombol cetak absensi pada hasil plotting tutorial mengikuti format absensi pretes. Pratinjau memakai kop dan logo yang sama dengan pretes, dengan metadata kelas dan dosen tutorial serta cetak/simpan PDF. Tidak membuat sesi atau QR absensi pretes untuk tutorial.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:00:54 | `admin/tutorial-hasil-plotting.php` | 11-29, 49-81, 541-546, 738 | Route dan tombol cetak | Tambah mode cetak GET setelah seleksi data tabel, akses tetap requireAdmin, validasi periode; lewatkan UPDATE sinkronisasi dosen pada mode cetak agar baca-saja. Sisipkan panel cetak pada halaman hasil plotting. |
+| 2026-11-14 16:00:54 | `includes/tutorial-absensi-form.php` | 1-42 | Panel Cetak Absensi Tutorial | Tombol Cetak Absensi / PDF membuka tab baru; periode eksplisit mengikuti halaman, filter kelas/hari/dosen/ruangan. Semua nilai opsi di-escape. |
+| 2026-11-14 15:59:33 | `includes/tutorial-absensi-view.php` | 1-164 | Pratinjau dan cetak A4 | Gunakan peserta dan kelas yang sama persis dengan tabel plotting; filter dan kelompokkan per ID kelas, maksimal 25 peserta/lembar. Kop/logo LPPAI, jadwal aktual, nomor berlanjut, tanda tangan, rekap hadir, tanda tangan dosen. Fit konten A4 sebelum cetak, empty state, validasi kelas/filter dan no-store. |
+| 2026-11-14 16:02:41 | `tests/tutorial-absensi-http-test.py` | 1-143 | Integrasi endpoint aktual | Fixture PDO SQLite terisolasi; uji autentikasi admin, periode aktif/terpilih/semua, filter gabungan, peserta legacy, deduplikasi, pengecualian lulus/histori sesuai tabel, escaping, input invalid, pembagian lembar, dan dump database tidak berubah. |
+| 2026-11-14 16:02:41 | `tests/tutorial-absensi-browser-test.cjs` | 1-47 | Chrome dan PDF | Uji submit form aktual ke tab baru dengan filter, logo termuat, 30 baris peserta, pas A4, PDF tepat 2 halaman per kelas 30 peserta dan 3 halaman untuk 2 kelas, tombol pada layar 390px, tanpa error JavaScript. |
+
+**Verifikasi:** `python tests/tutorial-absensi-http-test.py`, `php tests/tutorial-hasil-plotting-filter-test.php`, lint 3 file PHP, `node --check tests/tutorial-absensi-browser-test.cjs`, dan `git diff --check`: PASS. Chrome headless menguji form aktual dengan fixture HTTP terisolasi melalui `node tests/tutorial-absensi-browser-test.cjs <fixture-url>`: PASS. PDF 2 halaman/kelas dan 3 halaman/semua kelas diverifikasi; screenshot diperiksa visual, kop/tabel/tanda tangan tidak terpotong. Artefak lokal di `scratch/tutorial-absensi-preview/` (diabaikan Git). Cabang SQL yang dipakai cetak sama dengan tabel existing; tidak mengubah filter kelulusan/periode pada tabel. Pengujian memakai SQLite, bukan database produksi. Peringatan openssl ganda berasal dari konfigurasi PHP lokal yang sudah ada.
+**Penerapan:** commit `Add printable tutorial attendance sheets to plotting results`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, kemudian Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-14 15:53:34 +0700 — Opsi tindih plotting jadwal tutorial
 
 **ID:** TUTORIAL-GENERATE-OVERWRITE · **Parent Git:** `be7af6f`.

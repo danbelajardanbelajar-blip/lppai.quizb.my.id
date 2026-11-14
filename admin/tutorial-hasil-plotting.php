@@ -8,7 +8,15 @@ requireAdmin();
 
 $pdo = getDBConnection();
 
+$printAttendance = isset($_GET['cetak_absensi']);
+if ($printAttendance && $_SERVER['REQUEST_METHOD'] !== 'GET') {
+    http_response_code(405);
+    header('Allow: GET');
+    exit('Gunakan tombol Cetak Absensi pada halaman hasil plotting.');
+}
+
 // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users (role = dosen)
+if (!$printAttendance) {
 try {
     $pdo->exec("
         UPDATE tutorial_classes tc
@@ -17,6 +25,7 @@ try {
     ");
 } catch(PDOException $e) {
     // Ignore if errors
+}
 }
 
 $message = '';
@@ -37,6 +46,10 @@ if (!$active_gel && !empty($allGelombang)) {
     $active_gel = $allGelombang[0];
 }
 
+if (isset($_GET['gelombang_id']) && !is_string($_GET['gelombang_id'])) {
+    http_response_code(400);
+    exit('Periode tutorial tidak valid.');
+}
 $selected_gel_id = isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active';
 $current_gel = null;
 
@@ -50,10 +63,18 @@ if ($selected_gel_id === 'all') {
         }
     }
     if (!$current_gel) {
+        if ($printAttendance) {
+            http_response_code(404);
+            exit('Periode tutorial tidak ditemukan.');
+        }
         $current_gel = $active_gel;
         $selected_gel_id = 'active';
     }
 } else {
+    if ($printAttendance && $selected_gel_id !== 'active') {
+        http_response_code(400);
+        exit('Periode tutorial tidak valid.');
+    }
     $selected_gel_id = 'active';
     $current_gel = $active_gel;
 }
@@ -517,6 +538,13 @@ if ($current_gel) {
     ")->fetchAll(PDO::FETCH_ASSOC);
 }
 
+if ($printAttendance) {
+    header('Cache-Control: private, no-store');
+    header('Content-Type: text/html; charset=UTF-8');
+    require __DIR__ . '/../includes/tutorial-absensi-view.php';
+    exit;
+}
+
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll(PDO::FETCH_ASSOC);
 $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -707,6 +735,8 @@ $chartLabels = json_encode(array_values($statsLabels));
 $chartData = json_encode(array_values($statsKelas));
 ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<?php include __DIR__ . '/../includes/tutorial-absensi-form.php'; ?>
+
 <div class="card" style="margin-top: 30px;">
     <div class="card-header" style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0;">
         <span style="font-size:16px; font-weight:600; color:#1e293b; display:flex; align-items:center; gap:8px;">
