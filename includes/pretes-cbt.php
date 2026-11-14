@@ -122,6 +122,8 @@ function ensurePretesCbtTables(PDO $pdo): void {
     foreach ([
         ['mode', "VARCHAR(20) NOT NULL DEFAULT 'resmi'"],
         ['max_attempts', 'INTEGER NOT NULL DEFAULT 1'],
+        // Sakelar admin "Buka/Tutup Ujian" untuk sesi resmi (1 = peserta boleh mulai mengerjakan)
+        ['exam_open', 'INTEGER NOT NULL DEFAULT 0'],
     ] as [$colName, $colDef]) {
         try {
             $hasCol = false;
@@ -168,7 +170,7 @@ function ensurePretesCbtTables(PDO $pdo): void {
         // Inisialisasi default session jika tabel sessions kosong
         if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions')->fetchColumn() === 0) {
             $now = time();
-            $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, 1, ?)")
+            $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at, exam_open) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, 1, ?, 1)")
                 ->execute([$now]);
         }
 
@@ -287,7 +289,7 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
     }
 }
 
-function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null): array {
+function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null, bool $ignoreExamClosed = false): array {
     $now ??= time();
     $pdo->beginTransaction();
     try {
@@ -296,6 +298,11 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
             // Tryout memakai sesinya sendiri; ujian resmi memakai sesi resmi yang aktif
             $session = $forcedSession ?? pretesCbtGetActiveSession($pdo);
             $sessionId = $session ? (int)$session['id'] : null;
+
+            // Sakelar admin: pengerjaan ujian resmi ditutup (tryout tidak memakai sakelar ini)
+            if ($session && !$forcedSession && !$ignoreExamClosed && (int)($session['exam_open'] ?? 1) !== 1) {
+                throw new RuntimeException('Pengerjaan ujian pretes sedang ditutup oleh admin. Silakan tunggu informasi pembukaan ujian.');
+            }
 
             // Validasi Jadwal Waktu Mulai & Selesai Sesi
             if ($session) {
@@ -830,6 +837,8 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
     $mode = (($input['mode'] ?? 'resmi') === 'tryout') ? 'tryout' : 'resmi';
     // max_attempts: resmi selalu 1; tryout 0 = tanpa batas, 1–99 = batas jumlah pengerjaan
     $maxAttempts = $mode === 'tryout' ? max(0, min(99, (int)($input['max_attempts'] ?? 0))) : 1;
+    $examOpen = array_key_exists('exam_open', $input) ? ((int)$input['exam_open'] === 1 ? 1 : 0) : null;
+    if ($mode === 'tryout') $examOpen = 1;
 
     $pdo->beginTransaction();
     try {
@@ -852,6 +861,9 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
                 $token, $tokenRequired, $shuffleOnViolation, $isActive, $mode, $maxAttempts, $sessionId
             ]);
+            if ($examOpen !== null) {
+                $pdo->prepare('UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ?')->execute([$examOpen, $sessionId]);
+            }
         } else {
             $code = trim((string)($input['code'] ?? ''));
             if ($code === '') {
@@ -864,6 +876,7 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
                 $token, $tokenRequired, $shuffleOnViolation, $isActive, time(), $mode, $maxAttempts
             ]);
             $sessionId = (int)$pdo->lastInsertId();
+            $pdo->prepare('UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ?')->execute([$examOpen ?? 1, $sessionId]);
         }
         $pdo->commit();
         return $sessionId;
@@ -926,6 +939,51 @@ function pretesCbtDeleteSessions(PDO $pdo, array $sessionIds): int {
         if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SAKELAR BUKA / TUTUP PENGERJAAN UJIAN RESMI
+// ══════════════════════════════════════════════════════════════════════════
+
+/** Buka (true) atau tutup (false) pengerjaan ujian untuk satu sesi RESMI. */
+function pretesCbtSetExamOpen(PDO $pdo, int $sessionId, bool $open): bool {
+    if ($sessionId <= 0) return false;
+    ensurePretesCbtTables($pdo);
+    $stmt = $pdo->prepare("UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ? AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
+    $stmt->execute([$open ? 1 : 0, $sessionId]);
+    if ($stmt->rowCount() > 0) return true;
+    $chk = $pdo->prepare("SELECT 1 FROM pretes_cbt_sessions WHERE id = ? AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
+    $chk->execute([$sessionId]);
+    return (bool)$chk->fetchColumn(); // nilai sama dengan sebelumnya juga dianggap berhasil
+}
+
+/**
+ * Status pengerjaan ujian resmi untuk peserta (satu sumber kebenaran untuk halaman peserta,
+ * dashboard, halaman ujian, dan admin).
+ * @return array{open:bool, reason:string, notice:string, session:?array}
+ *   reason: open | no_session | closed | not_started | ended
+ */
+function pretesCbtExamStatus(PDO $pdo, ?int $now = null): array {
+    $now ??= time();
+    $session = pretesCbtGetActiveSession($pdo);
+    $fmt = static fn(int $ts) => (new DateTimeImmutable('@' . $ts))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+    if (!$session) {
+        return ['open' => false, 'reason' => 'no_session', 'session' => null,
+            'notice' => 'Belum ada sesi ujian pretes resmi yang aktif. Silakan tunggu informasi dari admin LPPAI.'];
+    }
+    if ((int)($session['exam_open'] ?? 1) !== 1) {
+        return ['open' => false, 'reason' => 'closed', 'session' => $session,
+            'notice' => 'Pengerjaan ujian pretes belum dibuka / sedang ditutup oleh admin. Silakan persiapkan diri dan tunggu informasi pembukaan ujian.'];
+    }
+    if (!empty($session['start_time']) && ($ts = strtotime($session['start_time'])) !== false && $now < $ts) {
+        return ['open' => false, 'reason' => 'not_started', 'session' => $session,
+            'notice' => "Ujian pretes dapat dimulai pada {$fmt($ts)} WIB."];
+    }
+    if (!empty($session['end_time']) && ($ts = strtotime($session['end_time'])) !== false && $now > $ts) {
+        return ['open' => false, 'reason' => 'ended', 'session' => $session,
+            'notice' => "Sesi ujian pretes telah ditutup sejak {$fmt($ts)} WIB."];
+    }
+    return ['open' => true, 'reason' => 'open', 'session' => $session, 'notice' => 'Pengerjaan ujian pretes telah dibuka.'];
 }
 
 // ══════════════════════════════════════════════════════════════════════════

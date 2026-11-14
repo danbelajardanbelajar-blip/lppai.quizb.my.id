@@ -330,6 +330,7 @@
             get('sesModalActive').checked = Number(data.is_active) === 1;
             if (get('sesModalMode')) get('sesModalMode').value = data.mode === 'tryout' ? 'tryout' : 'resmi';
             if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = data.mode === 'tryout' ? String(Number(data.max_attempts) || 0) : '0';
+            if (get('sesModalExamOpen')) get('sesModalExamOpen').checked = Number(data.exam_open) === 1;
             syncSessionModeFields();
 
             const pkgIds = data.package_ids || [];
@@ -359,6 +360,7 @@
             get('sesModalActive').checked = true;
             if (get('sesModalMode')) get('sesModalMode').value = window._cbtNewSessionMode === 'tryout' ? 'tryout' : 'resmi';
             if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = '0';
+            if (get('sesModalExamOpen')) get('sesModalExamOpen').checked = false; // sesi resmi baru: ujian ditutup sampai admin membuka
             window._cbtNewSessionMode = null;
             syncSessionModeFields();
 
@@ -377,6 +379,9 @@
         const wrap = get('sesModalMaxAttemptsWrap');
         if (wrap) wrap.style.opacity = mode === 'tryout' ? '1' : '0.45';
         if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').disabled = mode !== 'tryout';
+        // Sakelar buka/tutup hanya untuk sesi resmi (tryout dibuka lewat status aktif & jadwal)
+        const examWrap = get('sesModalExamOpenWrap');
+        if (examWrap) examWrap.style.display = mode === 'tryout' ? 'none' : '';
     }
     document.addEventListener('change', function (e) {
         if (e.target && e.target.id === 'sesModalMode') syncSessionModeFields();

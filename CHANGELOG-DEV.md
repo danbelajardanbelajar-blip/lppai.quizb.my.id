@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 22:43:25 +0700 — Sakelar admin "🟢 Buka / 🔴 Tutup Ujian" pretes & hapus tanggal 16 Nov yang tertanam
+
+**Ringkasan:** Admin kini membuka/menutup pengerjaan ujian pretes resmi kapan saja dari **Bank Soal CBT › Sesi Ujian** (banner status + tombol, juga per baris sesi dan checkbox di modal Edit Sesi). Tanggal `'2026-11-16'` yang tertanam di kode dihapus; semua titik (halaman peserta, dashboard, halaman ujian, API/mesin) memakai satu fungsi status `pretesCbtExamStatus()` = sakelar + jadwal mulai/batas sesi.
+**Migrasi aman:** kolom baru `exam_open` default 0 → sesi resmi yang sudah ada di server otomatis **TERTUTUP** sampai admin menekan **🟢 Buka Ujian** (diuji pada skema lama). Instalasi baru (seed) terbuka seperti sebelumnya.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/pretes-cbt.php` | 125–126 | `ensurePretesCbtTables()` | Kolom `pretes_cbt_sessions.exam_open INTEGER NOT NULL DEFAULT 0`. |
+| `includes/pretes-cbt.php` | 173 | Seed sesi bawaan | `exam_open = 1` untuk instalasi baru. |
+| `includes/pretes-cbt.php` | 292, 302–306 | `pretesCbtStart()` | Param `$ignoreExamClosed`; mulai ujian resmi ditolak bila `exam_open = 0` ("…sedang ditutup oleh admin"). Tryout (sesi dipaksa) tidak terpengaruh. Attempt yang sudah berjalan tetap bisa disimpan/dikumpulkan. |
+| `includes/pretes-cbt.php` | 840–841, 864–866, 879 | `pretesCbtSaveSession()` | Field `exam_open`: tidak dikirim → nilai lama dipertahankan (insert: 1); tryout selalu 1. |
+| `includes/pretes-cbt.php` | 944–988 (baru) | `pretesCbtSetExamOpen()`, `pretesCbtExamStatus()` | Sakelar khusus sesi resmi; status `open/no_session/closed/not_started/ended` + pesan WIB. |
+| `includes/pretes-active-page.php` | 38–46 | Halaman peserta aktif | `$isUjianDibuka = pretesCbtExamStatus()['open'] || tester`; `$isTesterPreview`, `$examClosedNotice`. |
+| `includes/pretes-participant-view.php` | 248–297 | Blok akses soal | Tanpa teks/tanggal 16 Nov; pesan tertutup dari status admin. *(ikut ter-commit di `81869b7` oleh sesi lain)* |
+| `pages/dashboard.php` | 112–121 | Gating dashboard | Tombol "Masuk/Kerjakan Ujian Pretes" mengikuti `pretesCbtExamStatus()` (try/catch). *(ikut ter-commit di `81869b7`)* |
+| `pages/pretes-ujian.php` | 130–141 | Status sesi | Logika jadwal lama diganti `pretesCbtExamStatus()`; peserta yang sudah punya attempt tetap bisa masuk (lanjut/lihat hasil) walau ditutup. |
+| `api/pretes-cbt.php` | 44 | Aksi start | Akun tester boleh mulai walau ditutup. |
+| `admin/pretes-bank-soal.php` | 100, 126–141 | Controller | Aksi `set_exam_open` (CSRF, flash pesan, redirect tab Sesi). |
+| `includes/pretes-cbt-admin-view.php` | 175–207 | Tab Sesi | Banner status 🟢/🔴 + tombol utama **Buka/Tutup Ujian** (konfirmasi). |
+| `includes/pretes-cbt-admin-view.php` | 320, 332–340 | Baris sesi resmi | Badge "🟢 Ujian dibuka / 🔴 Ujian ditutup" + tombol per sesi. |
+| `includes/pretes-cbt-admin-view.php` | 698–702 | Modal Sesi | Checkbox **Buka Pengerjaan Ujian** (hidden 0 + checkbox 1). |
+| `assets/css/pretes-cbt-admin.css` | 238–245 | Gaya | `.bank-exam-switch` (hijau/merah). |
+| `assets/js/pretes-cbt-admin.js` | 333, 363, 382–384 | Modal sesi | Isi checkbox saat edit, default tertutup untuk sesi baru, sembunyikan untuk tryout. |
+| `tests/pretes-peserta-instruksi-test.php` | 28–34 | Assertion | Dari "tanggal 16 Nov tertanam" → "gating via `pretesCbtExamStatus` tanpa tanggal tertanam". |
+| `tests/pretes-exam-open-test.php` (baru) | 1–83 | Test | Buka/tutup, start ditolak & tester boleh, attempt berjalan aman, jadwal, simpan sesi, tryout terpisah, no_session, integrasi. |
+
+**Verifikasi:** `php -l` & `node --check` OK; `pretes-exam-open-test` PASS; 10 test `pretes-cbt*`, tryout (2), peserta (2), stage, hasil-active-period, target-program, 2 test `.cjs` PASS; simulasi migrasi skema lama → `exam_open = 0` (tertutup); render admin tab Sesi status tertutup/terbuka tanpa error.
+
+---
+
 ## 2026-11-14 22:40:00 +0700 — Penyesuaian Field Keperluan Template WhatsApp Dosen agar Tidak Diisi Otomatis (Tetap Titik-Titik Sesuai Format Resmi)
 
 **ID:** FIX-DOSEN-WA-TEMPLATE-KEPERLUAN · **Parent Git:** `8acd9cc`.

@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
     if ($action === 'import_xlsx') {
         $activeTab = 'import';
-    } elseif (in_array($action, ['save_session', 'activate_session', 'delete_session', 'delete_sessions'], true)) {
+    } elseif (in_array($action, ['save_session', 'activate_session', 'delete_session', 'delete_sessions', 'set_exam_open'], true)) {
         $activeTab = 'sessions';
     } elseif (in_array($action, ['save_package', 'activate_package', 'delete_package', 'delete_packages'], true)) {
         $activeTab = 'packages';
@@ -119,6 +119,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode(['success' => true, 'message' => $flashMsg, 'session_id' => $sesId]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'set_exam_open') {
+            // Sakelar admin: buka / tutup pengerjaan ujian pretes resmi
+            $sesId = (int)($_POST['session_id'] ?? 0);
+            $open = (int)($_POST['open'] ?? 0) === 1;
+            if ($sesId <= 0) throw new InvalidArgumentException('ID sesi ujian tidak valid.');
+            if (!pretesCbtSetExamOpen($pdo, $sesId, $open)) throw new InvalidArgumentException('Sesi ujian resmi tidak ditemukan.');
+            $flashMsg = $open
+                ? '🟢 Pengerjaan ujian pretes DIBUKA. Peserta dapat menekan "Kerjakan Soal Pretes" (tetap mengikuti jadwal mulai/batas sesi bila diisi).'
+                : '🔴 Pengerjaan ujian pretes DITUTUP. Peserta tidak dapat memulai ujian baru; peserta yang sedang mengerjakan tetap dapat menyelesaikan.';
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
                 exit;
             }
             $_SESSION['cbt_bank_flash'] = $flashMsg;

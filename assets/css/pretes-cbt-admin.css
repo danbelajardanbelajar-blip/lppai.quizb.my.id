@@ -235,6 +235,14 @@
     color: #047857;
 }
 
+/* Sakelar Buka/Tutup pengerjaan ujian pretes resmi */
+.bank-exam-switch{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin:0 22px 14px;padding:14px 18px;border-radius:14px;border:2px solid}
+.bank-exam-switch.is-open{background:#f0fdf4;border-color:#86efac;color:#14532d}
+.bank-exam-switch.is-closed{background:#fef2f2;border-color:#fca5a5;color:#7f1d1d}
+.bank-exam-switch-info{flex:1;min-width:240px}
+.bank-exam-switch-state{font-weight:900;font-size:14.5px;letter-spacing:.02em}
+.bank-exam-switch-desc{font-size:12.5px;line-height:1.55;margin-top:4px}
+
 /* ═══════════════════════════════════════════════════════════════════════
    MODAL SCROLL LAYOUT (Tambah/Edit Sesi, Tambah/Edit Soal, Paket, Kelola Soal)
    <form> membungkus .bank-modal-body + .bank-modal-foot di dalam .bank-modal

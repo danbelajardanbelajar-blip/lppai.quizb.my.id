@@ -127,26 +127,18 @@ if (!$isCameraRequired) {
     $isVerified = true;
 }
 
-$isSessionOpen = true;
-$sessionNotice = '';
-if ($activeSession) {
-    $now = time();
-    if (!empty($activeSession['start_time'])) {
-        $startTs = strtotime($activeSession['start_time']);
-        if ($startTs !== false && $now < $startTs) {
-            $isSessionOpen = false;
-            $startFmt = (new DateTimeImmutable('@' . $startTs))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
-            $sessionNotice = "Sesi ujian '{$activeSession['title']}' belum dibuka. Ujian dijadwalkan dapat dimulai pada {$startFmt} WIB.";
-        }
-    }
-    if ($isSessionOpen && !empty($activeSession['end_time'])) {
-        $endTs = strtotime($activeSession['end_time']);
-        if ($endTs !== false && $now > $endTs) {
-            $isSessionOpen = false;
-            $endFmt = (new DateTimeImmutable('@' . $endTs))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
-            $sessionNotice = "Sesi ujian '{$activeSession['title']}' telah ditutup sejak {$endFmt} WIB.";
-        }
-    }
+// Status pengerjaan: sakelar admin Buka/Tutup Ujian + jadwal sesi (pretesCbtExamStatus)
+$examStatus = pretesCbtExamStatus($pdo);
+$isSessionOpen = $examStatus['open'] || $isTesterPrivileged;
+$sessionNotice = $examStatus['open'] ? '' : $examStatus['notice'];
+// Peserta yang sudah memulai (sedang mengerjakan / sudah selesai) tetap bisa masuk untuk melanjutkan
+// atau melihat hasil walaupun admin menutup pengerjaan; yang diblokir hanya memulai ujian baru.
+if (!$isSessionOpen && $regId > 0) {
+    try {
+        $stmtHasAttempt = $pdo->prepare('SELECT 1 FROM pretes_cbt_attempts WHERE user_id = ? AND registration_id = ? LIMIT 1');
+        $stmtHasAttempt->execute([(int)$user['id'], $regId]);
+        if ($stmtHasAttempt->fetchColumn()) $isSessionOpen = true;
+    } catch (Throwable $e) {}
 }
 
 include __DIR__ . '/../includes/header.php';

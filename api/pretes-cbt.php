@@ -41,7 +41,7 @@ try {
         $data = pretesCbtState($pdo, $userId, $regId);
     } elseif ($action === 'start') {
         $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
-        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput);
+        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester);
     } else {
         if ($action === 'resume' && $cameraRequired) {
             $state = pretesCbtState($pdo, $userId, $regId);

@@ -35,12 +35,15 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     $stmt->execute([$activePretes['periode']]);
     $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Preserve the participant page's exam access rules in both routes.
-    $tglSekarang = date('Y-m-d');
-    $tglBukaUjian = '2026-11-16';
+    // Akses link pengerjaan diatur admin (Bank Soal CBT › Sesi Ujian › Buka/Tutup Ujian + jadwal sesi),
+    // tidak lagi memakai tanggal yang tertanam di kode.
+    require_once __DIR__ . '/pretes-cbt.php';
+    $examStatus = pretesCbtExamStatus($pdo);
     $isTesterPrivileged = (string)($user['username'] ?? '') === '12345'
         || (string)($user['nim'] ?? '') === '12345' || (int)$user['id'] === 12345;
-    $isUjianDibuka = $tglSekarang >= $tglBukaUjian || $isTesterPrivileged;
+    $isUjianDibuka = $examStatus['open'] || $isTesterPrivileged;
+    $isTesterPreview = $isTesterPrivileged && !$examStatus['open'];
+    $examClosedNotice = $examStatus['notice'];
     $linkSoalPretes = BASE_URL . '/pretes-ujian.php';
 
     define('PAGE_TITLE', 'Peserta, Jadwal & Persiapan Pretes');

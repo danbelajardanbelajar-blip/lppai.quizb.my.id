@@ -172,6 +172,39 @@
                 <button type="button" class="bank-button" data-action="create-tryout" style="background:#eff6ff;color:#1e3a8a;border-color:#bfdbfe">📝 ＋ Buat Tryout</button>
             </div>
         </div>
+        <?php $examStatusAdmin = pretesCbtExamStatus($pdo); $examSes = $examStatusAdmin['session']; $examSwitchOpen = $examSes && (int)($examSes['exam_open'] ?? 0) === 1; ?>
+        <div class="bank-exam-switch <?= $examStatusAdmin['open'] ? 'is-open' : 'is-closed' ?>" id="examOpenSwitch" role="region" aria-label="Status pengerjaan ujian pretes resmi">
+            <div class="bank-exam-switch-info">
+                <div class="bank-exam-switch-state"><?= $examStatusAdmin['open'] ? '🟢 PENGERJAAN UJIAN PRETES DIBUKA' : '🔴 PENGERJAAN UJIAN PRETES DITUTUP' ?></div>
+                <div class="bank-exam-switch-desc">
+                    <?php if (!$examSes): ?>
+                        Belum ada sesi resmi yang aktif. Aktifkan salah satu sesi resmi terlebih dahulu.
+                    <?php else: ?>
+                        Sesi resmi aktif: <strong><?= sanitize($examSes['title']) ?></strong>.
+                        <?php if ($examStatusAdmin['open']): ?>
+                            Peserta pretes aktif dapat menekan <strong>"Kerjakan Soal Pretes"</strong> dan memulai ujian.
+                        <?php elseif ($examSwitchOpen): ?>
+                            Sakelar sudah <strong>dibuka</strong>, tetapi <?= sanitize($examStatusAdmin['notice']) ?> (atur di Edit Sesi › jadwal).
+                        <?php else: ?>
+                            Peserta melihat link pengerjaan terkunci 🔒 dan tidak dapat memulai ujian.
+                        <?php endif; ?>
+                        <span style="display:block;margin-top:4px;font-size:11.5px;opacity:.85">Menutup ujian tidak menghentikan peserta yang sedang mengerjakan; mereka tetap dapat menyelesaikan sampai waktunya habis.</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php if ($examSes): ?>
+                <form method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-no-spa style="margin:0"
+                      onsubmit="return confirm(<?= htmlspecialchars(json_encode($examSwitchOpen ? 'TUTUP pengerjaan ujian pretes sekarang? Peserta tidak akan bisa memulai ujian baru.' : 'BUKA pengerjaan ujian pretes sekarang? Peserta pretes aktif akan bisa memulai ujian.'), ENT_QUOTES, 'UTF-8') ?>)">
+                    <input type="hidden" name="action" value="set_exam_open">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="session_id" value="<?= (int)$examSes['id'] ?>">
+                    <input type="hidden" name="open" value="<?= $examSwitchOpen ? 0 : 1 ?>">
+                    <button type="submit" class="bank-button <?= $examSwitchOpen ? 'danger' : 'primary' ?>" id="examOpenToggle" style="min-height:42px;padding:8px 18px;font-weight:800">
+                        <?= $examSwitchOpen ? '🔴 Tutup Ujian' : '🟢 Buka Ujian' ?>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
         <form id="bulkDeleteSessionsForm" method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-bulk-delete-form="sessions" data-no-spa>
             <input type="hidden" name="action" value="delete_sessions">
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -284,6 +317,7 @@
                                 <div style="margin-top:4px"><span class="bank-badge" style="background:#dbeafe;color:#1e3a8a">📝 TRYOUT · <?= (int)($ses['max_attempts'] ?? 0) === 0 ? 'ulang ∞' : ('maks ' . (int)$ses['max_attempts'] . '×') ?></span></div>
                             <?php else: ?>
                                 <div style="margin-top:4px"><span class="bank-badge" style="background:#ecfdf5;color:#047857">🎓 RESMI</span></div>
+                                <div style="margin-top:4px"><?php if ((int)($ses['exam_open'] ?? 0) === 1): ?><span class="bank-badge" style="background:#dcfce7;color:#166534">🟢 Ujian dibuka</span><?php else: ?><span class="bank-badge" style="background:#fee2e2;color:#991b1b">🔴 Ujian ditutup</span><?php endif; ?></div>
                             <?php endif; ?>
                         </td>
                         <td style="text-align:right;white-space:nowrap">
@@ -293,6 +327,15 @@
                                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                     <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan sesi ini aktif untuk ujian mahasiswa">Set Aktif</button>
+                                </form>
+                            <?php endif; ?>
+                            <?php if (($ses['mode'] ?? 'resmi') !== 'tryout'): $rowOpen = (int)($ses['exam_open'] ?? 0) === 1; ?>
+                                <form method="post" action="<?= $bankUrl ?>&amp;tab=sessions" data-no-spa style="display:inline;margin:0 3px">
+                                    <input type="hidden" name="action" value="set_exam_open">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                    <input type="hidden" name="open" value="<?= $rowOpen ? 0 : 1 ?>">
+                                    <button type="submit" class="bank-button <?= $rowOpen ? 'danger-sm' : '' ?>" style="min-height:28px;padding:4px 8px;font-size:11px" title="<?= $rowOpen ? 'Tutup pengerjaan ujian untuk sesi ini' : 'Buka pengerjaan ujian untuk sesi ini' ?>"><?= $rowOpen ? '🔴 Tutup Ujian' : '🟢 Buka Ujian' ?></button>
                                 </form>
                             <?php endif; ?>
                             <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick='openSessionModal(true, <?= htmlspecialchars(json_encode($ses, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
@@ -651,6 +694,11 @@
                 <label class="bank-toggle">
                     <input type="checkbox" name="is_active" id="sesModalActive" value="1" checked>
                     <strong>Jadikan Sesi Aktif Saat Ini</strong> (Peserta pretes yang login otomatis diarahkan ke sesi ini)
+                </label>
+                <input type="hidden" name="exam_open" value="0">
+                <label class="bank-toggle" id="sesModalExamOpenWrap" style="margin-top:8px">
+                    <input type="checkbox" name="exam_open" id="sesModalExamOpen" value="1">
+                    <strong>Buka Pengerjaan Ujian</strong> (peserta dapat menekan "Kerjakan Soal Pretes"; tetap mengikuti jadwal mulai/batas di atas). Bisa juga diatur dengan tombol 🟢 Buka / 🔴 Tutup Ujian.
                 </label>
             </div>
             <div class="bank-modal-foot">

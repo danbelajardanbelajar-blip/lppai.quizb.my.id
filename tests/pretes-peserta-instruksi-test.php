@@ -25,12 +25,13 @@ $asserts = [
     'Instruksi 4: Tidak Menggunakan HP Lain' => function() use ($fileContent) {
         return stripos($fileContent, 'Pastikan tidak menggunakan HP lain') !== false;
     },
-    'Gating Tanggal 16 Nov: Variabel tglBukaUjian terdefinisi 2026-11-16' => function() use ($fileContent) {
-        return strpos($fileContent, "'2026-11-16'") !== false && strpos($fileContent, '$isUjianDibuka') !== false;
+    'Gating oleh admin: link dibuka via pretesCbtExamStatus (tanpa tanggal tertanam)' => function() use ($fileContent) {
+        return strpos($fileContent, 'pretesCbtExamStatus(') !== false && strpos($fileContent, '$isUjianDibuka') !== false
+            && strpos($fileContent, "'2026-11-16'") === false;
     },
-    'Teks Info Belum Tanggal 16 Muncul' => function() use ($fileContent) {
-        return strpos($fileContent, 'Link &quot;Kerjakan Soal Pretes&quot; akan dapat diakses pada') !== false
-            || strpos($fileContent, 'akan dapat diakses pada') !== false;
+    'Teks info saat pengerjaan belum dibuka admin muncul' => function() use ($fileContent) {
+        return strpos($fileContent, 'akan muncul di halaman ini begitu admin membuka pengerjaan ujian') !== false
+            && strpos($fileContent, '$examClosedNotice') !== false;
     },
     'Tombol Kerjakan Soal Pretes Tersedia Saat Buka' => function() use ($fileContent) {
         return strpos($fileContent, 'Kerjakan Soal Pretes') !== false;
