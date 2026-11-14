@@ -5,6 +5,25 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 15:53:34 +0700 — Opsi tindih plotting jadwal tutorial
+
+**ID:** TUTORIAL-GENERATE-OVERWRITE · **Parent Git:** `be7af6f`.
+**Perubahan:** tambahkan “Tindih plotting jadwal yang telah ada”. Tanpa centang plotting lama dipertahankan; dengan centang susun ulang peserta terdaftar/aktif pada periode halaman pengaturan. Dosen/ruangan diatur ulang melalui alur generate dan pilih ruangan. Data periode lain serta peserta lulus/tidak_lulus/mengundurkan_diri tidak diubah.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik). Nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 15:50:19 | `admin/tutorial-pengaturan-generate.php` | 769-776 | Form Generate Jadwal | Tambah centang opsional overwrite_plotting (default tidak dicentang), label dan penjelasan dampak terhadap plotting/dosen/ruangan. |
+| 2026-11-14 15:52:53 | `admin/tutorial-generate.php` | 19-26, 83-128, 136-168, 199-211 | Handler generate dan transaksi | Samakan pemilihan periode dengan halaman pengaturan; kunci periode MySQL; reset hanya kandidat saat dicentang; hapus kelas lama hanya jika kosong; pertahankan kelas yang masih dipakai; rollback jika tutor tidak tersedia atau proses gagal. Hapus sinkronisasi tutor lintas periode; nama tutor di-resolve saat pembuatan kelas. |
+| 2026-11-14 15:50:19 | `includes/tutorial-plotting.php` | 1-34 | Seleksi kandidat periode | Batasi tahun ajaran, semester, gelombang dan status terdaftar/aktif. Dukung format tahun slash/hyphen dan data legacy dengan tanggal pembukaan periode. Tanpa centang hanya peserta belum diplot. |
+| 2026-11-14 15:52:53 | `tests/tutorial-generate-overwrite-test.py` | 1-121 | Regresi endpoint PHP dengan database terisolasi | Uji dua mode dengan/tanpa tindih, generate berulang, periode nonaktif yang lebih baru, data legacy, perlindungan histori/status selesai/mundur/kelas bersama, rollback kekurangan tutor/kegagalan INSERT dan penolakan CSRF. |
+
+**Verifikasi:** `python tests/tutorial-generate-overwrite-test.py`: 7 skenario endpoint dan pemeriksaan checkbox PASS; lint 3 file PHP PASS; `git diff --check` PASS. Endpoint aktual dijalankan dengan PDO SQLite terisolasi; tidak menjalankan generate pada database produksi. Cabang penguncian MySQL diperiksa secara kode, belum diuji integrasi pada server MySQL. Peringatan openssl ganda berasal dari konfigurasi PHP lokal yang sudah ada.
+**Penerapan:** commit `Add optional overwrite for tutorial schedule plotting`, push dan pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-14 09:28:18 +0700 — Perjelas kewajiban wajah menghadap kamera
 
 **ID:** CBT-FACE-FORWARD-INSTRUCTION · **Parent Git:** `c49165c`.

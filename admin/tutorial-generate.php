@@ -4,6 +4,7 @@
  */
 define('PAGE_TITLE', 'Generate Jadwal Otomatis');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/tutorial-plotting.php';
 requireAdmin();
 
 $pdo = getDBConnection();
@@ -15,11 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $generateMode = $_POST['generate_mode'] ?? 'distribute_evenly';
+    $overwritePlotting = ($_POST['overwrite_plotting'] ?? '') === '1';
     $minPerClass = (int)($_POST['min_per_class'] ?? 30);
     if ($minPerClass < 1) $minPerClass = 1;
 
-    // Dapatkan data gelombang terakhir yang dibuat
-    $gel = $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
+    // Sama dengan periode yang ditampilkan pada halaman pengaturan.
+    $gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch()
+        ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC, id DESC LIMIT 1")->fetch();
     if (!$gel) {
         die("Belum ada data gelombang di Master Gelombang.");
     }
@@ -79,23 +82,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pdo->beginTransaction();
 
-    // Ambil daftar nama dosen dari tabel tutors
-    $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
-
     try {
+        // Kunci periode agar dua permintaan generate tidak memplot peserta yang sama.
+        if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            $lock = $pdo->prepare('SELECT id FROM master_gelombang WHERE id = ? FOR UPDATE');
+            $lock->execute([$gel['id']]);
+        }
+        $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
+        $candidates = tutorialPlottingCandidates($pdo, $gel, $overwritePlotting);
+        $oldClassIds = [];
+        if ($overwritePlotting) {
+            $reset = $pdo->prepare('UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE id = ?');
+            foreach ($candidates as $reg) {
+                if (!in_array($reg['hari_pilihan'], $hariList, true)) {
+                    throw new RuntimeException('Pilihan hari peserta tidak valid. Perbaiki data sebelum menindih plotting.');
+                }
+                if ($reg['tutorial_class_id'] !== null) {
+                    $oldClassIds[(int)$reg['tutorial_class_id']] = true;
+                    $reset->execute([$reg['id']]);
+                }
+            }
+        }
+        $deleteEmpty = $pdo->prepare('DELETE FROM tutorial_classes WHERE id = ? AND NOT EXISTS
+            (SELECT 1 FROM tutorial_registrations WHERE tutorial_class_id = tutorial_classes.id)');
+        foreach (array_keys($oldClassIds) as $oldClassId) {
+            $deleteEmpty->execute([$oldClassId]);
+        }
+        $countClasses = $pdo->prepare("SELECT COUNT(*) FROM tutorial_classes
+            WHERE hari = ? AND gelombang = ? AND REPLACE(semester, '/', '-') = ?");
         foreach ($hariList as $hari) {
             $hariLower = strtolower($hari);
             $tutorsString = $gel['tutors_'.$hariLower] ?? '';
             $tutors = parseLegacyTutors($tutorsString, $tutorsList);
             
-            // Cari mahasiswa yang sudah mendaftar di hari ini tetapi belum masuk kelas
-            // dan pastikan mereka terdaftar pada gelombang yang aktif ini
-            $stmtMhs = $pdo->prepare("SELECT id FROM tutorial_registrations WHERE hari_pilihan = ? AND tutorial_class_id IS NULL AND gelombang = ?");
-            $stmtMhs->execute([$hari, $gelombang_name]);
-            $students = $stmtMhs->fetchAll(PDO::FETCH_COLUMN);
+            // Kandidat sudah dibatasi periode dan pilihan mempertahankan/menindih plotting.
+            $students = array_column(array_filter($candidates, static fn($reg) => $reg['hari_pilihan'] === $hari), 'id');
 
             $N = count($students);
             $C = count($tutors);
+
+            if ($overwritePlotting && $N > 0 && $C === 0) {
+                throw new RuntimeException("Tutor hari $hari belum diatur. Plotting lama tetap dipertahankan.");
+            }
 
             if ($N === 0 || $C === 0) {
                 // Jika tidak ada mahasiswa atau tidak ada tutor di hari ini, skip hari ini
@@ -105,10 +133,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Siapkan helper untuk resolve nama asli tutor
             $realTutorNames = [];
             $stmtFindTutor = $pdo->prepare("SELECT nama_lengkap as nama FROM users WHERE role = 'dosen' AND nama_lengkap LIKE CONCAT('%', ?, '%') LIMIT 1");
+            $countClasses->execute([$hari, $gelombang_name, $tahun_ajaran . '-' . $semester]);
+            $firstClassIndex = (int)$countClasses->fetchColumn();
 
             if ($generateMode === 'fill_first') {
                 $tutorIndex = 0;
-                $classIndex = 0;
+                $classIndex = $firstClassIndex;
                 
                 while (!empty($students)) {
                     $chunk = array_splice($students, 0, $minPerClass);
@@ -134,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 // Mode distribute_evenly (meratakan)
-                $classIndex = 0;
+                $classIndex = $firstClassIndex;
                 $remainingStudents = $N;
 
                 for ($i = 0; $i < $C; $i++) {
@@ -167,12 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users
-        $pdo->exec("
-            UPDATE tutorial_classes tc
-            JOIN users u ON u.nama_lengkap LIKE CONCAT('%', tc.dosen_pengampu, '%') AND u.nama_lengkap != tc.dosen_pengampu AND u.role = 'dosen'
-            SET tc.dosen_pengampu = u.nama_lengkap
-        ");
+        // Nama tutor sudah di-resolve saat membuat kelas; jangan ubah kelas periode lain.
         
         $pdo->commit();
         

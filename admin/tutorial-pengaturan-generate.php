@@ -766,6 +766,13 @@ function addQETutorRow(day) {
                 </label>
             </div>
             
+            <label style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; cursor: pointer; color: #1e3a8a;">
+                <input type="checkbox" name="overwrite_plotting" value="1" aria-describedby="overwritePlottingHelp" style="margin-top: 4px;">
+                <span>
+                    <strong>Tindih plotting jadwal yang telah ada</strong>
+                    <small id="overwritePlottingHelp" style="display: block; margin-top: 4px;">Centang untuk menyusun ulang plotting periode ini, termasuk dosen dan penempatan ruangan. Jika tidak dicentang, plotting lama tetap dipertahankan.</small>
+                </span>
+            </label>
             <button type="submit" class="btn btn-primary" style="background-color: #2563eb; width: auto;">🚀 Generate Jadwal secara otomatis</button>
         </form>
         <script>
