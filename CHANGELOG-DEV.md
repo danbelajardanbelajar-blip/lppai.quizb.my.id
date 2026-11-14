@@ -5,6 +5,29 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:51:30 +0700 — Penetapan batas minimal kelulusan tutorial 70 dan pretes 80
+
+**ID:** TUTORIAL-PASSING-THRESHOLD-70-PRETES-80 · **Parent Git:** `77f52c0`.
+**Permintaan:** Catat dengan kuat: Batas minimal pretes adalah 80, batas minimal tutorial adalah 70. Perbaiki halaman https://lppai.quizb.my.id/rekap-nilai.php.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:49:48 | `rekap-nilai.php` | 387-427, 1511-1516, 1821-1830, 1896-1925, 1974-1980, 2109-2115 | Standar Kelulusan Tutorial & Pretes | 1. Helper `getTutorialScoreMeta()`: sesuaikan batas predikat lulus tutorial menjadi `>= 70` (B - Baik / Lulus Minimal), `< 70` (C / D / E - Di bawah batas kelulusan minimal 70).<br>2. Banner Hero: tambahkan badge aturan resmi LPPAI: "Batas Minimal Tutorial adalah 70.00 · Pretes 80.00".<br>3. Logika Kelulusan Mahasiswa: mahasiswa dinyatakan lulus jika seluruh 6 komponen terisi dan masing-masing komponen serta rata-rata akhir &ge; 70.00.<br>4. Spotlight Card: perbarui tile batas kelulusan menjadi "Min. 70.00" dan perbarui alert status kelulusan.<br>5. Rubrik Penilaian: perjelas ketentuan batas kelulusan minimal resmi (Pretes: 80, Tutorial: 70).<br>6. Modal Edit Live Preview: perbarui batas predikat B lulus minimal pada angka 70.00. |
+| 2026-11-14 16:50:06 | `tests/tutorial-rekap-nilai-ui-test.php` | 59-60 | Asersi Standar Kelulusan | Tambah asersi penegasan batas minimal tutorial 70.00 dan batas minimal pretes 80.00 pada halaman rekap nilai. |
+
+**Verifikasi:**
+1. `php -l rekap-nilai.php` dan `php -l tests/tutorial-rekap-nilai-ui-test.php`: No syntax errors detected (PASS).
+2. `php tests/tutorial-rekap-nilai-ui-test.php`: 40/40 asersi PASS 100%.
+3. `php tests/tutorial-rekap-nilai-active-period-test.php`: PASS 100%.
+4. `php tests/user-jenis-program-test.php`: PASS (24 files verified).
+5. `php tests/tutorial-waiting-test.php`: PASS 100%.
+
+**Penerapan:** commit `fix(tutorial): enforce official passing thresholds tutorial 70 and pretes 80 on rekap-nilai page`; push `origin main` lalu `git pull` di cPanel server hosting.
+
+---
+
 ## 2026-11-14 16:38:00 +0700 — Desain modern & responsif halaman rekapitulasi nilai terpadu
 
 **ID:** REKAP-NILAI-MODERN-REDESIGN · **Parent Git:** `841e943`.

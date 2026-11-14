@@ -31,7 +31,7 @@ def fixture():
                     (14,'Kelas Genap','Rabu','13.00','Dosen Semester Lain','R1','gel1','2026-2027-Genap'),
                     (15,'Kelas Gelombang Lain','Rabu','13.00','Dosen Gelombang Lain','R1','gel2','2026-2027-Ganjil'),
                     (16,'Kelas Belum Ada Dosen','Rabu','13.00','  ','R1','gel1','2026-2027-Ganjil'),
-                    (17,'Kelas Legacy','Rabu','13.00','Dosen Legacy','R1','gel1','Ganjil'),
+                    (17,'Kelas Legacy','Rabu','13.00','Dosen Legacy','R Legacy','gel1','Ganjil'),
                     (18,'Legacy Lama','Rabu','13.00','Dosen Lama','R1','gel1','Ganjil');
                 INSERT INTO tutorial_registrations (id,user_id,tutorial_class_id,tahun_ajaran,created_at)
                     VALUES (101,1001,17,'2026/2027','2026-11-02'),(102,1002,18,'2025-2026','2025-11-02');
@@ -73,14 +73,16 @@ if __name__ == '__main__':
         assert request(base, admin=False)[0] == 403
         original = snapshot(root)
         data = {'action': 'edit_tutorial_schedule', 'csrf_token': 'valid-csrf',
-                'schedule_period_id': '1', 'schedule_class_id': '11', 'nama_kelas': 'Kelas Baru', 'hari': 'Kamis'}
+                'schedule_period_id': '1', 'schedule_class_id': '11', 'nama_kelas': 'Kelas Baru', 'hari': 'Kamis', 'ruangan': 'R2'}
         for patch in [{'csrf_token': 'wrong'}, {'schedule_class_id': '13'}, {'schedule_class_id': '14'},
                       {'schedule_class_id': '15'}, {'schedule_class_id': '18'}, {'schedule_period_id': '2'},
                       {'hari': 'Minggu'}, {'nama_kelas': ''}, {'nama_kelas': 'X'*101},
-                      {'nama_kelas[]': 'array'}, {'schedule_class_id': '-1'}]:
+                      {'nama_kelas[]': 'array'}, {'schedule_class_id': '-1'}, {'ruangan': 'Unknown room'}, {'ruangan[]': 'R2'}]:
             payload = dict(data, **patch)
             if 'nama_kelas[]' in payload:
                 payload.pop('nama_kelas')
+            if 'ruangan[]' in payload:
+                payload.pop('ruangan')
             status, html = request(base, payload)
             assert status == 200 and ('alert-danger' in html), (patch, html[:300])
             assert snapshot(root) == original, f'Invalid request mutated data: {patch}'
@@ -92,14 +94,23 @@ if __name__ == '__main__':
         status, html = request(base, data, query='gelombang_id=2')
         assert status == 200 and 'alert-success' in html
         with contextlib.closing(sqlite3.connect(root / 'test.sqlite')) as db:
-            assert db.execute('SELECT nama_kelas,hari,dosen_pengampu,jam,ruangan FROM tutorial_classes WHERE id=11').fetchone() == ('Kelas Baru','Kamis','Dosen Satu','13.00 - 14.30','R1')
+            assert db.execute('SELECT nama_kelas,hari,dosen_pengampu,jam,ruangan FROM tutorial_classes WHERE id=11').fetchone() == ('Kelas Baru','Kamis','Dosen Satu','13.00 - 14.30','R2')
             assert db.execute('SELECT * FROM tutorial_classes WHERE id != 11 ORDER BY id').fetchall() == other_classes
             assert db.execute('SELECT * FROM tutorial_registrations ORDER BY id').fetchall() == registrations
         assert 'Kelas Baru' in request(base)[1]
         assert 'Kelas Baru' in attendance.request(base, 'kelas_id=11')[1], 'Printing must reflect changed schedule'
+        assert '<strong>Ruangan:</strong> R2' in attendance.request(base, 'kelas_id=11')[1]
         # Same values can safely be saved again.
         after = snapshot(root)
         assert 'alert-success' in request(base, data)[1] and snapshot(root) == after
+        # A room may be cleared, or retain a legacy option still used by active classes.
+        assert 'alert-success' in request(base, dict(data, ruangan=''))[1]
+        with contextlib.closing(sqlite3.connect(root / 'test.sqlite')) as db:
+            assert db.execute('SELECT ruangan FROM tutorial_classes WHERE id=11').fetchone()[0] is None
+        assert 'alert-success' in request(base, dict(data, ruangan='R Legacy'))[1]
+        with contextlib.closing(sqlite3.connect(root / 'test.sqlite')) as db:
+            assert db.execute('SELECT ruangan FROM tutorial_classes WHERE id=11').fetchone()[0] == 'R Legacy'
+        assert 'alert-success' in request(base, data)[1]
         # A failed database update must leave no partially changed schedule.
         with contextlib.closing(sqlite3.connect(root / 'test.sqlite')) as db:
             db.executescript("CREATE TRIGGER fail_schedule BEFORE UPDATE ON tutorial_classes BEGIN SELECT RAISE(ABORT, 'simulated update failure'); END;")
@@ -116,4 +127,4 @@ if __name__ == '__main__':
         assert 'data-edit-tutorial-schedule' not in html
         assert 'alert-danger' in request(base, data)[1] and snapshot(root) == no_active
         assert 'Fatal error' not in (root / 'server.log').read_text()
-        print('PASS: full admin page, active-only class scope, legacy scope, historical view, valid edit persists, unchanged roster/teacher/time/room, CSRF/admin/stale-period/input validation, rollback and no-active empty state')
+        print('PASS: full admin page, active-only scope, class/day/room persist, master/legacy/clear room choices, print reflects room, unchanged roster/teacher/time, CSRF/admin/invalid-room/stale-period validation, rollback and empty state')

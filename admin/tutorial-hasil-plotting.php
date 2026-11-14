@@ -153,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($action === 'edit_tutorial_schedule') {
             try {
                 updateTutorialLecturerSchedule($pdo, $_POST);
-                $message = 'Nama kelas dan hari tutorial berhasil diperbarui untuk seluruh peserta kelas.';
+                $message = 'Kelas, hari, dan ruangan tutorial berhasil diperbarui untuk seluruh peserta kelas.';
                 $msgType = 'success';
             } catch (InvalidArgumentException | DomainException $error) {
                 $message = $error->getMessage();
@@ -561,6 +561,7 @@ if ($printAttendance) {
 
 $scheduledTutorialPeriod = tutorialActiveSchedulePeriod($pdo);
 $scheduledLecturerClasses = $scheduledTutorialPeriod ? tutorialScheduledLecturerClasses($pdo, $scheduledTutorialPeriod) : [];
+$scheduledTutorialRooms = $scheduledTutorialPeriod ? tutorialLecturerScheduleRooms($pdo, $scheduledLecturerClasses) : [];
 
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll(PDO::FETCH_ASSOC);

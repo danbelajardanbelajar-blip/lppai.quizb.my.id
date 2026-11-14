@@ -31,7 +31,7 @@ if (!isset($scheduledLecturerClasses)) {
                             <td><?= sanitize($schedule['ruangan'] ?: 'Belum ditentukan') ?></td>
                             <td><button type="button" class="btn btn-sm btn-warning" data-edit-tutorial-schedule
                                 data-class-id="<?= (int)$schedule['id'] ?>" data-class-name="<?= sanitize($schedule['nama_kelas']) ?>"
-                                data-day="<?= sanitize($schedule['hari'] ?? '') ?>" data-lecturer="<?= sanitize($schedule['dosen_pengampu']) ?>">Edit</button></td>
+                                data-day="<?= sanitize($schedule['hari'] ?? '') ?>" data-room="<?= sanitize(trim($schedule['ruangan'] ?? '')) ?>" data-lecturer="<?= sanitize($schedule['dosen_pengampu']) ?>">Edit</button></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
@@ -43,7 +43,7 @@ if (!isset($scheduledLecturerClasses)) {
 </div>
 <?php if ($scheduledTutorialPeriod && $scheduledLecturerClasses): ?>
 <dialog id="tutorialScheduleDialog" aria-labelledby="tutorialScheduleTitle" style="width:min(92vw,480px);max-height:90vh;overflow:auto;margin:auto;border:0;border-radius:12px;padding:24px;box-shadow:0 12px 48px #0003;">
-    <h3 id="tutorialScheduleTitle" style="margin-top:0;">Edit Kelas &amp; Hari Tutorial</h3>
+    <h3 id="tutorialScheduleTitle" style="margin-top:0;">Edit Jadwal Tutorial</h3>
     <p id="tutorialScheduleLecturer" style="color:#475569;margin:0 0 16px;"></p>
     <form method="POST" action="tutorial-hasil-plotting.php?<?= sanitize(http_build_query(['gelombang_id' => $selected_gel_id])) ?>" data-no-spa>
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -63,7 +63,16 @@ if (!isset($scheduledLecturerClasses)) {
                 <?php endforeach; ?>
             </select>
         </div>
-        <p style="font-size:13px;color:#64748b;">Perubahan berlaku untuk seluruh peserta di kelas ini.</p>
+        <div class="form-group">
+            <label for="tutorialScheduleRoom">Ruangan</label>
+            <select name="ruangan" id="tutorialScheduleRoom">
+                <option value="">Belum ditentukan</option>
+                <?php foreach ($scheduledTutorialRooms as $scheduleRoom): ?>
+                <option value="<?= sanitize($scheduleRoom) ?>"><?= sanitize($scheduleRoom) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <p style="font-size:13px;color:#64748b;margin:0 0 16px;">Perubahan berlaku untuk seluruh peserta di kelas ini.</p>
         <div style="display:flex;justify-content:flex-end;gap:12px;">
             <button type="button" class="btn btn-secondary" id="cancelTutorialSchedule">Batal</button>
             <button type="submit" class="btn btn-primary">Simpan Jadwal</button>
@@ -81,6 +90,7 @@ if (!isset($scheduledLecturerClasses)) {
         document.getElementById('tutorialScheduleClassId').value = button.dataset.classId;
         document.getElementById('tutorialScheduleClassName').value = button.dataset.className;
         document.getElementById('tutorialScheduleDay').value = button.dataset.day;
+        document.getElementById('tutorialScheduleRoom').value = button.dataset.room;
         document.getElementById('tutorialScheduleLecturer').textContent = button.dataset.lecturer;
         dialog.showModal();
     });

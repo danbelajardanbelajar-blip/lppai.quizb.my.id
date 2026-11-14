@@ -384,27 +384,27 @@ if (!function_exists('getTutorialScoreMeta')) {
                 'tier'  => 'excellent',
                 'pct'   => $pct
             ];
-        } elseif ($val >= 75) {
+        } elseif ($val >= 70) {
             return [
                 'grade' => 'B',
-                'label' => 'Baik',
+                'label' => 'Baik (Lulus Minimal)',
                 'color' => '#0369a1',
                 'bg'    => '#e0f2fe',
                 'border'=> '#7dd3fc',
                 'tier'  => 'good',
                 'pct'   => $pct
             ];
-        } elseif ($val >= 65) {
+        } elseif ($val >= 60) {
             return [
                 'grade' => 'C',
-                'label' => 'Cukup',
+                'label' => 'Cukup (Di Bawah Batas 70)',
                 'color' => '#b45309',
                 'bg'    => '#fef3c7',
                 'border'=> '#fde68a',
                 'tier'  => 'fair',
                 'pct'   => $pct
             ];
-        } elseif ($val >= 55) {
+        } elseif ($val >= 50) {
             return [
                 'grade' => 'D',
                 'label' => 'Kurang',
@@ -1511,6 +1511,9 @@ include __DIR__ . '/includes/header.php';
                     Pantau rincian nilai 6 komponen perkuliahan tutorial Anda (Thaharah, Shalat, Surat Pendek, Amaliyah, Jenazah, dan Ujian Tulis) secara transparan.
                 <?php endif; ?>
             </p>
+            <div style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.22); padding:5px 14px; border-radius:999px; font-size:12.5px; font-weight:700; color:#fef3c7; margin-top:10px;">
+                <span>⚖️ Standar Kelulusan LPPAI: Batas Minimal Tutorial adalah <strong>70.00</strong> &bull; Pretes <strong>80.00</strong></span>
+            </div>
         </div>
         <div class="rn-hero-side">
             <?php if ($current_gel): ?>
@@ -1818,7 +1821,15 @@ include __DIR__ . '/includes/header.php';
                 $mAvg = $mCount > 0 ? round($mSum / $mCount, 2) : null;
                 $mMeta = getTutorialScoreMeta($mAvg);
                 $isAllComplete = ($mCount === 6);
-                $isPass = ($isAllComplete && $mAvg !== null && $mAvg >= 65);
+                $isPass = ($isAllComplete && $mAvg !== null && $mAvg >= 70);
+                if ($isPass) {
+                    foreach ($scoresList as $sc) {
+                        if ($sc < 70) {
+                            $isPass = false;
+                            break;
+                        }
+                    }
+                }
                 $minScore = !empty($scoresList) ? min($scoresList) : null;
                 $maxScore = !empty($scoresList) ? max($scoresList) : null;
             ?>
@@ -1885,13 +1896,13 @@ include __DIR__ . '/includes/header.php';
                             </div>
                             <div style="font-size:13px; color:#64748b; margin-top:6px;">
                                 <?php if ($isPass): ?>
-                                    <span style="color:#047857; font-weight:700;">🏆 Memenuhi syarat kelulusan program tutorial LPPAI.</span>
+                                    <span style="color:#047857; font-weight:700;">🏆 Memenuhi syarat kelulusan program tutorial LPPAI (Rata-rata &amp; komponen &ge; 70.00).</span>
                                 <?php elseif ($isAllComplete): ?>
-                                    <span style="color:#b91c1c; font-weight:700;">⚠️ Rata-rata akhir di bawah batas kelulusan minimal (65.00).</span>
+                                    <span style="color:#b91c1c; font-weight:700;">⚠️ Rata-rata akhir atau komponen di bawah batas kelulusan minimal tutorial (70.00).</span>
                                 <?php elseif ($mCount > 0): ?>
-                                    <span style="color:#d97706; font-weight:700;">⏳ Proses penilaian berjalan (<?= $mCount ?> dari 6 komponen dinilai).</span>
+                                    <span style="color:#d97706; font-weight:700;">⏳ Proses penilaian berjalan (<?= $mCount ?> dari 6 komponen dinilai &bull; Batas Lulus: 70.00).</span>
                                 <?php else: ?>
-                                    <span style="color:#64748b; font-weight:600;">⏳ Dosen tutor belum menginputkan nilai komponen Anda.</span>
+                                    <span style="color:#64748b; font-weight:600;">⏳ Dosen tutor belum menginputkan nilai komponen Anda (Batas Lulus: 70.00).</span>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1906,7 +1917,7 @@ include __DIR__ . '/includes/header.php';
                         </div>
                         <div class="rn-mini-tile">
                             <div class="rn-mini-tile-lbl">BATAS KELULUSAN</div>
-                            <div class="rn-mini-tile-val" style="color:#0f172a;">Min. 65.00</div>
+                            <div class="rn-mini-tile-val" style="color:#0f172a;">Min. 70.00</div>
                         </div>
                         <div class="rn-mini-tile">
                             <div class="rn-mini-tile-lbl">NILAI TERTINGGI</div>
@@ -1963,9 +1974,9 @@ include __DIR__ . '/includes/header.php';
                 <!-- Rubrik & Narahubung Card -->
                 <div class="rn-guide-card">
                     <div class="rn-guide-content">
-                        <h4>💡 Informasi Skala Penilaian &amp; Remedial</h4>
+                        <h4>💡 Standar Batas Kelulusan LPPAI (Tutorial: 70 &bull; Pretes: 80)</h4>
                         <p>
-                            Penilaian tutorial LPPAI mengacu pada standar kelulusan: <strong>A</strong> (&ge; 85), <strong>B</strong> (75&ndash;84.9), <strong>C</strong> (65&ndash;74.9 - Batas Minimal), <strong>D</strong> (55&ndash;64.9), dan <strong>E</strong> (&lt; 55). Jika ada nilai yang belum masuk atau perlu klarifikasi, hubungi dosen tutor pengampu kelas Anda atau narahubung resmi LPPAI.
+                            Standar akademik resmi LPPAI menetapkan <strong>Batas Minimal Kelulusan Tutorial adalah 70.00</strong> (sedangkan untuk Pretes batas kelulusan adalah <strong>80.00</strong>). Skala predikat tutorial: <strong>A</strong> (&ge; 85.00 · Sangat Memuaskan), <strong>B</strong> (70.00&ndash;84.99 · Memenuhi Batas Kelulusan Minimal 70), <strong>C</strong> (60.00&ndash;69.99 · Di Bawah Batas Kelulusan), <strong>D</strong> (50.00&ndash;59.99), dan <strong>E</strong> (&lt; 50.00). Mahasiswa wajib menyelesaikan seluruh 6 komponen dengan nilai masing-masing dan rata-rata akhir minimal 70.00 untuk dinyatakan lulus.
                         </p>
                     </div>
                     <div>
@@ -2098,9 +2109,9 @@ window.calculateLiveModalAvg = function() {
         const avg = sum / count;
         let grade = 'E';
         if (avg >= 85) grade = 'A (Sangat Memuaskan)';
-        else if (avg >= 75) grade = 'B (Baik)';
-        else if (avg >= 65) grade = 'C (Cukup)';
-        else if (avg >= 55) grade = 'D (Kurang)';
+        else if (avg >= 70) grade = 'B (Baik - Lulus Minimal 70)';
+        else if (avg >= 60) grade = 'C (Cukup - Di Bawah Batas 70)';
+        else if (avg >= 50) grade = 'D (Kurang)';
         else grade = 'E (Sangat Kurang)';
         previewEl.innerHTML = avg.toFixed(2) + ' <span style="font-size:12px; font-weight:700;">&bull; Predikat ' + grade + ' (' + count + '/6 Komponen)</span>';
     } else {

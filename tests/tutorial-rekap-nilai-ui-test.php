@@ -56,6 +56,8 @@ rekapAssert(strpos($content, 'rn-circle-score') !== false, "Indikator visual nil
 rekapAssert(strpos($content, 'rn-components-grid') !== false, "Grid kartu 6 komponen (.rn-components-grid) harus ada.", $errors);
 rekapAssert(strpos($content, 'rn-guide-card') !== false, "Panduan skala nilai & narahubung (.rn-guide-card) harus ada.", $errors);
 rekapAssert(strpos($content, 'wa.me/6281515726827') !== false, "Kontak WhatsApp Bu Umami harus terpasang.", $errors);
+rekapAssert(strpos($content, 'Min. 70.00') !== false, "Batas minimal kelulusan tutorial 70.00 harus dicantumkan.", $errors);
+rekapAssert(strpos($content, 'Pretes: 80') !== false || strpos($content, 'Pretes 80.00') !== false, "Batas minimal pretes 80 harus dicantumkan.", $errors);
 
 // 7. Modal Edit & Live Realtime Calculation
 rekapAssert(strpos($content, 'editNilaiModal') !== false, "Modal edit nilai (#editNilaiModal) harus ada.", $errors);

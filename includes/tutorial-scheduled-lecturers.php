@@ -30,9 +30,18 @@ function tutorialScheduledLecturerClasses(PDO $pdo, array $period, ?int $classId
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+function tutorialLecturerScheduleRooms(PDO $pdo, array $classes): array
+{
+    $rooms = $pdo->query('SELECT ruang FROM rooms')->fetchAll(PDO::FETCH_COLUMN);
+    $rooms = array_merge($rooms, array_column($classes, 'ruangan'));
+    $rooms = array_values(array_unique(array_filter(array_map(static fn($room) => trim((string)$room), $rooms), static fn($room) => $room !== '')));
+    sort($rooms, SORT_NATURAL | SORT_FLAG_CASE);
+    return $rooms;
+}
+
 function updateTutorialLecturerSchedule(PDO $pdo, array $input): void
 {
-    foreach (['schedule_class_id', 'schedule_period_id', 'nama_kelas', 'hari'] as $key) {
+    foreach (['schedule_class_id', 'schedule_period_id', 'nama_kelas', 'hari', 'ruangan'] as $key) {
         if (!isset($input[$key]) || !is_string($input[$key])) {
             throw new InvalidArgumentException('Data jadwal tidak valid. Muat ulang halaman dan coba lagi.');
         }
@@ -41,6 +50,7 @@ function updateTutorialLecturerSchedule(PDO $pdo, array $input): void
     $periodId = filter_var($input['schedule_period_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
     $name = trim($input['nama_kelas']);
     $day = trim($input['hari']);
+    $room = trim($input['ruangan']);
     if (!$classId || !$periodId) {
         throw new InvalidArgumentException('Jadwal tidak valid. Muat ulang halaman dan coba lagi.');
     }
@@ -61,11 +71,15 @@ function updateTutorialLecturerSchedule(PDO $pdo, array $input): void
             $lock->execute([$periodId]);
             if (!$lock->fetchColumn()) throw new DomainException('Periode tutorial sudah tidak aktif. Muat ulang halaman.');
         }
-        if (!tutorialScheduledLecturerClasses($pdo, $period, $classId)) {
+        $classes = tutorialScheduledLecturerClasses($pdo, $period);
+        if (!in_array($classId, array_map('intval', array_column($classes, 'id')), true)) {
             throw new DomainException('Jadwal dosen tidak ditemukan pada periode tutorial aktif.');
         }
-        $stmt = $pdo->prepare('UPDATE tutorial_classes SET nama_kelas = ?, hari = ? WHERE id = ?');
-        $stmt->execute([$name, $day, $classId]);
+        if ($room !== '' && !in_array($room, tutorialLecturerScheduleRooms($pdo, $classes), true)) {
+            throw new InvalidArgumentException('Pilih ruangan yang tersedia.');
+        }
+        $stmt = $pdo->prepare('UPDATE tutorial_classes SET nama_kelas = ?, hari = ?, ruangan = ? WHERE id = ?');
+        $stmt->execute([$name, $day, $room === '' ? null : $room, $classId]);
         $pdo->commit();
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) $pdo->rollBack();
