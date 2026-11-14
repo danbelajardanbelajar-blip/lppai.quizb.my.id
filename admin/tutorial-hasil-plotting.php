@@ -5,6 +5,7 @@
 define('PAGE_TITLE', 'Hasil Plotting & Jadwal');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/tutorial-scheduled-lecturers.php';
 
 $pdo = getDBConnection();
 
@@ -149,7 +150,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $action = $_POST['action'];
 
         /* ---- BUAT KELAS & TAMBAH PESERTA ---- */
-        if ($action === 'assign') {
+        if ($action === 'edit_tutorial_schedule') {
+            try {
+                updateTutorialLecturerSchedule($pdo, $_POST);
+                $message = 'Nama kelas dan hari tutorial berhasil diperbarui untuk seluruh peserta kelas.';
+                $msgType = 'success';
+            } catch (InvalidArgumentException | DomainException $error) {
+                $message = $error->getMessage();
+                $msgType = 'danger';
+            } catch (Throwable $error) {
+                error_log('Tutorial schedule update failed: ' . $error->getMessage());
+                $message = 'Jadwal belum tersimpan. Silakan coba lagi.';
+                $msgType = 'danger';
+            }
+        } elseif ($action === 'assign') {
             $namaKelas  = trim($_POST['nama_kelas'] ?? '');
             $dosen      = trim($_POST['dosen_pengampu'] ?? '');
             $hari       = trim($_POST['hari'] ?? '');
@@ -545,6 +559,9 @@ if ($printAttendance) {
     exit;
 }
 
+$scheduledTutorialPeriod = tutorialActiveSchedulePeriod($pdo);
+$scheduledLecturerClasses = $scheduledTutorialPeriod ? tutorialScheduledLecturerClasses($pdo, $scheduledTutorialPeriod) : [];
+
 $gelLabels = ['gel1' => 'Gel.1', 'gel2' => 'Gel.2', 'mandiri' => 'Mandiri'];
 $roomsList = $pdo->query("SELECT id, ruang FROM rooms ORDER BY ruang ASC")->fetchAll(PDO::FETCH_ASSOC);
 $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll(PDO::FETCH_ASSOC);
@@ -735,6 +752,7 @@ $chartLabels = json_encode(array_values($statsLabels));
 $chartData = json_encode(array_values($statsKelas));
 ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<?php include __DIR__ . '/../includes/tutorial-scheduled-lecturers-view.php'; ?>
 <?php include __DIR__ . '/../includes/tutorial-absensi-form.php'; ?>
 
 <div class="card" style="margin-top: 30px;">

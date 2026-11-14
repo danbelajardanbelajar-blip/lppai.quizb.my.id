@@ -5,6 +5,27 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:29:48 +0700 — Card dosen terjadwal tutorial aktif dan edit kelas/hari
+
+**ID:** TUTORIAL-ACTIVE-LECTURER-SCHEDULE · **Parent Git:** `215358b`.
+**Permintaan:** tambah card tabel dosen yang terjadwal pada tutorial aktif, beserta tombol Edit kelas dan hari di tiap record. Setiap baris merepresentasikan satu kelas yang diampu dosen. Edit mengubah nama kelas dan hari pada record kelas yang sama sehingga berlaku bagi semua pesertanya; tidak memindahkan dosen/peserta atau mengubah jam, ruangan, nilai maupun hari pilihan pendaftaran.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:21:41 | `admin/tutorial-hasil-plotting.php` | 8, 153-167, 562-563, 755 | Integrasi card dan penyimpanan jadwal | Muat helper jadwal aktif, tangani POST edit_tutorial_schedule melalui pemeriksaan admin/CSRF existing; tampilkan pesan berhasil/gagal dan card dosen aktif sebelum panel cetak absensi. |
+| 2026-11-14 16:25:17 | `includes/tutorial-scheduled-lecturers.php` | 1-74 | Seleksi dan update jadwal aktif | Pilih periode berstatus aktif tanpa fallback histori; batasi kelas pada tahun/semester/gelombang yang tepat dan dosen terisi. Dukung kelas legacy semester pendek dengan bukti pendaftaran periode aktif. Validasi ID/nama kelas/hari dan periode yang masih aktif; transaksi, penguncian periode pada MySQL, dan rollback. UPDATE hanya nama_kelas serta hari pada kelas terpilih. |
+| 2026-11-14 16:25:17 | `includes/tutorial-scheduled-lecturers-view.php` | 1-90 | Card tabel dan dialog edit | Satu baris per kelas dosen: nama dosen, kelas, hari, jam, ruangan, tombol Edit. Tabel selalu mengikuti periode aktif walau filter utama sedang membuka histori. Dialog terisi data record, ubah nama kelas/hari, batal/Escape, responsif, dan empty state tanpa periode/jadwal. Nilai HTML di-escape. |
+| 2026-11-14 16:21:41 | `tests/tutorial-absensi-http-test.py` | 21-22 | Dependensi fixture cetak | Salin helper baru yang diwajibkan route admin agar pengujian cetak tetap menggunakan route aktual. |
+| 2026-11-14 16:25:17 | `tests/tutorial-scheduled-lecturers-test.py` | 1-119 | Integrasi GET/POST admin aktual | Uji scope tahun/semester/gelombang dan legacy, tampilan aktif saat filter histori, autentikasi/CSRF, input invalid, simpan dan baca ulang, konsistensi cetak, peserta/dosen/jam/ruangan tidak berubah, gagal UPDATE rollback, simpan berulang, serta tidak ada periode aktif. |
+| 2026-11-14 16:24:22 | `tests/tutorial-scheduled-lecturers-browser-test.cjs` | 1-59 | Chrome desktop/mobile | Uji tombol Edit tiap record dan data dialog, submit POST aktual, pesan berhasil, persistensi setelah reload, 31 peserta tetap, Batal/reopen/Escape, muat pada layar 390px, dan tidak ada error JavaScript. Chart CDN di-stub untuk isolasi pengujian dialog. |
+
+**Verifikasi:** `python tests/tutorial-scheduled-lecturers-test.py`, `python tests/tutorial-absensi-http-test.py`, `php tests/tutorial-hasil-plotting-filter-test.php`, lint 3 file PHP dan `git diff --check`: PASS. Chrome headless melalui `node tests/tutorial-scheduled-lecturers-browser-test.cjs <fixture-url>`: PASS (GET/POST route aktual). Screenshot card desktop dan dialog 390px diperiksa; dialog terpusat, input dan tombol terlihat. Artefak lokal: `scratch/tutorial-scheduled-lecturers-preview/` (diabaikan Git). Database fixture menggunakan PDO SQLite terisolasi; tidak mengubah data produksi. Cabang penguncian MySQL diperiksa secara kode, belum diuji pada server MySQL. Peringatan openssl ganda berasal dari konfigurasi PHP lokal yang sudah ada.
+**Penerapan:** commit `Add active tutorial lecturer schedule card with class and day editing`; push dan pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-14 16:18:00 +0700 — Perbaikan deteksi mahasiswa terplot tutorial pada kartu menunggu plotting
 
 **ID:** TUTORIAL-PLOTTED-DETECTION-FIX · **Parent Git:** `9f3a556`.

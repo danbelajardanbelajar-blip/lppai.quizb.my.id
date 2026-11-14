@@ -19,7 +19,7 @@ def fixture():
     with tempfile.TemporaryDirectory(prefix='tutorial-absensi-') as directory:
         root = Path(directory)
         for file in ['admin/tutorial-hasil-plotting.php', 'includes/tutorial-absensi-view.php',
-                     'includes/tutorial-absensi-form.php', 'assets/logo.svg']:
+                     'includes/tutorial-absensi-form.php', 'includes/tutorial-scheduled-lecturers.php', 'assets/logo.svg']:
             target = root / file
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / file, target)
