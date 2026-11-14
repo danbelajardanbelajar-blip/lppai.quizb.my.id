@@ -81,7 +81,7 @@ $check(strpos($ujian, 'pretesExamAccess($pdo, $user)') !== false && strpos($ujia
 $api = file_get_contents("$root/api/pretes-cbt.php");
 $check(strpos($api, "if (!\$examAccess['allowed']) throw new RuntimeException") !== false, 'API menolak start di luar akses');
 $check(strpos(file_get_contents("$root/pages/tryout.php"), 'function tryoutUserAllowed') !== false, 'Tryout dibatasi peserta terdaftar');
-$check(strpos(file_get_contents("$root/includes/sidebar.php"), 'pretesExamIsRegisteredActive(') !== false, 'Menu Tryout hanya untuk peserta terdaftar');
+$check(strpos(file_get_contents("$root/includes/sidebar.php"), 'tryout.php') === false, 'Menu Tryout CBT sudah dihilangkan dari sidebar');
 $check(strpos(file_get_contents("$root/pages/dashboard.php"), 'pretesExamAccess($pdo, $user)') !== false, 'Dashboard memakai pretesExamAccess');
 
 if ($failures) { echo "FAIL:\n - " . implode("\n - ", $failures) . "\n"; exit(1); }

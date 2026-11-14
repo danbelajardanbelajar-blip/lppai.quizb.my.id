@@ -5,6 +5,21 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 23:27:15 +0700 — Penghapusan Menu Tryout CBT di Sidebar Seluruh Role & Status
+
+**Ringkasan:**
+1. **Pembersihan Menu Sidebar**: Menghapus item navigasi dan label menu `Tryout CBT` (`pages/tryout.php`) dari `includes/sidebar.php` pada seluruh role dan seluruh status mahasiswa (aktif, non-aktif, terdaftar, belum terdaftar).
+2. **Akses Tryout Terpusat**: Ruang latihan tryout kini diakses terpusat melalui kartu/tombol pengerjaan pada halaman peserta ujian pretes (`includes/pretes-participant-view.php`) saat tryout dibuka, sehingga navigasi sidebar lebih ringkas dan terfokus.
+3. **Verifikasi Test Suite**: Memperbarui asersi pada `tests/pretes-tryout-test.php` dan `tests/pretes-exam-access-test.php` untuk memastikan `tryout.php` tidak lagi dirender di sidebar. Seluruh pengujian sidebar dan CBT lulus 100%.
+
+| File | Baris (setelah edit) | Bagian | Perubahan |
+|---|---|---|---|
+| `includes/sidebar.php` | 233–236 | Menu Mahasiswa | Menghapus blok pengecekan `$showTryoutMenu` dan link navigasi `<a href="tryout.php">Tryout CBT</a>`. |
+| `tests/pretes-tryout-test.php` | 100 | Asersi Integrasi | Memperbarui pengujian untuk memverifikasi `tryout.php` tidak tampil di sidebar. |
+| `tests/pretes-exam-access-test.php` | 84 | Asersi Integrasi | Memperbarui pengujian untuk memverifikasi `tryout.php` tidak tampil di sidebar. |
+
+---
+
 ## 2026-11-14 23:22:10 +0700 — Penegasan Syarat Peserta Tryout Pretes, Pemisahan Ekspor Excel & Statistik Admin CBT
 
 **Ringkasan:**

@@ -97,7 +97,7 @@ $root = dirname(__DIR__);
 $page = file_get_contents("$root/pages/tryout.php");
 $check(strpos($page, 'pretesCbtStart($pdo, $userId, $regId, null, $token, $session)') !== false, 'API tryout memaksa sesi tryout saat start');
 $check(strpos($page, "'retake'") === false, 'Aksi lama retake tidak dipakai (diganti fresh)');
-$check(strpos(file_get_contents("$root/includes/sidebar.php"), "tryout.php") !== false, 'Menu Tryout CBT ada di sidebar');
+$check(strpos(file_get_contents("$root/includes/sidebar.php"), "tryout.php") === false, 'Menu Tryout CBT sudah dihilangkan dari sidebar');
 
 if ($failures) { echo "FAIL:\n - " . implode("\n - ", $failures) . "\n"; exit(1); }
 echo "PASS: tryout CBT terpisah dari ujian resmi (sesi, attempt, ulang & batas, jadwal, label admin).\n";
