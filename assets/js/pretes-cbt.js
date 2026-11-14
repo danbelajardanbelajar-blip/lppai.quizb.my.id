@@ -189,9 +189,9 @@
     function setInterruptionNotice(reason) {
         const notices = {
             page_hidden: ['Anda meninggalkan halaman ujian.', 'Kembali ke halaman ujian, lalu lanjutkan.'],
-            face_missing: ['Wajah tidak terdeteksi.', 'Hadapkan wajah ke kamera, lalu coba lagi.'],
+            face_missing: ['Wajah tidak terdeteksi.', 'Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.'],
             multiple_faces: ['Lebih dari satu wajah terdeteksi.', 'Pastikan hanya peserta ujian di depan kamera.'],
-            face_mismatch: ['Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera, lalu coba lagi.'],
+            face_mismatch: ['Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.'],
             camera_unavailable: ['Kamera tidak aktif.', 'Aktifkan kamera, lalu coba lagi.'],
             camera_denied: ['Izin kamera belum diberikan.', 'Izinkan akses kamera, lalu coba lagi.'],
             network: ['Koneksi ke server terganggu.', 'Periksa internet, lalu coba lagi.'],

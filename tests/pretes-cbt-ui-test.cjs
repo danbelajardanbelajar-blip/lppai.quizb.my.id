@@ -198,8 +198,8 @@ function environment(settings = {}) {
     assert.equal(slow.element('cbtInterruption').style.display, 'none', 'Delayed old autosave does not prevent resume');
     for (const [reason, expected, action] of [
         ['page_hidden', 'Anda meninggalkan halaman ujian.', 'Kembali ke halaman ujian, lalu lanjutkan.'],
-        ['face_missing', 'Wajah tidak terdeteksi.', 'Hadapkan wajah ke kamera, lalu coba lagi.'],
-        ['face_mismatch', 'Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera, lalu coba lagi.'],
+        ['face_missing', 'Wajah tidak terdeteksi.', 'Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.'],
+        ['face_mismatch', 'Wajah belum sesuai pasfoto.', 'Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.'],
         ['camera_unavailable', 'Kamera tidak aktif.', 'Aktifkan kamera, lalu coba lagi.']
     ]) {
         const notice = environment(); await settle(); await notice.element('cbtStart').onclick();

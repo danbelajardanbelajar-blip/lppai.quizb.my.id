@@ -5,6 +5,23 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 09:28:18 +0700 — Perjelas kewajiban wajah menghadap kamera
+
+**ID:** CBT-FACE-FORWARD-INSTRUCTION · **Parent Git:** `c49165c`.
+**Perubahan:** instruksi popup wajah tidak terdeteksi/tidak cocok menjadi “Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.” Peringatan penyebab lain tidak diubah.
+
+Waktu edit WIB sampai detik; baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 09:27:54 | `assets/js/pretes-cbt.js` | 192, 194 | Instruksi face_missing / face_mismatch | Tegaskan posisi wajah lurus ke kamera dan seluruh wajah terlihat. |
+| 2026-11-14 09:27:54 | `tests/pretes-cbt-ui-test.cjs` | 201, 202 | Asersi teks popup wajah | Tegaskan posisi wajah lurus ke kamera dan seluruh wajah terlihat. |
+
+**Verifikasi:** `node --check assets/js/pretes-cbt.js`, `node tests/pretes-cbt-ui-test.cjs`, `node tests/pretes-ujian-camera-test.cjs`, `git diff --check`: PASS. Aturan verifikasi, timer, dan jeda tetap sama.
+**Penerapan:** commit `Clarify that exam participants must face the camera`; push dan pull lokal `--ff-only`. Hosting cPanel memerlukan git pull dan muat ulang browser.
+
+---
+
 ## 2026-11-14 09:22:15 +0700 — Popup ujian ringkas sesuai penyebab
 
 **ID:** CBT-CONCISE-CAUSE-POPUP · **Parent Git:** `f35d208`.
