@@ -542,7 +542,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header">📚 Kelas Tutorial Saya</div>
     <div class="card-body">
         <div class="table-responsive">
-            <table>
+            <table class="no-datatable">
                 <thead>
                     <tr>
                         <th>Kelas</th>

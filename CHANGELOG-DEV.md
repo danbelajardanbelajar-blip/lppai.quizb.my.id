@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 21:49:00 +0700 — Perbaikan layout kontrol DataTables length dan isolasi tabel dashboard
+
+**ID:** UI-DATATABLES-LENGTH-LAYOUT-FIX · **Parent Git:** `16ec314`.
+**Permintaan:** Memperbaiki teks "Tampilkan", dropdown angka, dan teks "data" yang terpecah ke 3 baris terpisah pada tabel dashboard ("Kelas Tutorial Saya").
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 21:48:21 | `assets/css/style.css` | 1331–1356 | Styling Kontrol DataTables Length | Memperbaiki styling `.dataTables_wrapper .dataTables_length` dan label agar bertipe `display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;`, serta memaksa dropdown `<select>` menjadi `width: auto !important; min-width: 68px !important; display: inline-block !important;` untuk menimpa CSS global `select { width: 100%; }`. Teks dan dropdown kini selalu sejajar horizontal dalam satu baris rapi (`Tampilkan [ 10 ▾ ] data`). |
+| 2026-11-14 21:48:31 | `pages/dashboard.php` | 545 | Tabel Kelas Tutorial Mahasiswa | Menambahkan class `no-datatable` pada tabel kartu "Kelas Tutorial Saya" (`<table class="no-datatable">`) agar tabel ringkasan personal mahasiswa tidak diinisiasi DataTables secara berlebihan (menghilangkan dropdown pagination dan box pencarian yang tidak diperlukan untuk 1 baris data). |
+
+**Alasan:** Aturan CSS global `select { width: 100%; }` sebelumnya menyebabkan dropdown DataTables memaksa pemutusan baris (line-break) sehingga label terpecah menjadi "Tampilkan", baris baru dropdown 10, dan baris baru "data". Selain itu, tabel kelas tutorial pada dashboard mahasiswa hanya berisi 1–2 baris data pribadi sehingga tidak memerlukan kontrol pagination DataTables.
+**Dampak:** Tabel kartu "Kelas Tutorial Saya" di dashboard mahasiswa tampil ringkas, bersih, dan elegan tanpa kontrol pagination yang tidak perlu. Seluruh tabel lain di sistem yang menggunakan DataTables kini menampilkan kontrol jumlah data secara sejajar rapi dalam satu baris.
+**Verifikasi:**
+- `php -l pages/dashboard.php` -> No syntax errors detected.
+- `php tests/mahasiswa-unregistered-hide-menu-test.php` -> PASS.
+- `php tests/pretes-aktif-hide-tutorial-menu-test.php` -> PASS.
+- `python tests/tutorial-pretes-menu-test.py` -> PASS.
+- Seluruh 43 suite PHP di `tests/` -> PASS.
+**Penerapan:** Commit dan push ke `origin/main`. Pada cPanel terminal hosting jalankan `cd ~/public_html/lppai.quizb.my.id/web && git pull origin main`.
+
+---
+
 ## 2026-11-14 21:32:00 +0700 — Sembunyikan menu pretes dan menu tutorial bagi mahasiswa yang tidak terdaftar
 
 **ID:** NAV-HIDE-UNREGISTERED-STUDENT-MENUS · **Parent Git:** `ce918b2`.

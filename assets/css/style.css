@@ -1328,14 +1328,32 @@ table tbody tr.removing {
     border-color: var(--primary-light);
     box-shadow: 0 0 0 3.5px var(--primary-glow);
 }
+.dataTables_wrapper .dataTables_length {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.dataTables_wrapper .dataTables_length label {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
 .dataTables_wrapper .dataTables_length select {
+    width: auto !important;
+    min-width: 68px !important;
+    display: inline-block !important;
     border: 1.5px solid var(--border);
     border-radius: 9px;
     padding: 6px 12px;
     font-family: inherit;
     font-size: 13px;
-    margin: 0 6px;
+    margin: 0 4px;
     outline: none;
+    background: #ffffff;
 }
 .dataTables_wrapper .dataTables_info { 
     font-size: 13px; 
