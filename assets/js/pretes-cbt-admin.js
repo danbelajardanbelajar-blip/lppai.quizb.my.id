@@ -257,6 +257,9 @@
             get('sesModalEndTime').value = data.end_time ? data.end_time.replace(' ', 'T') : '';
             get('sesModalToken').value = data.token || '';
             get('sesModalTokenRequired').checked = Number(data.token_required) === 1;
+            if (get('sesModalShuffleOnViolation')) {
+                get('sesModalShuffleOnViolation').value = data.shuffle_on_violation !== undefined ? String(data.shuffle_on_violation) : '1';
+            }
             get('sesModalActive').checked = Number(data.is_active) === 1;
 
             const pkgIds = data.package_ids || [];
@@ -280,6 +283,9 @@
             get('sesModalEndTime').value = '';
             window.generateRandomToken();
             get('sesModalTokenRequired').checked = false;
+            if (get('sesModalShuffleOnViolation')) {
+                get('sesModalShuffleOnViolation').value = '1';
+            }
             get('sesModalActive').checked = true;
 
             // Default check first package

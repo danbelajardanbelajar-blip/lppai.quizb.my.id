@@ -196,7 +196,7 @@
         const dialog = el('cbtInterruption');
         el('cbtInterruptionReason').textContent = descriptions[reason] || 'Pengawasan memerlukan perhatian Anda.';
         el('cbtInterruptionStatus').textContent = interruption.confirmed
-            ? 'Waktu dijeda di server. Soal yang sedang terbuka dikosongkan dan diacak ulang; jawaban soal lain tetap tersimpan.'
+            ? 'Waktu dijeda di server. Soal yang belum dijawab diperbarui & diacak sistem; jawaban Anda yang telah tersimpan tetap aman.'
             : 'Mengonfirmasi jeda ke server… Jangan tutup halaman.';
         el('cbtWorkspace').inert = true;
         if (dialog.showModal && !dialog.open) dialog.showModal();

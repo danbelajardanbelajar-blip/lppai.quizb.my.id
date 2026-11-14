@@ -8,6 +8,7 @@ function rejectPause(callable $operation): void {
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 ensurePretesCbtTables($pdo);
 ensurePretesCbtTables($pdo);
+$pdo->exec('UPDATE pretes_cbt_sessions SET shuffle_on_violation = 0 WHERE id = 1');
 $initial = pretesCbtStart($pdo, 7, 42, 1000)['attempt'];
 pretesCbtChange($pdo, 7, 42, 'save', ['position' => 1, 'answer' => 'B'], 1010);
 $before = $pdo->query('SELECT * FROM pretes_cbt_items ORDER BY position')->fetchAll(PDO::FETCH_ASSOC);

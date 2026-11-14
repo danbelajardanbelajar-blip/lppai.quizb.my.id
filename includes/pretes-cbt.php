@@ -34,6 +34,7 @@ function ensurePretesCbtTables(PDO $pdo): void {
         end_time VARCHAR(30) DEFAULT NULL,
         token VARCHAR(32) DEFAULT NULL,
         token_required INTEGER NOT NULL DEFAULT 0,
+        shuffle_on_violation INTEGER NOT NULL DEFAULT 1,
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL
     )$engine");
@@ -96,6 +97,24 @@ function ensurePretesCbtTables(PDO $pdo): void {
         }
     } catch (Throwable $e) {}
 
+    // Pastikan kolom shuffle_on_violation ada di pretes_cbt_sessions
+    try {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $hasCol = false;
+        if ($driver === 'sqlite') {
+            $cols = $pdo->query("PRAGMA table_info(pretes_cbt_sessions)")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($cols as $col) {
+                if (strtolower((string)($col['name'] ?? '')) === 'shuffle_on_violation') { $hasCol = true; break; }
+            }
+        } else {
+            $cols = $pdo->query("SHOW COLUMNS FROM pretes_cbt_sessions LIKE 'shuffle_on_violation'")->fetchAll(PDO::FETCH_ASSOC);
+            $hasCol = !empty($cols);
+        }
+        if (!$hasCol) {
+            $pdo->exec("ALTER TABLE pretes_cbt_sessions ADD COLUMN shuffle_on_violation INTEGER NOT NULL DEFAULT 1");
+        }
+    } catch (Throwable $e) {}
+
     // Inisialisasi default package jika tabel packages kosong
     if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages')->fetchColumn() === 0) {
         $now = time();
@@ -106,7 +125,7 @@ function ensurePretesCbtTables(PDO $pdo): void {
     // Inisialisasi default session jika tabel sessions kosong
     if ((int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_sessions')->fetchColumn() === 0) {
         $now = time();
-        $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, is_active, created_at) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, ?)")
+        $pdo->prepare("INSERT INTO pretes_cbt_sessions (id, code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (1, 'SESI-REGULER-2026', 'Sesi Pretes Reguler 2026', 'Sesi ujian pretes resmi tutorial ubudiyah mahasiswa', '[]', NULL, 'wajib', NULL, 'standar', 65.00, NULL, NULL, 'PRETES26', 0, 1, 1, ?)")
             ->execute([$now]);
     }
 
@@ -623,6 +642,7 @@ function pretesCbtGetSessions(PDO $pdo): array {
         $ses['package_names'] = $packageNames;
         $ses['total_available_questions'] = $totalQuestions;
         $ses['active_available_questions'] = $activeQuestions;
+        $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
 
         // Target question count: sum of quotas or default
         if (!empty($ses['category_quotas'])) {
@@ -647,6 +667,7 @@ function pretesCbtGetSession(PDO $pdo, int $sessionId): ?array {
     $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
     $ses['package_ids'] = array_map('intval', $pkgIds);
     $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
+    $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
     return $ses;
 }
 
@@ -657,6 +678,7 @@ function pretesCbtGetActiveSession(PDO $pdo): ?array {
     $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
     $ses['package_ids'] = array_map('intval', $pkgIds);
     $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
+    $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
     return $ses;
 }
 
@@ -747,6 +769,10 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
         $token = pretesCbtGenerateToken(6);
     }
     $tokenRequired = isset($input['token_required']) && (int)$input['token_required'] === 1 ? 1 : 0;
+    $shuffleOnViolation = isset($input['shuffle_on_violation']) ? (int)$input['shuffle_on_violation'] : 1;
+    if ($shuffleOnViolation !== 0) {
+        $shuffleOnViolation = 1;
+    }
     $isActive = isset($input['is_active']) && (int)$input['is_active'] === 1 ? 1 : 0;
     $sessionId = (int)($input['id'] ?? 0);
 
@@ -762,22 +788,22 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
         }
 
         if ($sessionId > 0) {
-            $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, is_active = ? WHERE id = ?');
+            $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, shuffle_on_violation = ?, is_active = ? WHERE id = ?');
             $stmt->execute([
                 $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
-                $token, $tokenRequired, $isActive, $sessionId
+                $token, $tokenRequired, $shuffleOnViolation, $isActive, $sessionId
             ]);
         } else {
             $code = trim((string)($input['code'] ?? ''));
             if ($code === '') {
                 $code = 'SESI-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
             }
-            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([
                 $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
-                $token, $tokenRequired, $isActive, time()
+                $token, $tokenRequired, $shuffleOnViolation, $isActive, time()
             ]);
             $sessionId = (int)$pdo->lastInsertId();
         }

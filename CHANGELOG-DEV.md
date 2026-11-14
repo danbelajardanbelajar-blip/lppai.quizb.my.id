@@ -5,6 +5,40 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 07:07:45 +0700 — Fitur Anti-Contek CBT: Penggantian Soal Belum Dijawab Dari Bank Cadangan & Pengacakan Abjad Opsi Saat Terjadi Pelanggaran
+
+**ID perubahan:** CBT-ANTI-CHEAT-VIOLATION-SWAP · **Awal pengerjaan:** 2026-11-14 06:56:42 +0700 · **Parent Git:** `34f3d5c`.
+**Tujuan & Konteks Kebutuhan:**
+Admin/Dosen penguji mengunggah sekitar 170 butir soal ke bank soal, di mana mahasiswa hanya mengerjakan sekitar 50 butir soal per sesi ujian (terdapat 120 butir soal cadangan). Bila mahasiswa melakukan pelanggaran (ganti tab/jendela diminimalkan, kamera terputus, atau wajah tidak terdeteksi/mismatch):
+1. Seluruh butir soal yang belum dijawab otomatis diganti oleh mesin dengan soal baru yang diambil dari bank soal cadangan (secara cerdas memprioritaskan kategori materi yang sama).
+2. Pilihan jawaban A–E dari seluruh soal diacak abjadnya.
+3. Untuk butir soal yang sudah dijawab oleh mahasiswa: butir pertanyaan dipertahankan tetap sama, opsi A–E diacak, dan teks jawaban yang telah dipilih peserta serta kunci jawaban dipetakan secara presisi ke abjad baru sehingga skor & evaluasi nilai peserta 100% aman dan tidak berkurang.
+4. Jika bank cadangan habis atau dinonaktifkan (`shuffle_on_violation = 0`), sistem secara elegan melakukan relokasi posisi & pengacakan opsi tanpa kegagalan.
+
+Waktu tabel adalah waktu penyimpanan berkas (WIB, sampai detik).
+
+| Waktu edit file (WIB) | File | Baris snapshot | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 07:02:47 | `includes/pretes-cbt.php` | 36, 98–115, 627, 670, 772, 791, 804 | Skema tabel, migrasi, dan persistence sesi CBT | Menambahkan kolom `shuffle_on_violation INTEGER NOT NULL DEFAULT 1` pada skema `pretes_cbt_sessions`, auto-migration SQLite/MySQL, default seed session, serta pemrosesan dan penyimpanan pada `pretesCbtSaveSession` dan `pretesCbtGetSession`/`pretesCbtGetActiveSession`. |
+| 2026-11-14 07:03:52 | `includes/pretes-cbt-interruption.php` | 60–165 | Logika interupsi dan pertukaran soal anti-contek | Pada `pretesCbtInterrupt`: deteksi konfigurasi `shuffle_on_violation`. Jika aktif dan terdapat bank cadangan (`pretes_cbt_questions` di luar `pretes_cbt_items`), ambil cadangan (kelompokkan per kategori), ganti seluruh butir `answer === null` dengan soal baru dan acak opsi A–E; untuk butir `answer !== null`, pertahankan soal namun acak opsi A–E dan petakan `answer` serta `correct_answer` ke abjad baru berdasarkan kecocokan teks; relokasikan posisi aktif ke kandidat kosong. |
+| 2026-11-14 07:05:20 | `includes/pretes-cbt-admin-view.php` | 229–235, 580–595 | Antarmuka Admin CBT Bank Soal & Sesi | Menampilkan badge `🛡️ Anti-Contek (Tukar Cadangan)` pada kolom tabel sesi ujian, serta menambahkan form field select proteksi anti-contek pada Modal Pengatur Sesi Ujian (`#modalSessionForm`) lengkap dengan instruksi panduan admin. |
+| 2026-11-14 07:05:47 | `assets/js/pretes-cbt-admin.js` | 260–262, 287–289 | Modal Controller Sesi Ujian | Sinkronisasi `sesModalShuffleOnViolation` pada fungsi `openSessionModal` baik saat pembuatan sesi baru (default 1 / aktif) maupun saat pengeditan sesi eksisting. |
+| 2026-11-14 07:05:47 | `assets/js/pretes-cbt.js` | 199–200 | Dialog Interupsi Pengawasan | Memperbarui teks penjelasan dialog jeda interupsi agar informatif: *"Soal yang belum dijawab diperbarui & diacak sistem; jawaban Anda yang telah tersimpan tetap aman."* |
+| 2026-11-14 07:04:22 | `tests/pretes-cbt-interruption-test.php` | 11 | Uji regresi interupsi | Mengatur `shuffle_on_violation = 0` untuk memvalidasi mode standar/legacy relokasi satu soal tetap berjalan 100% kompatibel. |
+| 2026-11-14 07:04:57 | `tests/pretes-cbt-anti-cheat-violation-test.php` | 1–185 | Test suite komprehensif anti-contek | 11 tahapan uji: upload 170 butir bank soal, paket 50 butir, jawab 10 butir, pelanggaran jeda, verifikasi 40 butir belum dijawab diganti 100% dari 120 cadangan, verifikasi 10 butir terjawab teks sama dan opsi diacak serta jawaban terpetakan presisi, resume, submit dan verifikasi nilai akhir, serta fallback mode nonaktif (`shuffle_on_violation = 0`). |
+
+**Verifikasi:**
+- `php ..\tests\pretes-cbt-anti-cheat-violation-test.php`: PASS (11/11 langkah).
+- `php ..\tests\pretes-cbt-interruption-test.php`: PASS.
+- `php ..\tests\pretes-cbt-session-test.php`: PASS (8/8 test).
+- `php ..\tests\pretes-cbt-package-test.php`: PASS (7/7 test).
+- `php ..\tests\pretes-cbt-admin-buttons-test.php`: PASS.
+- `php ..\tests\pretes-aktif-hide-tutorial-menu-test.php`: PASS.
+- `php ..\tests\pretes-cbt-test.php`: PASS.
+- `php ..\tests\pretes-cbt-xlsx-test.php`: PASS.
+- `php ..\tests\pretes-proctoring-scenarios-test.php`: PASS.
+- `php -l` seluruh file yang diubah: PASS (tanpa syntax error).
+
 ## 2026-11-13 23:36:56 +0700 — Sembunyikan menu pretes selama menjadi peserta tutorial aktif
 
 **ID perubahan:** NAV-TUTORIAL-AKTIF · **Awal pengerjaan:** 2026-11-13 23:27:34 +0700 · **Parent Git:** `34f3d5c`.

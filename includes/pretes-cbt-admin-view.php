@@ -226,6 +226,13 @@
                                 <?= $ses['scoring_method'] === 'penalti' ? 'UTBK (+4, -1, 0)' : 'Skala 100 Proporsional' ?>
                                 (KKM: <?= number_format((float)$ses['passing_grade'], 0) ?>)
                             </div>
+                            <div style="margin-top:4px">
+                                <?php if (!empty($ses['shuffle_on_violation'])): ?>
+                                    <span class="bank-badge" style="background:#dcfce7;color:#15803d;font-size:10px;padding:2px 6px" title="Soal belum dijawab otomatis ditukar dari bank cadangan & opsi diacak jika terdeteksi pelanggaran">🛡️ Anti-Contek (Tukar Cadangan)</span>
+                                <?php else: ?>
+                                    <span class="bank-badge" style="background:#f1f5f9;color:#64748b;font-size:10px;padding:2px 6px" title="Hanya geser urutan posisi soal tanpa mengambil bank cadangan">Anti-Contek Standar</span>
+                                <?php endif; ?>
+                            </div>
                         </td>
                         <td>
                             <?php if (!empty($ses['start_time']) || !empty($ses['end_time'])): ?>
@@ -570,7 +577,22 @@
                     </div>
                 </div>
 
-                <!-- 8. Deskripsi & Status Aktif -->
+                <!-- 8. Proteksi Anti-Contek & Pertukaran Soal Pelanggaran -->
+                <div class="bank-field" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:14px">
+                    <label class="bank-label" for="sesModalShuffleOnViolation" style="color:#166534;margin-bottom:6px">🛡️ Proteksi Anti-Contek Saat Pelanggaran Terdeteksi</label>
+                    <div style="font-size:11.5px;color:#1e3a2b;margin-bottom:8px;line-height:1.5">
+                        Tindakan sistem ketika peserta melakukan pelanggaran (ganti tab, jendela diminimalkan, wajah hilang/berbeda):
+                    </div>
+                    <select id="sesModalShuffleOnViolation" class="bank-input" name="shuffle_on_violation">
+                        <option value="1">✅ Aktif: Seluruh soal belum dijawab diganti soal baru dari bank cadangan &amp; abjad opsi diacak (Anti-Joki/Bocoran)</option>
+                        <option value="0">❌ Nonaktif: Posisi soal hanya dipindah dan abjad diacak tanpa mengambil soal cadangan</option>
+                    </select>
+                    <span style="font-size:11px;color:#4b6354;margin-top:5px;display:block">
+                        💡 <strong>Sangat Dianjurkan</strong> bila memiliki bank soal cadangan (misal: upload ~170 soal, dikerjakan 50 soal). Soal yang sudah dijawab peserta tetap aman dan skor tidak berkurang, hanya susunan abjadnya disamarkan ulang.
+                    </span>
+                </div>
+
+                <!-- 9. Deskripsi & Status Aktif -->
                 <div class="bank-field">
                     <label class="bank-label" for="sesModalDesc">Deskripsi / Petunjuk untuk Peserta Sesi Ini</label>
                     <textarea id="sesModalDesc" class="bank-input" name="description" rows="2" placeholder="Keterangan pengawas, ruang lab, atau catatan khusus…"></textarea>
