@@ -17,7 +17,7 @@ if (!function_exists('getStudentTutorialWaiting')) {
         if ($userId <= 0) return null;
         try {
             $stmt = $pdo->prepare("
-                SELECT tr.id, tr.status, tr.tahun_ajaran, tc.nama_kelas,
+                SELECT tr.id, tr.user_id, tr.tutorial_class_id, tr.status, tr.tahun_ajaran, tc.nama_kelas,
                        COALESCE(NULLIF(tc.gelombang, ''), tr.gelombang) AS gelombang
                 FROM tutorial_registrations tr
                 LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -31,8 +31,8 @@ if (!function_exists('getStudentTutorialWaiting')) {
             return null;
         }
         if (!$reg || !in_array($reg['status'] ?? '', ['terdaftar', 'aktif'], true)) return null;
-        // Definisi sama dengan Info Tutorial: belum diplot bila belum ada kelas atau status masih terdaftar
-        $isPlotted = !empty($reg['nama_kelas']) && $reg['status'] !== 'terdaftar';
+        // Mahasiswa dianggap sudah diplot bila sudah memiliki kelas (nama_kelas / tutorial_class_id terisi)
+        $isPlotted = !empty($reg['nama_kelas']) || !empty($reg['tutorial_class_id']);
         return $isPlotted ? null : $reg;
     }
 }

@@ -46,7 +46,7 @@ $active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif'
 
 // Peserta yang masih berjalan (terdaftar / aktif) tidak boleh diarahkan daftar ulang
 $isOngoing = $latestReg && in_array($latestReg['status'] ?? '', ['terdaftar', 'aktif'], true);
-$isPlotted = $isOngoing && !empty($latestReg['nama_kelas']);
+$isPlotted = $isOngoing && (!empty($latestReg['nama_kelas']) || !empty($latestReg['tutorial_class_id']));
 $gelLabels = ['gel1' => 'Gelombang 1 (Ganjil)', 'gel2' => 'Gelombang 2 (Genap)', 'mandiri' => 'Mandiri'];
 $gelText   = $latestReg ? ($gelLabels[$latestReg['gelombang'] ?? ''] ?? ucfirst((string)($latestReg['gelombang'] ?? ''))) : '';
 
@@ -193,8 +193,8 @@ include __DIR__ . '/../includes/header.php';
             <p style="color: #4b5563; font-size: 16px; margin: 0 0 10px;">
                 Status Anda pada program Tutorial<?= $gelText !== '' ? ' <strong>' . sanitize($gelText) . '</strong>' : '' ?>
                 adalah
-                <?php if ($latestReg['status'] === 'aktif'): ?>
-                    <span class="badge" style="font-size: 14px; background:#d1fae5; color:#047857;">Peserta Aktif</span>
+                <?php if ($latestReg['status'] === 'aktif' || $isPlotted): ?>
+                    <span class="badge" style="font-size: 14px; background:#d1fae5; color:#047857;">Peserta <?= $latestReg['status'] === 'aktif' ? 'Aktif' : 'Terdaftar · Kelas Terplot' ?></span>
                 <?php else: ?>
                     <span class="badge" style="font-size: 14px; background:#fef3c7; color:#b45309;">Terdaftar · Menunggu Plotting Kelas</span>
                 <?php endif; ?>

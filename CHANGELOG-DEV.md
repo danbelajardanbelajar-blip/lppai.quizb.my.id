@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 16:18:00 +0700 — Perbaikan deteksi mahasiswa terplot tutorial pada kartu menunggu plotting
+
+**ID:** TUTORIAL-PLOTTED-DETECTION-FIX · **Parent Git:** `9f3a556`.
+**Permintaan:** Mengapa https://lppai.quizb.my.id/ambil-sertifikat.php, https://lppai.quizb.my.id/tutorial-pengumuman.php dan https://lppai.quizb.my.id/rekap-nilai.php masih melihat halaman "Pendaftaran Anda Telah Diterima & Sedang Menunggu Jadwal Plotting" padahal jadwal sudah diplot? Perbaiki bug ini dengan baik.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 16:15:41 | `includes/tutorial-waiting.php` | 19-38 | `getStudentTutorialWaiting()` | Tambah `tr.user_id, tr.tutorial_class_id` pada query pendaftaran. Perbaiki definisi status terplot dari yang semula keliru membatasi `&& $reg['status'] !== 'terdaftar'` menjadi `!empty($reg['nama_kelas']) || !empty($reg['tutorial_class_id'])`. Mahasiswa yang sudah diplot (termasuk status default 'terdaftar') mengembalikan `null` sehingga tidak lagi tertahan kartu menunggu plotting di `ambil-sertifikat.php`, `tutorial-pengumuman.php`, dan `rekap-nilai.php`. |
+| 2026-11-14 16:16:35 | `pages/tutorial-info.php` | 30, 192-196 | Query registrasi & status badge info tutorial | Tambah seleksi `tr.tutorial_class_id`. Samakan deteksi status terplot dengan `includes/tutorial-waiting.php`. Jika mahasiswa terplot dan status masih `'terdaftar'`, tampilkan badge hijau 'Terdaftar' (`#047857`, `#d1fae5`) dan tampilkan grid kelas, tutor, jadwal, serta ruangan alih-alih menampilkan kartu 'Menunggu Plotting'. |
+| 2026-11-14 16:16:54 | `pages/tutorial-pengumuman.php` | 49, 196-200 | Evaluasi `$isPlotted` & badge peserta pengumuman | Perbaiki `$isPlotted` agar menyertakan `!empty($latestReg['tutorial_class_id'])`. Sesuaikan badge bagi mahasiswa terplot dengan status terdaftar agar menampilkan 'Peserta Terdaftar · Kelas Terplot' berwarna hijau sehingga informatif dan konsisten. |
+| 2026-11-14 16:17:04 | `tests/tutorial-waiting-test.php` | 28 | Asersi unit test U3 | Perbarui pengujian U3: mahasiswa dengan status 'terdaftar' dan memiliki kelas (`tutorial_class_id = 1`) kini dipastikan mengembalikan `null` (sudah diplot, bukan menunggu plotting). |
+
+**Verifikasi:**
+1. `php -l includes/tutorial-waiting.php`, `php -l pages/tutorial-info.php`, `php -l pages/tutorial-pengumuman.php`, `php -l tests/tutorial-waiting-test.php`: No syntax errors detected (PASS).
+2. `php tests/tutorial-waiting-test.php`: Seluruh 6 skenario plotting + render kartu + verifikasi integrasi 3 halaman: PASS.
+3. `php tests/tutorial-info-test.php`: 17 asersi komponen UI Info Tutorial: PASS.
+4. `php tests/pretes-aktif-hide-tutorial-menu-test.php`: Uji isolasi menu pretes aktif: PASS.
+5. `php tests/pretes-cbt-anti-cheat-violation-test.php`: Uji integritas CBT: PASS.
+6. `php tests/tutorial-rekap-nilai-active-period-test.php`: Uji rekap nilai tutorial: PASS.
+
+**Penerapan:** commit `fix(tutorial): fix plotted student detection so plotted schedule is not blocked by waiting card`; push `origin main` lalu `git pull` di cPanel server hosting.
+
+---
+
 ## 2026-11-14 16:04:16 +0700 — Cetak absensi tutorial dari hasil plotting
 
 **ID:** TUTORIAL-PLOTTING-PRINT-ATTENDANCE · **Parent Git:** `7df404d`.

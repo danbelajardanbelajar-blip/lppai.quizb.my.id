@@ -27,7 +27,7 @@ $gelombangs = [
 ];
 
 $stmt = $pdo->prepare("
-    SELECT tr.id, tr.status, tr.created_at, tr.tahun_ajaran,
+    SELECT tr.id, tr.tutorial_class_id, tr.status, tr.created_at, tr.tahun_ajaran,
            tc.nama_kelas, tc.dosen_pengampu, tc.hari, tc.jam, tc.ruangan, tc.gelombang
     FROM tutorial_registrations tr
     LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
@@ -189,7 +189,10 @@ include __DIR__ . '/../includes/header.php';
 <?php else: ?>
     <?php foreach ($registrations as $reg):
         [$stLabel, $stColor, $stBg] = $statusBadges[$reg['status']] ?? [ucfirst(str_replace('_', ' ', (string)$reg['status'])), '#1d4ed8', '#dbeafe'];
-        $isPlotted = !empty($reg['nama_kelas']) && $reg['status'] !== 'terdaftar';
+        $isPlotted = !empty($reg['nama_kelas']) || !empty($reg['tutorial_class_id']);
+        if ($isPlotted && ($reg['status'] ?? '') === 'terdaftar') {
+            [$stLabel, $stColor, $stBg] = ['Terdaftar', '#047857', '#d1fae5'];
+        }
         $gelLabel = $gelombangs[$reg['gelombang'] ?? ''] ?? ($reg['gelombang'] ?: '');
     ?>
     <div class="ti-class">

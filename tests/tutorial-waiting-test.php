@@ -25,7 +25,7 @@ $check = function ($cond, $msg) use (&$failures) { if (!$cond) $failures[] = $ms
 
 $check(getStudentTutorialWaiting($pdo, ['id' => 1]) !== null, 'U1 terdaftar tanpa kelas → menunggu plotting');
 $check(getStudentTutorialWaiting($pdo, ['id' => 2]) === null, 'U2 aktif dengan kelas → sudah diplot');
-$check(getStudentTutorialWaiting($pdo, ['id' => 3]) !== null, 'U3 terdaftar meski ada kelas → masih menunggu (sama dengan Info Tutorial)');
+$check(getStudentTutorialWaiting($pdo, ['id' => 3]) === null, 'U3 terdaftar dengan kelas → sudah diplot (bukan menunggu)');
 $check(getStudentTutorialWaiting($pdo, ['id' => 4]) === null, 'U4 lulus → bukan menunggu');
 $check(getStudentTutorialWaiting($pdo, ['id' => 5]) !== null, 'U5 aktif tanpa kelas → menunggu');
 $check(getStudentTutorialWaiting($pdo, ['id' => 9]) === null, 'U9 tanpa pendaftaran → null');
