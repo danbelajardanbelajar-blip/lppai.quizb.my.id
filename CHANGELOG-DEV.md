@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-14 21:32:00 +0700 — Sembunyikan menu pretes dan menu tutorial bagi mahasiswa yang tidak terdaftar
+
+**ID:** NAV-HIDE-UNREGISTERED-STUDENT-MENUS · **Parent Git:** `ce918b2`.
+**Permintaan:** Atur agar mahasiswa yang tidak terdaftar tutorial atau pretes, baik yang aktif atau non aktif, agar menu pretes dan menu tutorial disembunyikan.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-14 21:27:06 | `includes/tutorial-membership.php` | 47–77 | Helper Keanggotaan Tutorial | Menambahkan fungsi `studentHasTutorialRegistration(PDO $pdo, ?array $user): bool` untuk memeriksa apakah mahasiswa memiliki pendaftaran tutorial (baik periode/status aktif maupun non-aktif), dengan mengabaikan pendaftaran yang berstatus `mengundurkan_diri`. |
+| 2026-11-14 21:28:42 | `includes/pretes-helper.php` | 573–605 | Helper Keanggotaan Pretes | Menambahkan fungsi `studentHasPretesRegistration(PDO $pdo, ?array $user): bool` untuk memeriksa apakah mahasiswa terdaftar pada program pretes (baik pada tabel `pretes_registrations` maupun riwayat nilai `pretes_results`), baik aktif maupun non-aktif. |
+| 2026-11-14 21:30:02 | `includes/sidebar.php` | 164–280 | Navigasi Sidebar Mahasiswa | Memperbarui logika visibilitas menu mahasiswa: (1) Menu Pretes disembunyikan jika mahasiswa tidak terdaftar pretes sama sekali (`!$hasPretesReg`) atau memiliki tutorial aktif; (2) Menu Tutorial dibungkus dengan `$showTutorialMenus` dan hanya tampil jika mahasiswa terdaftar tutorial atau terdaftar pretes yang selesai namun belum lulus; (3) Menu Absensi dibungkus dengan `$hasAnyAbsensiItem && !$isMahasiswaPretesAktif` sehingga mahasiswa yang tidak terdaftar tutorial dan tidak terdaftar pretes tidak melihat menu Pretes, Tutorial, maupun Absensi (baik akun mahasiswa aktif `is_active=1` maupun non-aktif `is_active=0`). |
+| 2026-11-14 21:31:21 | `tests/mahasiswa-unregistered-hide-menu-test.php` | 1–170 | Automated Test Suite (Baru) | Menguji 5 skenario komprehensif: deteksi helper, mahasiswa belum terdaftar (akun aktif & non-aktif), mahasiswa tutorial saja, mahasiswa pretes saja (aktif & lulus), serta isolasi menu role admin & dosen. |
+
+**Alasan:** Mahasiswa yang belum/tidak didaftarkan pada program tutorial maupun pretes (termasuk mahasiswa dengan akun non-aktif) sebelumnya tetap melihat menu Pretes dan/atau Tutorial pada sidebar navigasi. Aturan ini memastikan navigasi mahasiswa terisolasi strictly berdasarkan kepesertaan terdaftar.
+**Dampak:** Mahasiswa yang tidak terdaftar tutorial atau pretes hanya melihat menu Dashboard, Informasi (Tentang Kami, Kebijakan Privasi, Hapus Akun), dan Akun (Keluar). Peserta yang terdaftar tutorial atau pretes tetap melihat menu masing-masing secara normal. Menu Admin dan Dosen tidak terpengaruh.
+**Verifikasi:**
+- `php -l includes/tutorial-membership.php` -> No syntax errors detected.
+- `php -l includes/pretes-helper.php` -> No syntax errors detected.
+- `php -l includes/sidebar.php` -> No syntax errors detected.
+- `php tests/mahasiswa-unregistered-hide-menu-test.php` -> PASS (100% all scenarios).
+- `php tests/pretes-aktif-hide-tutorial-menu-test.php` -> PASS.
+- `python tests/tutorial-pretes-menu-test.py` -> PASS (all 20 cases).
+- Seluruh 43 file PHP test suite di folder `tests/` -> PASS (0 failed).
+**Penerapan:** Commit dan push ke `origin/main`. Pada cPanel terminal hosting jalankan `cd ~/public_html/lppai.quizb.my.id/web && git pull origin main`.
+
+---
+
 ## 2026-11-14 17:32:15 +0700 — Penelusuran halaman pretes-peserta & pembersihan info berulang istighasah / menu atas
 
 **ID:** PRETES-PESERTA-CLEANUP-ISTIGHASAH · **Parent Git:** origin/main.

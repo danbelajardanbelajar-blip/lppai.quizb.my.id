@@ -161,17 +161,54 @@ if (!function_exists('menuActive')) {
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">🎓</span> Rekapitulasi Nilai
             </a>
-        <?php else: ?>
+                <?php else: ?>
             <?php
             require_once __DIR__ . '/pretes-helper.php';
             require_once __DIR__ . '/tutorial-membership.php';
-            $hidePretesMenus = function_exists('getDBConnection')
-                && studentHasActiveTutorialRegistration(getDBConnection(), $currentUser ?? null);
-            $showDaftarPretesMenu = function_exists('getDBConnection')
-                ? shouldShowDaftarPretesToStudent(getDBConnection(), $currentUser ?? null)
+
+            $db = null;
+            if (function_exists('getDBConnection')) {
+                try {
+                    $db = getDBConnection();
+                } catch (Throwable $e) {
+                    $db = null;
+                }
+            }
+
+            $hasTutorialReg = ($db && function_exists('studentHasTutorialRegistration'))
+                ? studentHasTutorialRegistration($db, $currentUser ?? null)
+                : false;
+            $hasPretesReg = ($db && function_exists('studentHasPretesRegistration'))
+                ? studentHasPretesRegistration($db, $currentUser ?? null)
+                : false;
+            $hasActiveTutorialReg = ($db && function_exists('studentHasActiveTutorialRegistration'))
+                ? studentHasActiveTutorialRegistration($db, $currentUser ?? null)
+                : false;
+
+            // Sembunyikan menu pretes jika:
+            // 1. Mahasiswa tidak terdaftar pretes sama sekali (baik periode/status aktif maupun non-aktif), ATAU
+            // 2. Mahasiswa memiliki pendaftaran tutorial aktif (fokus mengikuti tutorial)
+            $hidePretesMenus = (!$hasPretesReg) || $hasActiveTutorialReg;
+            $showDaftarPretesMenu = ($db && function_exists('shouldShowDaftarPretesToStudent'))
+                ? shouldShowDaftarPretesToStudent($db, $currentUser ?? null)
                 : true;
-            $isMahasiswaPretesAktif = !$hidePretesMenus && function_exists('getDBConnection')
-                && isMahasiswaPretesAktif(getDBConnection(), $currentUser ?? null);
+            $isMahasiswaPretesAktif = !$hidePretesMenus && $db && function_exists('isMahasiswaPretesAktif')
+                && isMahasiswaPretesAktif($db, $currentUser ?? null);
+
+            // Sembunyikan menu tutorial jika:
+            // 1. Mahasiswa sedang dalam tahapan pretes aktif, ATAU
+            // 2. Mahasiswa tidak terdaftar tutorial dan tidak terdaftar pretes yang membutuhkan tutorial
+            //    (Mahasiswa yang telah lulus pretes dibebaskan dari tutorial).
+            $isLulusPretes = ($currentUser && $db && function_exists('isUserLulusPretes'))
+                ? isUserLulusPretes($db, (int)($currentUser['id'] ?? 0))
+                : false;
+            $showTutorialMenus = !$isMahasiswaPretesAktif && ($hasTutorialReg || ($hasPretesReg && !$isLulusPretes));
+
+            // Item dan label Absensi: tampil hanya bila ada item yang relevan dan tidak dalam pretes aktif
+            $showAbsensiPretes    = !$hidePretesMenus;
+            $showAbsensiTutorial  = $showTutorialMenus && $hasTutorialReg;
+            $showAbsensiAlKhidmah = $showTutorialMenus && $hasTutorialReg;
+            $hasAnyAbsensiItem    = $showAbsensiPretes || $showAbsensiTutorial || $showAbsensiAlKhidmah;
             ?>
             <!-- MAHASISWA MENU -->
             <div class="menu-label">Dashboard</div>
@@ -194,7 +231,7 @@ if (!function_exists('menuActive')) {
             </a>
             <?php endif; ?>
 
-            <?php if (!$isMahasiswaPretesAktif): ?>
+            <?php if ($showTutorialMenus): ?>
             <div class="menu-label">Tutorial</div>
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">
                 <span class="icon">📝</span> Pendaftaran Tutorial
@@ -211,6 +248,9 @@ if (!function_exists('menuActive')) {
             <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="page-nav <?= menuActive('ambil-sertifikat.php') ?>">
                 <span class="icon">📷</span> Scan Pengambilan Sertifikat
             </a>
+            <?php endif; ?>
+
+            <?php if ($hasAnyAbsensiItem && !$isMahasiswaPretesAktif): ?>
             <div class="menu-label">Absensi</div>
             <div class="menu-item has-submenu">
                 <a href="#" class="page-nav submenu-toggle <?= in_array($currentPage, ['absensi-pretes.php', 'absensi-tutorial.php', 'absensi-alkhidmah.php']) ? 'active' : '' ?>">
@@ -218,17 +258,21 @@ if (!function_exists('menuActive')) {
                     <span class="arrow" style="float: right; font-size: 10px; margin-top: 4px; transition: transform 0.2s;">▼</span>
                 </a>
                 <div class="submenu" style="display: <?= in_array($currentPage, ['absensi-pretes.php', 'absensi-tutorial.php', 'absensi-alkhidmah.php']) ? 'block' : 'none' ?>; background: rgba(0,0,0,0.2); border-radius: 8px; margin: 2px 10px; padding: 4px 0;">
-                    <?php if (!$hidePretesMenus): ?>
+                    <?php if ($showAbsensiPretes): ?>
                     <a href="<?= BASE_URL ?>/absensi-pretes.php" class="page-nav <?= menuActive('absensi-pretes.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi Pretes
                     </a>
                     <?php endif; ?>
+                    <?php if ($showAbsensiTutorial): ?>
                     <a href="<?= BASE_URL ?>/absensi-tutorial.php" class="page-nav <?= menuActive('absensi-tutorial.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi Tutorial
                     </a>
+                    <?php endif; ?>
+                    <?php if ($showAbsensiAlKhidmah): ?>
                     <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="page-nav <?= menuActive('absensi-alkhidmah.php') ?>" style="margin: 2px 0; padding-left: 40px; font-size: 13px;">
                         Absensi al Khidmah
                     </a>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>

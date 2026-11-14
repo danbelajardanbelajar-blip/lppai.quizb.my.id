@@ -570,6 +570,38 @@ if (!function_exists('shouldShowDaftarPretesToStudent')) {
         return isUserEligibleForPretesPeriod($user, $period);
     }
 }
+if (!function_exists('studentHasPretesRegistration')) {
+    /**
+     * Cek apakah mahasiswa terdaftar pada program pretes (baik periode/status aktif maupun non-aktif).
+     * Mengembalikan true jika mahasiswa memiliki catatan pendaftaran pretes atau riwayat hasil pretes.
+     *
+     * @param PDO $pdo
+     * @param array|null $user
+     * @return bool
+     */
+    function studentHasPretesRegistration(PDO $pdo, ?array $user): bool {
+        if (!$user || ($user['role'] ?? '') !== 'mahasiswa' || (int)($user['id'] ?? 0) < 1) {
+            return false;
+        }
+        $userId = (int)$user['id'];
+        try {
+            $stmt = $pdo->prepare("SELECT 1 FROM pretes_registrations WHERE user_id = ? LIMIT 1");
+            $stmt->execute([$userId]);
+            if ($stmt->fetchColumn()) {
+                return true;
+            }
+            $stmtRes = $pdo->prepare("SELECT 1 FROM pretes_results WHERE user_id = ? LIMIT 1");
+            $stmtRes->execute([$userId]);
+            if ($stmtRes->fetchColumn()) {
+                return true;
+            }
+        } catch (Throwable $e) {
+            error_log('studentHasPretesRegistration error: ' . $e->getMessage());
+        }
+        return false;
+    }
+}
+
 
 
 if (!function_exists('isMahasiswaPretesAktif')) {

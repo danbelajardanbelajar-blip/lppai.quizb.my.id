@@ -43,3 +43,36 @@ function studentHasActiveTutorialRegistration(PDO $pdo, ?array $user): bool {
     }
     return false;
 }
+
+if (!function_exists('studentHasTutorialRegistration')) {
+    /**
+     * Cek apakah mahasiswa terdaftar pada program tutorial (baik periode/status aktif maupun non-aktif).
+     * Mengembalikan true jika mahasiswa memiliki catatan pendaftaran tutorial yang tidak berstatus 'mengundurkan_diri'.
+     *
+     * @param PDO $pdo
+     * @param array|null $user
+     * @return bool
+     */
+    function studentHasTutorialRegistration(PDO $pdo, ?array $user): bool {
+        if (!$user || ($user['role'] ?? '') !== 'mahasiswa' || (int)($user['id'] ?? 0) < 1) {
+            return false;
+        }
+        try {
+            $stmt = $pdo->prepare("
+                SELECT status FROM tutorial_registrations 
+                WHERE user_id = ? 
+                ORDER BY id DESC 
+                LIMIT 1
+            ");
+            $stmt->execute([(int)$user['id']]);
+            $status = $stmt->fetchColumn();
+            if ($status !== false) {
+                return strtolower(trim((string)$status)) !== 'mengundurkan_diri';
+            }
+        } catch (Throwable $error) {
+            error_log('studentHasTutorialRegistration error: ' . $error->getMessage());
+        }
+        return false;
+    }
+}
+
