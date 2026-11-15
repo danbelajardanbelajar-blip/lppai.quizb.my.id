@@ -5,6 +5,49 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 18:08:31 +0700 — Fitur klik & zoom foto profil pengguna admin dengan proteksi anti simpan klik kanan
+
+**ID:** ADMIN-PROFILE-PHOTO-ZOOM · **Parent Git:** `a8fb91b`.
+**Permintaan:** Pada halaman https://lppai.quizb.my.id/admin/profil-pengguna.php?id=18310 buatkan fitur agar foto bisa diklik dan bisa dizoom namun tidak bisa disimpan dengan klik kanan.
+
+**Perubahan:**
+1. Menambahkan interaktivitas klik pada avatar foto profil pengguna (`.admin-profile-identity .users-table-user-icon.has-photo`): kursor `zoom-in`, indikator badge `🔍` saat hover, dan title panduan interaktif.
+2. Membangun komponen modal lightbox perbesar foto (`#admin-photo-zoom-modal`) dengan kontrol lengkap: tombol Zoom In (`➕`), Zoom Out (`➖`), indikator level persentase zoom (`100%`), tombol Reset Ukuran (`🔄 Reset`), dan tombol Tutup (`✕ Tutup`).
+3. Mendukung interaksi multi-metode: perbesaran melalui scroll roda mouse (`wheel`), klik ganda (`dblclick`) untuk beralih antara 100% dan 200%, pergeseran foto saat diperbesar (*click & drag pan*) dengan kursor `grab`/`grabbing`, serta navigasi keyboard (`+`, `-`, `0`, `Escape`).
+4. Menerapkan proteksi berlapis anti-simpan dan anti-klik-kanan (*save protection*):
+   - Mencegah kemunculan menu konteks klik kanan (`contextmenu` dicegah via `e.preventDefault()`) pada thumbnail maupun seluruh area modal perbesar.
+   - Menyematkan lapisan pelindung transparan (*shield overlay* `.photo-zoom-shield`) di atas gambar sehingga kursor dan klik tidak menyentuh elemen `<img>` asli secara langsung.
+   - Menetapkan `pointer-events: none`, `user-select: none`, `-webkit-user-drag: none`, `-webkit-touch-callout: none` (mencegah lembar simpan gambar pada ponsel/tablet), dan `draggable="false"`.
+   - Mengintersepsi pintasan simpan / cetak keyboard (`Ctrl+S`, `Cmd+S`, `Ctrl+P`, `Cmd+P`) saat modal aktif, serta menyembunyikan modal pada stylesheet `@media print`.
+5. Menampilkan thumbnail pasfoto pretes pada riwayat pendaftaran pretes di `admin-profile-academic-view.php` dengan fitur zoom dan proteksi anti klik kanan yang sama.
+6. Menambahkan suite pengujian otomatis `tests/admin-profile-photo-zoom-test.py` untuk memvalidasi alur HTTP dan browser Chrome headless Playwright secara menyeluruh.
+
+Waktu edit berikut adalah **penyimpanan terakhir file** (WIB sampai detik). Baris merujuk awal blok perubahan pada snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 18:05:16 | `admin/profil-pengguna.php` | 44–71 | CSS styling untuk `.users-table-user-icon.has-photo`, hover badge, `.admin-pretes-photo-thumb`, dan modal `.photo-zoom-*`. |
+| 2026-11-15 18:05:16 | `admin/profil-pengguna.php` | 112–140 | Markup HTML modal `#admin-photo-zoom-modal` (toolbar kontrol, viewport, shield overlay, footer tips). |
+| 2026-11-15 18:05:16 | `admin/profil-pengguna.php` | 142–340 | JavaScript: handler click-to-zoom, pan/drag, wheel zoom, dblclick, keyboard shortcuts, dan proteksi anti right-click/drag/save. |
+| 2026-11-15 18:05:38 | `includes/admin-profile-academic-view.php` | 41–57 | Render thumbnail pasfoto pretes (`.admin-pretes-photo-thumb`) dengan modal zoom dan proteksi anti-klik-kanan. |
+| 2026-11-15 18:06:25 | `tests/admin-profile-photo-zoom-test.py` | 1–220 | Test suite otomatis baru (HTTP markup check & browser Playwright click/zoom/anti-contextmenu/mobile test). |
+| 2026-11-15 18:07:47 | `tests/admin-tables-jenis-program-test.php` | 96–98 | Kompatibilitas pembacaan dashboard registrations view yang telah direfaktor. |
+| 2026-11-15 18:08:31 | `CHANGELOG-DEV.md` | 8–46 | Entri catatan perubahan sistematis WIB sampai detik untuk audit dan perbaikan berikutnya. |
+
+**Alasan:** Admin membutuhkan pemeriksaan detail terhadap foto profil dan pasfoto peserta pretes (misalnya pemeriksaan kejelasan wajah), dengan tetap menjaga keamanan foto dari penyimpanan langsung via klik kanan atau drag-and-drop.
+**Dampak:** Foto profil dan pasfoto pretes di halaman profil admin dapat dizoom secara interaktif. Klik kanan dan drag simpan gambar dinonaktifkan secara aman.
+**Verifikasi:**
+- `php -l admin/profil-pengguna.php` -> 0 syntax error.
+- `php -l includes/admin-profile-academic-view.php` -> 0 syntax error.
+- `python tests/admin-profile-photo-zoom-test.py` -> PASS HTTP & Browser (100% Lulus).
+- `python tests/admin-user-profile-test.py` -> PASS HTTP & Browser (100% Lulus).
+- `php tests/pretes-peserta-columns-test.php` -> PASS (100% Lulus).
+- `php tests/admin-tables-jenis-program-test.php` -> PASS (100% Lulus).
+- `php tests/pretes-target-program-test.php` -> PASS (100% Lulus).
+- `php tests/pretes-peserta-pdf-test.php` -> PASS (100% Lulus).
+
+---
+
 ## 2026-11-15 18:05:43 +0700 — Pendaftaran dashboard untuk seluruh periode aktif
 
 **ID:** ADMIN-DASHBOARD-ALL-ACTIVE-REGISTRATIONS · **Parent Git:** `a8fb91b`.

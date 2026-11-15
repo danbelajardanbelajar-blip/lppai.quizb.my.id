@@ -93,6 +93,9 @@ foreach ($checks as $fileRel => $patterns) {
     }
 
     $content = file_get_contents($filePath);
+    if ($fileRel === 'admin/dashboard.php' && file_exists($root . '/includes/admin-dashboard-registrations-view.php')) {
+        $content .= file_get_contents($root . '/includes/admin-dashboard-registrations-view.php');
+    }
     foreach ($patterns as $pat) {
         if (strpos($content, $pat) === false) {
             $failures[] = "[$fileRel] Pattern tidak ditemukan: " . htmlspecialchars($pat);

@@ -37,6 +37,25 @@ $tutorialScores = [
         <div><dt>Status Periode</dt><dd><?= $display(adminProfileStatus($row['period_status'])) ?></dd></div>
         <div><dt>Status Kegiatan</dt><dd><?= $display(adminProfilePretesActivity($row)) ?></dd></div>
         <div><dt>Hasil Penilaian</dt><dd><?= $display(adminProfileStatus($row['assessment_status'])) ?></dd></div>
+        <?php if (!empty($row['foto'])): ?>
+        <?php
+            $pretesPhotoUrl = null;
+            $rawP = trim((string)$row['foto']);
+            if (preg_match('~^https?://~i', $rawP) || preg_match('~^data:image/~i', $rawP)) {
+                $pretesPhotoUrl = $rawP;
+            } elseif ($rawP !== '') {
+                $pretesPhotoUrl = rtrim(BASE_URL, '/') . '/' . ltrim(str_replace('\\', '/', $rawP), '/');
+            }
+        ?>
+        <?php if ($pretesPhotoUrl): ?>
+        <div><dt>Pasfoto Pretes</dt><dd>
+            <div class="admin-pretes-photo-thumb" style="display:inline-block;position:relative;cursor:zoom-in;border-radius:6px;overflow:hidden;" title="🔍 Klik untuk memperbesar pasfoto pretes" onclick="openPhotoZoom('<?= htmlspecialchars($pretesPhotoUrl, ENT_QUOTES, 'UTF-8') ?>', 'Pasfoto Pretes — <?= htmlspecialchars(addslashes($display($row['periode'] ?? '')), ENT_QUOTES, 'UTF-8') ?>')">
+                <img src="<?= htmlspecialchars($pretesPhotoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="Pasfoto" style="width:40px;height:54px;object-fit:cover;border-radius:6px;border:1.5px solid #cbd5e1;box-shadow:0 2px 6px rgba(0,0,0,0.08);pointer-events:none;" draggable="false" oncontextmenu="return false;">
+                <div style="position:absolute;inset:0;cursor:zoom-in;" oncontextmenu="return false;"></div>
+            </div>
+        </dd></div>
+        <?php endif; ?>
+        <?php endif; ?>
     </dl>
     <details><summary>Rincian Nilai Pretes (<?= count(pretesComponents()) ?> komponen)</summary>
         <dl class="admin-profile-fields">
