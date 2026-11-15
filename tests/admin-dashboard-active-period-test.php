@@ -50,8 +50,8 @@ $registrationGroups=adminDashboardRegistrationGroups($pdo,$tutorial,$pretes);
 checkDashboard(count($registrationGroups)===5,'all five active periods, including empty period');
 $byLabel=array_column($registrationGroups,null,'label');
 $rpl=$byLabel['Pretes RPL 2026/2027'];
-checkDashboard(count($rpl['rows'])===10,'ten recent registrations per period');
-checkDashboard(array_column($rpl['rows'],'id')===range(12,3),'order by registration time then ID');
+checkDashboard(count($rpl['rows'])===5,'five recent registrations per period');
+checkDashboard(array_column($rpl['rows'],'id')===range(12,8),'order by registration time then ID');
 checkDashboard(count($byLabel['Pretes Reguler']['rows'])===1,'second active pretes is retained');
 checkDashboard($byLabel['Pretes Kosong']['rows']===[],'empty active period does not fall back to historical rows');
 checkDashboard(array_column($byLabel['2026/2027 / Ganjil / gel1']['rows'],'id')===[5,1],'tutorial year normalization and safe legacy dates');
@@ -99,4 +99,4 @@ $registrationGroups=adminDashboardRegistrationGroups($missingTablePdo,[],$pretes
 checkDashboard($registrationGroups[0]['error']===true,'query failure is distinguished from no registrations');
 ob_start(); include __DIR__ . '/../includes/admin-dashboard-registrations-view.php'; $error=ob_get_clean();
 checkDashboard(str_contains($error,'Pendaftaran periode ini belum dapat dimuat.'),'query failure shown to admin');
-echo "PASS: active periods, concurrent tutorial/pretes RPL, isolated years/semesters, legacy records, ten latest per period, empty/error states, escaped HTML and scoped profile links.\n";
+echo "PASS: active periods, concurrent tutorial/pretes RPL, isolated years/semesters, legacy records, five latest per period, empty/error states, escaped HTML and scoped profile links.\n";

@@ -12,7 +12,7 @@
                 <span class="badge badge-success">Aktif</span>
             </h3>
             <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-                <span style="font-size:13px;color:#64748b;">Maksimal 10 pendaftaran terbaru pada periode ini.</span>
+                <span style="font-size:13px;color:#64748b;">Maksimal 5 pendaftaran terbaru pada periode ini.</span>
                 <a class="btn btn-sm btn-outline-primary" href="<?= BASE_URL ?>/admin/<?= $registrationGroup['type'] === 'tutorial' ? 'tutorial-data-pendaftar.php?gelombang_id=' . (int)$registrationGroup['period']['id'] : 'pretes-peserta.php?periode=' . rawurlencode($registrationGroup['period']['periode']) ?>">Buka Data Lengkap <?= $registrationGroup['type'] === 'tutorial' ? 'Pendaftar Tutorial' : 'Peserta Pretes' ?> &rarr;</a>
             </div>
             <?php if ($registrationGroup['error']): ?>

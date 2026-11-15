@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 18:10:13 +0700 — Batasi daftar pendaftaran dashboard menjadi lima per periode
+
+**ID:** ADMIN-DASHBOARD-RECENT-LIMIT-5 · **Parent Git:** `dd5e4a6`.
+**Permintaan:** Kurangi daftar Pendaftaran Terbaru dari 10 menjadi 5 agar setiap bagian periode lebih ringkas.
+
+**Perubahan dan alasan:** Query pendaftaran tutorial dan pretes kini mengambil maksimal lima pendaftaran terbaru per periode aktif. Keterangan tampilan dan hasil pengujian diselaraskan. Semua periode aktif tetap ditampilkan bersamaan; urutan waktu pendaftaran dan ID tetap dipertahankan.
+
+Waktu berikut adalah penyimpanan terakhir file, dalam WIB sampai detik. Baris adalah awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 18:09:51 | `includes/admin-dashboard-registrations.php` | 15, 35 | adminDashboardRegistrationGroups: ubah LIMIT query pretes dan tutorial dari 10 menjadi 5 per periode aktif. |
+| 2026-11-15 18:09:51 | `includes/admin-dashboard-registrations-view.php` | 15 | Keterangan daftar menjadi Maksimal 5 pendaftaran terbaru pada periode ini. |
+| 2026-11-15 18:09:51 | `tests/admin-dashboard-active-period-test.php` | 53, 102 | Sesuaikan batas hasil dan urutan ID yang diharapkan menjadi lima terbaru; sesuaikan laporan pengujian. |
+| 2026-11-15 18:10:13 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-DASHBOARD-RECENT-LIMIT-5 beserta hasil verifikasi. |
+
+**Verifikasi:** `php tests/admin-dashboard-active-period-test.php` lulus: batas lima dan urutan hasil, seluruh periode aktif tampil bersamaan, isolasi tahun/semester, catatan lama, escaping, tautan profil/data lengkap, render controller dashboard asli, serta kondisi kosong/error. PHP lint kedua file aplikasi dan file pengujian, serta `git diff --check`, diperiksa sebelum commit/push. Pesan missing-table pada pengujian adalah skenario kegagalan query yang disengaja; PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali.
+
+**Batas verifikasi:** Pengujian memakai fixture SQLite lokal, bukan database produksi. Deployment hosting diverifikasi terpisah dari push Git. Tidak ada perubahan skema/data produksi.
+
+**Pelacakan:** Cari commit dengan ID `ADMIN-DASHBOARD-RECENT-LIMIT-5`.
+
+---
+
 ## 2026-11-15 18:08:31 +0700 — Fitur klik & zoom foto profil pengguna admin dengan proteksi anti simpan klik kanan
 
 **ID:** ADMIN-PROFILE-PHOTO-ZOOM · **Parent Git:** `a8fb91b`.

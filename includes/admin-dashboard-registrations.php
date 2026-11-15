@@ -12,7 +12,7 @@ function adminDashboardRegistrationGroups(PDO $pdo, array $tutorialPeriods, arra
                 if ($type === 'pretes') {
                     $stmt = $pdo->prepare('SELECT pr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.no_hp
                         FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id
-                        WHERE pr.periode = ? ORDER BY pr.tanggal_daftar DESC, pr.id DESC LIMIT 10');
+                        WHERE pr.periode = ? ORDER BY pr.tanggal_daftar DESC, pr.id DESC LIMIT 5');
                     $stmt->execute([$period['periode']]);
                 } else {
                     $normalize = static fn($value) => strtolower(str_replace('/', '-', trim((string)$value)));
@@ -32,7 +32,7 @@ function adminDashboardRegistrationGroups(PDO $pdo, array $tutorialPeriods, arra
                                 OR (? <> '' AND tr.created_at >= ?)
                             ))
                           )
-                        ORDER BY tr.created_at DESC, tr.id DESC LIMIT 10");
+                        ORDER BY tr.created_at DESC, tr.id DESC LIMIT 5");
                     $opened = trim((string)($period['created_at'] ?? ''));
                     $stmt->execute([$normalize($period['gelombang']), $semester, $year, $fullSemester,
                         $year, $fullSemester, $fullSemester, $opened, $opened]);
