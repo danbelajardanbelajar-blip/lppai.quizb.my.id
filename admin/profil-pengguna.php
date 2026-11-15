@@ -36,6 +36,15 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <style>
 .admin-profile-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.admin-profile-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.admin-profile-back{display:inline-flex;align-items:center;gap:12px;padding:10px 18px 10px 10px;border:1px solid #bbdfce;border-radius:16px;background:linear-gradient(135deg,#fff,#edf8f2);color:#14532d;text-decoration:none;box-shadow:0 4px 14px rgba(20,83,45,.07);transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.admin-profile-back:hover{color:#14532d;border-color:#6eac8b;box-shadow:0 7px 20px rgba(20,83,45,.13);transform:translateY(-2px)}
+.admin-profile-back:focus-visible{outline:3px solid #16a34a;outline-offset:4px}
+.admin-profile-back-icon{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;background:#14532d;color:#fff;flex-shrink:0}
+.admin-profile-back-label{display:flex;flex-direction:column;gap:2px;line-height:1.3}.admin-profile-back-label strong{font-size:14px}.admin-profile-back-label small{font-size:11px;color:#527360}
+.admin-profile-breadcrumb{display:flex;align-items:center;gap:8px;font-size:12px;color:#64748b}.admin-profile-breadcrumb strong{color:#334155;font-weight:600}
+@media(max-width:480px){.admin-profile-breadcrumb{display:none}}
+@media(prefers-reduced-motion:reduce){.admin-profile-back{transition:none}.admin-profile-back:hover{transform:none}}
 .admin-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.admin-profile-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .admin-profile-record{border-top:1px solid #e2e8f0;padding:16px 0;min-width:0}.admin-profile-record h3{overflow-wrap:anywhere}.admin-profile-record summary{cursor:pointer;color:#166534;font-weight:600;padding:8px 0}.admin-profile-fields dt{font-size:12px;color:#64748b;margin-bottom:5px}.admin-profile-fields dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 .admin-profile-identity .users-table-user-icon{width:88px!important;height:88px!important;flex-basis:88px!important}.admin-profile-identity .users-table-user-icon svg{width:44px;height:44px}
@@ -73,6 +82,22 @@ include __DIR__ . '/../includes/header.php';
 @media (max-width:600px){.photo-zoom-header{flex-direction:column;align-items:stretch}.photo-zoom-actions{justify-content:space-between}}
 @media print{.photo-zoom-modal{display:none!important}}
 </style>
+<nav class="admin-profile-nav" aria-label="Navigasi profil pengguna">
+    <a id="admin-profile-back" class="admin-profile-back" data-no-spa href="<?= BASE_URL ?>/admin/users.php">
+        <span class="admin-profile-back-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg></span>
+        <span class="admin-profile-back-label"><strong>Kembali</strong><small>Halaman sebelumnya</small></span>
+    </a>
+    <span class="admin-profile-breadcrumb"><span>Administrasi</span><span aria-hidden="true">/</span><strong>Profil Pengguna</strong></span>
+</nav>
+<script>
+document.getElementById('admin-profile-back').addEventListener('click', function(event) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if (document.referrer && new URL(document.referrer).origin === window.location.origin && window.history.length > 1) {
+        event.preventDefault();
+        window.history.back();
+    }
+});
+</script>
 <div class="admin-profile-head"><div><h2 style="margin:0;">Profil Pengguna</h2><p style="margin:6px 0 0;color:#64748b;">Tampilan khusus admin · Informasi akun dan aktivitas akademik</p></div><a href="<?= BASE_URL ?>/admin/users.php" class="btn btn-secondary" data-no-spa style="width:auto;">Kelola Pengguna</a></div>
 <?php if (!$profileUser): ?>
 <section class="card"><div class="card-header">Pilih akun yang dimaksud</div><div class="card-body">

@@ -165,6 +165,16 @@ await page.setViewportSize({width:390,height:844});
 if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile overflow');
 await page.locator('details').first().locator('summary').click();
 if(!(await page.locator('details').first().innerText()).includes('Ujian tulis'))throw Error('pretes scores unavailable');
+await page.locator('#admin-profile-back').click();
+await page.waitForURL(process.argv[3]+'/');
+await page.waitForSelector('#student a');
+const direct=await browser.newPage();
+await direct.route('**/admin/users.php',route=>route.fulfill({contentType:'text/html',body:'<p>Kelola Pengguna fixture</p>'}));
+await direct.goto(process.argv[3]+'/admin/profil-pengguna.php?id=1');
+await direct.locator('#admin-profile-back').click();
+await direct.waitForURL('**/admin/users.php');
+if(!(await direct.textContent('body')).includes('Kelola Pengguna fixture'))throw Error('direct-entry back fallback failed');
+await direct.close();
 await page.route('**/mock?**',route=>route.fulfill({json:{success:true,data:[
 {id:900,user_id:3,nama_lengkap:'Nama Sama',nim:'003',is_submitted:true},
 {id:901,user_id:4,nama_lengkap:'Nama Sama',nim:'004',is_submitted:true}

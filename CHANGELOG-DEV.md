@@ -5,6 +5,29 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 19:21:10 +0700 — Menu Kembali modern pada profil pengguna admin
+
+**ID:** ADMIN-PROFILE-BACK-NAVIGATION · **Parent Git:** `17608b1`.
+**Permintaan:** Tambahkan menu Kembali yang cantik dan modern pada profil pengguna admin, termasuk profil ID 14488.
+
+**Perubahan dan alasan:** Tambahkan bilah navigasi di atas judul profil, berisi tombol Kembali dengan ikon SVG panah, latar gradasi hijau lembut, sudut membulat, bayangan ringan, efek hover, fokus keyboard, dan breadcrumb Administrasi / Profil Pengguna. Saat terdapat riwayat dan referrer satu origin, klik biasa memakai history.back agar halaman asal dapat dipulihkan. Jika profil dibuka langsung atau berasal dari situs lain, tautan menuju Kelola Pengguna. Klik dengan modifier tetap mengikuti perilaku tautan browser. Breadcrumb disembunyikan pada layar kecil agar tampilan ringkas; preferensi reduced-motion dihormati. Tautan Kelola Pengguna yang sudah ada tetap tersedia.
+
+Waktu berikut adalah penyimpanan terakhir file, dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 19:19:49 | `admin/profil-pengguna.php` | 39, 85 | CSS navigasi: tombol hijau lembut, ikon SVG, sudut membulat, hover/fokus, breadcrumb dan responsivitas. Navigasi Kembali memakai history untuk asal satu origin; tautan cadangan Kelola Pengguna untuk akses langsung/asal luar. |
+| 2026-11-15 19:20:06 | `tests/admin-user-profile-test.py` | 168 | Uji browser tombol Kembali: profil dari tabel kembali ke halaman asal, sedangkan profil dibuka langsung menuju Kelola Pengguna. |
+| 2026-11-15 19:21:10 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-PROFILE-BACK-NAVIGATION beserta bukti verifikasi. |
+
+**Verifikasi:** `php -l admin/profil-pengguna.php`, `python tests/admin-user-profile-test.py`, `python tests/admin-profile-photo-zoom-test.py`, serta `git diff --check` lulus. Browser membuktikan kembali ke halaman tabel asal dan cadangan Kelola Pengguna saat akses langsung, tanpa error JavaScript atau overflow seluler. Akses admin-only, validasi, data sesuai akun, pencarian profil nama kembar, dan tidak adanya mutasi database tetap lulus. Zoom foto tetap terpusat pada desktop, setelah scroll, ponsel potret/lanskap; kontrol zoom/reset/tutup tetap berfungsi.
+
+**Batas verifikasi:** Menggunakan fixture database dan browser Chrome lokal; akun/database produksi tidak diakses. PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali. Push Git tidak membuktikan deployment hosting. Tidak ada perubahan skema atau data produksi.
+
+**Pelacakan:** Cari commit dengan ID `ADMIN-PROFILE-BACK-NAVIGATION`.
+
+---
+
 ## 2026-11-15 19:12:56 +0700 — Pusatkan modal zoom foto profil terhadap layar
 
 **ID:** ADMIN-PROFILE-PHOTO-ZOOM-CENTER · **Parent Git:** `1086915`.
