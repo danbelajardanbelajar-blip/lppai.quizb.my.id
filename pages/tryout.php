@@ -167,7 +167,8 @@ if ($session) {
         $myReg['hari_pilihan'] = 'Minggu';
         $myReg['jam'] = '04.25 WIB';
     }
-    $refPhoto = $myReg ? trim((string)($myReg['foto'] ?? '')) : '';
+    require_once __DIR__ . '/../includes/user-exam-photo.php';
+    $refPhoto = getUserExamReferencePhoto($pdo, $userId);
     $regId = pretesTryoutResolveRegId($pdo, $userId, $session, $isFresh);
 
     // Handle Aksi Pintas Pengembang / Tester 12345
@@ -465,12 +466,12 @@ include __DIR__ . '/../includes/header.php';
         <!-- ── State: Pasfoto Pendaftaran Belum Lengkap ── -->
         <div class="card" style="border:2px solid #eab308; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px; background:#fff;">
             <span style="font-size:48px; display:block; margin-bottom:12px;">📸</span>
-            <h3 style="margin:0 0 8px; font-weight:800; color:#854d0e;">Pasfoto Resmi Belum Terdaftar</h3>
+            <h3 style="margin:0 0 8px; font-weight:800; color:#854d0e;">Foto Profil Acuan Belum Tersedia</h3>
             <p style="color:#64748b; font-size:14px; max-width:500px; margin:0 auto 20px; line-height:1.5;">
                 Sistem pengawasan AI memerlukan pasfoto resmi acuan Anda untuk memverifikasi keaslian peserta saat tryout berlangsung.
             </p>
-            <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
-                Perbarui Pasfoto Resmi ➔
+            <a href="<?= BASE_URL ?>/profil.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
+                Perbarui Foto Profil ➔
             </a>
         </div>
 
@@ -487,7 +488,7 @@ include __DIR__ . '/../includes/header.php';
                             <span>🛡️</span> <span>Verifikasi Identitas Peserta Tryout</span>
                         </h2>
                         <p style="margin:4px 0 0; color:#64748b; font-size:13.5px;">
-                            Tahap 1 (Skenario A): Pengecekan wajah live mahasiswa terhadap pasfoto pendaftaran resmi sebelum membuka soal tryout.
+                            Tahap 1 (Skenario A): Pengecekan wajah live mahasiswa terhadap foto profil acuan sebelum membuka soal tryout.
                         </p>
                     </div>
                     <div class="proctoring-badge badge-waiting" id="badgeCheckinStatus">
@@ -506,7 +507,7 @@ include __DIR__ . '/../includes/header.php';
                         <!-- Sisi Kiri: Pasfoto Referensi Pendaftaran -->
                         <div class="checkin-card">
                             <div style="font-size:12px; font-weight:800; color:#0f766e; text-transform:uppercase; margin-bottom:8px;">
-                                Pasfoto Resmi Pendaftaran Anda
+                                Foto Profil Acuan Ujian
                             </div>
                             <div style="width:180px; height:240px; margin:0 auto 12px; border-radius:12px; overflow:hidden; border:2.5px solid #0f766e; box-shadow:0 4px 12px rgba(15,118,110,0.15);">
                                 <img src="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim(str_replace('\\', '/', $refPhoto), '/')) ?>" 
@@ -968,7 +969,7 @@ include __DIR__ . '/../includes/header.php';
                 alertBox.style.background = '#eff6ff';
                 alertBox.style.border = '1px solid #bfdbfe';
                 alertBox.style.color = '#1e40af';
-                alertBox.innerHTML = '<strong>⏳ Sedang Mencocokkan...</strong><br>Sistem AI sedang membandingkan wajah di kamera dengan pasfoto pendaftaran resmi Anda.';
+                alertBox.innerHTML = '<strong>⏳ Sedang Mencocokkan...</strong><br>Sistem AI sedang membandingkan wajah di kamera dengan foto profil acuan Anda.';
             }
 
             Promise.resolve().then(async function() {
@@ -1026,7 +1027,7 @@ include __DIR__ . '/../includes/header.php';
                         alertBox.style.background = '#fef2f2';
                         alertBox.style.border = '1px solid #fca5a5';
                         alertBox.style.color = '#991b1b';
-                        let reason = data.message || 'Wajah belum sesuai dengan pasfoto pendaftaran.';
+                        let reason = data.message || 'Wajah belum sesuai dengan foto profil acuan.';
                         if (data.status === 'MOTION_REQUIRED' && data.failed_step === 2 && motionGuide) {
                             reason = 'Langkah 2: gerakan menoleh ke ' + motionGuide.side + ' Anda belum cukup terbaca. Putar kepala seperti saat bercermin dan tahan hingga hitung mundur selesai.';
                         }

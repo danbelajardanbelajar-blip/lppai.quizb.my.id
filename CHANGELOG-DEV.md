@@ -5,6 +5,29 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 10:08:00 +0700 — Foto profil ketat dan acuan verifikasi ujian terpadu
+
+**ID:** PROFILE-STRICT-PHOTO-EXAM-REFERENCE · **Parent Git:** `23ab300`.
+**Permintaan:** upload profil mengikuti persyaratan foto pendaftaran pretes dan foto profil digunakan untuk verifikasi saat ujian. Upload kini memakai pemeriksa wajah browser yang sama, dilanjutkan pemeriksaan kualitas/satu wajah di server VPS sebelum menyimpan. Pemeriksaan server membandingkan kandidat dengan dirinya sendiri untuk menjalankan deteksi/kualitas; ini bukan pembuktian identitas pemilik akun. Pretes resmi, tryout dan API proctoring memakai pemilih referensi canonical yang membaca foto profil terbaru. Riwayat foto pendaftaran tidak ditimpa.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 09:50:44 | `includes/user-exam-photo.php` | 1-109 | Sumber acuan tunggal dan penyimpanan foto ketat | Baca users.foto fresh per user sebagai acuan utama; hanya jika kosong gunakan pasfoto pretes terbaru milik user yang sama (sesuai fallback avatar existing). Batasi referensi pada file uploads. Validasi format/ukuran/dimensi di server, normalisasi JPEG 480x640, periksa kualitas/satu wajah via bridge VPS /verify dengan foto dibandingkan dirinya sendiri. Simpan hanya setelah MATCH; transaksi DB, bersihkan kandidat/gagal simpan, pertahankan file/riwayat lama dan batalkan flag check-in sesi saat foto berhasil diganti. |
+| 2026-11-15 09:52:55 | `assets/js/profile-photo.js` | 1-94 | Alur unggah dan kamera profil | Gunakan PretesFaceVerifier yang sama dengan pendaftaran pretes: file JPG/PNG/WEBP maksimal 5 MB atau kamera mirror, crop 3:4, cek wajah browser, submit terkunci sampai valid, tangani perubahan pilihan/race dan hentikan stream. Hasil dikirim sebagai foto_data JPEG untuk pemeriksaan akhir server. |
+| 2026-11-15 10:02:13 | `pages/profil.php` | 8, 34-45, 54, 138-145, 154, 174-216, 370-371 | Form profil dan informasi acuan ujian | Hubungkan upload ke saveVerifiedUserPhoto; sanitasi pesan penolakan; instruksi foto resmi, preview 3:4, kontrol file/kamera dan status validasi. Layout responsif, hidden controls tidak dikalahkan CSS tombol. Invalidate check-in setelah hapus foto; beri keterangan foto menjadi acuan verifikasi resmi/tryout. |
+| 2026-11-15 10:04:45 | `pages/pretes-ujian.php` | 127-128, 353-358, 376, 395, 903, 965 | Foto referensi ujian resmi | Gunakan pemilih foto profil canonical; ubah label/instruksi dan tautan foto yang belum tersedia ke profil.php. |
+| 2026-11-15 10:04:45 | `pages/tryout.php` | 170-171, 469-474, 491, 510, 972, 1030 | Foto referensi tryout | Gunakan pemilih canonical yang sama, label foto profil acuan, dan tautan profil untuk perbaikan foto. |
+| 2026-11-15 09:52:55 | `api/pretes-proctoring-check.php` | 109-110, 132 | Referensi pemeriksaan awal dan berkala | Baca foto acuan terbaru dari user yang sedang login untuk initial_checkin dan periodic_check; referensi tidak diambil dari session atau user lain. Pesan foto kosong mengarahkan unggah lewat Profil. |
+| 2026-11-15 10:06:19 | `tests/user-exam-photo-test.py` | 1-155 | Integrasi POST profil dan bridge HTTP | Uji form/controller/helper aktual memakai PDO SQLite, file GD dan layanan wajah tiruan via HTTP: reject/no-face, outage, sukses base64 dan multipart, hasil JPEG 480x640, pemilihan acuan baru, fallback legacy, isolasi akun, invalidate hanya setelah sukses, CSRF/payload/GIF ditolak, DB gagal rollback/file bersih, dan riwayat lama tetap. |
+| 2026-11-15 10:02:13 | `tests/profile-photo-browser-test.cjs` | 1-55 | Chrome file/camera/mobile | Uji halaman/JS profil aktual: hasil classifier invalid mengunci tombol; upload valid dan kamera fake-device menempuh POST dan bridge aktual; referensi berganti ke uploads/profil, hidden controls, tidak meluber pada 390px dan tanpa error JS. Classifier dan engine di-mock, bukan pengujian akurasi biometrik. |
+
+**Verifikasi:** `python tests/user-exam-photo-test.py`, `php tests/user-profile-avatar-menu-test.php`, `node tests/pretes-cbt-ui-test.cjs`, `node tests/pretes-ujian-camera-test.cjs`, `php tests/pretes-tryout-camera-test.php`, `php tests/pretes-cbt-token-test.php`, lint 5 file PHP, `node --check assets/js/profile-photo.js`, dan `git diff --check` pada file perubahan ini: PASS. Chrome `node tests/profile-photo-browser-test.cjs <fixture-url> <fixture-root>`: PASS; screenshot 390px diperiksa. Artefak: `scratch/profile-exam-photo-preview/` (diabaikan Git). Uji otomatis memakai classifier/face-engine tiruan, file dan database terisolasi, bukan klaim pengujian akurasi wajah nyata. Health layanan produksi `https://face.lppai.quizb.my.id/health` HTTP 200, ready=true, engine opencv-sface-v1, capture_protocol pose-burst-v2. Tidak mengubah foto/database produksi atau layanan VPS. Penyimpanan ketat memerlukan GD, cURL dan konfigurasi bridge wajah existing; kegagalan pemeriksaan menolak penyimpanan dan menjaga foto sebelumnya.
+**Penerapan:** commit `Validate profile photos strictly and use them for exam face verification`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi schema baru atau deployment service VPS.
+
+---
+
 ## 2026-11-15 09:41:09 +0700 — Tampilkan foto unggahan pengguna pada tabel
 
 **ID:** USERS-TABLE-UPLOADED-PHOTO · **Parent Git:** `f3094bc`.

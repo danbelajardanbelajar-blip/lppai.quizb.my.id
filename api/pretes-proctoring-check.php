@@ -106,7 +106,8 @@ if (!$myReg) {
     exit;
 }
 
-$refPhoto = trim((string)($myReg['foto'] ?? ''));
+require_once __DIR__ . '/../includes/user-exam-photo.php';
+$refPhoto = getUserExamReferencePhoto($pdo, (int)$user['id']);
 $regId = $regIdInput < 0 ? $regIdInput : (int)$myReg['id'];
 
 // Foto acuan harus milik peserta; jangan mengambil foto peserta lain sebagai sampel.
@@ -127,7 +128,7 @@ if (empty($refPhoto)) {
     echo json_encode([
         'success' => false,
         'verified' => false,
-        'message' => 'Pasfoto resmi pendaftaran Anda belum tersimpan. Silakan perbarui pasfoto pada menu Pendaftaran Pretes.'
+        'message' => 'Foto acuan ujian belum tersedia. Unggah foto yang memenuhi persyaratan melalui menu Profil.'
     ]);
     exit;
 }

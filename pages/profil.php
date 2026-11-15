@@ -5,6 +5,7 @@
 define('PAGE_TITLE', 'Profil Saya');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
+require_once __DIR__ . '/../includes/user-exam-photo.php';
 
 $currentUser = getCurrentUser();
 $userId = (int)($currentUser['id'] ?? 0);
@@ -31,13 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Token keamanan (CSRF) tidak valid atau sesi telah kedaluwarsa. Silakan muat ulang halaman.';
         $msgType = 'danger';
     } elseif ($action === 'upload_photo') {
-        if (!isset($_FILES['foto_profil']) || empty($_FILES['foto_profil']['name'])) {
+        $photoData = is_string($_POST['foto_data'] ?? null) ? $_POST['foto_data'] : '';
+        if ($photoData === '' && (!isset($_FILES['foto_profil']) || empty($_FILES['foto_profil']['name']))) {
             $message = 'Silakan pilih file foto terlebih dahulu sebelum menekan tombol unggah.';
             $msgType = 'warning';
         } else {
-            $res = saveUserUploadedPhoto($_FILES['foto_profil'], $userId, $pdo);
+            $res = saveVerifiedUserPhoto($pdo, $userId, $_FILES['foto_profil'] ?? [], $photoData);
             if ($res['success']) {
-                $message = 'Foto profil berhasil diperbarui! Foto kini aktif di seluruh halaman sistem.';
+                $message = 'Foto profil lolos pemeriksaan dan disimpan sebagai acuan verifikasi pretes serta tryout.';
                 $msgType = 'success';
                 // Refresh data
                 $stmt->execute([$userId]);
@@ -49,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'delete_photo') {
         if (deleteUserPhoto($userId, $pdo)) {
+            invalidateUserPhotoVerification();
             $message = 'Foto profil berhasil dihapus. Tampilan avatar dikembalikan ke inisial nama.';
             $msgType = 'success';
             // Refresh data
@@ -134,11 +137,12 @@ include __DIR__ . '/../includes/header.php';
     <?php if (!empty($message)): ?>
         <div class="alert alert-<?= $msgType ?> keep-alert" style="margin-bottom:24px; display:flex; align-items:center; gap:10px; border-radius:12px; font-size:13.5px;">
             <span><?= $msgType === 'success' ? '✅' : ($msgType === 'danger' ? '❌' : 'ℹ️') ?></span>
-            <div><?= $message ?></div>
+            <div><?= sanitize($message) ?></div>
         </div>
     <?php endif; ?>
 
-    <div style="display:grid; grid-template-columns: 340px 1fr; gap:24px; align-items:start;">
+    <style>.profile-page-wrapper [hidden]{display:none!important;}@media(max-width:800px){.profile-page-wrapper .profile-page-grid{grid-template-columns:minmax(0,1fr)!important;}}</style>
+    <div class="profile-page-grid" style="display:grid; grid-template-columns:minmax(0,340px) minmax(0,1fr); gap:24px; align-items:start;">
         <!-- KOLOM KIRI: Foto & Ringkasan Akun -->
         <div style="display:flex; flex-direction:column; gap:24px;">
             <!-- Card Foto Profil -->
@@ -147,7 +151,7 @@ include __DIR__ . '/../includes/header.php';
                     📷 Foto Profil
                 </div>
                 <div class="card-body" style="padding:24px; text-align:center;">
-                    <div style="position:relative; width:130px; height:130px; margin:0 auto 16px;">
+                    <div style="position:relative; width:150px; height:200px; margin:0 auto 16px;">
                         <div id="profileAvatarPreview" style="width:100%; height:100%; border-radius:24px; overflow:hidden; background:linear-gradient(135deg, var(--primary), var(--primary-light)); display:flex; align-items:center; justify-content:center; color:#ffffff; font-size:48px; font-weight:800; box-shadow:0 0 0 4px #ffffff, 0 0 0 6px rgba(16, 185, 129, 0.25), var(--shadow);">
                             <?php if (!empty($userPhotoUrl)): ?>
                                 <img src="<?= sanitize($userPhotoUrl) ?>" alt="<?= sanitize($userData['nama_lengkap']) ?>" style="width:100%; height:100%; object-fit:cover; display:block;">
@@ -170,6 +174,8 @@ include __DIR__ . '/../includes/header.php';
                     <form method="POST" enctype="multipart/form-data" id="formUploadPhoto" style="margin-top:16px;">
                         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                         <input type="hidden" name="action" value="upload_photo">
+                        <input type="hidden" name="foto_data" id="profilePhotoData" value="">
+                        <p style="text-align:left;font-size:13px;line-height:1.6;margin-bottom:12px;">Gunakan foto terbaru perorangan, berpakaian rapi, wajah menghadap depan, kedua mata terbuka, tanpa masker atau kacamata hitam. Foto harus terang, tajam, dan wajah tidak terpotong. Foto ini menjadi acuan verifikasi ujian.</p>
 
                         <div style="margin-bottom:12px;">
                             <label for="foto_profil" style="display:block; text-align:left; font-size:12px; font-weight:700; color:var(--text-dark); margin-bottom:6px;">
@@ -177,11 +183,18 @@ include __DIR__ . '/../includes/header.php';
                             </label>
                             <input type="file" name="foto_profil" id="foto_profil" accept="image/jpeg,image/png,image/webp" required
                                 style="width:100%; padding:8px 10px; font-size:12px; border:1px dashed #cbd5e1; border-radius:10px; background:#f8fafc; cursor:pointer;"
-                                onchange="previewSelectedPhoto(this);">
+                                >
                         </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                            <button type="button" class="btn btn-secondary" id="profilePhotoCamera">Ambil dari Kamera</button>
+                            <button type="button" class="btn btn-secondary" id="profilePhotoCapture" hidden>Ambil Foto</button>
+                            <button type="button" class="btn btn-secondary" id="profilePhotoStop" hidden>Tutup Kamera</button>
+                        </div>
+                        <video id="profilePhotoVideo" autoplay playsinline muted hidden style="width:100%;max-height:300px;object-fit:cover;transform:scaleX(-1);border-radius:10px;"></video>
+                        <p id="profilePhotoStatus" role="status" aria-live="polite" style="text-align:left;font-size:13px;line-height:1.6;">Pilih foto atau gunakan kamera. Foto akan dipotong 3:4 dan diperiksa sebelum disimpan.</p>
 
                         <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-                            <button type="submit" class="btn btn-primary" style="flex:1; min-width:120px; font-size:12.5px; padding:9px 14px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+                            <button type="submit" id="profilePhotoSubmit" disabled class="btn btn-primary" style="flex:1; min-width:120px; font-size:12.5px; padding:9px 14px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; gap:6px;">
                                 <span>📤</span> Unggah Foto
                             </button>
                         </div>
@@ -198,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endif; ?>
 
                     <div style="margin-top:14px; padding:10px; background:#f8fafc; border-radius:10px; font-size:11.5px; color:var(--text-muted); text-align:left; line-height:1.4;">
-                        💡 <strong>Catatan:</strong> Foto profil yang Anda pasang akan otomatis muncul pada lingkaran avatar pojok kanan atas seluruh halaman aplikasi.
+                        💡 <strong>Catatan:</strong> Foto yang lolos pemeriksaan dipakai pada avatar dan sebagai acuan verifikasi pretes serta tryout. Ukuran minimal 240 × 320 piksel; maksimal 12 megapiksel sebelum diproses. Mengganti foto mengharuskan verifikasi wajah ulang.
                     </div>
                 </div>
             </div>
@@ -354,20 +367,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<script>
-function previewSelectedPhoto(input) {
-    if (input.files && input.files[0]) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            var preview = document.getElementById('profileAvatarPreview');
-            if (preview) {
-                preview.innerHTML = '<img src="' + e.target.result + '" style="width:100%; height:100%; object-fit:cover; display:block;">';
-            }
-        };
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-</script>
+<script src="<?= BASE_URL ?>/assets/js/pretes-face-verifier.js?v=<?= filemtime(__DIR__ . '/../assets/js/pretes-face-verifier.js') ?>"></script>
+<script src="<?= BASE_URL ?>/assets/js/profile-photo.js?v=<?= filemtime(__DIR__ . '/../assets/js/profile-photo.js') ?>"></script>
 
 <?php
 include __DIR__ . '/../includes/footer.php';
