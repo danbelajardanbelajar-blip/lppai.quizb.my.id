@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 07:56:30 +0700 — Pengecualian Akun Percobaan (Username 12345) dari Seluruh Hasil Export
+
+**ID:** PRETES-EXCLUDE-USER-12345-EXPORT · **Parent Git:** `6845a51`.
+**Permintaan:** bagus sekali, atur agar username 12345 tidak perlu ditampilkan dalam export.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 07:48:15 | `admin/pretes-peserta-pdf.php` | 33-35 | Filter Query Dokumen PDF Peserta Pretes | Menambahkan klausul filter SQL `LOWER(TRIM(COALESCE(u.username, ''))) <> '12345' AND TRIM(COALESCE(u.nim, '')) <> '12345'` ke dalam `$whereConditions` default sehingga akun percobaan (username atau NIM 12345) secara otomatis dikecualikan dari data baris cetak, rekapitulasi total, rekapitulasi RPL, rekapitulasi Non RPL (Reguler), dan pengelompokan jurusan. |
+| 2026-11-15 07:49:22 | `admin/pretes-peserta-export.php` | 78-81, 492-530 | Filter Query Export Excel/CSV Peserta Pretes & Preview Counters | Menambahkan klausul pengecualian akun percobaan ke dalam `$whereConditions` untuk export Excel (.xlsx) dan CSV. Menambahkan variable `$excludeTestUserSql` pada query rekapitulasi dashboard (`$stmtTotalAll`, `$stmtWithCred`, `$stmtDays`, `$stmtAllProdi`) agar metrik ringkasan dan pratinjau live tabel tidak menghitung akun 12345. |
+| 2026-11-15 07:50:08 | `admin/pretes-absensi-export.php` | 38-39 | Filter Query Export Berkas Presensi / Lembar Kehadiran Pretes | Menambahkan klausul pengecualian `u.username <> '12345'` dan `u.nim <> '12345'` pada array `$where` query peserta presensi pretes cetak A4. |
+| 2026-11-15 07:50:45 | `includes/pretes-cbt-xlsx.php` | 233-242 | Generator Export Data Hasil Ujian CBT ke Spreadsheet | Memperbarui fungsi `cbtResultsExportRows(PDO $pdo, string $filter = 'all')` untuk selalu menyertakan pengecualian `LOWER(TRIM(COALESCE(u.username, ''))) <> '12345' AND TRIM(COALESCE(u.nim, '')) <> '12345'` pada filter 'all', 'resmi', maupun 'tryout'. |
+| 2026-11-15 07:51:30 | `admin/pretes-rekap-nilai.php` | 227-229 | Query Rekapitulasi Roster Nilai Peserta Pretes | Menambahkan klausul pengecualian akun percobaan 12345 pada query utama registrasi dan penilaian pretes (`$sql`), sehingga seluruh export nilai (Excel, Spreadsheet, CSV, Print) bebas dari data akun percobaan. |
+| 2026-11-15 07:56:13 | `tests/pretes-peserta-pdf-test.php` | 96-105, 113-127, 139-158, 203-216 | Test Suite Otomatis Export PDF & Pengecualian Akun 12345 | Menambahkan fixture akun percobaan (username 12345 / nim 12345), validasi query export bahwa akun 12345 tereliminasi dari daftar peserta, validasi filter program & jurusan, serta validasi statis bahwa kelima file export (`admin/pretes-peserta-pdf.php`, `admin/pretes-peserta-export.php`, `admin/pretes-absensi-export.php`, `includes/pretes-cbt-xlsx.php`, `admin/pretes-rekap-nilai.php`) memiliki klausul pengecualian akun percobaan. Total 24 pengujian lulus 100%. |
+
+**Verifikasi:**
+1. Linting seluruh file PHP (`php -l`): PASS 100% tanpa error syntax.
+2. `php tests/pretes-peserta-pdf-test.php`: PASS (24 skenario validasi Export PDF & Pengecualian Akun 12345 lulus 100%).
+3. `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file).
+4. `php tests/pretes-cbt-review-test.php`: PASS (22 skenario validasi Review Result CBT).
+5. `php tests/user-jenis-program-test.php`: PASS (24 file verified).
+6. `php tests/pretes-rekap-nilai-test.php`: PASS (151 skenario kelulusan).
+
+**Penerapan:** commit `Exclude trial account username 12345 from all participant, attendance, CBT and grade exports`; push ke `origin/main` lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 07:33:30 +0700 — Menu Export ke PDF Data Peserta Pretes (NIM, Nama, Program RPL/Non RPL, Jurusan)
 
 **ID:** PRETES-PESERTA-EXPORT-PDF · **Parent Git:** `7b5dc9b`.

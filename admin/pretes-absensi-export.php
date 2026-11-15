@@ -35,6 +35,8 @@ if ($filters['hari'] !== '' && !in_array($filters['hari'], ['Senin', 'Selasa', '
     exit('Hari pelaksanaan tidak valid.');
 }
 $where = ['pr.periode = ?'];
+$where[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+$where[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
 $params = [$pretes['periode']];
 if ($filters['hari'] !== '') {
     $where[] = "COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin') = ?";

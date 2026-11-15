@@ -75,6 +75,10 @@ if (empty($selectedCols)) {
 $whereConditions = ["1=1"];
 $params = [];
 
+// Kecualikan akun percobaan / uji coba (username atau NIM 12345) dari hasil export
+$whereConditions[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+$whereConditions[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
+
 if ($filterPeriode !== '') {
     $whereConditions[] = "pr.periode = ?";
     $params[] = $filterPeriode;
@@ -485,11 +489,13 @@ $periodeScopeParams = $filterPeriode !== '' ? [$filterPeriode] : [];
 $periodeQuery = '&periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
 $backPesertaUrl = 'pretes-peserta.php?periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
 
-$stmtTotalAll = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE 1=1{$periodeScopeSql}");
+$excludeTestUserSql = " AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345' AND TRIM(COALESCE(u.nim, '')) <> '12345'";
+
+$stmtTotalAll = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE 1=1{$excludeTestUserSql}{$periodeScopeSql}");
 $stmtTotalAll->execute($periodeScopeParams);
 $totalPesertaAll = (int)$stmtTotalAll->fetchColumn();
 
-$stmtWithCred = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr WHERE pr.username_tes IS NOT NULL AND pr.username_tes != ''{$periodeScopeSql}");
+$stmtWithCred = $pdo->prepare("SELECT COUNT(*) FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE pr.username_tes IS NOT NULL AND pr.username_tes != ''{$excludeTestUserSql}{$periodeScopeSql}");
 $stmtWithCred->execute($periodeScopeParams);
 $totalWithCred   = (int)$stmtWithCred->fetchColumn();
 $totalNoCred     = $totalPesertaAll - $totalWithCred;
@@ -500,7 +506,8 @@ $dayStats = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 
 $stmtDays = $pdo->prepare("
     SELECT TRIM(pr.hari_pilihan) as hari, COUNT(*) as cnt 
     FROM pretes_registrations pr
-    WHERE 1=1{$periodeScopeSql}
+    JOIN users u ON pr.user_id = u.id
+    WHERE 1=1{$excludeTestUserSql}{$periodeScopeSql}
     GROUP BY TRIM(pr.hari_pilihan)
 ");
 $stmtDays->execute($periodeScopeParams);
@@ -516,7 +523,7 @@ $stmtAllProdi = $pdo->prepare("
     SELECT DISTINCT u.program_studi, COUNT(*) as cnt
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    WHERE u.program_studi IS NOT NULL AND u.program_studi != ''{$periodeScopeSql}
+    WHERE u.program_studi IS NOT NULL AND u.program_studi != ''{$excludeTestUserSql}{$periodeScopeSql}
     GROUP BY u.program_studi
     ORDER BY u.program_studi ASC
 ");

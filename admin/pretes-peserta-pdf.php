@@ -30,6 +30,10 @@ $filterSearch = trim($_GET['q'] ?? ($_GET['nama'] ?? ($_GET['nim'] ?? '')));
 $whereConditions = ["1=1"];
 $params = [];
 
+// Kecualikan akun percobaan / uji coba (username atau NIM 12345) dari dokumen export
+$whereConditions[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+$whereConditions[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
+
 if ($filterPeriode !== '') {
     $whereConditions[] = "pr.periode = ?";
     $params[] = $filterPeriode;

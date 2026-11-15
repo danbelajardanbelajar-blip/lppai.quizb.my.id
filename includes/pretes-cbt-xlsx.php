@@ -230,12 +230,16 @@ function cbtBankExportRows(PDO $pdo): Generator {
 function cbtResultsExportRows(PDO $pdo, string $filter = 'all'): Generator {
     yield ['NIM', 'Nama Peserta', 'Jenis Ujian', 'Sesi Ujian', 'Mulai (WIB)', 'Selesai (WIB)', 'Status', 'Jawaban Benar', 'Jumlah Soal', 'Nilai'];
 
-    $where = '';
+    $whereConds = [];
     if ($filter === 'resmi') {
-        $where = 'WHERE a.registration_id > 0';
+        $whereConds[] = 'a.registration_id > 0';
     } elseif ($filter === 'tryout') {
-        $where = 'WHERE a.registration_id < 0';
+        $whereConds[] = 'a.registration_id < 0';
     }
+    $whereConds[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+    $whereConds[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
+
+    $where = 'WHERE ' . implode(' AND ', $whereConds);
 
     $sql = "SELECT a.*, u.nim, u.nama_lengkap, s.title AS session_title,
                    (SELECT COUNT(*) FROM pretes_cbt_items WHERE attempt_id = a.id) AS total_items

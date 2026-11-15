@@ -93,23 +93,38 @@ $uid2 = (int)$pdo->lastInsertId();
 $stmtUser->execute(['mhs_reg_3', 'Ahmad Dani Reguler', '2601003', 'Pendidikan Agama Islam', 'Reguler']);
 $uid3 = (int)$pdo->lastInsertId();
 
+// Mahasiswa 4: Akun Percobaan (Username 12345) - WAJIB DIKECUALIKAN DARI EXPORT
+$stmtUser->execute(['12345', 'User Percobaan Test', '12345', 'Pendidikan Agama Islam', 'Reguler']);
+$uidTrial = (int)$pdo->lastInsertId();
+
 $stmtReg = $pdo->prepare("INSERT INTO pretes_registrations (user_id, periode, hari_pilihan, jam, status, tanggal_daftar) VALUES (?, '2025/2026 Ganjil', ?, '13.00 WIB', 'terdaftar', ?)");
 $stmtReg->execute([$uid1, 'Senin', $ts]);
 $stmtReg->execute([$uid2, 'Selasa', $ts]);
 $stmtReg->execute([$uid3, 'Senin', $ts]);
+$stmtReg->execute([$uidTrial, 'Minggu', $ts]);
 
-// ── Test 1: Query & Logika Filter Data PDF ──────────────────────────────────
+// ── Test 1: Query & Logika Filter Data PDF (Dengan Pengecualian Akun 12345) ──
 $sql = "
     SELECT pr.id as reg_id, pr.periode, pr.hari_pilihan, pr.jam, pr.status,
-           u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
+           u.nama_lengkap, u.nim, u.username, u.program_studi, u.jenis_program
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     WHERE pr.periode = '2025/2026 Ganjil'
+      AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'
+      AND TRIM(COALESCE(u.nim, '')) <> '12345'
     ORDER BY u.program_studi ASC, u.nama_lengkap ASC
 ";
 $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
-pdfAssert(count($rows) === 3, 'Total peserta pretes terambil 3 orang', 'Jumlah peserta tidak sesuai');
+pdfAssert(count($rows) === 3, 'Total peserta pretes dalam dokumen export terhitung 3 orang (akun 12345 dikecualikan)', 'Jumlah peserta tidak sesuai');
+
+$hasUser12345 = false;
+foreach ($rows as $r) {
+    if (($r['username'] ?? '') === '12345' || ($r['nim'] ?? '') === '12345') {
+        $hasUser12345 = true;
+    }
+}
+pdfAssert(!$hasUser12345, 'Username 12345 (user percobaan) TIDAK ADA di dalam data hasil export', 'Akun 12345 masih muncul dalam export');
 
 $rplCount = 0;
 $nonRplCount = 0;
@@ -120,27 +135,33 @@ foreach ($rows as $r) {
 pdfAssert($rplCount === 1, 'Jumlah peserta RPL terhitung 1 orang', 'Jumlah RPL salah');
 pdfAssert($nonRplCount === 2, 'Jumlah peserta Non RPL (Reguler) terhitung 2 orang', 'Jumlah Non RPL salah');
 
-// Filter khusus RPL
+// Filter khusus RPL (dengan pengecualian user 12345)
 $stmtFilterRpl = $pdo->prepare("
     SELECT pr.id, u.nama_lengkap, u.jenis_program
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    WHERE pr.periode = '2025/2026 Ganjil' AND u.jenis_program = 'RPL'
+    WHERE pr.periode = '2025/2026 Ganjil'
+      AND u.jenis_program = 'RPL'
+      AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'
+      AND TRIM(COALESCE(u.nim, '')) <> '12345'
 ");
 $stmtFilterRpl->execute();
 $rplRows = $stmtFilterRpl->fetchAll(PDO::FETCH_ASSOC);
 pdfAssert(count($rplRows) === 1 && $rplRows[0]['nama_lengkap'] === 'Fathur Rahman RPL', 'Filter program RPL mengembalikan peserta RPL secara tepat', 'Filter RPL gagal');
 
-// Filter khusus Jurusan PAI
+// Filter khusus Jurusan PAI (dengan pengecualian user 12345)
 $stmtFilterPai = $pdo->prepare("
     SELECT pr.id, u.nama_lengkap, u.program_studi
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
-    WHERE pr.periode = '2025/2026 Ganjil' AND u.program_studi = 'Pendidikan Agama Islam'
+    WHERE pr.periode = '2025/2026 Ganjil'
+      AND u.program_studi = 'Pendidikan Agama Islam'
+      AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'
+      AND TRIM(COALESCE(u.nim, '')) <> '12345'
 ");
 $stmtFilterPai->execute();
 $paiRows = $stmtFilterPai->fetchAll(PDO::FETCH_ASSOC);
-pdfAssert(count($paiRows) === 2, 'Filter jurusan PAI mengembalikan 2 peserta PAI', 'Filter jurusan gagal');
+pdfAssert(count($paiRows) === 2, 'Filter jurusan PAI mengembalikan 2 peserta PAI (user 12345 dikecualikan)', 'Filter jurusan gagal');
 
 // ── Test 2: Verifikasi File admin/pretes-peserta-pdf.php ─────────────────────
 $pdfFile = file_get_contents(__DIR__ . '/../admin/pretes-peserta-pdf.php');
@@ -179,4 +200,17 @@ pdfAssert($exportFile !== false, 'File admin/pretes-peserta-export.php berhasil 
 pdfAssert(strpos($exportFile, "\$format === 'pdf'") !== false, 'admin/pretes-peserta-export.php menangani format pdf dan mendelegasikan ke pretes-peserta-pdf.php', 'Delegasi format pdf tidak ada');
 pdfAssert(strpos($exportFile, 'pretes-peserta-pdf.php') !== false, 'admin/pretes-peserta-export.php menyertakan rujukan ke pretes-peserta-pdf.php', 'Rujukan pretes-peserta-pdf.php tidak ada');
 
-echo "\nSemua 18 uji validasi Export PDF Data Peserta Pretes BERHASIL 100% SEMPURNA!\n";
+// ── Test 5: Verifikasi Pengecualian Username 12345 Pada Seluruh File Export ──
+pdfAssert(strpos($pdfFile, "'12345'") !== false, 'admin/pretes-peserta-pdf.php mengecualikan username 12345', 'Tidak ada filter 12345 di PDF');
+pdfAssert(strpos($exportFile, "'12345'") !== false, 'admin/pretes-peserta-export.php mengecualikan username 12345', 'Tidak ada filter 12345 di Export Excel');
+
+$absensiExportFile = file_get_contents(__DIR__ . '/../admin/pretes-absensi-export.php');
+pdfAssert(strpos($absensiExportFile, "'12345'") !== false, 'admin/pretes-absensi-export.php mengecualikan username 12345', 'Tidak ada filter 12345 di Absensi Export');
+
+$cbtXlsxFile = file_get_contents(__DIR__ . '/../includes/pretes-cbt-xlsx.php');
+pdfAssert(strpos($cbtXlsxFile, "'12345'") !== false, 'includes/pretes-cbt-xlsx.php mengecualikan username 12345 pada ekspor CBT', 'Tidak ada filter 12345 di CBT Export');
+
+$rekapNilaiFile = file_get_contents(__DIR__ . '/../admin/pretes-rekap-nilai.php');
+pdfAssert(strpos($rekapNilaiFile, "'12345'") !== false, 'admin/pretes-rekap-nilai.php mengecualikan username 12345 pada rekap nilai', 'Tidak ada filter 12345 di Rekap Nilai');
+
+echo "\nSemua 24 uji validasi Export PDF & Pengecualian Akun Percobaan 12345 BERHASIL 100% SEMPURNA!\n";

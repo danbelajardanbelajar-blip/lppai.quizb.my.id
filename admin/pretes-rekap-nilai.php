@@ -225,6 +225,8 @@ $sql = "
     LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
     LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id
     WHERE pr.periode = ?
+      AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'
+      AND TRIM(COALESCE(u.nim, '')) <> '12345'
 ";
 $params = [$periodeName];
 
