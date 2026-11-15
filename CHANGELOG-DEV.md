@@ -34,7 +34,7 @@ Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris mer
 
 ## 2026-11-15 18:05:08 +0700 — Kolom password Kelola Pengguna: tertutup, tombol mata, tombol Salin, klik = salin otomatis
 
-**ID:** USERS-PASSWORD-COPY · **Parent Git:** `a8fb91b`.
+**ID:** USERS-PASSWORD-COPY · **Parent Git:** `68fa1e2` (disusun di atas `a8fb91b`, lalu di-rebase saat `git pull --rebase` membawa `68fa1e2`; verifikasi diulang setelah rebase: test terkait PASS). Commit: `be69717`.
 **Permintaan:** Pada halaman Kelola Pengguna, beri menu klik yang otomatis menyimpan password user ke clipboard; password tertutup oleh mata, diklik tampil, dan ada tombol copy di sebelahnya.
 
 **Catatan penting:** password di database tersimpan sebagai **hash** (tidak dapat dibaca balik). Yang dapat ditampilkan/disalin hanya **password bawaan** (tanggal lahir `ddmmyyyy`, atau `123456` bila tanpa tanggal lahir). Karena itu server mencocokkan password bawaan dengan hash: bila pengguna sudah menggantinya, kolom menampilkan **"🔒 Sudah diganti"** (tanpa tombol salin) agar admin tidak menyalin password yang salah.
