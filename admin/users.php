@@ -797,6 +797,7 @@ function initUsersPage() {
         lengthMenu: [10, 25, 50, 100, 500],
         order: [[3, 'asc']],
         columnDefs: [
+            { visible: false, targets: [5, 8] }, // Tanggal Lahir dan Angkatan
             { orderable: false, targets: [0, 10] }
         ],
         language: {

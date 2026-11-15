@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 18:25:13 +0700 — Sembunyikan kolom Angkatan dan Tanggal Lahir pada Kelola Pengguna
+
+**ID:** USERS-HIDE-COHORT-BIRTHDATE · **Parent Git:** `fa84420`.
+**Permintaan:** Sembunyikan kolom Angkatan dan Tanggal Lahir pada tabel `admin/users.php`.
+
+**Perubahan dan alasan:** Konfigurasi DataTables menyetel `visible: false` pada indeks kolom 5 (Tanggal Lahir) dan 8 (Angkatan), sehingga tabel lebih ringkas. Struktur respons AJAX, indeks pengurutan, filter Angkatan, dan field formulir tambah/edit tetap tersedia; data tersimpan tidak diubah.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Nomor baris merujuk snapshot perubahan ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 18:24:49 | `admin/users.php` | 800 | Inisialisasi DataTables, columnDefs: sembunyikan Tanggal Lahir dan Angkatan. |
+| 2026-11-15 18:25:13 | `CHANGELOG-DEV.md` | 8 | Entri USERS-HIDE-COHORT-BIRTHDATE beserta hasil verifikasi. |
+
+**Verifikasi:** `php -l admin/users.php`, `python tests/users-table-photo-test.py`, `php tests/users-password-copy-test.php`, dan `git diff --check` lulus. Pengujian AJAX memastikan 11 kolom respons tetap konsisten, pencarian/pengurutan berfungsi, foto sesuai akun, dan database tidak berubah. Pengujian kontrol password tetap lulus. Pemetaan indeks kolom 5/8 diperiksa terhadap urutan thead dan respons AJAX.
+
+**Batas verifikasi:** Tidak mengakses akun/database produksi; deployment hosting tidak disimpulkan dari push GitHub. PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali, dengan hasil sintaks dan pengujian lulus.
+
+**Pelacakan:** Cari commit dengan ID `USERS-HIDE-COHORT-BIRTHDATE`.
+
+---
+
 ## 2026-11-15 18:10:13 +0700 — Batasi daftar pendaftaran dashboard menjadi lima per periode
 
 **ID:** ADMIN-DASHBOARD-RECENT-LIMIT-5 · **Parent Git:** `dd5e4a6`.
