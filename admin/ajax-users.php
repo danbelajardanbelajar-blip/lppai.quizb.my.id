@@ -11,6 +11,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 }
 
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/user-table-avatar.php';
 ensureJenisProgramColumn($pdo);
 
 // Parameter dari DataTables
@@ -137,11 +138,7 @@ foreach ($data as $row) {
     // Basic sanitization
     $id = $row['id'];
     $nimUsername = htmlspecialchars($row['nim'] ?? $row['username']);
-    $namaLengkap = htmlspecialchars($row['nama_lengkap']);
-    $namaDenganIcon = '<span class="users-table-user-cell" style="display:inline-flex;align-items:center;gap:10px;">'
-        . '<span class="users-table-user-icon" aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 32px;width:32px;height:32px;border-radius:50%;background:#ecfdf5;color:#166534;">'
-        . '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg>'
-        . '</span><span>' . $namaLengkap . '</span></span>';
+    $namaDenganIcon = renderUserTableName($row);
     $tglLahir = !empty($row['tanggal_lahir']) ? date('d/m/Y', strtotime($row['tanggal_lahir'])) : '-';
     $prodi = htmlspecialchars(!empty($row['program_studi']) ? $row['program_studi'] : '-');
     $jenisProgramVal = normalizeJenisProgram($row['jenis_program'] ?? 'Reguler');

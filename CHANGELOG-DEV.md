@@ -5,6 +5,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 09:41:09 +0700 — Tampilkan foto unggahan pengguna pada tabel
+
+**ID:** USERS-TABLE-UPLOADED-PHOTO · **Parent Git:** `f3094bc`.
+**Permintaan:** foto/icon yang sudah diunggah pengguna (contoh Martha) harus muncul di Kelola Pengguna. Penyebab: perubahan sebelumnya hanya menampilkan siluet SVG statis tanpa membaca users.foto. Sekarang foto profil milik masing-masing record digunakan, dengan siluet sebagai fallback. Helper avatar header yang mengandung fallback session tidak digunakan untuk daftar akun agar foto admin tidak terbawa ke baris lain.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 09:15:22 | `admin/ajax-users.php` | 14, 141, 256 | Kolom Nama pada tabel pengguna | Ganti ikon statis dengan renderer yang memakai foto unggahan milik user pada baris tersebut; struktur 11 kolom DataTables tetap. |
+| 2026-11-15 09:15:22 | `includes/user-table-avatar.php` | 1-29 | Foto profil dan fallback ikon | Gunakan users.foto dari row (tanpa session atau query per-user). Resolusi file upload lokal, URL http(s) dan data image raster; path lokal wajib berada dalam uploads dan format jpg/png/webp. Render foto 32px bulat object-fit cover dengan lazy loading; ikon di bawahnya tetap ada dan muncul jika gambar gagal. Escape nama/src. |
+| 2026-11-15 09:39:43 | `tests/users-table-photo-test.py` | 1-71 | Regresi respons AJAX aktual | Fixture akun bernama MARTHA PRAMUDYA ANGGARA dengan unggahan PNG: periksa URL foto, akun tanpa foto/file hilang, URL gagal, nama HTML, skema javascript dan path keluar uploads, session foto admin tidak terbaca/berubah, serta pencarian/sorting/11 kolom dan dump database tetap. |
+
+**Verifikasi:** `python tests/users-table-photo-test.py`, lint 2 file PHP dan `git diff --check` pada file perubahan ini: PASS. Chrome merender sel dari respons AJAX aktual pada lebar 390px: file foto fixture berhasil dimuat (naturalWidth > 0), URL gambar rusak diganti ikon, hanya baris yang punya foto valid menampilkan img. Tidak ada modifikasi database atau foto session admin. Artefak lokal: `scratch/users-table-photo-preview/` (diabaikan Git). Pengujian menggunakan database/file unggahan fixture terisolasi; belum memeriksa file atau database akun Martha pada hosting produksi.
+**Penerapan:** commit `Display uploaded profile photos in the user management table`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 09:03:58 +0700 — Ikon pengguna pada tabel Kelola Pengguna
 
 **ID:** USERS-TABLE-USER-ICON · **Parent Git:** `cb3185a`.
