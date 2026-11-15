@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='profile-zoom-test-') as directory:
         'admin/profil-pengguna.php', 'admin/ajax-user-profile-links.php',
         'includes/admin-user-profile.php', 'includes/user-table-avatar.php',
         'includes/admin-profile-academic-view.php', 'includes/pretes-helper.php',
-        'includes/pretes-face-engine.php'
+        'includes/pretes-face-engine.php', 'assets/css/style.css'
     ]:
         target = root / file
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -108,7 +108,7 @@ function getDBConnection() {
 }
 ''', encoding='utf-8')
 
-    (root / 'includes/header.php').write_text('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><main class="content-area">', encoding='utf-8')
+    (root / 'includes/header.php').write_text('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/assets/css/style.css"><style>.content-area{min-height:2400px}</style></head><body><main class="content-area">', encoding='utf-8')
     (root / 'includes/footer.php').write_text('</main></body></html>', encoding='utf-8')
 
     with socket.socket() as s:
@@ -163,6 +163,26 @@ const { chromium } = require(process.argv[2]);
         const page = await browser.newPage();
         const errors = [];
         page.on('pageerror', e => errors.push(e.message));
+        await page.route('https://example.com/**', route => route.fulfill({
+            contentType: 'image/svg+xml',
+            body: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600"><rect width="400" height="600" fill="#64748b"/></svg>'
+        }));
+        async function assertCentered(label) {
+            const bounds = await page.evaluate(() => {
+                const overlay = document.getElementById('admin-photo-zoom-modal').getBoundingClientRect();
+                const panel = document.querySelector('.photo-zoom-container').getBoundingClientRect();
+                return {x: panel.x, y: panel.y, w: panel.width, h: panel.height,
+                    ox: overlay.x, oy: overlay.y, ow: overlay.width, oh: overlay.height,
+                    vw: innerWidth, vh: innerHeight};
+            });
+            if (Math.abs(bounds.x + bounds.w / 2 - bounds.vw / 2) > 2 ||
+                Math.abs(bounds.y + bounds.h / 2 - bounds.vh / 2) > 2 ||
+                bounds.x < 0 || bounds.y < 0 || bounds.y + bounds.h > bounds.vh ||
+                Math.abs(bounds.ox) > 1 || Math.abs(bounds.oy) > 1 ||
+                Math.abs(bounds.ow - bounds.vw) > 1 || Math.abs(bounds.oh - bounds.vh) > 1) {
+                throw new Error(label + ': modal must be centered within viewport: ' + JSON.stringify(bounds));
+            }
+        }
 
         await page.goto(process.argv[3] + '/admin/profil-pengguna.php?id=18310');
 
@@ -186,6 +206,7 @@ const { chromium } = require(process.argv[2]);
         await modal.waitFor({ state: 'visible' });
         const isModalActive = await modal.evaluate(el => el.classList.contains('active'));
         if (!isModalActive) throw new Error('Zoom modal must have .active class when opened');
+        await assertCentered('Desktop with animated content ancestor');
 
         // Check image src in zoom modal
         const zoomImg = page.locator('#photo-zoom-img');
@@ -258,6 +279,7 @@ const { chromium } = require(process.argv[2]);
             if (!pretesZoomSrc || !pretesZoomSrc.includes('pasfoto-pretes.jpg')) {
                 throw new Error('Pretes photo thumb must open with pasfoto src');
             }
+            await assertCentered('Pretes thumbnail after scrolling');
             await page.locator('.photo-zoom-close').click();
             await page.waitForTimeout(300);
         }
@@ -266,6 +288,13 @@ const { chromium } = require(process.argv[2]);
         await page.setViewportSize({ width: 390, height: 844 });
         const hasMobileOverflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
         if (hasMobileOverflow) throw new Error('Mobile viewport width overflow detected');
+        await icon.click();
+        await modal.waitFor({ state: 'visible' });
+        await assertCentered('Mobile portrait');
+        await page.setViewportSize({ width: 844, height: 390 });
+        await assertCentered('Mobile landscape');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
 
         if (errors.length) throw new Error('Page errors found: ' + errors.join('; '));
         console.log('PASS browser: Photo click, zoom in/out, reset, keyboard shortcuts, right-click protection, and mobile responsiveness verified 100%!');

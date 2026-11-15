@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 19:12:56 +0700 — Pusatkan modal zoom foto profil terhadap layar
+
+**ID:** ADMIN-PROFILE-PHOTO-ZOOM-CENTER · **Parent Git:** `1086915`.
+**Permintaan:** Saat foto profil admin diklik, tampilan zoom tepat di tengah layar dan tidak turun ke bagian bawah halaman, seperti laporan pada profil ID 17993.
+
+**Penyebab:** `.content-area` memakai animasi `pageEnter` dengan `transform` dan fill-mode `both`. Transform tersebut membentuk containing block bagi turunan position:fixed, sehingga lapisan zoom yang berada di dalamnya mengikuti tinggi seluruh konten halaman. Uji browser sebelum perbaikan mereproduksi overlay setinggi 2400 px pada viewport 720 px; posisi atas panel sekitar 927,5 px, di luar layar.
+
+**Perubahan dan alasan:** Saat dibuka, modal ditempatkan langsung di body agar batas dan pusatnya mengacu viewport. Setelah animasi tutup selesai modal dikembalikan ke posisi asal; bila area asal sudah dilepas, modal dibersihkan. Panel memakai batas tinggi viewport dinamis dikurangi padding, dan area foto boleh menyusut agar panel tetap muat di layar pendek/lanskap. Kontrol zoom/reset/tutup dan foto pretes tetap menggunakan mekanisme yang sama.
+
+Waktu berikut adalah penyimpanan terakhir file, dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 19:12:04 | `admin/profil-pengguna.php` | 54, 64, 73, 149, 208, 228 | Modal zoom dipindahkan ke body saat dibuka agar position:fixed mengikuti viewport; dikembalikan setelah ditutup. Tinggi panel dibatasi viewport dinamis dan area foto dapat mengecil pada layar pendek. |
+| 2026-11-15 19:11:37 | `tests/admin-profile-photo-zoom-test.py` | 21, 111, 166, 209, 282, 291 | Fixture memakai CSS aplikasi asli dan halaman panjang; gambar fixture deterministik; pengukuran pusat/batas modal di desktop, setelah scroll, ponsel potret dan lanskap. |
+| 2026-11-15 19:12:56 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-PROFILE-PHOTO-ZOOM-CENTER beserta penyebab dan bukti pengujian. |
+
+**Verifikasi:** `python tests/admin-profile-photo-zoom-test.py` gagal mereproduksi bug sebelum perbaikan, lalu lulus setelah perbaikan. Uji memakai CSS aplikasi asli dan fixture gambar deterministik; memastikan overlay sesuai viewport dan pusat panel berselisih maksimal 2 px dari pusat viewport di desktop, setelah scroll menuju pasfoto pretes, ponsel 390×844, serta lanskap 844×390. Zoom +/−, reset, pintasan keyboard, Escape/tombol tutup, pencegahan contextmenu/drag, dan lebar seluler tetap lulus. `python tests/admin-user-profile-test.py`, `php -l admin/profil-pengguna.php`, serta `git diff --check` lulus.
+
+**Batas verifikasi:** Tidak mengakses akun/database hosting produksi; geometri diuji melalui Chrome dengan fixture halaman PHP lokal dan stylesheet asli. PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali. Push Git tidak membuktikan deployment hosting. Tidak ada perubahan skema/data produksi.
+
+**Pelacakan:** Cari commit dengan ID `ADMIN-PROFILE-PHOTO-ZOOM-CENTER`.
+
+---
+
 ## 2026-11-15 19:01:48 +0700 — Perbaikan: widget Pesan "Gagal memuat pesan (HTTP 404)" di produksi
 
 **ID:** MESSAGES-API-404-FIX · **Parent Git:** `17949f3`.

@@ -51,7 +51,7 @@ include __DIR__ . '/../includes/header.php';
 .photo-zoom-modal{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:16px;box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;opacity:0;pointer-events:none;transition:opacity 0.22s ease}
 .photo-zoom-modal.active{opacity:1;pointer-events:auto}
 .photo-zoom-backdrop{position:absolute;inset:0;background:transparent;cursor:pointer}
-.photo-zoom-container{display:flex;flex-direction:column;width:100%;max-width:820px;max-height:92vh;background:#0f172a;border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 25px 60px -15px rgba(0,0,0,0.7);overflow:hidden;position:relative;box-sizing:border-box}
+.photo-zoom-container{display:flex;flex-direction:column;width:100%;max-width:820px;max-height:calc(100dvh - 32px);background:#0f172a;border:1px solid rgba(255,255,255,0.12);border-radius:16px;box-shadow:0 25px 60px -15px rgba(0,0,0,0.7);overflow:hidden;position:relative;box-sizing:border-box}
 .photo-zoom-header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#1e293b;border-bottom:1px solid rgba(255,255,255,0.08);gap:12px;flex-wrap:wrap;color:#f8fafc}
 .photo-zoom-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14.5px;color:#f1f5f9;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .photo-zoom-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -61,7 +61,7 @@ include __DIR__ . '/../includes/header.php';
 .photo-zoom-btn.photo-zoom-close{background:#dc2626;border-color:#b91c1c;color:#ffffff;margin-left:6px}
 .photo-zoom-btn.photo-zoom-close:hover{background:#b91c1c}
 .photo-zoom-level{font-size:12.5px;font-weight:800;color:#38bdf8;background:#0f172a;padding:5px 10px;border-radius:6px;border:1px solid #1e293b;min-width:48px;text-align:center}
-.photo-zoom-viewport{flex:1;min-height:380px;max-height:68vh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:radial-gradient(circle,#1e293b 0%,#0f172a 100%);cursor:grab}
+.photo-zoom-viewport{flex:1;min-height:0;height:68dvh;max-height:68dvh;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:radial-gradient(circle,#1e293b 0%,#0f172a 100%);cursor:grab}
 .photo-zoom-viewport.grabbing{cursor:grabbing}
 .photo-zoom-stage{position:relative;display:inline-flex;align-items:center;justify-content:center;transform-origin:center center;transition:transform 0.12s ease-out;will-change:transform}
 .photo-zoom-stage.no-transition{transition:none}
@@ -70,7 +70,7 @@ include __DIR__ . '/../includes/header.php';
 .photo-zoom-viewport.grabbing .photo-zoom-shield{cursor:grabbing}
 .photo-zoom-footer{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:#0b1120;border-top:1px solid rgba(255,255,255,0.08);font-size:12px;color:#94a3b8;flex-wrap:wrap;gap:8px}
 .photo-zoom-protected-tag{font-weight:700;color:#ef4444;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:2px 8px;border-radius:6px;font-size:11px}
-@media (max-width:600px){.photo-zoom-header{flex-direction:column;align-items:stretch}.photo-zoom-actions{justify-content:space-between}.photo-zoom-viewport{min-height:280px}}
+@media (max-width:600px){.photo-zoom-header{flex-direction:column;align-items:stretch}.photo-zoom-actions{justify-content:space-between}}
 @media print{.photo-zoom-modal{display:none!important}}
 </style>
 <div class="admin-profile-head"><div><h2 style="margin:0;">Profil Pengguna</h2><p style="margin:6px 0 0;color:#64748b;">Tampilan khusus admin · Informasi akun dan aktivitas akademik</p></div><a href="<?= BASE_URL ?>/admin/users.php" class="btn btn-secondary" data-no-spa style="width:auto;">Kelola Pengguna</a></div>
@@ -146,6 +146,8 @@ include __DIR__ . '/../includes/header.php';
 <script>
 (function() {
     var modal = document.getElementById('admin-photo-zoom-modal');
+    var modalHome = modal ? modal.parentNode : null;
+    var modalNextSibling = modal ? modal.nextSibling : null;
     var zoomImg = document.getElementById('photo-zoom-img');
     var zoomStage = document.getElementById('photo-zoom-stage');
     var zoomViewport = document.getElementById('photo-zoom-viewport');
@@ -203,6 +205,9 @@ include __DIR__ . '/../includes/header.php';
 
     window.openPhotoZoom = function(src, name) {
         if (!src || !modal) return;
+        // The content animation has a transform, which traps fixed descendants.
+        // Attach the overlay to body so its bounds and center use the viewport.
+        if (modal.parentNode !== document.body) document.body.appendChild(modal);
         if (zoomImg) zoomImg.src = src;
         if (name && caption) {
             caption.textContent = name;
@@ -220,6 +225,11 @@ include __DIR__ . '/../includes/header.php';
         setTimeout(function() {
             modal.style.display = 'none';
             if (zoomImg) zoomImg.src = '';
+            if (modalHome && modalHome.isConnected) {
+                modalHome.insertBefore(modal, modalNextSibling && modalNextSibling.parentNode === modalHome ? modalNextSibling : null);
+            } else {
+                modal.remove();
+            }
         }, 220);
         document.body.style.overflow = '';
     };
