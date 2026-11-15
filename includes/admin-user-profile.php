@@ -1,4 +1,18 @@
 <?php
+/** Read-only profile link; record IDs must be users.id, never registration/class IDs. */
+function adminUserProfileLink($name, $userId = null): string
+{
+    $name = trim((string)$name);
+    $label = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
+    $id = filter_var($userId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    if (!function_exists('isAdmin') || !isAdmin() || $name === '' || (!$id && in_array(mb_strtolower($name, 'UTF-8'),
+        ['-', 'tamu', 'admin', 'belum ditentukan', 'menunggu pembagian', 'menunggu plotting'], true))) return $label;
+    $query = $id ? 'id=' . $id : 'nama=' . rawurlencode($name);
+    $url = rtrim(BASE_URL, '/') . '/admin/profil-pengguna.php?' . $query;
+    return '<a class="admin-user-profile-link" data-no-spa href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8')
+        . '" style="color:inherit;text-decoration:underline;text-underline-offset:3px;" title="Lihat profil pengguna">' . $label . '</a>';
+}
+
 function adminProfileNameKey(string $name): string
 {
     return mb_strtolower(preg_replace('/\s+/u', ' ', trim($name)), 'UTF-8');

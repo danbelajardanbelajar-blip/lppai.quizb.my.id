@@ -3,7 +3,7 @@
     const script = document.currentScript;
     if (!script || window.adminUserProfileLinksInitialized) return;
     window.adminUserProfileLinksInitialized = true;
-    const root = document.querySelector('.content-area');
+    const root = document.body;
     if (!root) return;
     const lookup = script.dataset.profileLookup;
     const profile = script.dataset.profilePage;
@@ -11,7 +11,7 @@
     const cache = new Map();
     let timer, loading = false;
     const normalize = value => value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase('id-ID');
-    const excluded = 'a,button,input,textarea,select,option,label,script,style,noscript,svg,nav,thead,dialog,[contenteditable="true"],[data-no-user-profile-links],.badge,.bank-badge,.stat-info';
+    const excluded = 'a,button,input,textarea,select,option,script,style,noscript,svg,nav,thead,[contenteditable="true"],[data-no-user-profile-links]';
     const style = document.createElement('style');
     style.textContent = 'a.admin-user-profile-link{color:inherit;text-decoration:none;cursor:pointer}a.admin-user-profile-link:hover,a.admin-user-profile-link:focus-visible{text-decoration:underline;text-underline-offset:3px}';
     document.head.appendChild(style);
@@ -25,6 +25,8 @@
         while ((node = walker.nextNode())) nodes.push(node);
         for (const node of nodes) {
             if (!node.parentElement || node.parentElement.closest(excluded)) continue;
+            if (!node.parentElement.closest('table,.content-area')) continue;
+            if (node.parentElement.closest('label') && !node.parentElement.closest('td,th')) continue;
             const name = node.nodeValue.trim();
             if (!name || name.length > 200 || !/\p{L}/u.test(name)) continue;
             const key = normalize(name);

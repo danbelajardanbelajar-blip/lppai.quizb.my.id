@@ -49,7 +49,7 @@ foreach (['dosen_penguji', 'ruangan'] as $field) {
     }
 }
 $stmt = $pdo->prepare('SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan,
-    u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
+    u.id AS profile_user_id, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
     FROM pretes_registrations pr JOIN users u ON u.id = pr.user_id
     WHERE ' . implode(' AND ', $where) . "
     ORDER BY FIELD(COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin'), 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'),
@@ -171,7 +171,7 @@ foreach ($groups as $group) {
                 <tr>
                     <td class="center"><?= $i + 1 ?></td>
                     <td><?= sanitize($row['nim']) ?></td>
-                    <td><?= sanitize($row['nama_lengkap']) ?></td>
+                    <td><?= adminUserProfileLink($row['nama_lengkap'], $row['profile_user_id'] ?? null) ?></td>
                     <td><?= sanitize($row['program_studi'] ?: '-') ?></td>
                     <td class="center" style="font-weight:bold;"><?= sanitize(normalizeJenisProgram($row['jenis_program'] ?? 'Reguler')) ?></td>
                     <td></td><td></td>

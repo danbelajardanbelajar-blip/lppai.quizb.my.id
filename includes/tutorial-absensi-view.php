@@ -121,7 +121,7 @@ $backUrl = 'tutorial-hasil-plotting.php?' . http_build_query(['gelombang_id' => 
             <thead><tr><th>No.</th><th>NIM</th><th>Nama Mahasiswa</th><th>Program Studi</th><th>Tanda Tangan</th><th>Ket.</th></tr></thead>
             <tbody>
             <?php foreach ($page['rows'] as $index => $row): ?>
-                <tr><td class="center"><?= $page['offset'] + $index + 1 ?></td><td><?= sanitize($row['nim']) ?></td><td><?= sanitize($row['nama_lengkap']) ?></td><td><?= sanitize($row['program_studi'] ?? '') ?></td><td></td><td></td></tr>
+                <tr><td class="center"><?= $page['offset'] + $index + 1 ?></td><td><?= sanitize($row['nim']) ?></td><td><?= adminUserProfileLink($row['nama_lengkap'], $row['user_id'] ?? null) ?></td><td><?= sanitize($row['program_studi'] ?? '') ?></td><td></td><td></td></tr>
             <?php endforeach; ?>
             </tbody>
         </table>

@@ -5,6 +5,63 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 13:05:04 +0700 — Tautan profil pada tabel di seluruh tampilan role admin
+
+**ID:** ADMIN-PROFILE-ALL-TABLES · **Parent Git:** `af56086`.
+**Permintaan:** Semua tabel yang menampilkan nama pengguna pada halaman web role admin dapat membuka profil pengguna.
+
+**Perubahan:** Renderer bersama hanya membuat tautan untuk admin. Tabel peserta, tutorial, hasil CBT, rekap nilai, log aktivitas, sertifikat, absensi dan halaman cetak HTML memakai `users.id`/`user_id` yang sesuai; query berbasis NIM menambahkan alias `profile_user_id`. Nama dosen/jadwal lama tanpa ID memakai halaman pemilih akun berdasarkan nama lengkap (nama kembar tidak dipilih secara acak). Tidak memakai ID pendaftaran, kelas, atau attempt sebagai ID pengguna. Enhancer memantau tabel seluruh body termasuk modal/badge/AJAX, dan melewati tautan/kontrol yang sudah ada. Payload live-results membawa user_id dan renderer mempertahankan tautan setelah refresh. Data Excel/CSV tetap berupa teks.
+
+Waktu adalah penyimpanan terakhir file (WIB sampai detik). Nomor baris adalah awal blok perubahan pada snapshot entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian |
+|---|---|---|---|
+| 2026-11-15 13:02:51 | `admin/absensi-alkhidmah.php` | 119, 280 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/ajax-kelola-nilai.php` | 220 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/aktivasi-mahasiswa.php` | 83 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:00:57 | `admin/cetak-tanda-terima-sertifikat.php` | 22, 30, 222, 282, 475, 482 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/dashboard.php` | 314, 395 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:02:51 | `admin/jaminan.php` | 110, 214 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/log-aktivitas.php` | 163, 260 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:00:57 | `admin/pengambilan-sertifikat.php` | 363, 887, 985, 996 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-absensi-export.php` | 52, 174 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:56:18 | `admin/pretes-bank-soal.php` | 164 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-cbt-review.php` | 545 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-jadwal-cetak.php` | 610 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-jadwal.php` | 866, 884 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-pengaturan-tutor.php` | 1440, 1616, 1698 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-peserta-export.php` | 875, 909 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-peserta-pdf.php` | 603 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-peserta.php` | 902 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/pretes-rekap-nilai.php` | 1001, 1459, 1469 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/profil-pengguna.php` | 44, 72 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/tutorial-data-pendaftar.php` | 1198, 1320 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/tutorial-hasil-plotting.php` | 889 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `admin/tutorial-pendaftaran-kolektif.php` | 684 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:54:10 | `assets/js/admin-user-profile-links.js` | 6, 14, 28 | Tautan dinamis / pembaruan tabel |
+| 2026-11-15 12:56:18 | `assets/js/pretes-cbt-admin.js` | 894, 913 | Tautan dinamis / pembaruan tabel |
+| 2026-11-15 12:57:11 | `dosen/detail-kelas.php` | 239, 453 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:58:44 | `includes/admin-user-profile.php` | 2 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:02:51 | `includes/announcement-helper.php` | 583 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:54:10 | `includes/auth.php` | 10 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `includes/pretes-cbt-admin-view.php` | 565 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `includes/pretes-panel.php` | 1262 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `includes/tutorial-absensi-view.php` | 124 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `includes/tutorial-jadwal-dosen-export-view.php` | 85 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:55:30 | `includes/tutorial-scheduled-lecturers-view.php` | 33 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 12:56:18 | `includes/user-helper.php` | 785 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:00:57 | `pages/pretes-hasil.php` | 871 | Renderer tautan profil dan sumber ID |
+| 2026-11-15 13:02:06 | `tests/admin-user-profile-test.py` | 19, 39, 53, 86, 115, 126 | Uji akses/identitas/DOM/refresh |
+| 2026-11-15 12:58:44 | `tests/tutorial-absensi-http-test.py` | 23, 62 | Uji akses/identitas/DOM/refresh |
+
+**Verifikasi:** PHP lint 33 file berubah; `node --check` kedua JS; `git diff --check` lulus. `python tests/admin-user-profile-test.py` lulus: admin-only, CSRF, validasi, escaping, riwayat sesuai akun, tidak membocorkan hash, database tetap, tautan pada tabel di luar content-area, dialog/badge, AJAX, nama kembar, navigasi, seluler; browser menjalankan script CBT asli dengan respons fixture untuk membuktikan attempt 900/901 membuka user 3/4 dan refresh mempertahankan tautan. `python tests/tutorial-absensi-http-test.py`, `python tests/tutorial-scheduled-lecturers-test.py`, `python tests/tutorial-jadwal-dosen-export-test.py`, `php tests/pretes-cbt-admin-buttons-test.php`, `php tests/pretes-rekap-nilai-test.php` (151 skenario), dan `python tests/users-table-photo-test.py` lulus.
+
+**Batas pengujian tambahan:** `python tests/pretes-cbt-bulk-http-test.py --browser` tidak dapat memulai fixture lama: fixture tidak menyalin `includes/pretes-tryout.php` yang telah dibutuhkan halaman CBT sebelum perubahan ini. Error terjadi pada setup fixture (HTTP 500/missing include), bukan hasil pengujian penghapusan. Pengujian browser tautan/live-results dilakukan melalui fixture profil yang lengkap untuk perubahan ini. Belum login/mengubah data hosting produksi.
+
+**Pencatatan:** Tidak ada perubahan skema, data, atau kewenangan akses; mahasiswa/dosen tetap mendapat teks biasa dan profil tujuan tetap requireAdmin. Nama historis tanpa akun dapat menghasilkan profil tidak ditemukan. Commit dapat ditelusuri lewat ID entri ini.
+
+---
+
 ## 2026-11-15 12:59:15 +0700 — Perbaikan Deteksi Keterbukaan Mata Pasfoto dan Toleransi Jilbab/Busana Gelap
 
 **ID:** PRETES-PHOTO-EYE-OPENNESS-HIJAB-FIX · **Parent Git:** `9417bd6`.

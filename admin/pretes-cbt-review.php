@@ -542,7 +542,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div>
                         <h2 style="font-size:19px; font-weight:800; color:#0f172a; margin:0 0 4px 0;">
-                            <?= sanitize($attempt['nama_lengkap']) ?>
+                            <?= adminUserProfileLink($attempt['nama_lengkap'], $attempt['user_id']) ?>
                         </h2>
                         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:#475569;">
                             <span>NIM: <strong><?= sanitize($attempt['nim'] ?: '-') ?></strong></span>

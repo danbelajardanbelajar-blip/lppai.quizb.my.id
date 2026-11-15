@@ -1259,7 +1259,7 @@ include __DIR__ . '/header.php';
                                     <div style="flex:1;min-width:0;">
                                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                                             <span class="student-name">
-                                                <?= sanitize($row['nama_lengkap']) ?>
+                                                <?= adminUserProfileLink($row['nama_lengkap'], $row['user_id']) ?>
                                             </span>
                                             <?php if ($isAttended): ?>
                                                 <span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:800;display:inline-flex;align-items:center;gap:4px;">

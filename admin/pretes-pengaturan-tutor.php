@@ -1437,7 +1437,7 @@ input:checked + .slider:before { transform: translateX(16px); }
                         <strong style="color:#0f172a; font-size:13px;"><?= sanitize($sess['jam']) ?></strong>
                     </td>
                     <td>
-                        <strong style="color:#1e293b; font-size:13.5px;"><?= sanitize($sess['penguji']) ?></strong>
+                        <strong style="color:#1e293b; font-size:13.5px;"><?= adminUserProfileLink($sess['penguji']) ?></strong>
                     </td>
                     <td>
                         <span class="badge" style="background:#f1f5f9; color:#1e293b; font-size:12px; font-weight:600; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;">
@@ -1613,7 +1613,7 @@ input:checked + .slider:before { transform: translateX(16px); }
                     <td style="text-align:center; color:#94a3b8;"><?= $tNo++ ?></td>
                     <td style="font-weight:600; color:#475569;"><?= sanitize($tut['nim'] ?: '-') ?></td>
                     <td>
-                        <strong style="color:#0f172a; font-size:14px;"><?= sanitize($tut['nama_lengkap']) ?></strong>
+                        <strong style="color:#0f172a; font-size:14px;"><?= adminUserProfileLink($tut['nama_lengkap'], $tut['id']) ?></strong>
                     </td>
                     <td style="color:#64748b; font-family:monospace;"><?= sanitize($tut['username']) ?></td>
                     <td>
@@ -1695,7 +1695,7 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <tr style="border-bottom:1px solid #f1f5f9;">
                     <td style="text-align:center; color:#94a3b8;"><?= $rNo++ ?></td>
                     <td>
-                        <strong style="color:#0f172a; font-size:14px;"><?= sanitize($tut['nama_lengkap']) ?></strong>
+                        <strong style="color:#0f172a; font-size:14px;"><?= adminUserProfileLink($tut['nama_lengkap'], $tut['id']) ?></strong>
                         <div style="font-size:11px; color:#64748b;">NIDN: <?= sanitize($tut['nim'] ?: '-') ?></div>
                     </td>
                     <td>

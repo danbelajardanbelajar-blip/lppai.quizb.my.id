@@ -30,7 +30,7 @@ if (!isset($scheduledLecturerClasses)) {
                     <?php foreach ($scheduledLecturerClasses as $index => $schedule): ?>
                         <tr data-schedule-id="<?= (int)$schedule['id'] ?>">
                             <td><?= $index + 1 ?></td>
-                            <td><?= sanitize($schedule['dosen_pengampu']) ?></td>
+                            <td><?= adminUserProfileLink($schedule['dosen_pengampu']) ?></td>
                             <td><?= sanitize($schedule['nama_kelas']) ?></td>
                             <td><?= sanitize($schedule['hari'] ?: 'Belum ditentukan') ?></td>
                             <td><?= sanitize($schedule['jam'] ?: 'Belum ditentukan') ?></td>

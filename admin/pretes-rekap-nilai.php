@@ -998,7 +998,7 @@ if ($isPrint) {
                 <tr>
                     <td><?= $idx + 1 ?></td>
                     <td><?= sanitize($r['nim']) ?></td>
-                    <td class="text-left" style="font-weight:600;"><?= sanitize($r['nama_lengkap']) ?></td>
+                    <td class="text-left" style="font-weight:600;"><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id'] ?? null) ?></td>
                     <td><?= sanitize($r['program_studi'] ?: '-') ?></td>
                     <td><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                     <td><?= sanitize($r['hari_pilihan']) ?><br><small style="color:#475569;"><?= sanitize($r['ruangan']) ?></small></td>
@@ -1456,7 +1456,7 @@ include __DIR__ . '/../includes/header.php';
                 <tr>
                     <td class="col-sticky-left"><?= $idx + 1 ?></td>
                     <td class="col-sticky-left" style="left:40px; text-align:left;">
-                        <strong style="color:#0f172a; font-size:13.5px;"><?= sanitize($r['nama_lengkap']) ?></strong>
+                        <strong style="color:#0f172a; font-size:13.5px;"><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id'] ?? null) ?></strong>
                         <div style="font-size:11.5px; color:#64748b; font-family:monospace;"><?= sanitize($r['nim']) ?></div>
                     </td>
                     <td style="text-align:left; font-size:12.5px;"><?= sanitize($r['program_studi'] ?: '-') ?></td>
@@ -1466,7 +1466,7 @@ include __DIR__ . '/../includes/header.php';
                         <div style="color:#64748b;"><?= sanitize($r['ruangan']) ?></div>
                     </td>
                     <td style="text-align:left; font-size:12px; font-weight:600; color:#334155;">
-                        <?= sanitize($r['dosen_penguji']) ?>
+                        <?= adminUserProfileLink($r['dosen_penguji']) ?>
                     </td>
                     <td>
                         <?php if ($r['is_hadir']): ?>

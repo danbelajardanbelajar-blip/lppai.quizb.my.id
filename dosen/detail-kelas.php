@@ -236,7 +236,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr>
                                 <td align="center"><?= $no++ ?></td>
                                 <td>
-                                    <strong><?= sanitize($s['nama_lengkap']) ?></strong><br>
+                                    <strong><?= adminUserProfileLink($s['nama_lengkap'], $s['user_id'] ?? null) ?></strong><br>
                                     <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?> <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></small>
                                 </td>
                                 <td align="center"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
@@ -450,7 +450,7 @@ include __DIR__ . '/../includes/header.php';
                                 <tr>
                                     <td align="center"><?= $no++ ?></td>
                                     <td><?= sanitize($s['nim']) ?></td>
-                                    <td><strong><?= sanitize($s['nama_lengkap']) ?></strong></td>
+                                    <td><strong><?= adminUserProfileLink($s['nama_lengkap'], $s['user_id'] ?? null) ?></strong></td>
                                     <td>
                                         <div style="display:flex; gap:15px; align-items:center;">
                                             <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#475569;">

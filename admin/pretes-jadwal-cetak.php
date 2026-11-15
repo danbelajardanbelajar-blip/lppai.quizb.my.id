@@ -607,7 +607,7 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
                         <?php else: ?>
                             <?php foreach ($d['tutors_detail'] as $td): ?>
                             <div class="tutor-item">
-                                <div class="tutor-name"><?= sanitize($td['name']) ?></div>
+                                <div class="tutor-name"><?= adminUserProfileLink($td['name']) ?></div>
                                 <?php if (!empty($td['room'])): ?>
                                 <span class="tutor-room">🏢 <?= sanitize($td['room']) ?></span>
                                 <?php endif; ?>

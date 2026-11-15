@@ -782,7 +782,7 @@ if (!function_exists('renderDosenWithWa')) {
             return htmlspecialchars($displayFallback, ENT_QUOTES, 'UTF-8');
         }
 
-        $escaped = htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
+        $escaped = function_exists('adminUserProfileLink') ? adminUserProfileLink($raw) : htmlspecialchars($raw, ENT_QUOTES, 'UTF-8');
         $btn = renderDosenWaButton($pdo, $raw, $student, $keperluan);
         return $btn !== '' ? ($escaped . ' ' . $btn) : $escaped;
     }

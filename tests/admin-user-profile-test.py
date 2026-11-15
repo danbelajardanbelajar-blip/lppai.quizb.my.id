@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix='admin-profile-') as directory:
     root = Path(directory)
     for file in ['admin/profil-pengguna.php', 'admin/ajax-user-profile-links.php',
                  'includes/admin-user-profile.php', 'includes/user-table-avatar.php',
-                 'assets/js/admin-user-profile-links.js']:
+                 'assets/js/admin-user-profile-links.js', 'assets/js/pretes-cbt-admin.js']:
         target = root/file
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT/file, target)
@@ -36,6 +36,7 @@ with tempfile.TemporaryDirectory(prefix='admin-profile-') as directory:
         db.commit()
         original = '\n'.join(db.iterdump())
     (root/'includes/auth.php').write_text('''<?php
+require_once __DIR__.'/admin-user-profile.php';
 define('BASE_URL',''); $_SESSION=['user_id'=>99,'role'=>$_SERVER['HTTP_X_ROLE']??'admin'];
 function isLoggedIn(){return $_SESSION['role']!=='guest';}
 function isAdmin(){return $_SESSION['role']==='admin';}
@@ -49,7 +50,18 @@ function getDBConnection(){return new PDO('sqlite:'.__DIR__.'/../test.sqlite',nu
     (root/'index.html').write_text('''<!doctype html><html><head>
 <script defer src="/assets/js/admin-user-profile-links.js" data-profile-lookup="/admin/ajax-user-profile-links.php" data-profile-page="/admin/profil-pengguna.php" data-profile-csrf="fixture-token"></script>
 </head><body><main class="content-area"><table><tbody><tr><td id="student">Mahasiswa Satu</td><td id="teacher">Dosen Satu</td><td id="duplicate">Nama Sama</td></tr></tbody></table>
-<a id="wa" href="https://wa.me/123">Dosen Satu</a><button>Mahasiswa Satu</button><select><option>Nama Sama</option></select><p id="partial">Halo Mahasiswa Satu</p></main></body></html>''', encoding='utf-8')
+<a id="wa" href="https://wa.me/123">Dosen Satu</a><button>Mahasiswa Satu</button><select><option>Nama Sama</option></select><p id="partial">Halo Mahasiswa Satu</p></main>
+<dialog open><table><tbody><tr><td id="dialog-name"><span class="badge">Dosen Satu</span></td></tr></tbody></table></dialog>
+<table><tbody><tr><td id="outside-name">Mahasiswa Satu</td></tr></tbody></table></body></html>''', encoding='utf-8')
+    (root/'helper.php').write_text('''<?php require __DIR__.'/includes/auth.php';
+header('Content-Type: application/json');
+echo json_encode([adminUserProfileLink('Nama Sama',3),adminUserProfileLink('Nama Sama',4),
+adminUserProfileLink('Dosen Satu'),adminUserProfileLink('<script>bad</script>',1),adminUserProfileLink('Admin',99),adminUserProfileLink('-')]);
+''', encoding='utf-8')
+    (root/'cbt.html').write_text('''<!doctype html><html><head><script>window.CBT_BANK_URL='/mock?cbt_bank=1';</script>
+<script defer src="/assets/js/pretes-cbt-admin.js"></script></head><body>
+<button id="cbtLiveManualRefreshBtn">Segarkan</button><table id="cbtLiveResultsTable"><tbody id="cbtLiveResultsTbody"></tbody></table>
+</body></html>''', encoding='utf-8')
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
@@ -71,6 +83,12 @@ function getDBConnection(){return new PDO('sqlite:'.__DIR__.'/../test.sqlite',nu
             except OSError:
                 time.sleep(.1)
         endpoint='/admin/ajax-user-profile-links.php'
+        links=json.loads(request('/helper.php')[1])
+        assert '?id=3' in links[0] and '?id=4' in links[1]
+        assert '?nama=Dosen%20Satu' in links[2] and '&lt;script&gt;' in links[3] and '<script>' not in links[3]
+        assert '?id=99' in links[4] and links[5]=='-'
+        for role in ['mahasiswa','dosen','guest']:
+            assert all('<a ' not in link for link in json.loads(request('/helper.php',role=role)[1]))
         payload={'csrf_token':'fixture-token','names':['Mahasiswa Satu','Dosen Satu','Nama Sama','Halo Mahasiswa Satu']}
         status,body=request(endpoint,payload)
         assert status==200 and json.loads(body)['links']==[{'name':'Mahasiswa Satu','id':1},{'name':'Dosen Satu','id':2},{'name':'Nama Sama','id':None}],body
@@ -94,6 +112,7 @@ function getDBConnection(){return new PDO('sqlite:'.__DIR__.'/../test.sqlite',nu
 (async()=>{const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
 try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.goto(process.argv[3]);await page.waitForSelector('#student a');await page.waitForSelector('#teacher a');await page.waitForSelector('#duplicate a');
+await page.waitForSelector('#dialog-name a');await page.waitForSelector('#outside-name a');
 if(!((await page.locator('#student a').getAttribute('href')).endsWith('?id=1')))throw Error('wrong student');
 if(!((await page.locator('#duplicate a').getAttribute('href')).includes('nama=Nama')))throw Error('duplicate not routed to chooser');
 await page.evaluate(()=>{const p=document.createElement('p');p.id='dynamic';p.textContent='Dosen Satu';document.querySelector('main').appendChild(p)});
@@ -104,6 +123,18 @@ await page.locator('#student a').click();await page.waitForURL('**/profil-penggu
 if(!(await page.textContent('body')).includes('Admin 99'))throw Error('admin identity changed');
 await page.setViewportSize({width:390,height:844});
 if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile overflow');
+await page.route('**/mock?**',route=>route.fulfill({json:{success:true,data:[
+{id:900,user_id:3,nama_lengkap:'Nama Sama',nim:'003',is_submitted:true},
+{id:901,user_id:4,nama_lengkap:'Nama Sama',nim:'004',is_submitted:true}
+]}}));
+await page.goto(process.argv[3]+'/cbt.html');
+await page.locator('#cbtLiveManualRefreshBtn').click();
+await page.waitForSelector('#attemptRow_900 .admin-user-profile-link');
+if(!(await page.locator('#attemptRow_900 .admin-user-profile-link').getAttribute('href')).endsWith('?id=3'))throw Error('CBT used attempt ID or duplicate name');
+if(!(await page.locator('#attemptRow_901 .admin-user-profile-link').getAttribute('href')).endsWith('?id=4'))throw Error('CBT duplicated profile target');
+await page.locator('#cbtLiveManualRefreshBtn').click();
+await page.waitForFunction(()=>!document.querySelector('#cbtLiveManualRefreshBtn').disabled);
+if(await page.locator('#cbtLiveResultsTbody .admin-user-profile-link').count()!==2)throw Error('CBT refresh lost links');
 if(errors.length)throw Error(errors.join(';'));console.log('PASS browser: static/dynamic names, duplicates, controls, navigation, mobile, no JS errors');
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});''',encoding='utf-8')
         result=subprocess.run(['node',str(browser_test),str(ROOT/'scratch/cbt-preview/node_modules/playwright-core'),base],capture_output=True,text=True)

@@ -872,7 +872,7 @@ include __DIR__ . '/../includes/header.php';
                                                 <?php break; ?>
 
                                             <?php case 'nama_lengkap': ?>
-                                                <strong style="color:#0f172a;"><?= sanitize($r['nama_lengkap']) ?></strong>
+                                                <strong style="color:#0f172a;"><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id']) ?></strong>
                                                 <?php break; ?>
 
                                             <?php case 'nim': ?>
@@ -906,7 +906,7 @@ include __DIR__ . '/../includes/header.php';
                                                 <?php break; ?>
 
                                             <?php case 'dosen_penguji': ?>
-                                                <?= sanitize($r['dosen_penguji'] ?: '-') ?>
+                                                <?= adminUserProfileLink($r['dosen_penguji'] ?: '-') ?>
                                                 <?php break; ?>
 
                                             <?php case 'status': ?>

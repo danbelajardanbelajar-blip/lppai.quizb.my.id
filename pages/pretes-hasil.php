@@ -868,7 +868,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php foreach ($allResults as $i => $r): ?>
                     <tr>
                         <td><?= $i + 1 ?></td>
-                        <td><?= sanitize($r['nama_lengkap']) ?></td>
+                        <td><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id']) ?></td>
                         <td><?= sanitize($r['nim']) ?></td>
                         <td><?= formatProdiDisplay($r['program_studi'] ?? '', $r['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td>

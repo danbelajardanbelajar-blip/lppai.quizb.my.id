@@ -82,7 +82,7 @@ $periodLabel = $schedulePeriod['tahun_ajaran'] . ' / ' . $schedulePeriod['semest
             <thead><tr><th class="center">No.</th><th>Nama Dosen</th><th>Kelas Tutorial</th><th>Hari</th><th>Jam</th><th>Ruangan</th><th class="center">Jml Mhs</th></tr></thead>
             <tbody>
             <?php foreach ($scheduleRows as $index => $row): ?>
-                <tr><td class="center"><?= $index + 1 ?></td><td><?= sanitize($row['dosen_pengampu']) ?></td><td><?= sanitize($row['nama_kelas']) ?></td><td><?= sanitize($row['hari'] ?: 'Belum ditentukan') ?></td><td><?= sanitize($row['jam'] ?: 'Belum ditentukan') ?></td><td><?= sanitize($row['ruangan'] ?: 'Belum ditentukan') ?></td><td class="center"><strong><?= (int)($row['jumlah_mahasiswa'] ?? 0) ?></strong></td></tr>
+                <tr><td class="center"><?= $index + 1 ?></td><td><?= adminUserProfileLink($row['dosen_pengampu']) ?></td><td><?= sanitize($row['nama_kelas']) ?></td><td><?= sanitize($row['hari'] ?: 'Belum ditentukan') ?></td><td><?= sanitize($row['jam'] ?: 'Belum ditentukan') ?></td><td><?= sanitize($row['ruangan'] ?: 'Belum ditentukan') ?></td><td class="center"><strong><?= (int)($row['jumlah_mahasiswa'] ?? 0) ?></strong></td></tr>
             <?php endforeach; ?>
             </tbody>
             <tfoot>

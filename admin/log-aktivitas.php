@@ -160,7 +160,7 @@ include __DIR__ . '/../includes/header.php';
                             <strong><?= $timeStr ?></strong>
                         </td>
                         <td>
-                            <strong style="color:var(--primary-dark);"><?= sanitize($nama) ?></strong>
+                            <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($nama, $log['user_id'] ?? null) ?></strong>
                         </td>
                         <td><?= renderRoleBadge($log['role']) ?></td>
                         <td><code><?= sanitize($log['username']) ?></code></td>
@@ -257,7 +257,7 @@ include __DIR__ . '/../includes/header.php';
                             <strong><?= $timeStr ?></strong>
                         </td>
                         <td>
-                            <strong style="color:var(--primary-dark);"><?= sanitize($namaUser) ?></strong>
+                            <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($namaUser, $c['user_id'] ?? null) ?></strong>
                             <?php if (!empty($c['username']) && $c['username'] !== $namaUser): ?>
                                 <div style="font-size:11px;color:#6b7280;"><code><?= sanitize($c['username']) ?></code></div>
                             <?php endif; ?>

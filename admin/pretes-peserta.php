@@ -899,7 +899,7 @@ include __DIR__ . '/../includes/header.php';
                                     <div style="width:34px; height:44px; border-radius:4px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px; font-weight:700;">3x4</div>
                                 <?php endif; ?>
                                 <div>
-                                    <strong><?= sanitize($p['nama_lengkap']) ?></strong>
+                                    <strong><?= adminUserProfileLink($p['nama_lengkap'], $p['user_id']) ?></strong>
                                 </div>
                             </div>
                         </td>

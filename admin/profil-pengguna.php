@@ -41,7 +41,7 @@ include __DIR__ . '/../includes/header.php';
     <p>Beberapa akun memiliki nama yang sama. Pilih berdasarkan NIM, username, atau peran.</p>
     <div class="admin-profile-table"><table><thead><tr><th>Nama</th><th>NIM / Username</th><th>Peran</th><th>Program Studi</th><th>Aksi</th></tr></thead><tbody>
     <?php foreach ($profileChoices as $choice): ?>
-    <tr><td><?= sanitize($choice['nama_lengkap']) ?></td><td><?= sanitize($choice['nim'] ?: $choice['username']) ?></td><td><?= sanitize(ucfirst($choice['role'])) ?></td><td><?= sanitize($choice['program_studi'] ?? '-') ?></td><td><a class="btn btn-sm btn-primary" data-no-spa href="<?= BASE_URL ?>/admin/profil-pengguna.php?id=<?= (int)$choice['id'] ?>">Lihat Profil</a></td></tr>
+    <tr><td><?= adminUserProfileLink($choice['nama_lengkap'], $choice['id']) ?></td><td><?= sanitize($choice['nim'] ?: $choice['username']) ?></td><td><?= sanitize(ucfirst($choice['role'])) ?></td><td><?= sanitize($choice['program_studi'] ?? '-') ?></td><td><a class="btn btn-sm btn-primary" data-no-spa href="<?= BASE_URL ?>/admin/profil-pengguna.php?id=<?= (int)$choice['id'] ?>">Lihat Profil</a></td></tr>
     <?php endforeach; ?>
     </tbody></table></div>
 </div></section>
@@ -69,7 +69,7 @@ include __DIR__ . '/../includes/header.php';
 <section class="card"><div class="card-header">Riwayat Tutorial</div><div class="card-body">
 <?php if (!$profileHistory['tutorial']): ?><p>Belum ada riwayat tutorial yang tersedia.</p><?php else: ?>
 <p style="font-size:12px;color:#64748b;">Maksimal 50 pendaftaran terakhir.</p><div class="admin-profile-table"><table><thead><tr><th>Tahun / Gelombang</th><th>Kelas</th><th>Dosen</th><th>Hari / Jam</th><th>Ruangan</th><th>Status</th><th>Nilai</th></tr></thead><tbody>
-<?php foreach ($profileHistory['tutorial'] as $row): ?><tr><td><?= sanitize(($row['tahun_ajaran'] ?? '-') . ' / ' . ($row['gelombang'] ?? '-')) ?></td><td><?= sanitize($row['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></td><td><?= sanitize($row['dosen_pengampu'] ?: '-') ?></td><td><?= sanitize(($row['hari'] ?: $row['hari_pilihan']) . ' / ' . ($row['jam'] ?: '-')) ?></td><td><?= sanitize($row['ruangan'] ?: '-') ?></td><td><?= sanitize($row['status']) ?></td><td><?= $row['nilai_akhir'] !== null ? sanitize($row['nilai_akhir']) : '-' ?></td></tr><?php endforeach; ?>
+<?php foreach ($profileHistory['tutorial'] as $row): ?><tr><td><?= sanitize(($row['tahun_ajaran'] ?? '-') . ' / ' . ($row['gelombang'] ?? '-')) ?></td><td><?= sanitize($row['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></td><td><?= adminUserProfileLink($row['dosen_pengampu'] ?: '-') ?></td><td><?= sanitize(($row['hari'] ?: $row['hari_pilihan']) . ' / ' . ($row['jam'] ?: '-')) ?></td><td><?= sanitize($row['ruangan'] ?: '-') ?></td><td><?= sanitize($row['status']) ?></td><td><?= $row['nilai_akhir'] !== null ? sanitize($row['nilai_akhir']) : '-' ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?></div></section>
 <?php elseif ($profileUser['role'] === 'dosen'): ?>
 <section class="card"><div class="card-header">Kelas Tutorial yang Diampu</div><div class="card-body">

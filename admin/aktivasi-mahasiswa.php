@@ -80,7 +80,7 @@ include __DIR__ . '/../includes/header.php';
                 </tr>
                 <tr>
                     <th>Nama Lengkap</th>
-                    <td><?= sanitize($userData['nama_lengkap']) ?></td>
+                    <td><?= adminUserProfileLink($userData['nama_lengkap'], $userData['id']) ?></td>
                 </tr>
                 <tr>
                     <th>Program Studi</th>

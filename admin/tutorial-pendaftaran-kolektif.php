@@ -681,7 +681,7 @@ include __DIR__ . '/../includes/header.php';
                         <tr>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['nim'] ?: '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize((strlen(trim($m['nim'])) >= 2) ? "20" . substr(trim($m['nim']), 0, 2) : '-') ?></td>
-                            <td style="padding: 10px 16px; font-size: 13px;"><strong><?= sanitize($m['nama_lengkap']) ?></strong></td>
+                            <td style="padding: 10px 16px; font-size: 13px;"><strong><?= adminUserProfileLink($m['nama_lengkap'], $m['user_id']) ?></strong></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= sanitize($m['program_studi'] ?: '-') ?></td>
                             <td style="padding: 10px 16px; font-size: 13px;"><?= renderJenisProgramBadge($m['jenis_program'] ?? 'Reguler', true) ?></td>
                             <td style="padding: 10px 16px; text-align: center;">

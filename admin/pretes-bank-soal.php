@@ -161,6 +161,7 @@ if (isset($_GET['ajax'])) {
 
             $data[] = [
                 'id' => $attId,
+                'user_id' => (int)$a['user_id'],
                 'nama_lengkap' => $a['nama_lengkap'],
                 'nim' => $a['nim'] ?? '-',
                 'program_studi' => $a['program_studi'] ?? '',

@@ -20,7 +20,7 @@ def fixture():
         root = Path(directory)
         for file in ['admin/tutorial-hasil-plotting.php', 'includes/tutorial-absensi-view.php',
                      'includes/tutorial-absensi-form.php', 'includes/tutorial-scheduled-lecturers.php',
-                     'includes/user-helper.php', 'assets/logo.svg']:
+                     'includes/user-helper.php', 'includes/admin-user-profile.php', 'assets/logo.svg']:
             target = root / file
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / file, target)
@@ -59,6 +59,8 @@ def fixture():
             db.execute("ALTER TABLE users ADD COLUMN jenis_program TEXT DEFAULT 'Reguler'")
             db.commit()
         (root / 'includes/auth.php').write_text('''<?php
+            require_once __DIR__ . '/admin-user-profile.php';
+            function isAdmin() { return ($_SERVER['HTTP_X_TEST_ADMIN'] ?? '') === '1'; }
             define('BASE_URL', 'http://' . $_SERVER['HTTP_HOST']);
             function requireAdmin() {
                 if (($_SERVER['HTTP_X_TEST_ADMIN'] ?? '') !== '1') {

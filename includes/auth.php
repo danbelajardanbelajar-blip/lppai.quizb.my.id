@@ -7,6 +7,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/SessionDatabaseHandler.php';
 require_once __DIR__ . '/activity-logger.php';
 require_once __DIR__ . '/user-helper.php';
+require_once __DIR__ . '/admin-user-profile.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     // Konfigurasi masa aktif sesi tahan lama (30 hari = 2.592.000 detik)

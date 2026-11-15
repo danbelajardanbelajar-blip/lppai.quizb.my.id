@@ -1195,7 +1195,7 @@ include __DIR__ . '/../includes/header.php';
                             <input type="checkbox" class="check-pendaftar" name="reg_ids[]" value="<?= $reg['id'] ?>" style="width: 18px; height: 18px; cursor: pointer;">
                         </td>
                         <td>
-                            <strong><?= sanitize($reg['nama_lengkap']) ?></strong>
+                            <strong><?= adminUserProfileLink($reg['nama_lengkap'], $reg['user_id']) ?></strong>
                             <?php if ($selected_gel_id === 'all' && !empty($reg['tahun_ajaran'])): ?>
                                 <div style="font-size: 11px; color: #64748b;"><?= sanitize($reg['tahun_ajaran']) ?> (<?= sanitize($reg['gelombang'] ?? '-') ?>)</div>
                             <?php endif; ?>
@@ -1317,7 +1317,7 @@ include __DIR__ . '/../includes/header.php';
                         <tr data-status="<?= $statusCategory ?>" data-jurusan="<?= htmlspecialchars(trim($p['program_studi'] ?? ''), ENT_QUOTES) ?>">
                             <td style="text-align: center; color: #64748b;"><?= $no++ ?></td>
                             <td>
-                                <strong style="color: #1e293b;"><?= sanitize($p['nama_lengkap']) ?></strong>
+                                <strong style="color: #1e293b;"><?= adminUserProfileLink($p['nama_lengkap'], $p['user_id']) ?></strong>
                             </td>
                             <td><?= sanitize($p['nim'] ?: '-') ?></td>
                             <td><?= sanitize($p['program_studi'] ?: '-') ?></td>

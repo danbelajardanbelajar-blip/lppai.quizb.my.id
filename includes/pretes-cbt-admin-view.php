@@ -562,7 +562,7 @@
                     $unansCount = max(0, $totItems - $ansCount);
                 ?>
                     <tr id="attemptRow_<?= (int)$attempt['id'] ?>" data-attempt-id="<?= (int)$attempt['id'] ?>">
-                        <td><strong><?= sanitize($attempt['nama_lengkap']) ?></strong></td>
+                        <td><strong><?= adminUserProfileLink($attempt['nama_lengkap'], $attempt['user_id']) ?></strong></td>
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
                         <td><?= renderJenisProgramBadge($attempt['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>

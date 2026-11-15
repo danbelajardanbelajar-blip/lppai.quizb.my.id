@@ -886,8 +886,8 @@ $chartData = json_encode(array_values($statsKelas));
                             <input type="checkbox" class="check-peserta" name="reg_ids[]" value="<?= $r['id'] ?>" style="width: 18px; height: 18px; cursor: pointer;">
                         </td>
                         <td><strong><?= sanitize($r['nama_kelas']) ?></strong></td>
-                        <td><?= sanitize($r['dosen_pengampu'] ?: '-') ?></td>
-                        <td><?= sanitize($r['nama_lengkap']) ?></td>
+                        <td><?= adminUserProfileLink($r['dosen_pengampu'] ?: '-') ?></td>
+                        <td><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id']) ?></td>
                         <td><?= renderJenisProgramBadge($r['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><span class="badge badge-success"><?= sanitize($r['ruangan'] ?: 'Belum Ada Ruang') ?></span></td>
                         <td>

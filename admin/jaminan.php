@@ -107,7 +107,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'search_mahasiswa') {
 
 // Fetch Jaminan data
 $stmtData = $pdo->query("
-    SELECT j.*, u.nama_lengkap, u.jenis_program 
+    SELECT j.*, u.id AS profile_user_id, u.nama_lengkap, u.jenis_program
     FROM jaminan_mahasiswa j 
     JOIN users u ON j.nim = u.nim 
     ORDER BY j.status_pengambilan ASC, j.created_at DESC
@@ -211,7 +211,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php foreach($jaminanData as $row): ?>
                             <tr>
                                 <td style="padding:12px 10px; vertical-align:middle;">
-                                    <strong><?= htmlspecialchars($row['nama_lengkap']) ?></strong><br>
+                                    <strong><?= adminUserProfileLink($row['nama_lengkap'], $row['profile_user_id'] ?? null) ?></strong><br>
                                     <small class="text-muted"><?= htmlspecialchars($row['nim']) ?></small>
                                 </td>
                                 <td style="padding:12px 10px; vertical-align:middle;">

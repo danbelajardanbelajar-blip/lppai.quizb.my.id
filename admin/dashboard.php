@@ -311,7 +311,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php foreach ($recentTutorialRegs as $r): ?>
                             <tr style="border-bottom:1px solid #e2e8f0;">
                                 <td style="padding:10px 14px; font-weight:600; color:#1e293b;">
-                                    <?= sanitize($r['nama_lengkap']) ?>
+                                    <?= adminUserProfileLink($r['nama_lengkap'], $r['user_id'] ?? null) ?>
                                     <?php $waUrl = formatWaDashboard($r['no_hp'] ?? ''); ?>
                                     <?php if (!empty($waUrl)): ?>
                                         <a href="<?= $waUrl ?>" target="_blank" rel="noopener noreferrer" title="Chat WhatsApp" style="margin-left:6px; color:#16a34a; text-decoration:none; font-size:13px;" onclick="event.stopPropagation();">
@@ -392,7 +392,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php foreach ($recentPretesRegs as $r): ?>
                             <tr style="border-bottom:1px solid #e2e8f0;">
                                 <td style="padding:10px 14px; font-weight:600; color:#1e293b;">
-                                    <?= sanitize($r['nama_lengkap']) ?>
+                                    <?= adminUserProfileLink($r['nama_lengkap'], $r['user_id'] ?? null) ?>
                                     <?php $waUrl = formatWaDashboard($r['no_hp'] ?? ''); ?>
                                     <?php if (!empty($waUrl)): ?>
                                         <a href="<?= $waUrl ?>" target="_blank" rel="noopener noreferrer" title="Chat WhatsApp" style="margin-left:6px; color:#16a34a; text-decoration:none; font-size:13px;" onclick="event.stopPropagation();">

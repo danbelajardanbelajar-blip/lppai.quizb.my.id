@@ -891,6 +891,10 @@
             const programBadge = att.jenis_program_badge || ('<span class="badge-jenis-program badge-jenis-' + (att.jenis_program || 'reguler').toLowerCase() + '">' + escapeHtml(att.jenis_program || 'Reguler') + '</span>');
 
             const baseUrl = window.CBT_BASE_URL || '';
+            const profileUserId = Number(att.user_id);
+            const profileNameHtml = Number.isInteger(profileUserId) && profileUserId > 0
+                ? '<a class="admin-user-profile-link" data-no-spa href="' + escapeHtml(baseUrl + '/admin/profil-pengguna.php?id=' + profileUserId) + '" style="color:inherit;text-decoration:underline;text-underline-offset:3px" title="Lihat profil pengguna">' + safeName + '</a>'
+                : safeName;
             const filterQuery = (currentFilter && currentFilter !== 'all') ? '&result_filter=' + encodeURIComponent(currentFilter) : '';
             const reviewUrl = baseUrl + '/pretes-ujian.php?cbt_review=1&attempt_id=' + att.id + filterQuery;
 
@@ -906,7 +910,7 @@
                 '</div>';
 
             return '<tr id="attemptRow_' + att.id + '" data-attempt-id="' + att.id + '">' +
-                '<td><strong>' + safeName + '</strong></td>' +
+                '<td><strong>' + profileNameHtml + '</strong></td>' +
                 '<td>' + safeNim + '</td>' +
                 '<td>' + programBadge + '</td>' +
                 '<td><span class="bank-badge" style="' + jenisStyle + '">' + escapeHtml(att.jenis_label) + '</span></td>' +

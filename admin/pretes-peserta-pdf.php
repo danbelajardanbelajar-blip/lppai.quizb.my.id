@@ -600,7 +600,7 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
                             <td class="col-no"><?= $idx + 1 ?></td>
                             <td class="col-nim"><?= htmlspecialchars($row['nim'] ?: '-', ENT_QUOTES, 'UTF-8') ?></td>
                             <td class="col-nama">
-                                <?= htmlspecialchars($row['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>
+                                <?= adminUserProfileLink($row['nama_lengkap'], $row['user_id']) ?>
                             </td>
                             <td class="col-program">
                                 <?php if ($isRpl): ?>

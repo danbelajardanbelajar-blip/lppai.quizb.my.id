@@ -863,7 +863,7 @@ function addQETutorRow(day) {
                                     <div style="width:34px; height:44px; border-radius:4px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px; font-weight:700;">3x4</div>
                                 <?php endif; ?>
                                 <div>
-                                    <strong><?= sanitize($p['nama_lengkap']) ?></strong>
+                                    <strong><?= adminUserProfileLink($p['nama_lengkap'], $p['user_id']) ?></strong>
                                 </div>
                             </div>
                         </td>
@@ -881,7 +881,7 @@ function addQETutorRow(day) {
                         <td data-order="<?= sanitize($curDosen) ?>" data-search="<?= sanitize($curDosen ?: '__BELUM__') ?>" data-filter="<?= sanitize($curDosen ?: '__BELUM__') ?>">
                             <?php if (!empty($p['dosen_penguji'])): ?>
                                 <span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:4px 10px; border-radius:6px; font-size:13px; font-weight:600; display:inline-block;">
-                                    👨‍🏫 <?= sanitize($p['dosen_penguji']) ?>
+                                    👨‍🏫 <?= adminUserProfileLink($p['dosen_penguji']) ?>
                                 </span>
                             <?php else: ?>
                                 <span style="color:#94a3b8; font-size:12px; font-style:italic;">— Belum diplot —</span>

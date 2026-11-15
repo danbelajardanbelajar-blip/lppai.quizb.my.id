@@ -217,7 +217,7 @@ foreach ($data as $i => $row) {
         $checkbox,
         $start + $i + 1, // Nomor urut
         htmlspecialchars($row['nim'] ?: '-'),
-        '<strong>' . htmlspecialchars($row['nama_lengkap']) . '</strong>',
+        '<strong>' . adminUserProfileLink($row['nama_lengkap'], $row['user_id']) . '</strong>',
         htmlspecialchars($row['program_studi'] ?: '-'),
         renderJenisProgramBadge($row['jenis_program'] ?? 'Reguler', true),
         htmlspecialchars($row['tahun_ajaran'] ?: '-'),

@@ -360,7 +360,7 @@ $prodiList = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program
 
 // 6. Recent Logs (10 Terakhir)
 $recentLogs = $pdo->query("
-    SELECT ps.*, u.program_studi as jurusan_asli, u.jenis_program
+    SELECT ps.*, u.id AS profile_user_id, u.program_studi as jurusan_asli, u.jenis_program
     FROM pengambilan_sertifikat ps
     LEFT JOIN users u ON ps.nim = u.nim
     WHERE ps.status_pengambilan = 'Sudah Diambil'
@@ -884,7 +884,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr>
                                 <td style="text-align:center; color:#64748b;"><?= $no++ ?></td>
                                 <td>
-                                    <strong><?= sanitize($c['nama_lengkap']) ?></strong><br>
+                                    <strong><?= adminUserProfileLink($c['nama_lengkap'], $c['user_id'] ?? null) ?></strong><br>
                                     <small class="text-muted">NIM: <?= sanitize($c['nim']) ?></small>
                                 </td>
                                 <td><?= sanitize($c['program_studi'] ?: '-') ?></td>
@@ -982,7 +982,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr>
                                 <td><strong><?= date('d/m/Y H:i', strtotime($log['tanggal_pengambilan'])) ?></strong></td>
                                 <td>
-                                    <strong><?= sanitize($log['nama_mahasiswa']) ?></strong><br>
+                                    <strong><?= adminUserProfileLink($log['nama_mahasiswa'], $log['profile_user_id'] ?? null) ?></strong><br>
                                     <small class="text-muted"><?= sanitize($log['nim']) ?></small>
                                 </td>
                                 <td><?= sanitize($log['program_studi'] ?: ($log['jurusan_asli'] ?? '-')) ?></td>
@@ -993,7 +993,7 @@ include __DIR__ . '/../includes/header.php';
                                     <small style="color:#64748b;">(<?= sanitize($log['hubungan_penerima']) ?>)</small>
                                 </td>
                                 <td><span class="badge" style="background:#e0f2fe; color:#0369a1;"><?= sanitize($log['metode_pengambilan']) ?></span></td>
-                                <td><?= sanitize($log['petugas_nama'] ?: 'Admin') ?></td>
+                                <td><?= adminUserProfileLink($log['petugas_nama'] ?: 'Admin') ?></td>
                                 <td><?= sanitize($log['catatan'] ?: '-') ?></td>
                                 <td>
                                     <a href="cetak-tanda-terima-sertifikat.php?id=<?= $log['id'] ?>" target="_blank" class="btn btn-sm btn-secondary" style="padding:3px 8px; font-size:12px;">
