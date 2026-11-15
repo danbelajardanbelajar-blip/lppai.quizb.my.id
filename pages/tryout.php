@@ -210,6 +210,9 @@ if ($session) {
 $fmtTime = static fn($ts) => $ts ? date('d/m/Y H:i', (int)$ts) : '-';
 $scoreText = static fn($a) => $a['submitted_at'] !== null ? number_format((float)$a['score'], 1) : 'Berlangsung';
 
+// Ruang pengerjaan tryout: widget Pesan tidak ditampilkan (daftar tryout tetap menampilkan widget)
+if ($session) define('HIDE_MESSAGE_WIDGET', true);
+
 include __DIR__ . '/../includes/header.php';
 ?>
 <style>

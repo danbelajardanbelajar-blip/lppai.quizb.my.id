@@ -16,5 +16,6 @@
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/activity-tracker.js?v=<?= file_exists(__DIR__ . '/../assets/js/activity-tracker.js') ? filemtime(__DIR__ . '/../assets/js/activity-tracker.js') : time() ?>"></script>
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=<?= file_exists(__DIR__ . '/../assets/js/app.js') ? filemtime(__DIR__ . '/../assets/js/app.js') : time() ?>"></script>
+<?php include __DIR__ . '/messages-widget.php'; // Widget Pesan melayang (kanan bawah) ?>
 </body>
 </html>

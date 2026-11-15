@@ -53,6 +53,7 @@ if (isset($_GET['cbt_admin_asset'])) {
 }
 
 define('PAGE_TITLE', 'Ujian Pretes & Pengawas AI');
+define('HIDE_MESSAGE_WIDGET', true); // Ruang ujian CBT: widget Pesan tidak ditampilkan
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 

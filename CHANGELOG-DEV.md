@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 18:35:35 +0700 — Menu Pesan melayang (kanan bawah) Mahasiswa/Dosen ↔ Admin LPPAI dengan notifikasi
+
+**ID:** MESSAGES-WIDGET · **Parent Git:** `ed94a78`.
+**Permintaan:** Menu perpesanan (Pesan) dengan teknologi terbaru, notifikasi aktif bila ada pesan, ikon melayang modern & responsif di kanan bawah (bukan sidebar), dan hilang pada keadaan tertentu (upload foto, ujian, dll). Keputusan pengguna: **Mahasiswa/Dosen ↔ Admin**; notifikasi **di dalam web + notifikasi browser** (tanpa Web Push).
+
+**Desain:**
+- Setiap mahasiswa/dosen memiliki **satu percakapan** dengan tim "Admin LPPAI"; semua admin melihat kotak masuk yang sama dan dapat membalas; admin dapat memulai percakapan ke pengguna non-admin mana pun.
+- Pembaruan real-time memakai **polling adaptif** (panel terbuka 4 dtk, tab terlihat 15 dtk, tab tersembunyi 60 dtk, backoff eksponensial saat error/offline), sinkron antar-tab via **BroadcastChannel**, dedup notifikasi via `localStorage`. Dipilih alih-alih WebSocket/SSE karena hosting PHP bersama tidak cocok untuk koneksi panjang.
+- Notifikasi: badge angka + denyut pada ikon, judul tab `(n)`, suara singkat (Web Audio, setelah interaksi pengguna), toast `showToast()`, dan **Notification API** saat tab tidak aktif (izin lewat tombol 🔔 di panel).
+- Keamanan: API POST + CSRF, `session_write_close()`, akses percakapan dicek per pengguna, aksi admin dibatasi, rate limit 15 pesan/menit, idempoten `client_id`, isi dirender via `textContent` (anti-XSS), batas 2.000 karakter.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/messaging.php` (baru) | 2026-11-15 18:35:35 | 1–314 | Layanan pesan | `msgEnsureTables` (19, tabel `message_threads` & `messages` + indeks, MySQL/SQLite), `msgCleanBody` (79), `msgGetOrCreateThread` (101), `msgResolveThread` (120, tolak thread milik orang lain), `msgSend` (134, idempoten + rate limit + transaksi + penghitung unread), `msgFormat` (172), `msgFetchThread` (191, after/before + tandai dibaca), `msgThreadSummary` (222), `msgAdminThreads` (244), `msgSearchUsers` (260), `msgAdminStartThread` (276), `msgPoll` (289, unread + rev + incoming). |
+| `api/messages.php` (baru) | 2026-11-15 18:31:03 | 1–76 | API JSON | Aksi `poll/thread/send/read/threads/users/start`; 401/403/405/413/422/429/500 terstruktur. |
+| `includes/messages-widget.php` (baru) | 2026-11-15 18:34:06 | 1–26 | Pemasang widget | Hanya untuk pengguna login; dilewati bila halaman mendefinisikan `HIDE_MESSAGE_WIDGET`; konfigurasi JSON aman (`JSON_HEX_*`). |
+| `includes/footer.php` | 2026-11-15 18:34:06 | 19 | Footer global | `include messages-widget.php` setelah `app.js`. |
+| `assets/js/messages-widget.js` (baru) | 2026-11-15 18:34:05 | 1–609 | Widget | Util/API fetch+AbortController (32–70), DOM FAB+panel (72–153), tampilan & render pesan (155–250), data/kirim optimistis (252–374), notifikasi (376–415), polling adaptif & BroadcastChannel (417–461), buka/tutup & keyboard (463–522), **auto-sembunyi** (524–586: upload via pembungkus `fetch`/XHR & form multipart, ujian `#cbtWorkspace`/dialog jeda, kamera aktif, layar penuh, modal, `[data-hide-messages]`), API publik `window.LppaiMessages` (588–596). |
+| `assets/css/messages-widget.css` (baru) | 2026-11-15 18:34:06 | 1–191 | Gaya | FAB gradien + badge + denyut, panel 380×600 animasi, gelembung pesan, panel layar penuh ≤600px (safe-area), `prefers-reduced-motion`, sembunyi saat cetak. |
+| `pages/pretes-ujian.php` | 2026-11-15 18:34:22 | 56 | Ruang ujian CBT | `define('HIDE_MESSAGE_WIDGET', true)`. |
+| `pages/tryout.php` | 2026-11-15 18:34:28 | 213–215 | Ruang tryout | Widget disembunyikan saat mengerjakan (`?sesi=`); daftar tryout tetap menampilkan widget. |
+| `tests/messaging-test.php` (baru) | 2026-11-15 18:35:34 | 1–105 | Test | Kirim/balas, unread & poll, idempoten, akses lintas pengguna ditolak, validasi, rate limit, admin mulai & cari, integrasi footer/halaman/JS. |
+
+**Verifikasi:** `php -l` OK (6 file PHP), `node --check` OK, `git diff --check` OK; `tests/messaging-test.php` PASS; regresi `pretes-exam-access`, `pretes-exam-open`, `pretes-tryout`, `pretes-peserta-instruksi`, `pretes-cbt`, `pretes-cbt-session`, `tryout-mudah-import`, `users-password-copy`, 2 test `.cjs` PASS. **Uji browser end-to-end** (API & widget asli, SQLite): mahasiswa kirim 2 pesan (Enter & tombol, `<b>` tampil sebagai teks) → admin: badge 2 & judul tab `(2)`, daftar percakapan, buka, balas, badge 0, kembali, cari penerima → mahasiswa: badge 1, toast notifikasi, buka → unread 0; auto-sembunyi terbukti untuk ujian, kamera (`captureStream`), upload `fetch` & XHR (bukan untuk fetch biasa), `data-hide-messages`, `LppaiMessages.hide/show`, modal; tampilan desktop (panel kanan bawah) & HP 375×812 (layar penuh, kolom ketik di dasar, scroll terkunci).
+**Keterbatasan:** notifikasi hanya saat situs terbuka di browser (tanpa Web Push sesuai pilihan); beban server ±1 request/15 dtk per tab aktif; belum diuji di hosting live.
+
+---
+
 ## 2026-11-15 18:25:13 +0700 — Sembunyikan kolom Angkatan dan Tanggal Lahir pada Kelola Pengguna
 
 **ID:** USERS-HIDE-COHORT-BIRTHDATE · **Parent Git:** `fa84420`.
