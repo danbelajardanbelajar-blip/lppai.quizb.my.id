@@ -55,17 +55,63 @@ if (isset($_GET['ajax'])) {
         exit;
     }
     if ($_GET['ajax'] === 'live_results') {
+        $statusFilter = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : 'all';
+        if (!in_array($statusFilter, ['all', 'live', 'finished'], true)) $statusFilter = 'all';
+
         $filter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
         if (!in_array($filter, ['all', 'resmi', 'tryout'], true)) $filter = 'all';
 
-        $where = '';
-        if ($filter === 'resmi') {
-            $where = 'WHERE a.registration_id > 0';
-        } elseif ($filter === 'tryout') {
-            $where = 'WHERE a.registration_id < 0';
+        $searchQuery = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = (int)($_GET['per_page'] ?? 25);
+        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+
+        $now = time();
+
+        $whereConditions = [];
+        $params = [];
+
+        if ($statusFilter === 'live') {
+            $whereConditions[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
+            $params[':now_ts'] = $now;
+        } elseif ($statusFilter === 'finished') {
+            $whereConditions[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
+            $params[':now_ts'] = $now;
         }
 
-        $attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $where ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+        if ($filter === 'resmi') {
+            $whereConditions[] = 'a.registration_id > 0';
+        } elseif ($filter === 'tryout') {
+            $whereConditions[] = 'a.registration_id < 0';
+        }
+
+        if ($searchQuery !== '') {
+            $whereConditions[] = '(u.nama_lengkap LIKE :search_kw OR u.nim LIKE :search_kw)';
+            $params[':search_kw'] = '%' . $searchQuery . '%';
+        }
+
+        $whereSql = !empty($whereConditions) ? ('WHERE ' . implode(' AND ', $whereConditions)) : '';
+
+        // Total filtered count
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereSql");
+        foreach ($params as $k => $v) {
+            $countStmt->bindValue($k, $v);
+        }
+        $countStmt->execute();
+        $totalFiltered = (int)$countStmt->fetchColumn();
+
+        $totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+
+        $stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereSql ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
         $itemStatsMap = [];
@@ -91,7 +137,6 @@ if (isset($_GET['ajax'])) {
 
         $tryoutCache = [];
         $data = [];
-        $now = time();
         foreach ($attempts as $a) {
             $attId = (int)$a['id'];
             $stat = $itemStatsMap[$attId] ?? null;
@@ -146,15 +191,23 @@ if (isset($_GET['ajax'])) {
         $tryoutStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts WHERE registration_id < 0')->fetch(PDO::FETCH_ASSOC) ?: [];
         $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts')->fetchColumn() ?: 0);
         $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+        $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
 
         echo json_encode([
             'success' => true,
             'timestamp' => $now,
             'timestamp_wib' => (new DateTimeImmutable('@' . $now))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i:s') . ' WIB',
             'ongoing_count' => $ongoingCount,
+            'finished_count' => $finishedCount,
             'total_all' => $totalAll,
             'total_resmi' => (int)($resmiStats['total'] ?? 0),
             'total_tryout' => (int)($tryoutStats['total'] ?? 0),
+            'total_filtered' => $totalFiltered,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+            'status_filter' => $statusFilter,
+            'result_filter' => $filter,
             'data' => $data
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -513,22 +566,70 @@ $tryoutStats['average_score'] = $tryoutStats['average_score'] !== null ? (float)
 $allStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC) ?: [];
 $totalAttemptCount = (int)($allStats['total'] ?? 0);
 
+$statusFilter = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : 'all';
+if (!in_array($statusFilter, ['all', 'live', 'finished'], true)) {
+    $statusFilter = 'all';
+}
+
 $resultFilter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
 if (!in_array($resultFilter, ['all', 'resmi', 'tryout'], true)) {
     $resultFilter = 'all';
 }
 
-$whereClause = '';
-if ($resultFilter === 'resmi') {
-    $whereClause = 'WHERE a.registration_id > 0';
-} elseif ($resultFilter === 'tryout') {
-    $whereClause = 'WHERE a.registration_id < 0';
+$searchQuery = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = (int)($_GET['per_page'] ?? 25);
+if (!in_array($perPage, [10, 25, 50, 100], true)) {
+    $perPage = 25;
 }
 
 $now = time();
 $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+$finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
 
-$attempts = $pdo->query("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+$whereConditions = [];
+$params = [];
+
+if ($statusFilter === 'live') {
+    $whereConditions[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
+    $params[':now_ts'] = $now;
+} elseif ($statusFilter === 'finished') {
+    $whereConditions[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
+    $params[':now_ts'] = $now;
+}
+
+if ($resultFilter === 'resmi') {
+    $whereConditions[] = 'a.registration_id > 0';
+} elseif ($resultFilter === 'tryout') {
+    $whereConditions[] = 'a.registration_id < 0';
+}
+
+if ($searchQuery !== '') {
+    $whereConditions[] = '(u.nama_lengkap LIKE :search_kw OR u.nim LIKE :search_kw)';
+    $params[':search_kw'] = '%' . $searchQuery . '%';
+}
+
+$whereClause = !empty($whereConditions) ? ('WHERE ' . implode(' AND ', $whereConditions)) : '';
+
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause");
+foreach ($params as $k => $v) {
+    $countStmt->bindValue($k, $v);
+}
+$countStmt->execute();
+$totalFiltered = (int)$countStmt->fetchColumn();
+
+$totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+
+$stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
+foreach ($params as $k => $v) {
+    $stmt->bindValue($k, $v);
+}
+$stmt->execute();
+$attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
 $itemStatsMap = [];
@@ -561,6 +662,37 @@ foreach ($attempts as &$att) {
     $att['live_wrong_count'] = $stat ? (int)$stat['live_wrong_count'] : 0;
 }
 unset($att);
+
+if (!function_exists('buildCbtResultUrl')) {
+    function buildCbtResultUrl(array $overrides = []): string {
+        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page;
+        $params = [
+            'cbt_bank' => 1,
+            'tab' => 'results'
+        ];
+        $mergedStatus = $overrides['status_filter'] ?? $statusFilter;
+        if ($mergedStatus !== 'all') {
+            $params['status_filter'] = $mergedStatus;
+        }
+        $mergedResult = $overrides['result_filter'] ?? $resultFilter;
+        if ($mergedResult !== 'all') {
+            $params['result_filter'] = $mergedResult;
+        }
+        $mergedQ = array_key_exists('q', $overrides) ? $overrides['q'] : $searchQuery;
+        if ($mergedQ !== '') {
+            $params['q'] = $mergedQ;
+        }
+        $mergedPerPage = array_key_exists('per_page', $overrides) ? (int)$overrides['per_page'] : (int)$perPage;
+        if ($mergedPerPage !== 25) {
+            $params['per_page'] = $mergedPerPage;
+        }
+        $mergedPage = array_key_exists('page', $overrides) ? (int)$overrides['page'] : (int)$page;
+        if ($mergedPage > 1) {
+            $params['page'] = $mergedPage;
+        }
+        return BASE_URL . '/pretes-ujian.php?' . http_build_query($params);
+    }
+}
 if (!defined('EXTRA_HEAD')) {
     define('EXTRA_HEAD', '<link rel="stylesheet" href="' . BASE_URL . '/pretes-ujian.php?cbt_style=bank&amp;v=' . (file_exists(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ? filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') : time()) . '">');
 }

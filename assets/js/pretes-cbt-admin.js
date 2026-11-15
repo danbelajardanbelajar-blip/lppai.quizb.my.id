@@ -778,6 +778,10 @@
         const manualRefreshBtn = get('cbtLiveManualRefreshBtn');
 
         const currentFilter = window.CBT_RESULT_FILTER || 'all';
+        const currentStatus = window.CBT_STATUS_FILTER || 'all';
+        const currentSearch = window.CBT_SEARCH_QUERY || '';
+        const currentPage = window.CBT_PAGE || 1;
+        const currentPerPage = window.CBT_PER_PAGE || 25;
         const bankUrl = window.CBT_BANK_URL || (window.location.pathname + '?cbt_bank=1');
         const csrfToken = window.CBT_CSRF_TOKEN || (document.querySelector('input[name=csrf_token]') || {}).value || '';
 
@@ -918,7 +922,13 @@
         function updateTableRows(data) {
             if (!tbody) return;
             if (!data.length) {
-                tbody.innerHTML = '<tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
+                if (currentStatus === 'live') {
+                    tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:32px 16px"><div style="font-size:24px;margin-bottom:6px">⚡</div><div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">Tidak ada peserta yang sedang mengerjakan ujian saat ini.</div><div style="font-size:12px;color:#64748b">Seluruh peserta telah menyelesaikan ujian atau belum ada sesi baru yang dimulai.</div></td></tr>';
+                } else if (currentSearch) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:28px 16px"><div style="font-size:22px;margin-bottom:6px">🔍</div><div style="font-weight:700;color:#0f172a;margin-bottom:4px">Tidak ditemukan sesi dengan kata kunci &ldquo;' + escapeHtml(currentSearch) + '&rdquo;.</div></td></tr>';
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
+                }
                 return;
             }
 
@@ -968,7 +978,15 @@
                 manualRefreshBtn.textContent = '⏳ Memuat…';
             }
 
-            const url = bankUrl + '&ajax=live_results&result_filter=' + encodeURIComponent(currentFilter);
+            let url = bankUrl + '&ajax=live_results' +
+                '&result_filter=' + encodeURIComponent(currentFilter) +
+                '&status_filter=' + encodeURIComponent(currentStatus) +
+                '&page=' + encodeURIComponent(currentPage) +
+                '&per_page=' + encodeURIComponent(currentPerPage);
+            if (currentSearch) {
+                url += '&q=' + encodeURIComponent(currentSearch);
+            }
+
             fetch(url, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
@@ -977,6 +995,23 @@
                 if (!res || !res.success) return;
                 if (ongoingNumEl && res.ongoing_count !== undefined) {
                     ongoingNumEl.textContent = res.ongoing_count;
+                }
+                const liveBadge = get('cbtLiveTabBadge');
+                if (liveBadge && res.ongoing_count !== undefined) {
+                    liveBadge.textContent = res.ongoing_count;
+                    if (res.ongoing_count > 0) {
+                        liveBadge.classList.add('live');
+                    } else {
+                        liveBadge.classList.remove('live');
+                    }
+                }
+                const finishedBadge = get('cbtFinishedTabBadge');
+                if (finishedBadge && res.finished_count !== undefined) {
+                    finishedBadge.textContent = res.finished_count;
+                }
+                const allBadge = get('cbtAllTabBadge');
+                if (allBadge && res.total_all !== undefined) {
+                    allBadge.textContent = res.total_all;
                 }
                 if (lastUpdatedEl && res.timestamp_wib) {
                     lastUpdatedEl.textContent = 'Pembaruan: ' + res.timestamp_wib;

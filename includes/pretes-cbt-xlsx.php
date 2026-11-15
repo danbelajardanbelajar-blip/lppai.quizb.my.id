@@ -236,7 +236,19 @@ function cbtResultsExportRows(PDO $pdo, string $filter = 'all'): Generator {
     } elseif ($filter === 'tryout') {
         $whereConds[] = 'a.registration_id < 0';
     }
-    $whereConds[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+    $hasUsername = true;
+    try {
+        $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        if ($driver === 'sqlite') {
+            $cols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
+            $names = array_map(fn($c) => strtolower((string)($c['name'] ?? '')), $cols ?: []);
+            $hasUsername = in_array('username', $names, true);
+        }
+    } catch (Throwable $e) {}
+
+    if ($hasUsername) {
+        $whereConds[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
+    }
     $whereConds[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
 
     $where = 'WHERE ' . implode(' AND ', $whereConds);

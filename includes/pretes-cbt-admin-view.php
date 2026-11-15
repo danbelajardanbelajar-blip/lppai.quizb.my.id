@@ -429,7 +429,16 @@
         <div class="bank-panel-head">
             <div>
                 <h3>Hasil Ujian Peserta &amp; Live Monitoring CBT</h3>
-                <p>100 sesi terbaru<?= $resultFilter === 'resmi' ? ' (Filter: Ujian Resmi)' : ($resultFilter === 'tryout' ? ' (Filter: Tryout)' : '') ?>. Menampilkan metrik live real-time: progres soal, jawaban benar, ragu, salah, sisa waktu, dan nilai.</p>
+                <p>
+                    <?php if ($statusFilter === 'live'): ?>
+                        <strong>⚡ Mode Live:</strong> Memantau peserta yang sedang aktif mengerjakan ujian secara real-time.
+                    <?php elseif ($statusFilter === 'finished'): ?>
+                        <strong>✓ Mode Selesai:</strong> Riwayat hasil akhir, nilai, dan lembar jawaban peserta yang telah selesai.
+                    <?php else: ?>
+                        Semua sesi pengerjaan CBT (berlangsung maupun telah selesai).
+                    <?php endif; ?>
+                    <?= $resultFilter === 'resmi' ? ' (Filter: Ujian Resmi)' : ($resultFilter === 'tryout' ? ' (Filter: Tryout)' : '') ?>
+                </p>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <?php if (!empty($attempts)): ?>
@@ -447,6 +456,22 @@
         </div>
 
         <div style="padding:14px 24px 0;">
+            <!-- Status Sub-Tabs: Live Monitoring vs Selesai vs Semua -->
+            <div class="cbt-status-tabs" style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid #e2e8f0;padding-bottom:12px;flex-wrap:wrap">
+                <a href="<?= buildCbtResultUrl(['status_filter' => 'live', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'live' ? 'active' : '' ?>">
+                    <span>⚡ Sedang Berlangsung (Live)</span>
+                    <span id="cbtLiveTabBadge" class="cbt-tab-count <?= $ongoingCount > 0 ? 'live' : '' ?>"><?= $ongoingCount ?></span>
+                </a>
+                <a href="<?= buildCbtResultUrl(['status_filter' => 'finished', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'finished' ? 'active' : '' ?>">
+                    <span>✓ Riwayat Selesai</span>
+                    <span id="cbtFinishedTabBadge" class="cbt-tab-count"><?= $finishedCount ?></span>
+                </a>
+                <a href="<?= buildCbtResultUrl(['status_filter' => 'all', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'all' ? 'active' : '' ?>">
+                    <span>📋 Semua Sesi</span>
+                    <span id="cbtAllTabBadge" class="cbt-tab-count"><?= $totalAttemptCount ?></span>
+                </a>
+            </div>
+
             <!-- Live Monitoring Toolbar -->
             <div class="cbt-live-toolbar" style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 18px;margin-bottom:14px;flex-wrap:wrap;gap:12px">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -463,7 +488,7 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                     <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#334155;cursor:pointer">
-                        <input type="checkbox" id="cbtLiveAutoRefreshToggle" checked style="accent-color:#126147;width:16px;height:16px;cursor:pointer">
+                        <input type="checkbox" id="cbtLiveAutoRefreshToggle" <?= $statusFilter === 'finished' ? '' : 'checked' ?> style="accent-color:#126147;width:16px;height:16px;cursor:pointer">
                         Auto-refresh
                     </label>
                     <select id="cbtLiveRefreshInterval" class="bank-input" style="width:auto;min-height:30px;padding:4px 8px;font-size:11.5px;margin:0">
@@ -477,11 +502,27 @@
                 </div>
             </div>
 
-            <div style="display:flex;gap:8px;padding:0 0 14px;flex-wrap:wrap;align-items:center">
-                <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Filter Hasil:</span>
-                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=all" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
-                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=resmi" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
-                <a href="<?= $bankUrl ?>&amp;tab=results&amp;result_filter=tryout" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
+            <!-- Filter Tipe & Pencarian -->
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0 0 14px;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Tipe:</span>
+                    <a href="<?= buildCbtResultUrl(['result_filter' => 'all', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
+                    <a href="<?= buildCbtResultUrl(['result_filter' => 'resmi', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
+                    <a href="<?= buildCbtResultUrl(['result_filter' => 'tryout', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
+                </div>
+
+                <form method="get" action="<?= BASE_URL ?>/pretes-ujian.php" style="margin:0;display:inline-flex;align-items:center;gap:6px">
+                    <input type="hidden" name="cbt_bank" value="1">
+                    <input type="hidden" name="tab" value="results">
+                    <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status_filter" value="<?= sanitize($statusFilter) ?>"><?php endif; ?>
+                    <?php if ($resultFilter !== 'all'): ?><input type="hidden" name="result_filter" value="<?= sanitize($resultFilter) ?>"><?php endif; ?>
+                    <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= (int)$perPage ?>"><?php endif; ?>
+                    <input type="search" name="q" value="<?= sanitize($searchQuery) ?>" placeholder="Cari nama atau NIM..." class="bank-input" style="min-height:30px;padding:3px 10px;font-size:12px;width:180px">
+                    <button type="submit" class="bank-button" style="min-height:30px;padding:3px 10px;font-size:11.5px">🔍 Cari</button>
+                    <?php if ($searchQuery !== ''): ?>
+                        <a href="<?= buildCbtResultUrl(['q' => '', 'page' => 1]) ?>" class="bank-button" style="min-height:30px;padding:3px 8px;font-size:11.5px;background:#f1f5f9;color:#475569;border-color:#cbd5e1" title="Hapus pencarian">✕ Reset</a>
+                    <?php endif; ?>
+                </form>
             </div>
         </div>
 
@@ -615,13 +656,96 @@
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php if (!$attempts): ?><tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr><?php endif; ?>
+                <?php if (!$attempts): ?>
+                    <?php if ($statusFilter === 'live'): ?>
+                        <tr>
+                            <td colspan="10" class="bank-empty" style="padding:32px 16px">
+                                <div style="font-size:24px;margin-bottom:6px">⚡</div>
+                                <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">Tidak ada peserta yang sedang mengerjakan ujian saat ini.</div>
+                                <div style="font-size:12px;color:#64748b;margin-bottom:12px">Seluruh peserta telah menyelesaikan ujian atau belum ada sesi baru yang dimulai.</div>
+                                <a href="<?= buildCbtResultUrl(['status_filter' => 'finished', 'page' => 1]) ?>" class="bank-button primary" style="font-size:12px;min-height:30px;padding:4px 14px">Lihat Riwayat Selesai (<?= $finishedCount ?>)</a>
+                            </td>
+                        </tr>
+                    <?php elseif ($searchQuery !== ''): ?>
+                        <tr>
+                            <td colspan="10" class="bank-empty" style="padding:28px 16px">
+                                <div style="font-size:22px;margin-bottom:6px">🔍</div>
+                                <div style="font-weight:700;color:#0f172a;margin-bottom:4px">Tidak ditemukan sesi dengan kata kunci &ldquo;<?= sanitize($searchQuery) ?>&rdquo;.</div>
+                                <a href="<?= buildCbtResultUrl(['q' => '', 'page' => 1]) ?>" class="bank-button" style="font-size:11.5px;min-height:28px;margin-top:8px">Reset Pencarian</a>
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>
+                    <?php endif; ?>
+                <?php endif; ?>
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination & Footer Bar -->
+        <div class="cbt-pagination-bar" style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid #e2e8f0;background:#fafcfb;flex-wrap:wrap;gap:12px">
+            <div class="cbt-pagination-info" style="font-size:12px;color:#475569">
+                Menampilkan <strong><?= $totalFiltered > 0 ? ($offset + 1) : 0 ?></strong> &ndash; <strong><?= min($offset + $perPage, $totalFiltered) ?></strong> dari <strong><?= $totalFiltered ?></strong> sesi
+                <?php if ($totalPages > 1): ?>
+                    <span style="color:#94a3b8;margin-left:6px">(Halaman <strong><?= $page ?></strong> dari <strong><?= $totalPages ?></strong>)</span>
+                <?php endif; ?>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#64748b">
+                    <label for="cbtPerPageSelect">Per halaman:</label>
+                    <select id="cbtPerPageSelect" class="bank-input" style="min-height:28px;padding:2px 8px;font-size:12px;width:auto;margin:0" onchange="window.location.href = this.value">
+                        <?php foreach ([10, 25, 50, 100] as $pp): ?>
+                            <option value="<?= buildCbtResultUrl(['per_page' => $pp, 'page' => 1]) ?>" <?= $perPage === $pp ? 'selected' : '' ?>><?= $pp ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <?php if ($totalPages > 1): ?>
+                <nav class="cbt-pagination-nav" aria-label="Navigasi Halaman CBT" style="display:flex;gap:4px;align-items:center">
+                    <?php if ($page > 1): ?>
+                        <a href="<?= buildCbtResultUrl(['page' => 1]) ?>" class="cbt-page-link" title="Halaman Pertama">&laquo;</a>
+                        <a href="<?= buildCbtResultUrl(['page' => $page - 1]) ?>" class="cbt-page-link" title="Halaman Sebelumnya">&lsaquo;</a>
+                    <?php else: ?>
+                        <span class="cbt-page-link disabled">&laquo;</span>
+                        <span class="cbt-page-link disabled">&lsaquo;</span>
+                    <?php endif; ?>
+
+                    <?php
+                    $startP = max(1, $page - 2);
+                    $endP = min($totalPages, $page + 2);
+                    if ($startP > 1) {
+                        echo '<a href="' . buildCbtResultUrl(['page' => 1]) . '" class="cbt-page-link">1</a>';
+                        if ($startP > 2) echo '<span class="cbt-page-ellipsis">&hellip;</span>';
+                    }
+                    for ($p = $startP; $p <= $endP; $p++) {
+                        if ($p === $page) {
+                            echo '<span class="cbt-page-link active" aria-current="page">' . $p . '</span>';
+                        } else {
+                            echo '<a href="' . buildCbtResultUrl(['page' => $p]) . '" class="cbt-page-link">' . $p . '</a>';
+                        }
+                    }
+                    if ($endP < $totalPages) {
+                        if ($endP < $totalPages - 1) echo '<span class="cbt-page-ellipsis">&hellip;</span>';
+                        echo '<a href="' . buildCbtResultUrl(['page' => $totalPages]) . '" class="cbt-page-link">' . $totalPages . '</a>';
+                    }
+                    ?>
+
+                    <?php if ($page < $totalPages): ?>
+                        <a href="<?= buildCbtResultUrl(['page' => $page + 1]) ?>" class="cbt-page-link" title="Halaman Berikutnya">&rsaquo;</a>
+                        <a href="<?= buildCbtResultUrl(['page' => $totalPages]) ?>" class="cbt-page-link" title="Halaman Terakhir">&raquo;</a>
+                    <?php else: ?>
+                        <span class="cbt-page-link disabled">&rsaquo;</span>
+                        <span class="cbt-page-link disabled">&raquo;</span>
+                    <?php endif; ?>
+                </nav>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <div class="bank-footer">
             <span>Nilai CBT dan progres pengerjaan disimpan terpisah dari penilaian praktik dan nilai impor lama.</span>
-            <?php if (!empty($attempts)): ?><span>Menampilkan <?= count($attempts) ?> sesi pengerjaan CBT terbaru.</span><?php endif; ?>
+            <?php if (!empty($attempts)): ?><span>Menampilkan sesi pengerjaan CBT dengan kontrol live monitor &amp; paginasi.</span><?php endif; ?>
         </div>
     </section>
     <?php endif; ?>
@@ -973,5 +1097,9 @@ window.CBT_CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
 window.CBT_BASE_URL = <?= json_encode(BASE_URL) ?>;
 window.CBT_BANK_URL = <?= json_encode($bankUrl) ?>;
 window.CBT_RESULT_FILTER = <?= json_encode($resultFilter) ?>;
+window.CBT_STATUS_FILTER = <?= json_encode($statusFilter ?? 'all') ?>;
+window.CBT_SEARCH_QUERY = <?= json_encode($searchQuery ?? '') ?>;
+window.CBT_PAGE = <?= (int)($page ?? 1) ?>;
+window.CBT_PER_PAGE = <?= (int)($perPage ?? 25) ?>;
 </script>
 <script src="<?= BASE_URL ?>/pretes-ujian.php?cbt_admin_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt-admin.js') ?>"></script>

@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 10:55:00 +0700 — Paginasi Hasil Ujian CBT dan Pemisahan Sub-Tab Live vs Selesai
+
+**ID:** CBT-RESULTS-PAGINATION-SUBTABS · **Parent Git:** `cb3185a`.
+**Permintaan:** Pada halaman `pretes-ujian.php?cbt_bank=1&tab=results`, pengguna menanyakan ketiadaan paginasi dan menyarankan pemisahan antara sesi ujian yang sedang berlangsung (live) dengan sesi yang sudah selesai agar tertata rapi saat peserta sangat banyak.
+Solusi komprehensif:
+1. Menambahkan pemisahan sub-tab status di bagian atas hasil ujian:
+   - `⚡ Sedang Berlangsung (Live)` (`status_filter=live`): Khusus memantau peserta yang sedang aktif mengerjakan ujian real-time, hitung mundur sisa waktu, progres butir, live skor, dan polling auto-refresh (5s/10s/30s) yang terisolasi hanya pada sesi aktif.
+   - `✓ Riwayat Selesai` (`status_filter=finished`): Khusus menampilkan arsip hasil ujian yang telah diserahkan (submit) atau berakhir batas waktunya, lengkap dengan paginasi, pencarian, dan auto-refresh dinonaktifkan secara default untuk menghemat CPU/bandwidth server.
+   - `📋 Semua Sesi` (`status_filter=all`): Menampilkan seluruh riwayat sesi CBT dengan paginasi lengkap (menjaga kompatibilitas 100%).
+2. Menambahkan fitur Paginasi dinamis (`page` & `per_page`: 10, 25, 50, 100) dengan penghitungan total halaman, offset, baris informasi (Menampilkan X – Y dari Z sesi), dan tombol navigasi halaman (« Pertama, ‹ Sebelumnya, nomor halaman cerdas dengan elipsis, Berikutnya ›, Terakhir »).
+3. Menambahkan fitur Pencarian nama peserta / NIM (`q=...`) dengan tombol cari dan reset cepat.
+4. Menambahkan helper canonical URL `buildCbtResultUrl(array $overrides)` di `includes/pretes-cbt.php` untuk merangkai query parameter secara konsisten dan aman.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 10:48:13 | `admin/pretes-bank-soal.php` | 57-165 | Handler AJAX `live_results` | Menerima parameter `status_filter` (`all`, `live`, `finished`), `result_filter`, `q`, `page`, dan `per_page`. Mengisolasi query live hanya untuk sesi yang aktif; menghitung `ongoing_count`, `finished_count`, `total_filtered`, `page`, dan `total_pages` pada respons JSON. |
+| 2026-11-15 10:48:42 | `admin/pretes-bank-soal.php` | 566-652 | Controller Server-Side Rendering (SSR) | Menghitung `$ongoingCount`, `$finishedCount`, `$totalAttemptCount`, memvalidasi `$statusFilter`, `$resultFilter`, `$searchQuery`, `$page`, `$perPage`, menjalankan query paginasi `LIMIT $perPage OFFSET $offset`, dan mendefinisikan fungsi fallback `buildCbtResultUrl`. |
+| 2026-11-15 10:50:17 | `includes/pretes-cbt-admin-view.php` | 428-524, 617-640, 642-700 | Tampilan Sub-Tab, Filter & Paginasi CBT | Menambahkan navigasi sub-tab `.cbt-status-tabs` (Live, Selesai, Semua) beserta counter badge; menambahkan form pencarian peserta `q`; menyesuaikan deskripsi panel sesuai mode aktif; menambahkan pesan empty-state interaktif saat tidak ada peserta live; dan menambahkan bar navigasi paginasi `.cbt-pagination-bar` dengan dropdown per halaman. |
+| 2026-11-15 10:50:30 | `includes/pretes-cbt-admin-view.php` | 1094-1102 | State Global JavaScript | Meneruskan variabel `CBT_STATUS_FILTER`, `CBT_SEARCH_QUERY`, `CBT_PAGE`, dan `CBT_PER_PAGE` ke objek `window`. |
+| 2026-11-15 10:51:15 | `assets/js/pretes-cbt-admin.js` | 780-785, 922-990 | Live Monitor AJAX & Dynamic Tabs | Membaca filter status dan query pencarian saat polling `fetchLiveResults`; memperbarui badge counter live, finished, dan total secara real-time; serta memperbarui rendering baris tabel dan empty state sesuai mode sub-tab aktif. |
+| 2026-11-15 10:51:39 | `assets/css/pretes-cbt-admin.css` | 316-435 | Styling Sub-Tabs & Kontrol Paginasi | Menambahkan styling `.cbt-status-tabs`, `.cbt-status-tab-btn`, `.cbt-tab-count`, `.cbt-pagination-bar`, `.cbt-pagination-nav`, `.cbt-page-link`, dan `.cbt-page-ellipsis` sesuai tema Emerald Royale & Champagne Prestige. |
+| 2026-11-15 10:52:50 | `includes/pretes-cbt.php` | 1083-1115 | Helper URL Canonical CBT | Menyediakan fungsi `buildCbtResultUrl(array $overrides)` secara global untuk membangun URL tab hasil CBT dengan query parameter lengkap yang dipertahankan. |
+| 2026-11-15 10:43:00 | `includes/pretes-cbt-xlsx.php` | 239-251 | Keamanan Ekspor SQLite Fixture | Menambahkan pengecekan keberadaan kolom `u.username` secara dinamis pada driver SQLite sehingga ekspor hasil CBT tidak crash saat dijalankan dengan fixture minimal. |
+| 2026-11-15 10:43:00 | `tests/pretes-cbt-export-scope-test.php` | 22 | Fixture Tabel Users | Menambahkan kolom `username TEXT` pada tabel users fixture SQLite. |
+| 2026-11-15 10:53:18 | `tests/pretes-cbt-pagination-tabs-test.php` | 1-200 | Test Suite Paginasi & Sub-Tabs | Uji otomatis menyeluruh: isolasi sesi live (5) vs selesai (30), kalkulasi total halaman dan offset, pencarian nama dan NIM, helper `buildCbtResultUrl`, parameter controller AJAX, serta verifikasi markup dan CSS. |
+
+**Verifikasi:**
+1. `php tests/pretes-cbt-pagination-tabs-test.php`: PASS (semua 22 asersi validasi paginasi, sub-tab, pencarian, helper URL, markup dan CSS lulus 100%).
+2. `php tests/pretes-cbt-live-monitoring-test.php`: PASS (live monitoring, polling, counter ongoing, dan countdown timer lulus 100%).
+3. `php tests/pretes-cbt-review-test.php`: PASS (review jawaban benar, salah, dan ragu pada pretes resmi & tryout lulus 100%).
+4. `php tests/pretes-cbt-delete-test.php`: PASS (penghapusan attempt individu dan massal lulus 100%).
+5. `php tests/pretes-cbt-export-scope-test.php`: PASS (ekspor resmi, tryout, dan semua lulus 100%).
+6. `php tests/admin-tables-jenis-program-test.php`: PASS (kolom program RPL/Reguler pada seluruh tabel admin lulus 100%).
+7. `php tests/user-profile-avatar-menu-test.php`: PASS (avatar foto profil dan menu profil/pengaturan lulus 100%).
+8. `php tests/pretes-peserta-pdf-test.php`: PASS (ekspor PDF peserta pretes lulus 100%).
+9. `php tests/theme-emerald-royale-test.php`: PASS (standar visual tema Emerald Royale lulus 100%).
+10. Lint PHP (`php -l`): 0 syntax errors detected pada seluruh berkas yang dimodifikasi.
+
+**Penerapan:** commit `Add pagination and separate live monitoring vs completed results in CBT admin view`; push lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 10:08:00 +0700 — Foto profil ketat dan acuan verifikasi ujian terpadu
 
 **ID:** PROFILE-STRICT-PHOTO-EXAM-REFERENCE · **Parent Git:** `23ab300`.

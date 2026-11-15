@@ -1079,3 +1079,35 @@ function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null, string 
         throw $e;
     }
 }
+
+if (!function_exists('buildCbtResultUrl')) {
+    function buildCbtResultUrl(array $overrides = []): string {
+        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page;
+        $params = [
+            'cbt_bank' => 1,
+            'tab' => 'results'
+        ];
+        $mergedStatus = $overrides['status_filter'] ?? ($statusFilter ?? 'all');
+        if ($mergedStatus !== 'all') {
+            $params['status_filter'] = $mergedStatus;
+        }
+        $mergedResult = $overrides['result_filter'] ?? ($resultFilter ?? 'all');
+        if ($mergedResult !== 'all') {
+            $params['result_filter'] = $mergedResult;
+        }
+        $mergedQ = array_key_exists('q', $overrides) ? $overrides['q'] : ($searchQuery ?? '');
+        if ($mergedQ !== '') {
+            $params['q'] = $mergedQ;
+        }
+        $mergedPerPage = array_key_exists('per_page', $overrides) ? (int)$overrides['per_page'] : (int)($perPage ?? 25);
+        if ($mergedPerPage !== 25) {
+            $params['per_page'] = $mergedPerPage;
+        }
+        $mergedPage = array_key_exists('page', $overrides) ? (int)$overrides['page'] : (int)($page ?? 1);
+        if ($mergedPage > 1) {
+            $params['page'] = $mergedPage;
+        }
+        $base = defined('BASE_URL') ? BASE_URL : '';
+        return $base . '/pretes-ujian.php?' . http_build_query($params);
+    }
+}
