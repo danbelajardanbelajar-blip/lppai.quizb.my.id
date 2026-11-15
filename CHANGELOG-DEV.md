@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 09:03:58 +0700 — Ikon pengguna pada tabel Kelola Pengguna
+
+**ID:** USERS-TABLE-USER-ICON · **Parent Git:** `cb3185a`.
+**Permintaan:** tampilkan ikon user pada tabel Kelola Pengguna. Ikon siluet SVG ditempatkan di samping nama, berbentuk lingkaran 32px, tanpa kolom tambahan atau perubahan indeks DataTables.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 09:01:56 | `admin/ajax-users.php` | 141-144, 259 | Render kolom Nama pada respons AJAX | Gabungkan ikon pengguna SVG dekoratif (aria-hidden) dengan nama yang tetap di-escape. Gunakan inline-flex agar ikon sejajar nama dan berukuran tetap. Seluruh role mendapat ikon yang sama. |
+
+**Verifikasi:** `php -l admin/ajax-users.php` dan `git diff --check -- admin/ajax-users.php`: PASS. Uji sekali jalan menjalankan endpoint AJAX aktual dengan fixture PDO SQLite berisi dua pengguna: JSON valid, seluruh baris mempunyai ikon, tetap 11 kolom, nama berupa HTML dirender sebagai teks aman, pencarian Alice dan sorting kolom nama tetap berfungsi. Chrome merender sel respons aktual pada lebar 390px: dua ikon SVG terlihat dengan ukuran wadah 32px, tanpa elemen img dari input nama. Screenshot lokal: `scratch/users-icon-preview/icons.png` (diabaikan Git). Data produksi tidak diubah; tidak ditambahkan suite permanen untuk perubahan tampilan kecil ini.
+**Penerapan:** commit `Show user icons beside names in the user management table`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 08:42:00 +0700 — Ikon Avatar Foto Profil & Dropdown Menu Profil dan Pengaturan Seluruh Role
 
 **ID:** USER-AVATAR-PROFILE-SETTINGS-MENU · **Parent Git:** `ed889f2`.
