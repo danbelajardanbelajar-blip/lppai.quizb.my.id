@@ -5,6 +5,33 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 18:05:43 +0700 — Pendaftaran dashboard untuk seluruh periode aktif
+
+**ID:** ADMIN-DASHBOARD-ALL-ACTIVE-REGISTRATIONS · **Parent Git:** `a8fb91b`.
+**Permintaan:** Bagian Pendaftaran Terbaru menampilkan seluruh periode aktif, termasuk pretes RPL saat tutorial juga aktif.
+
+**Penyebab:** Query master hanya mengambil satu periode aktif per jenis dengan LIMIT 1; tab tutorial menjadi pilihan awal ketika tutorial/pretes aktif bersamaan. Query pendaftaran kosong juga jatuh kembali ke seluruh riwayat sehingga peserta periode lama dapat terlihat sebagai peserta periode aktif.
+
+**Perubahan:** Bagian Pendaftaran Terbaru kini menampilkan satu bagian untuk setiap periode aktif tutorial/pretes secara bersamaan, masing-masing maksimal 10 pendaftaran yang diurutkan menurut waktu pendaftaran dan ID. Periode aktif kosong tetap terlihat; kegagalan query diberi pesan terpisah. Tidak memakai fallback riwayat periode nonaktif. Pencocokan tutorial menormalkan tahun, membatasi semester/gelombang kelas, dan membatasi catatan tanpa tahun berdasarkan semester penuh atau tanggal pembukaan periode. Tautan data lengkap membawa periode/ID gelombang yang sesuai. Ringkasan statistik lain dashboard tetap memakai perilaku semula.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini, atau seluruh baris untuk file baru.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 18:02:28 | `admin/dashboard.php` | 23, 25, 30, 32, 69, 170 | Ambil seluruh master periode aktif; hubungkan daftar pendaftaran ke helper/view bersama; hapus pilihan tab yang menyembunyikan pretes. |
+| 2026-11-15 18:02:26 | `includes/admin-dashboard-registrations.php` | 1–49 | adminDashboardRegistrationGroups: query terisolasi per periode, urut waktu daftar dan ID, LIMIT 10 per periode, validasi tahun/semester/gelombang tutorial dan catatan lama tanpa tahun. |
+| 2026-11-15 18:04:07 | `includes/admin-dashboard-registrations-view.php` | 1–150 | Semua bagian tutorial/pretes aktif terlihat bersamaan; indikator aktif, tabel, status kosong/error, tautan profil dan tautan data lengkap sesuai periode. |
+| 2026-11-15 18:04:55 | `tests/admin-dashboard-active-period-test.php` | 2, 16, 86, 97 | Ganti pemeriksaan string/assert dengan pengujian SQLite nyata dan render controller dashboard; lima periode aktif, RPL/Reguler, nilai batas 10, urutan waktu, semester, escaping, tautan dan kegagalan query. |
+| 2026-11-15 18:05:43 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-DASHBOARD-ALL-ACTIVE-REGISTRATIONS dan hasil verifikasi. |
+
+**Verifikasi:** PHP lint ketiga file PHP aplikasi dan file pengujian; `php tests/admin-dashboard-active-period-test.php`; `git diff --check` pada file dalam cakupan. Uji nyata SQLite/render membuktikan lima periode tampil bersamaan, pretes RPL dan Reguler tidak saling menggantikan, periode nonaktif tidak muncul, batas 10 berlaku per periode, urut timestamp mendahului ID, normalisasi tahun dan semester, catatan lama tidak salah periode, pesan kosong/error, escaping nama serta tautan profil/data lengkap. Controller dashboard asli dijalankan dengan dependency auth/header/footer fixture dan database query-only; guard admin terpanggil dan tidak ada warning/error aplikasi pada render tersebut. Log missing-table saat skenario kegagalan query adalah hasil pengujian yang disengaja. Pemeriksaan akhir diulang sebelum push.
+
+**Batas verifikasi:** Tidak mengakses akun/database hosting produksi; perubahan dipastikan melalui fixture lokal. PHP CLI masih memiliki peringatan konfigurasi OpenSSL dimuat dua kali. Push GitHub tidak membuktikan deployment hosting. Perubahan workspace pada `admin/users.php`, `admin/ajax-users.php` serta `.claude/` berada di luar paket ini dan tidak disertakan.
+
+**Pelacakan:** Commit memakai ID entri ini. Tidak ada perubahan skema/data produksi.
+
+---
+
 ## 2026-11-15 17:26:28 +0700 — Sembunyikan kolom Status Hadir, Username Tes, dan Password Tes pada tabel peserta pretes
 
 **ID:** PRETES-PESERTA-HIDE-COLUMNS · **Parent Git:** `f1d15f2`.
