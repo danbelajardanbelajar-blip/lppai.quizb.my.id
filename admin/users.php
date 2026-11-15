@@ -645,6 +645,44 @@ window.toggleUserPass = function(btn) {
     }
 };
 
+// Salin password ke clipboard (klik teks password atau tombol 📋 Salin). Tetap bekerja saat password tertutup.
+window.copyUserPass = function(el) {
+    var box = el.closest('.user-pass-box');
+    var textEl = box ? box.querySelector('.pass-text') : null;
+    if (!textEl) return;
+    var pass = textEl.getAttribute('data-pass') || '';
+    var copyBtn = box.querySelector('.btn-copy-pass');
+    var done = function(ok) {
+        var msg = ok ? 'Password disalin ke clipboard.' : 'Gagal menyalin otomatis. Tampilkan password lalu salin manual.';
+        if (typeof showToast === 'function') showToast(msg, ok ? 'success' : 'danger', 2500);
+        if (ok && copyBtn) {
+            var old = copyBtn.innerHTML;
+            copyBtn.innerHTML = '✅ Tersalin';
+            copyBtn.style.background = '#dcfce7';
+            setTimeout(function() { copyBtn.innerHTML = old; copyBtn.style.background = '#e2e8f0'; }, 1600);
+        }
+    };
+    var fallback = function() {
+        try {
+            var ta = document.createElement('textarea');
+            ta.value = pass;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            var ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            done(ok);
+        } catch (e) { done(false); }
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(pass).then(function() { done(true); }, fallback);
+    } else {
+        fallback();
+    }
+};
+
 window.openUserModal = function(id, nama, email, noHp, prodi, jenisProgram, tmptLahir, tglLahir, angkatan, role) {
     document.getElementById('edit_user_id').value            = id;
     document.getElementById('edit_user_nama').value          = nama;

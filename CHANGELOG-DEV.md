@@ -32,6 +32,27 @@ Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris mer
 
 ---
 
+## 2026-11-15 18:05:08 +0700 — Kolom password Kelola Pengguna: tertutup, tombol mata, tombol Salin, klik = salin otomatis
+
+**ID:** USERS-PASSWORD-COPY · **Parent Git:** `a8fb91b`.
+**Permintaan:** Pada halaman Kelola Pengguna, beri menu klik yang otomatis menyimpan password user ke clipboard; password tertutup oleh mata, diklik tampil, dan ada tombol copy di sebelahnya.
+
+**Catatan penting:** password di database tersimpan sebagai **hash** (tidak dapat dibaca balik). Yang dapat ditampilkan/disalin hanya **password bawaan** (tanggal lahir `ddmmyyyy`, atau `123456` bila tanpa tanggal lahir). Karena itu server mencocokkan password bawaan dengan hash: bila pengguna sudah menggantinya, kolom menampilkan **"🔒 Sudah diganti"** (tanpa tombol salin) agar admin tidak menyalin password yang salah.
+
+Waktu edit = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/ajax-users.php` | 2026-11-15 18:03:52 | 169–175 | Data password per baris | `$passStatus`: `default` (bawaan masih berlaku) / `changed` (sudah diganti) via `password_verify`, dibatasi halaman ≤ 25 baris (±100 ms/pengguna); selain itu `unknown`. |
+| `admin/ajax-users.php` | 2026-11-15 18:03:52 | 230–241 | Kolom Aksi › kotak password | `•••` tertutup; teks password `role=button` → klik/Enter = salin; 👁️ tampil/sembunyi; tombol **📋 Salin**; bingkai hijau bila bawaan terverifikasi, keterangan "belum dicek" bila tidak diverifikasi; status `changed` → badge "🔒 Sudah diganti" tanpa nilai/tombol salin. |
+| `admin/users.php` | 2026-11-15 18:03:52 | 648–685 | JS `copyUserPass()` | Salin `data-pass` (tetap bisa saat tertutup) via `navigator.clipboard` + fallback `execCommand('copy')`; toast "Password disalin ke clipboard." dan tombol berubah "✅ Tersalin" 1,6 detik. |
+| `tests/users-password-copy-test.php` (baru) | 2026-11-15 18:05:08 | 1–45 | Test | Render 3 status kotak password, tombol mata/salin/klik-salin, logika `password_verify`, batas 25 baris, JS clipboard + fallback. |
+
+**Verifikasi:** `php -l` OK (3 file); `git diff --check` OK; `tests/users-password-copy-test.php` PASS; `tests/users-table-photo-test.py` & `tests/admin-user-profile-test.py` PASS (merender `ajax-users.php` aktual); `tests/user-profile-avatar-menu-test.php` PASS; uji browser harness (markup & JS asli): tertutup ••••••••, Salin saat tertutup menyalin `01031990`, tombol → "✅ Tersalin", 👁️ tampil/🙈 sembunyi, klik teks & Enter menyalin, status diganti tanpa tombol salin.
+**Keterbatasan:** `tests/user-jenis-program-test.php` gagal pada `admin/dashboard.php` akibat perubahan sesi lain yang belum di-commit di working tree (HEAD: 6 rujukan `jenis_program`, working tree: 0) — bukan bagian paket ini dan tidak ikut di-commit.
+
+---
+
 ## 2026-11-15 17:26:28 +0700 — Sembunyikan kolom Status Hadir, Username Tes, dan Password Tes pada tabel peserta pretes
 
 **ID:** PRETES-PESERTA-HIDE-COLUMNS · **Parent Git:** `f1d15f2`.

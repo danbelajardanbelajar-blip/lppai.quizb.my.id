@@ -166,6 +166,13 @@ foreach ($data as $row) {
     }
     $safePass = htmlspecialchars($passwordLogin, ENT_QUOTES, 'UTF-8');
     $maskPass = str_repeat('•', strlen($passwordLogin));
+    // Password tersimpan sebagai hash → yang bisa ditampilkan hanya password BAWAAN (tgl lahir / 123456).
+    // Cocokkan dengan hash agar admin tahu bila pengguna sudah menggantinya (dibatasi ≤ 25 baris/halaman
+    // karena password_verify berbiaya ±100 ms per pengguna).
+    $passStatus = 'unknown';
+    if ($length > 0 && $length <= 25 && !empty($row['password'])) {
+        $passStatus = password_verify($passwordLogin, (string)$row['password']) ? 'default' : 'changed';
+    }
     
     // Role badge
     $badgeClass = 'badge-primary';
@@ -220,11 +227,18 @@ foreach ($data as $row) {
             data-confirm="Reset password ke tanggal lahir (ddmmyyyy)?">🔑 Reset Pass</button>
     </form>';
 
-    // Password Box (Hide with eye toggle) di sebelah Reset Pass
-    $aksi .= '<span class="user-pass-box" style="display:inline-flex; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:3px 7px; font-family:monospace; font-size:12px; margin-right:4px; vertical-align:middle; gap:4px;" title="Password Login">'
-        . '<span class="pass-text" data-pass="' . $safePass . '" style="min-width:60px; text-align:center; font-weight:700; color:#334155; user-select:all; letter-spacing:1px;">' . $maskPass . '</span>'
-        . '<button type="button" class="btn-toggle-pass" onclick="toggleUserPass(this)" style="background:none; border:none; cursor:pointer; padding:0; font-size:13px; line-height:1; color:#64748b; display:inline-flex; align-items:center;" title="Tampilkan/Sembunyikan Password">👁️</button>'
-        . '</span>';
+    // Password Box: tertutup (•••), 👁️ tampilkan/sembunyikan, 📋 salin, klik teks = salin otomatis
+    if ($passStatus === 'changed') {
+        $aksi .= '<span class="user-pass-box is-changed" title="Pengguna sudah mengganti password. Password baru tidak dapat dilihat (tersimpan terenkripsi); gunakan Reset Pass bila perlu."'
+            . ' style="display:inline-flex; align-items:center; background:#fff7ed; border:1px solid #fdba74; border-radius:6px; padding:3px 8px; font-size:11.5px; font-weight:700; color:#9a3412; margin-right:4px; vertical-align:middle;">🔒 Sudah diganti</span>';
+    } else {
+        $passHint = $passStatus === 'default' ? 'Password bawaan masih berlaku' : 'Password bawaan (tgl lahir ddmmyyyy / 123456) — belum dicek apakah sudah diganti';
+        $aksi .= '<span class="user-pass-box" data-status="' . $passStatus . '" style="display:inline-flex; align-items:center; background:#f8fafc; border:1px solid ' . ($passStatus === 'default' ? '#86efac' : '#cbd5e1') . '; border-radius:6px; padding:3px 7px; font-family:monospace; font-size:12px; margin-right:4px; vertical-align:middle; gap:5px;" title="' . $passHint . '">'
+            . '<span class="pass-text" data-pass="' . $safePass . '" role="button" tabindex="0" onclick="copyUserPass(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();copyUserPass(this);}" style="min-width:60px; text-align:center; font-weight:700; color:#334155; letter-spacing:1px; cursor:copy;" title="Klik untuk menyalin password">' . $maskPass . '</span>'
+            . '<button type="button" class="btn-toggle-pass" onclick="toggleUserPass(this)" aria-label="Tampilkan password" style="background:none; border:none; cursor:pointer; padding:0; font-size:13px; line-height:1; color:#64748b; display:inline-flex; align-items:center;" title="Tampilkan/Sembunyikan Password">👁️</button>'
+            . '<button type="button" class="btn-copy-pass" onclick="copyUserPass(this)" aria-label="Salin password" style="background:#e2e8f0; border:none; border-radius:4px; cursor:pointer; padding:1px 6px; font-size:11px; line-height:1.4; color:#1e293b; font-family:inherit; display:inline-flex; align-items:center; gap:3px;" title="Salin password ke clipboard">📋 Salin</button>'
+            . '</span>';
+    }
     
     // Login As & Delete (if not current user)
     if ($id != $_SESSION['user_id']) {
