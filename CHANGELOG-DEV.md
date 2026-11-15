@@ -5,6 +5,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 07:04:08 +0700 — Sembunyikan aktivitas username zainulhakim pada halaman log
+
+**ID:** ACTIVITY-LOG-HIDE-ZAINULHAKIM · **Parent Git:** `e66befe`.
+**Permintaan:** jangan tampilkan aktivitas username zainulhakim di admin/log-aktivitas.php. Filter diterapkan pada baris login/klik, jumlah hari ini dan total; catatan tidak dikirim ke tabel HTML sehingga pencarian tabel juga tidak menampilkannya. Tidak menghapus riwayat atau menonaktifkan pencatatan aktivitas akun tersebut.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 07:02:04 | `admin/log-aktivitas.php` | 15-20 | Filter tampilan halaman admin | Teruskan username zainulhakim ke query daftar login, klik dan seluruh statistik; log asli tetap disimpan. |
+| 2026-11-15 07:03:29 | `includes/activity-logger.php` | 245, 257, 283, 307 | Query baca dan statistik log | Tambah filter username opsional yang memakai prepared parameters, pencocokan case-insensitive/trim pada snapshot log dan akun user_id. Terapkan sebelum LIMIT serta pada hitungan hari ini/total. Panggilan tanpa filter tetap mengembalikan data lengkap; fungsi pencatatan INSERT tidak diubah. |
+| 2026-11-15 07:03:06 | `tests/activity-log-visibility-test.py` | 1-95 | Regresi query dan render halaman aktual | Fixture 123 login dan 123 klik: uji username normal/kapital/spasi, snapshot lama/NULL milik user target, akun mirip dan anonim tetap terlihat, 120 log tersembunyi tidak menghabiskan LIMIT, empat statistik konsisten, binding aman, default tanpa filter, empty states, serta dump database tidak berubah setelah pembacaan. |
+
+**Verifikasi:** `python tests/activity-log-visibility-test.py`, lint 2 file PHP dan `git diff --check` pada file perubahan ini: PASS. Test menjalankan query helper dan render halaman admin aktual di fixture PDO SQLite terisolasi; DDL bootstrap MySQL yang tidak relevan diisolasi, data produksi tidak diubah. Data yang terlihat tepat 3 login/3 klik (2 hari ini), sementara tanpa filter tetap 123/123. Setelah hanya log target tersisa, kedua empty state dan statistik nol tampil dengan benar. Dump seluruh database sesudah membaca/render sama dengan sebelum membaca. Peringatan openssl ganda berasal dari konfigurasi PHP lokal yang sudah ada.
+**Penerapan:** commit `Hide selected username from activity log display and counters`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 06:52:30 +0700 — Penambahan Kolom Program (RPL / Reguler) pada Seluruh Halaman Tabel Role Admin
 
 **ID:** ADMIN-TABLES-PROGRAM-COLUMN · **Parent Git:** `84d0602`.

@@ -12,11 +12,12 @@ $pdo = getDBConnection();
 ensureActivityLogTablesExist($pdo);
 
 // Ambil Statistik Aktivitas
-$activityStats = getActivityLogStats();
+$excludedActivityUsername = 'zainulhakim';
+$activityStats = getActivityLogStats($excludedActivityUsername);
 
 // Ambil Data Riwayat Login & Klik Terbaru
-$recentLogins = getRecentLoginLogs(100);
-$recentClicks = getRecentClickLogs(200);
+$recentLogins = getRecentLoginLogs(100, $excludedActivityUsername);
+$recentClicks = getRecentClickLogs(200, $excludedActivityUsername);
 
 // Helper badge renderer
 function renderRoleBadge($role) {

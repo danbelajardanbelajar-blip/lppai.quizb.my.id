@@ -240,21 +240,36 @@ function recordClickLog(array $data) {
 }
 
 /**
- * Ambil data log login terbaru
+ * Filter pembacaan log berdasarkan username tersimpan atau akun pemilik; tidak mengubah pencatatan.
  */
-function getRecentLoginLogs($limit = 50) {
+function activityLogUsernameFilter(string $alias, ?string $excludedUsername): array {
+    $username = strtolower(trim((string)$excludedUsername));
+    if ($username === '') return ['sql' => '', 'params' => []];
+    return [
+        'sql' => " AND LOWER(TRIM(COALESCE($alias.username, ''))) <> :excluded_log_username
+            AND NOT EXISTS (SELECT 1 FROM users hidden_user WHERE hidden_user.id = $alias.user_id
+                AND LOWER(TRIM(hidden_user.username)) = :excluded_account_username)",
+        'params' => ['excluded_log_username' => $username, 'excluded_account_username' => $username],
+    ];
+}
+
+/** Ambil data log login terbaru, dengan filter tampilan opsional. */
+function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
     try {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 50;
-        $stmt = $pdo->query("
+        $filter = activityLogUsernameFilter('l', $excludedUsername);
+        $stmt = $pdo->prepare("
             SELECT l.*, COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp
             FROM user_login_logs l
             LEFT JOIN users u ON (l.user_id = u.id OR (l.user_id IS NULL AND l.username = u.username))
+            WHERE 1 = 1 {$filter['sql']}
             ORDER BY l.created_at DESC 
             LIMIT $lim
         ");
+        $stmt->execute($filter['params']);
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Exception $e) {
         error_log("Error getRecentLoginLogs: " . $e->getMessage());
@@ -265,17 +280,20 @@ function getRecentLoginLogs($limit = 50) {
 /**
  * Ambil data log klik terbaru
  */
-function getRecentClickLogs($limit = 100) {
+function getRecentClickLogs($limit = 100, ?string $excludedUsername = null) {
     try {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 100;
-        $stmt = $pdo->query("
-            SELECT * FROM user_click_logs 
-            ORDER BY created_at DESC 
+        $filter = activityLogUsernameFilter('c', $excludedUsername);
+        $stmt = $pdo->prepare("
+            SELECT c.* FROM user_click_logs c
+            WHERE 1 = 1 {$filter['sql']}
+            ORDER BY c.created_at DESC
             LIMIT $lim
         ");
+        $stmt->execute($filter['params']);
         return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
     } catch (Exception $e) {
         error_log("Error getRecentClickLogs: " . $e->getMessage());
@@ -286,22 +304,27 @@ function getRecentClickLogs($limit = 100) {
 /**
  * Ambil statistik ringkasan log aktivitas
  */
-function getActivityLogStats() {
+function getActivityLogStats(?string $excludedUsername = null) {
     try {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
         $today = date('Y-m-d');
+        $filter = activityLogUsernameFilter('l', $excludedUsername);
 
-        $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs WHERE DATE(created_at) = :today");
-        $stmt1->execute(['today' => $today]);
+        $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs l WHERE DATE(l.created_at) = :today {$filter['sql']}");
+        $stmt1->execute(['today' => $today] + $filter['params']);
         $loginToday = (int)$stmt1->fetchColumn();
 
-        $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM user_click_logs WHERE DATE(created_at) = :today");
-        $stmt2->execute(['today' => $today]);
+        $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM user_click_logs l WHERE DATE(l.created_at) = :today {$filter['sql']}");
+        $stmt2->execute(['today' => $today] + $filter['params']);
         $clickToday = (int)$stmt2->fetchColumn();
 
-        $totalLogin = (int)$pdo->query("SELECT COUNT(*) FROM user_login_logs")->fetchColumn();
-        $totalClick = (int)$pdo->query("SELECT COUNT(*) FROM user_click_logs")->fetchColumn();
+        $stmtTotalLogin = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs l WHERE 1 = 1 {$filter['sql']}");
+        $stmtTotalLogin->execute($filter['params']);
+        $totalLogin = (int)$stmtTotalLogin->fetchColumn();
+        $stmtTotalClick = $pdo->prepare("SELECT COUNT(*) FROM user_click_logs l WHERE 1 = 1 {$filter['sql']}");
+        $stmtTotalClick->execute($filter['params']);
+        $totalClick = (int)$stmtTotalClick->fetchColumn();
 
         return [
             'login_today' => $loginToday,
