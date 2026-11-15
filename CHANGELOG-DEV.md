@@ -5,12 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 17:26:28 +0700 — Sembunyikan kolom Status Hadir, Username Tes, dan Password Tes pada tabel peserta pretes
+
+**ID:** PRETES-PESERTA-HIDE-COLUMNS · **Parent Git:** `f1d15f2`.
+**Permintaan:** Pada halaman https://lppai.quizb.my.id/admin/pretes-peserta.php sembunyikan kolom ini (gambar: Status Hadir, Username Tes, Password Tes).
+
+**Perubahan:**
+1. Merampingkan tabel peserta pretes (`#table-peserta-pretes`) dengan menyembunyikan 3 kolom: `Status Hadir`, `Username Tes`, dan `Password Tes` dari `<thead>` dan `<tbody>` sehingga tabel lebih ringkas, fokus, dan rapi (7 kolom: No, Nama, NIM, Prodi, Program, Hari / Periode, Aksi).
+2. Menyematkan atribut `data-status` dan `data-cred` pada setiap baris `<tr>` tabel.
+3. Memperbarui `setupPretesFilters()` dan `applyPretesFilters()` pada DataTables `ext.search` agar dropdown filter Status Hadir (`#filter-status`) dan Status Credentials (`#filter-cred`) tetap berfungsi menyaring baris secara akurat tanpa memicu error out-of-bounds pada `dt.column(6)` atau `dt.column(7)`.
+4. Memindahkan input perubahan Status Kehadiran (`terdaftar`, `hadir`, `tidak_hadir`) ke dalam modal interaktif `✏️ Edit Data & Credentials Peserta` (`#modal-edit-cred`) dan memperbarui handler POST `action=set_credential` agar fungsionalitas admin mengubah status kehadiran peserta tetap dapat diakses dengan mudah dan aman.
+5. Menambahkan test suite baru `tests/pretes-peserta-columns-test.php` untuk validasi otomatis.
+
+Waktu edit berikut adalah **penyimpanan terakhir file** (WIB sampai detik). Baris merujuk awal blok perubahan pada snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 183, 196–199 | Handler POST `action=set_credential` mendukung pembaruan kolom `status` ke database. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 885–886 | `<thead>`: Menyembunyikan kolom `Status Hadir`, `Username Tes`, dan `Password Tes`. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 893, 938 | `<tbody>`: Menambahkan `data-status` & `data-cred` ke `<tr>`; menghapus 3 `<td>` kolom yang disembunyikan. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 953 | Tombol `btn-edit-cred`: menambahkan `data-status` untuk modal edit. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 1007–1015 | Modal `#modal-edit-cred`: Menambahkan form select `Status Kehadiran`. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 1090, 1096–1098, 1128 | JS: Handler `openEditModal` & delegasi event klik untuk membawa nilai status. |
+| 2026-11-15 17:25:20 | `admin/pretes-peserta.php` | 1202, 1263–1275 | JS: `applyPretesFilters` & `setupPretesFilters` DataTables `ext.search` filter via `data-status` & `data-cred`. |
+| 2026-11-15 17:25:55 | `tests/pretes-peserta-columns-test.php` | 1–85 | File test baru: Verifikasi kolom disembunyikan, 7 kolom utama terjaga, DataTables filter aman, dan modal status aktif. |
+
+**Alasan:** Tampilan tabel peserta pretes sebelumnya terlalu lebar dan padat dengan dropdown status hadir dan kode akses credential pada setiap baris. Menyembunyikan ketiga kolom ini membuat tabel jauh lebih bersih dan mudah dibaca pada layar monitor maupun laptop, sementara pengaturan kredensial dan kehadiran tetap tersedia di modal edit dan filter pencarian tetap aktif.
+**Dampak:** Kolom tabel pretes menjadi 7 kolom. Data di database tidak berubah. Filter bar dan tombol ekspor tetap bekerja 100%.
+**Verifikasi:**
+- `php -l admin/pretes-peserta.php` -> 0 syntax error.
+- `php tests/pretes-peserta-columns-test.php` -> PASS (100% dari 15 assertions lulus).
+- `php tests/admin-tables-jenis-program-test.php` -> PASS (100% lulus).
+- `php tests/pretes-target-program-test.php` -> PASS (100% lulus).
+- `php tests/pretes-peserta-pdf-test.php` -> PASS (100% lulus).
+- `php tests/pretes-foto-verifikasi-test.php` -> PASS (100% lulus).
+- `python tests/admin-user-profile-test.py` -> PASS (100% lulus).
+
+---
+
 ## 2026-11-15 17:24:35 +0700 — Kelengkapan profil pengguna admin dan alur verifikasi Git
 
 **ID:** ADMIN-PROFILE-COMPLETE · **Parent Git:** `6523501`.
 **Permintaan:** Tampilkan status pretes/tutorial, kelas, ikon/foto profil, kelulusan dan tidak lulus secara lengkap; verifikasi sebelum setiap push, lakukan pull/push, dan dokumentasikan perubahan secara sistematis.
 
-**Perubahan:** Profil admin menampilkan seluruh riwayat milik akun tujuan, rincian kelas/jadwal/penguji/dosen, 12 komponen nilai pretes, nilai tutorial, hasil resmi pretes, nomor sertifikat, serta keterangan ketika sumber data tidak tersedia. Status pendaftaran, hasil penilaian, dan hasil resmi dipisahkan agar data yang berbeda tidak tercampur. Foto menggunakan akun yang dilihat dengan cadangan pasfoto pretes tanpa membaca atau mengubah foto sesi admin. Riwayat dan kelas dosen tidak lagi dibatasi 50 baris. `AGENTS.md` menyimpan alur kerja yang diminta pengguna untuk pekerjaan berikutnya.
+**Perubahan:**Profil admin menampilkan seluruh riwayat milik akun tujuan, rincian kelas/jadwal/penguji/dosen, 12 komponen nilai pretes, nilai tutorial, hasil resmi pretes, nomor sertifikat, serta keterangan ketika sumber data tidak tersedia. Status pendaftaran, hasil penilaian, dan hasil resmi dipisahkan agar data yang berbeda tidak tercampur. Foto menggunakan akun yang dilihat dengan cadangan pasfoto pretes tanpa membaca atau mengubah foto sesi admin. Riwayat dan kelas dosen tidak lagi dibatasi 50 baris. `AGENTS.md` menyimpan alur kerja yang diminta pengguna untuk pekerjaan berikutnya.
 
 Waktu edit berikut adalah **penyimpanan terakhir file** yang tersedia, bukan rekonstruksi setiap penekanan tombol. Baris merujuk awal blok perubahan (atau seluruh file baru) pada snapshot commit entri ini. Semua waktu WIB sampai detik.
 
@@ -36,7 +74,7 @@ Waktu edit berikut adalah **penyimpanan terakhir file** yang tersedia, bukan rek
 **ID:** ADMIN-PROFILE-ALL-TABLES · **Parent Git:** `af56086`.
 **Permintaan:** Semua tabel yang menampilkan nama pengguna pada halaman web role admin dapat membuka profil pengguna.
 
-**Perubahan:** Renderer bersama hanya membuat tautan untuk admin. Tabel peserta, tutorial, hasil CBT, rekap nilai, log aktivitas, sertifikat, absensi dan halaman cetak HTML memakai `users.id`/`user_id` yang sesuai; query berbasis NIM menambahkan alias `profile_user_id`. Nama dosen/jadwal lama tanpa ID memakai halaman pemilih akun berdasarkan nama lengkap (nama kembar tidak dipilih secara acak). Tidak memakai ID pendaftaran, kelas, atau attempt sebagai ID pengguna. Enhancer memantau tabel seluruh body termasuk modal/badge/AJAX, dan melewati tautan/kontrol yang sudah ada. Payload live-results membawa user_id dan renderer mempertahankan tautan setelah refresh. Data Excel/CSV tetap berupa teks.
+**Perubahan:**Renderer bersama hanya membuat tautan untuk admin. Tabel peserta, tutorial, hasil CBT, rekap nilai, log aktivitas, sertifikat, absensi dan halaman cetak HTML memakai `users.id`/`user_id` yang sesuai; query berbasis NIM menambahkan alias `profile_user_id`. Nama dosen/jadwal lama tanpa ID memakai halaman pemilih akun berdasarkan nama lengkap (nama kembar tidak dipilih secara acak). Tidak memakai ID pendaftaran, kelas, atau attempt sebagai ID pengguna. Enhancer memantau tabel seluruh body termasuk modal/badge/AJAX, dan melewati tautan/kontrol yang sudah ada. Payload live-results membawa user_id dan renderer mempertahankan tautan setelah refresh. Data Excel/CSV tetap berupa teks.
 
 Waktu adalah penyimpanan terakhir file (WIB sampai detik). Nomor baris adalah awal blok perubahan pada snapshot entri ini.
 
@@ -1100,7 +1138,7 @@ Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris mer
 ## 2026-11-14 15:53:34 +0700 — Opsi tindih plotting jadwal tutorial
 
 **ID:** TUTORIAL-GENERATE-OVERWRITE · **Parent Git:** `be7af6f`.
-**Perubahan:** tambahkan “Tindih plotting jadwal yang telah ada”. Tanpa centang plotting lama dipertahankan; dengan centang susun ulang peserta terdaftar/aktif pada periode halaman pengaturan. Dosen/ruangan diatur ulang melalui alur generate dan pilih ruangan. Data periode lain serta peserta lulus/tidak_lulus/mengundurkan_diri tidak diubah.
+**Perubahan:**tambahkan “Tindih plotting jadwal yang telah ada”. Tanpa centang plotting lama dipertahankan; dengan centang susun ulang peserta terdaftar/aktif pada periode halaman pengaturan. Dosen/ruangan diatur ulang melalui alur generate dan pilih ruangan. Data periode lain serta peserta lulus/tidak_lulus/mengundurkan_diri tidak diubah.
 
 Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik). Nomor baris merujuk snapshot commit entri ini.
 
@@ -1119,7 +1157,7 @@ Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik). Nomor baris mer
 ## 2026-11-14 09:28:18 +0700 — Perjelas kewajiban wajah menghadap kamera
 
 **ID:** CBT-FACE-FORWARD-INSTRUCTION · **Parent Git:** `c49165c`.
-**Perubahan:** instruksi popup wajah tidak terdeteksi/tidak cocok menjadi “Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.” Peringatan penyebab lain tidak diubah.
+**Perubahan:**instruksi popup wajah tidak terdeteksi/tidak cocok menjadi “Hadapkan wajah lurus ke kamera dan pastikan seluruh wajah terlihat.” Peringatan penyebab lain tidak diubah.
 
 Waktu edit WIB sampai detik; baris merujuk snapshot commit entri ini.
 

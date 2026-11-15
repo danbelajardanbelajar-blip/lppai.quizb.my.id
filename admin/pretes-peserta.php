@@ -180,6 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $username = trim($_POST['username_tes'] ?? '');
             $password = trim($_POST['password_tes'] ?? '');
             $hari     = trim($_POST['hari_pilihan'] ?? '');
+            $status   = trim($_POST['status'] ?? '');
             $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
             if ($regId <= 0) {
@@ -191,6 +192,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (in_array($hari, $validDays)) {
                     $updates[] = "hari_pilihan = ?";
                     $params[] = $hari;
+                }
+                if (in_array($status, ['terdaftar', 'hadir', 'tidak_hadir'])) {
+                    $updates[] = "status = ?";
+                    $params[] = $status;
                 }
                 if ($username !== '') {
                     $updates[] = "username_tes = ?";
@@ -880,16 +885,13 @@ include __DIR__ . '/../includes/header.php';
                         <th>Prodi</th>
                         <th>Program</th>
                         <th>Hari / Periode</th>
-                        <th>Status Hadir</th>
-                        <th style="min-width:140px;">Username Tes</th>
-                        <th style="min-width:120px;">Password Tes</th>
                         <th style="min-width:160px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($participants as $i => $p): ?>
                     <?php $rowJenis = normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'); ?>
-                    <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>">
+                    <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>" data-status="<?= sanitize($p['status'] ?? 'terdaftar') ?>" data-cred="<?= !empty($p['username_tes']) ? 'has_cred' : 'no_cred' ?>">
                         <td><?= $i + 1 ?></td>
                         <td data-search="<?= sanitize($p['nama_lengkap']) ?>">
                             <div style="display:flex; align-items:center; gap:10px;">
@@ -936,57 +938,7 @@ include __DIR__ . '/../includes/header.php';
                                 <div style="font-size:11px;color:#475569;margin-top:3px;"><?= sanitize($p['periode']) ?></div>
                             <?php endif; ?>
                         </td>
-                        <td data-order="<?= sanitize($p['status']) ?>" data-search="<?= sanitize($p['status']) ?>">
-                            <!-- Dropdown status hadir -->
-                            <form method="POST" style="display:inline;">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action"  value="update_status">
-                                <input type="hidden" name="reg_id"  value="<?= $p['reg_id'] ?>">
-                                <select name="status" onchange="this.form.submit()"
-                                    style="padding:4px 8px;border-radius:6px;border:1px solid #ddd;font-size:12px;">
-                                    <?php foreach (['terdaftar', 'hadir', 'tidak_hadir'] as $st): ?>
-                                        <option value="<?= $st ?>" <?= $p['status'] === $st ? 'selected' : '' ?>>
-                                            <?= ucfirst(str_replace('_', ' ', $st)) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </form>
-                        </td>
-                        <!-- Username -->
-                        <td data-order="<?= !empty($p['username_tes']) ? 1 : 0 ?>" data-search="<?= !empty($p['username_tes']) ? ('has_cred ' . sanitize($p['username_tes'])) : 'no_cred' ?>">
-                            <?php if (!empty($p['username_tes'])): ?>
-                                <code style="background:#f0f7ff;padding:3px 8px;border-radius:6px;font-size:13px;color:#1a73e8;">
-                                    <?= sanitize($p['username_tes']) ?>
-                                </code>
-                            <?php else: ?>
-                                <span style="color:#ccc;font-size:12px;font-style:italic;">— belum ada —</span>
-                            <?php endif; ?>
-                        </td>
-                        <!-- Password -->
-                        <td>
-                            <?php if (!empty($p['password_tes'])): ?>
-                                <span class="password-cell" style="position:relative;display:inline-flex;align-items:center;gap:6px;">
-                                    <!-- Hidden encoded password -->
-                                    <input type="hidden"
-                                        class="enc-pass-data"
-                                        data-reg-id="<?= $p['reg_id'] ?>"
-                                        value="<?= base64_encode($p['password_tes']) ?>">
-                                    <code id="pass-display-<?= $p['reg_id'] ?>"
-                                        style="background:#fff3e0;padding:3px 8px;border-radius:6px;font-size:13px;color:#e65100;letter-spacing:2px;">
-                                        ••••••
-                                    </code>
-                                    <button type="button"
-                                        id="pass-btn-<?= $p['reg_id'] ?>"
-                                        style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;"
-                                        title="Tampilkan password"
-                                        onclick="openPasswordModal(<?= $p['reg_id'] ?>)">
-                                        👁️
-                                    </button>
-                                </span>
-                            <?php else: ?>
-                                <span style="color:#ccc;font-size:12px;font-style:italic;">— belum ada —</span>
-                            <?php endif; ?>
-                        </td>
+
                         <!-- Aksi -->
                         <td style="white-space:nowrap;">
                             <div style="display:flex;gap:6px;align-items:center;">
@@ -1004,9 +956,10 @@ include __DIR__ . '/../includes/header.php';
                                     data-reg-id="<?= $p['reg_id'] ?>"
                                     data-nama="<?= htmlspecialchars($p['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>"
                                     data-hari="<?= htmlspecialchars($curHari, ENT_QUOTES, 'UTF-8') ?>"
+                                    data-status="<?= htmlspecialchars($p['status'] ?? 'terdaftar', ENT_QUOTES, 'UTF-8') ?>"
                                     data-username="<?= htmlspecialchars($p['username_tes'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                     data-password="<?= htmlspecialchars($p['password_tes'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                    title="Edit Hari Pelaksanaan & Credentials">
+                                    title="Edit Hari, Status & Credentials">
                                     ✏️ Edit
                                 </button>
                                 <!-- Tombol Hapus Peserta -->
@@ -1048,6 +1001,16 @@ include __DIR__ . '/../includes/header.php';
                     <option value="Rabu">Rabu</option>
                     <option value="Kamis">Kamis</option>
                     <option value="Jumat">Jumat</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:600;color:#334155;margin-bottom:6px;display:block;">Status Kehadiran</label>
+                <select name="status" id="modal-status"
+                    style="width:100%;padding:10px 14px;border:2px solid #e0e0e0;border-radius:10px;font-size:14px;background:#fff;color:#1e293b;outline:none;">
+                    <option value="terdaftar">Terdaftar</option>
+                    <option value="hadir">Hadir</option>
+                    <option value="tidak_hadir">Tidak Hadir</option>
                 </select>
             </div>
 
@@ -1124,11 +1087,14 @@ function openPasswordModal(regId) {
 }
 
 // Buka modal edit data peserta & credentials
-function openEditModal(regId, nama, hari, username, password) {
+function openEditModal(regId, nama, hari, status, username, password) {
     document.getElementById('modal-reg-id').value  = regId;
     document.getElementById('modal-name').textContent = 'Peserta: ' + (nama || '');
     if (document.getElementById('modal-hari')) {
         document.getElementById('modal-hari').value = hari || 'Senin';
+    }
+    if (document.getElementById('modal-status')) {
+        document.getElementById('modal-status').value = status || 'terdaftar';
     }
     document.getElementById('modal-username').value  = username || '';
     document.getElementById('modal-password').value  = password || '';
@@ -1159,7 +1125,7 @@ document.addEventListener('click', function(e) {
     const btn = e.target.closest('.btn-edit-cred');
     if (btn) {
         const d = btn.dataset;
-        openEditModal(d.regId, d.nama, d.hari, d.username, d.password);
+        openEditModal(d.regId, d.nama, d.hari, d.status, d.username, d.password);
         return;
     }
     const modal = document.getElementById('modal-edit-cred');
@@ -1233,22 +1199,7 @@ function applyPretesFilters() {
         dt.column(5).search('');
     }
 
-    // Kolom 6: Status Hadir (Exact match jika dipilih)
-    if (statusVal) {
-        dt.column(6).search('^' + $.fn.dataTable.util.escapeRegex(statusVal) + '$', true, false);
-    } else {
-        dt.column(6).search('');
-    }
-
-    // Kolom 7: Credentials (has_cred / no_cred)
-    if (credVal === 'has_cred') {
-        dt.column(7).search('has_cred');
-    } else if (credVal === 'no_cred') {
-        dt.column(7).search('no_cred');
-    } else {
-        dt.column(7).search('');
-    }
-
+    // Status Hadir & Credentials disaring via custom DataTables ext.search (data-status & data-cred pada <tr>)
     dt.draw();
 
     // Sinkronkan badge shortcut distribusi hari
@@ -1307,12 +1258,20 @@ function setupPretesFilters() {
             }
             var rowNode = settings.aoData && settings.aoData[dataIndex] ? settings.aoData[dataIndex].nTr : null;
             if (!rowNode) return true;
-            var wantProdi = ($('#filter-prodi').val() || '').trim();
-            var wantJenis = ($('#filter-jenis-program').val() || '').trim();
+            var wantProdi  = ($('#filter-prodi').val() || '').trim();
+            var wantJenis  = ($('#filter-jenis-program').val() || '').trim();
+            var wantStatus = ($('#filter-status').val() || '').trim();
+            var wantCred   = ($('#filter-cred').val() || '').trim();
             if (wantProdi && (rowNode.getAttribute('data-prodi') || '') !== wantProdi) {
                 return false;
             }
             if (wantJenis && (rowNode.getAttribute('data-jenis') || '') !== wantJenis) {
+                return false;
+            }
+            if (wantStatus && (rowNode.getAttribute('data-status') || '') !== wantStatus) {
+                return false;
+            }
+            if (wantCred && (rowNode.getAttribute('data-cred') || '') !== wantCred) {
                 return false;
             }
             return true;
