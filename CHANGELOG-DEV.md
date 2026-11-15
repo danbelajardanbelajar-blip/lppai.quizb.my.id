@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 12:59:15 +0700 — Perbaikan Deteksi Keterbukaan Mata Pasfoto dan Toleransi Jilbab/Busana Gelap
+
+**ID:** PRETES-PHOTO-EYE-OPENNESS-HIJAB-FIX · **Parent Git:** `9417bd6`.
+**Permintaan:** Mengapa pasfoto mahasiswi berhijab dan berjas almamater resmi gagal pendaftaran pretes dengan pesan "Mata terpejam/tertutup pada pasfoto. Harap gunakan pasfoto dengan kedua mata terbuka jelas menghadap lurus ke kamera", padahal kedua mata di foto terbuka jelas dan memenuhi seluruh syarat?
+**Akar Penyebab Matematis & Algoritmik:**
+1. Kesalahan koordinat landmark vertikal mata: Fungsi `checkEyeOpenness` menggunakan formula `eyeY = r + 0.29 * s`. Karena `r` pada deteksi Pico ML adalah titik tengah wajah (center level hidung), penambahan `+ 0.29 * s` menyebabkan koordinat jatuh ke bawah menuju area bibir/mulut/dagu, bukan area mata. Posisi mata manusia anatomis berada di atas titik tengah wajah (`r - 0.12 * s`).
+2. Kesalahan sampling warna kulit pipi: Formula pipi lama `cheekY = r + 0.65 * s` sampai `r + 0.85 * s` jatuh jauh di bawah dagu, tepat menimpa kain jilbab hitam/kerah busana gelap. Hal ini menyebabkan nilai luminansi dasar kulit `skinLum` anjlok hingga 20.9 (mendekati hitam pekat).
+3. Ambang pupil runtuh: Nilai `skinLum` yang anjlok ke 20.9 menyebabkan ambang batas pupil `pupilThreshold = max(30, skinLum - 25)` terkunci pada 30, sehingga pemindaian pada area mulut (luminansi > 100) tidak menemukan piksel pupil (`darkCount = 0`, `darkRatio = 0`), yang secara mutlak menolak foto mata terbuka sebagai mata terpejam.
+4. Offset fallback: Pemanggilan heuristik fallback menggunakan `fMinY + headH * 0.15` alih-alih titik tengah wajah `fMinY + headH * 0.50`.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 12:54:27 | `assets/js/pretes-face-verifier.js` | 288–348, 717 | Perbaiki `checkEyeOpenness`: reposisi landmark mata ke `r - 0.12 * s` dengan jendela scan vertikal adaptif `inspectEyeAt` (`r - 0.15 * s` s.d. `r - 0.09 * s`), sampling pipi terlindung dari jilbab/busana gelap (`lumVal >= 50`), batas bawah pupil dinamis, serta koreksi titik tengah wajah fallback ke `fMinY + headH * 0.50`. |
+| 2026-11-15 12:55:43 | `pages/pretes-daftar.php` | 583–640, 776 | Selaraskan implementasi inline `checkEyeOpenness` dan panggilan fallback `analyzeCanvasFace` dengan perbaikan koordinat mata adaptif dan perlindungan warna jilbab. |
+| 2026-11-15 12:56:17 | `tests/pretes-foto-eye-openness-test.php` | 1–135 | Test suite baru untuk verifikasi eliminasi koordinat salah, pembersihan sampling dagu/jilbab, dan verifikasi langsung pasfoto riil mahasiswi berhijab hitam (Image 3) yang lulus 100% dengan kedua mata terbuka jelas. |
+
+**Verifikasi:**
+- `php tests/pretes-foto-eye-openness-test.php`: PASS (11/11 assertions).
+- `php tests/pretes-foto-verifikasi-test.php`: PASS.
+- `php -l pages/pretes-daftar.php`: 0 syntax error.
+- `node -c assets/js/pretes-face-verifier.js`: 0 syntax error.
+- Verifikasi langsung pada pasfoto mahasiswi berhijab hitam (Image 3): Kedua mata terdeteksi terbuka jelas (L-contrast: 213, R-contrast: 180, skinLum: 192.5, status: VALID 100%).
+
+**Penerapan:** commit `Fix photo eye openness verification and dark hijab tolerance on pretes registration`; push lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 12:24:07 +0700 — Profil pengguna khusus admin dan tautan nama
 
 **ID:** ADMIN-USER-PROFILE · **Parent Git:** `58c70d0`.
