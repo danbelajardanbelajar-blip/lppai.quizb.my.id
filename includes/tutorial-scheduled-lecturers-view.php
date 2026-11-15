@@ -8,7 +8,8 @@ if (!isset($scheduledLecturerClasses)) {
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <span>👨‍🏫 Dosen Terjadwal Tutorial Aktif</span>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-            <span style="font-size:13px;"><?= count($scheduledLecturerClasses) ?> jadwal kelas</span>
+            <?php $totalScheduledStudents = array_sum(array_map(static fn($r) => (int)($r['jumlah_mahasiswa'] ?? 0), $scheduledLecturerClasses)); ?>
+            <span style="font-size:13px;"><?= count($scheduledLecturerClasses) ?> jadwal kelas · <?= $totalScheduledStudents ?> mahasiswa</span>
             <?php if ($scheduledTutorialPeriod && $scheduledLecturerClasses): ?>
             <a class="btn btn-sm btn-primary" href="tutorial-jadwal-dosen-export.php?gelombang_id=<?= (int)$scheduledTutorialPeriod['id'] ?>" target="_blank" rel="noopener" data-no-spa>Export Jadwal Dosen / PDF</a>
             <?php endif; ?>
@@ -24,7 +25,7 @@ if (!isset($scheduledLecturerClasses)) {
             <?php else: ?>
             <div style="overflow-x:auto;">
                 <table id="scheduledTutorialLecturerTable" style="width:100%;">
-                    <thead><tr><th>No.</th><th>Nama Dosen</th><th>Kelas</th><th>Hari</th><th>Jam</th><th>Ruangan</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>No.</th><th>Nama Dosen</th><th>Kelas</th><th>Hari</th><th>Jam</th><th>Ruangan</th><th>Jml Mahasiswa</th><th>Aksi</th></tr></thead>
                     <tbody>
                     <?php foreach ($scheduledLecturerClasses as $index => $schedule): ?>
                         <tr data-schedule-id="<?= (int)$schedule['id'] ?>">
@@ -34,6 +35,7 @@ if (!isset($scheduledLecturerClasses)) {
                             <td><?= sanitize($schedule['hari'] ?: 'Belum ditentukan') ?></td>
                             <td><?= sanitize($schedule['jam'] ?: 'Belum ditentukan') ?></td>
                             <td><?= sanitize($schedule['ruangan'] ?: 'Belum ditentukan') ?></td>
+                            <td><span class="badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;padding:3px 8px;border-radius:6px;font-size:11.5px;"><?= (int)($schedule['jumlah_mahasiswa'] ?? 0) ?> Mhs</span></td>
                             <td><button type="button" class="btn btn-sm btn-warning" data-edit-tutorial-schedule
                                 data-class-id="<?= (int)$schedule['id'] ?>" data-class-name="<?= sanitize($schedule['nama_kelas']) ?>"
                                 data-day="<?= sanitize($schedule['hari'] ?? '') ?>" data-room="<?= sanitize(trim($schedule['ruangan'] ?? '')) ?>" data-lecturer="<?= sanitize($schedule['dosen_pengampu']) ?>">Edit</button></td>

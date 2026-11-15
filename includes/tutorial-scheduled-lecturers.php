@@ -10,7 +10,9 @@ function tutorialScheduledLecturerClasses(PDO $pdo, array $period, ?int $classId
 {
     $year = str_replace('/', '-', trim($period['tahun_ajaran']));
     $semester = trim($period['semester']);
-    $sql = "SELECT tc.* FROM tutorial_classes tc
+    $sql = "SELECT tc.*, 
+            (SELECT COUNT(*) FROM tutorial_registrations tr WHERE tr.tutorial_class_id = tc.id) AS jumlah_mahasiswa
+        FROM tutorial_classes tc
         WHERE tc.gelombang = ? AND TRIM(COALESCE(tc.dosen_pengampu, '')) <> ''
           AND (REPLACE(TRIM(tc.semester), '/', '-') = ?
             OR (TRIM(tc.semester) = ? AND EXISTS (

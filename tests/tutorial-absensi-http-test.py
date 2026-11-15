@@ -19,7 +19,8 @@ def fixture():
     with tempfile.TemporaryDirectory(prefix='tutorial-absensi-') as directory:
         root = Path(directory)
         for file in ['admin/tutorial-hasil-plotting.php', 'includes/tutorial-absensi-view.php',
-                     'includes/tutorial-absensi-form.php', 'includes/tutorial-scheduled-lecturers.php', 'assets/logo.svg']:
+                     'includes/tutorial-absensi-form.php', 'includes/tutorial-scheduled-lecturers.php',
+                     'includes/user-helper.php', 'assets/logo.svg']:
             target = root / file
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / file, target)
@@ -55,6 +56,7 @@ def fixture():
             db.execute('UPDATE tutorial_registrations SET tahun_ajaran = NULL WHERE id = 1')
             # The old registration must not duplicate the same participant in the current class.
             db.execute("INSERT INTO tutorial_registrations VALUES (100,2,13,'2025-2026','gel1','2025-11-02','gel 1',NULL,NULL,NULL,NULL,NULL,NULL)")
+            db.execute("ALTER TABLE users ADD COLUMN jenis_program TEXT DEFAULT 'Reguler'")
             db.commit()
         (root / 'includes/auth.php').write_text('''<?php
             define('BASE_URL', 'http://' . $_SERVER['HTTP_HOST']);

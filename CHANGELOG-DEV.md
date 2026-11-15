@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 12:15:30 +0700 — Penambahan Jumlah Mahasiswa per Sesi pada Export Jadwal Dosen dan Tabel Admin
+
+**ID:** TUTORIAL-EXPORT-STUDENT-COUNT · **Parent Git:** `87d6394`.
+**Permintaan:** Perbaiki export pada halaman `https://lppai.quizb.my.id/admin/tutorial-hasil-plotting.php` agar menambahkan jumlah mahasiswa per sesi (dosen). Tampilkan jumlah mahasiswa per kelas baik pada berkas PDF / cetak maupun pada tabel Dosen Terjadwal Tutorial Aktif di halaman admin.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 12:12:15 | `admin/tutorial-hasil-plotting.php` | 8 | Dependency helper | Tambahkan `require_once __DIR__ . '/../includes/user-helper.php'` untuk memastikan fungsi `renderJenisProgramBadge()` tersedia secara konsisten tanpa error fatal. |
+| 2026-11-15 12:12:15 | `includes/tutorial-scheduled-lecturers.php` | 13-15 | Query jadwal dosen | Tambahkan subquery `(SELECT COUNT(*) FROM tutorial_registrations tr WHERE tr.tutorial_class_id = tc.id) AS jumlah_mahasiswa` pada `tutorialScheduledLecturerClasses()` agar jumlah peserta per sesi dihitung akurat dan dinamis. |
+| 2026-11-15 12:12:15 | `includes/tutorial-jadwal-dosen-export-view.php` | 75-76, 81-82, 85, 88-90 | Template export jadwal dosen (PDF/Print) | Hitung total mahasiswa `$totalStudents`, tambahkan info total mahasiswa pada ringkasan header, tambahkan kolom `Jml Mhs` pada `<thead>` dan `<tbody>`, serta tambahkan baris `<tfoot>` untuk total kumulatif mahasiswa dengan styling rapi. |
+| 2026-11-15 12:12:15 | `includes/tutorial-scheduled-lecturers-view.php` | 11-12, 28, 38 | Card Dosen Terjadwal Tutorial Aktif | Tampilkan total mahasiswa pada card header, tambahkan kolom `<th>Jml Mahasiswa</th>` pada tabel admin, dan tampilkan badge biru penanda jumlah mahasiswa (`X Mhs`) per sesi kelas dosen. |
+| 2026-11-15 12:12:15 | `tests/tutorial-absensi-http-test.py` | 23, 59 | Fixture test suite | Tambahkan file `includes/user-helper.php` dan migrasi kolom `jenis_program` pada SQLite fixture agar seluruh test suite absensi lulus 100%. |
+| 2026-11-15 12:12:15 | `tests/tutorial-export-student-count-test.php` | 1-126 | Test suite baru | Tambahkan automated unit test lengkap untuk verifikasi integritas data query, akurasi hitungan per kelas (25, 18, 0), elemen markup export view, dan elemen markup tabel admin (11 asersi, 100% PASS). |
+
+**Verifikasi:**
+- `php tests/tutorial-export-student-count-test.php`: PASS (11/11 assertions).
+- `python tests/tutorial-scheduled-lecturers-test.py`: PASS.
+- `python tests/tutorial-jadwal-dosen-export-test.py`: PASS.
+- `python tests/tutorial-absensi-http-test.py`: PASS.
+- `php tests/admin-tables-jenis-program-test.php`: PASS.
+- `php -l` pada seluruh file PHP termodifikasi: 0 syntax error.
+
+**Penerapan:** commit `Add student count per session to scheduled lecturers export and admin view`; push lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 12:08:18 +0700 — Angka jumlah pengerjaan pada tab Hasil Ujian
 
 **ID:** CBT-RESULTS-TAB-COUNT · **Parent Git:** `992456f`.

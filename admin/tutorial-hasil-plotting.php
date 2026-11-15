@@ -5,6 +5,7 @@
 define('PAGE_TITLE', 'Hasil Plotting & Jadwal');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/user-helper.php';
 require_once __DIR__ . '/../includes/tutorial-scheduled-lecturers.php';
 
 $pdo = getDBConnection();
