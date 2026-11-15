@@ -14,7 +14,7 @@ if (!$lmwUser) return;
 $lmwBase = __DIR__ . '/../assets/';
 $lmwVer = static fn(string $f) => file_exists($lmwBase . $f) ? filemtime($lmwBase . $f) : time();
 $lmwConfig = [
-    'api' => BASE_URL . '/api/messages.php',
+    'api' => BASE_URL . '/pesan-api.php', // via pages/pesan-api.php (folder /api/ tidak dapat diakses langsung di produksi)
     'csrf' => csrfToken(),
     'userId' => (int)$lmwUser['id'],
     'isAdmin' => strtolower((string)$lmwUser['role']) === 'admin',

@@ -88,8 +88,11 @@ $check(count(msgAdminThreads($pdo, $admin)) === 3, 'Daftar admin: 3 percakapan (
 
 // Integrasi statis
 $root = dirname(__DIR__);
-$api = file_get_contents("$root/api/messages.php");
+$api = file_get_contents("$root/includes/messaging-api.php");
 $check(str_contains($api, 'verifyCsrf(') && str_contains($api, "if (!\$isAdmin) msgReply(403") && str_contains($api, 'session_write_close()'), 'API: CSRF, aksi admin dibatasi, sesi dilepas');
+// Folder /api/ tidak dapat diakses di produksi (404) → endpoint lewat halaman root /pesan-api.php
+$check(str_contains(file_get_contents("$root/pages/pesan-api.php"), "require __DIR__ . '/../includes/messaging-api.php'"), 'Endpoint /pesan-api.php memuat API');
+$check(str_contains(file_get_contents("$root/includes/messages-widget.php"), "BASE_URL . '/pesan-api.php'"), 'Widget memanggil /pesan-api.php (bukan /api/)');
 $check(str_contains(file_get_contents("$root/includes/footer.php"), "messages-widget.php"), 'Widget dipasang di footer');
 $widget = file_get_contents("$root/includes/messages-widget.php");
 $check(str_contains($widget, "HIDE_MESSAGE_WIDGET") && str_contains($widget, 'isLoggedIn()'), 'Widget hanya untuk pengguna login & bisa dimatikan per halaman');

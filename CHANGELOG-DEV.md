@@ -5,6 +5,27 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 19:01:48 +0700 — Perbaikan: widget Pesan "Gagal memuat pesan (HTTP 404)" di produksi
+
+**ID:** MESSAGES-API-404-FIX · **Parent Git:** `17949f3`.
+**Masalah (laporan pengguna, tangkapan layar produksi):** panel Pesan menampilkan "Gagal memuat pesan (HTTP 404)" dan pesan "halo" gagal terkirim.
+**Akar masalah (diverifikasi langsung ke server):** folder `/api/` tidak dapat diakses lewat URL di hosting produksi — `POST /api/index.php` (file lama) dan `/api/messages.php` sama-sama **404**, sedangkan halaman root (`/ajax-delete.php`, `/pretes-hasil.php`) **302** normal. Ini sejalan dengan pola proyek: endpoint lain dipanggil lewat halaman (mis. `pretes-ujian.php?cbt_api=1`) dan komentar `ajax-delete.php` ("reachable even when the /api/ subdirectory is not deployed").
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/messaging-api.php` (dipindah dari `api/messages.php`) | 2026-11-15 19:01:17 | 1–80 | Logika API | Dipindah ke `includes/` (selalu ter-deploy); `require` disesuaikan (`auth.php`, `messaging.php`); docblock menjelaskan alasan. Isi aksi tidak berubah. |
+| `pages/pesan-api.php` (baru) | 2026-11-15 19:01:17 | 1–7 | Endpoint | URL **`/pesan-api.php`** (dilayani rewrite root → `pages/`, sama seperti halaman lain yang terbukti jalan). |
+| `api/messages.php` | 2026-11-15 19:01:17 | 1–3 | Kompatibilitas | Pembungkus tipis ke `includes/messaging-api.php`. |
+| `includes/messages-widget.php` | 2026-11-15 19:01:17 | 17 | Konfigurasi widget | `api` → `BASE_URL . '/pesan-api.php'`. |
+| `tests/messaging-test.php` | 2026-11-15 19:01:48 | 91–96 | Assertion | Cek API di lokasi baru, endpoint `/pesan-api.php`, dan widget tidak memanggil `/api/`. |
+
+**Verifikasi:** `php -l` OK (4 file), `git diff --check` OK; `tests/messaging-test.php` PASS; uji browser harness dengan URL `/pesan-api.php` & file API yang dipindah: kirim pesan berhasil (tanpa error), `poll` HTTP 200; probe produksi sebelum perbaikan: `/api/*` 404, root 302.
+**Keterbatasan:** keberhasilan di produksi baru bisa dipastikan setelah deploy; pesan "halo" yang gagal tadi bisa dikirim ulang dengan mengetuknya.
+
+---
+
 ## 2026-11-15 18:35:35 +0700 — Menu Pesan melayang (kanan bawah) Mahasiswa/Dosen ↔ Admin LPPAI dengan notifikasi
 
 **ID:** MESSAGES-WIDGET · **Parent Git:** `ed94a78`.
