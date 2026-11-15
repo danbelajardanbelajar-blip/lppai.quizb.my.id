@@ -63,6 +63,7 @@
                 <?= $label ?>
                 <?php if ($tab === 'packages'): ?><span class="bank-tab-count"><?= count($packages) ?></span><?php endif; ?>
                 <?php if ($tab === 'sessions'): ?><span class="bank-tab-count"><?= count($sessions) ?></span><?php endif; ?>
+                <?php if ($tab === 'results'): ?><span class="bank-tab-count" title="Total pengerjaan pretes dan tryout"><?= (int)$totalAttemptCount ?></span><?php endif; ?>
             </a>
         <?php endforeach; ?>
     </nav>

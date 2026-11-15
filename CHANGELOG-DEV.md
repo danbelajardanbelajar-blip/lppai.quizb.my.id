@@ -5,6 +5,22 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 12:08:18 +0700 — Angka jumlah pengerjaan pada tab Hasil Ujian
+
+**ID:** CBT-RESULTS-TAB-COUNT · **Parent Git:** `992456f`.
+**Permintaan:** tab Hasil Ujian menampilkan angka seperti Paket Soal dan Sesi Ujian. Gunakan totalAttemptCount yang sudah dihitung controller (total pengerjaan resmi/tryout, berlangsung maupun selesai; bukan jumlah peserta unik dan bukan jumlah pada satu halaman hasil).
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 12:07:34 | `includes/pretes-cbt-admin-view.php` | 66 | Badge tab results | Tambah bank-tab-count dengan totalAttemptCount cast integer dan tooltip Total pengerjaan pretes dan tryout. Nilai nol tetap ditampilkan. |
+
+**Verifikasi:** `php -l includes/pretes-cbt-admin-view.php`, `php tests/pretes-cbt-pagination-tabs-test.php` dan `git diff --check -- includes/pretes-cbt-admin-view.php`: PASS. Render PHP sekali jalan atas blok navigasi aktual untuk total 0, 1 dan 1234 menghasilkan tepat tiga badge (paket, sesi, hasil), nilai sesuai dan tautan results tetap benar. Tidak mengubah query, filter, paginasi atau JavaScript live monitoring. Tidak ditambahkan suite permanen untuk penambahan badge kecil ini; data produksi tidak diubah.
+**Penerapan:** commit `Show total exam attempts on the CBT results tab`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 11:00:50 +0700 — Hapus informasi interval pemeriksaan dari tampilan mahasiswa
 
 **ID:** STUDENT-PROCTORING-HIDE-INTERVAL-CAPTIONS · **Parent Git:** `b42d83a`.
