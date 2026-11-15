@@ -21,6 +21,11 @@ $currentUser = getCurrentUser();
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=<?= file_exists(__DIR__ . '/../assets/css/style.css') ? filemtime(__DIR__ . '/../assets/css/style.css') : time() ?>">
     <meta name="base-url" content="<?= BASE_URL ?>">
     <?= EXTRA_HEAD ?>
+    <?php if (isAdmin()): ?>
+    <script defer src="<?= BASE_URL ?>/assets/js/admin-user-profile-links.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-user-profile-links.js') ?>"
+        data-profile-lookup="<?= BASE_URL ?>/admin/ajax-user-profile-links.php"
+        data-profile-page="<?= BASE_URL ?>/admin/profil-pengguna.php" data-profile-csrf="<?= sanitize(csrfToken()) ?>"></script>
+    <?php endif; ?>
 </head>
 <body>
 <?php if (isset($_SESSION['admin_login_as'])): ?>

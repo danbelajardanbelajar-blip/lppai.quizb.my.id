@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 12:24:07 +0700 — Profil pengguna khusus admin dan tautan nama
+
+**ID:** ADMIN-USER-PROFILE · **Parent Git:** `58c70d0`.
+**Permintaan:** Nama mahasiswa/dosen dapat diklik admin untuk membuka profil pengguna yang bersangkutan.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 12:18:03 | `admin/profil-pengguna.php` | 1–83 | Profil khusus admin: identitas, kontak, riwayat pretes/tutorial dan kelas dosen; GET saja, validasi ID dan pemilih nama kembar. |
+| 2026-11-15 12:18:03 | `admin/ajax-user-profile-links.php` | 1–21 | Lookup nama khusus admin: POST, CSRF, batas 100 nama dan payload 100 KB. |
+| 2026-11-15 12:18:03 | `includes/admin-user-profile.php` | 1–52 | Pencocokan nama persis dan riwayat berdasarkan ID; cegah tertukarnya dosen bernama sama. |
+| 2026-11-15 12:21:41 | `assets/js/admin-user-profile-links.js` | 1–68 | Tautan nama pada konten admin termasuk hasil AJAX; cache, batch dan MutationObserver; kontrol formulir tetap utuh. |
+| 2026-11-15 12:18:39 | `includes/header.php` | 1–148 | Muat enhancer hanya untuk admin (baris 24–28). |
+| 2026-11-15 12:18:39 | `includes/user-table-avatar.php` | 1–33 | Dukung tautan profil langsung berdasarkan ID pada nama/foto pengguna (baris 3, 25–32). |
+| 2026-11-15 12:18:39 | `admin/ajax-users.php` | 1–273 | Aktifkan tautan profil pada tabel Kelola Pengguna (baris 141). |
+| 2026-11-15 12:23:02 | `tests/admin-user-profile-test.py` | 1–118 | Uji HTTP dan browser terisolasi: akses, CSRF, nama kembar, riwayat, rahasia, AJAX, navigasi, seluler dan database tetap. |
+
+**Verifikasi:** PHP lint 6 file dan Node syntax check lulus; `python tests/admin-user-profile-test.py`, `python tests/users-table-photo-test.py`, `php tests/user-profile-avatar-menu-test.php` lulus. Browser Chromium menguji tautan statis/dinamis, pemilih akun kembar, kontrol tidak berubah, navigasi dan lebar 390px. Tidak ada mutasi database pada pengujian.
+
+**Batas:** Nama harus cocok persis dengan akun; nama historis tanpa akun tetap berupa teks. Riwayat maksimal 50 data. Profil hanya baca; sesi admin tetap. Validasi menggunakan fixture terisolasi, belum login ke hosting produksi. Commit dapat dilacak melalui ID entri ini pada Git.
+
+---
+
 ## 2026-11-15 12:15:30 +0700 — Penambahan Jumlah Mahasiswa per Sesi pada Export Jadwal Dosen dan Tabel Admin
 
 **ID:** TUTORIAL-EXPORT-STUDENT-COUNT · **Parent Git:** `87d6394`.

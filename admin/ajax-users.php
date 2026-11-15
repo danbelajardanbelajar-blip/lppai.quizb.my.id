@@ -138,7 +138,7 @@ foreach ($data as $row) {
     // Basic sanitization
     $id = $row['id'];
     $nimUsername = htmlspecialchars($row['nim'] ?? $row['username']);
-    $namaDenganIcon = renderUserTableName($row);
+    $namaDenganIcon = renderUserTableName($row, true);
     $tglLahir = !empty($row['tanggal_lahir']) ? date('d/m/Y', strtotime($row['tanggal_lahir'])) : '-';
     $prodi = htmlspecialchars(!empty($row['program_studi']) ? $row['program_studi'] : '-');
     $jenisProgramVal = normalizeJenisProgram($row['jenis_program'] ?? 'Reguler');
