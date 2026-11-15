@@ -526,6 +526,40 @@ var SPA = {
             var linkFile = href.replace(/^.*\//, '');
             if (linkFile && linkFile === urlFile) {
                 link.classList.add('active');
+
+                // Auto-expand parent nav-group and close sibling groups
+                var navGroup = link.closest('.nav-group');
+                if (navGroup) {
+                    var menuContainer = navGroup.closest('.sidebar-menu');
+                    if (menuContainer) {
+                        menuContainer.querySelectorAll('.nav-group.open').forEach(function(other) {
+                            if (other !== navGroup) {
+                                other.classList.remove('open');
+                                var otherBtn = other.querySelector('.nav-group-toggle');
+                                if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+                            }
+                        });
+                    }
+                    navGroup.classList.add('open');
+                    var toggleBtn = navGroup.querySelector('.nav-group-toggle');
+                    if (toggleBtn) {
+                        toggleBtn.classList.add('has-active');
+                        toggleBtn.setAttribute('aria-expanded', 'true');
+                    }
+                }
+
+                // Auto-expand nested submenu
+                var submenu = link.closest('.submenu');
+                if (submenu) {
+                    submenu.style.display = 'block';
+                    var parentItem = submenu.closest('.has-submenu');
+                    if (parentItem) {
+                        var parentToggle = parentItem.querySelector('.submenu-toggle');
+                        if (parentToggle) parentToggle.classList.add('active');
+                        var arrow = parentItem.querySelector('.arrow');
+                        if (arrow) arrow.style.transform = 'rotate(180deg)';
+                    }
+                }
             } else {
                 link.classList.remove('active');
             }

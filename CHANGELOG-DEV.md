@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 19:35:45 +0700 — Penataan sidebar modern, elegan, dan compact berbasis accordion group
+
+**ID:** SIDEBAR-ACCORDION-BEAUTIFY · **Parent Git:** 5d43e68.
+**Permintaan:** Tata sidebar agar cantik dan tidak terlalu panjang ke bawah.
+
+**Perubahan dan alasan:** Mengorganisir menu navigasi sidebar yang sebelumnya memanjang ke bawah (~32 tautan, tinggi ~1700 px) menjadi kelompok accordion interaktif yang ringkas, rapi, dan estetis (tema Emerald Royale). Pada peran Admin, tautan dikelompokkan ke dalam modul: Dashboard (langsung), Manajemen Pretes (7 item), Manajemen Tutorial (4 item / sub-item), Keuangan (3 item), Pengguna & Fasilitas (3 item), Administrasi & Layanan (3 item), Sistem & Pengumuman (3 item), Informasi & Bantuan (3 item), serta Akun Saya (3 item). Hanya grup yang memuat halaman aktif yang terbuka secara otomatis pada pemuatan halaman; grup lainnya tertutup rapi sehingga tinggi sidebar pas dalam satu layar viewport desktop (~550-650 px) tanpa perlu scroll panjang. Mengklik tombol toggle grup membuka bagian tersebut secara instan dan menutup grup saudara untuk menjaga sidebar tetap ramping. Memperbarui ukuran logo sidebar menjadi 44 px dengan ambient glow hijau lembut, merapikan proporsi jarak item, menyematkan indikator jumlah badge transparan, panah chevron dengan transisi rotasi halus, garis pandu vertikal berindentasi (tree guide line), dan memperbarui SPA.updateNav() di ssets/js/app.js agar secara otomatis membuka parent group dan submenu ketika tautan aktif berpindah pada navigasi dinamis SPA.
+
+Waktu berikut adalah penyimpanan terakhir file, dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 19:32:56 | includes/sidebar.php | 20, 35, 190, 225 | Struktur accordion .nav-group untuk seluruh modul admin & umum, deteksi server-side isNavGroupActive agar grup aktif terbuka sejak render awal tanpa layout shift, skrip interaksi toggle dengan penutupan grup saudara otomatis dan aria-expanded. |
+| 2026-11-15 19:32:56 | ssets/css/style.css | 450, 495, 520, 550 | Penyegaran visual Emerald Royale: header ringkas dengan ambient radial glow, padding & tipografi menu compact, komponen .nav-group-toggle, .nav-badge, .chevron (rotasi 180°), .nav-group-content animasi fade-in, garis pemandu vertikal, dan styling submenu bertingkat. |
+| 2026-11-15 19:33:25 | ssets/js/app.js | 528 | Integrasi SPA.updateNav(): secara otomatis memperluas .nav-group dan .submenu induk dari tautan aktif serta menutup grup lain saat navigasi SPA. |
+| 2026-11-15 19:35:04 | 	ests/sidebar-accordion-compact-test.php | 1 | Suite pengujian otomatis mencakup 8 modul accordion, token CSS animasi/rotasi/tree guide line, perilaku SPA updateNav, dan retensi tautan esensial & status pill online. |
+| 2026-11-15 19:35:45 | CHANGELOG-DEV.md | 8 | Pencatatan sistematis paket perubahan ID SIDEBAR-ACCORDION-BEAUTIFY. |
+
+**Verifikasi:**
+1. Pemeriksaan sintaks php -l includes/sidebar.php lulus tanpa error.
+2. Pengujian otomatis php tests/sidebar-accordion-compact-test.php (4 skenario validasi, 8 group, CSS styling, SPA updateNav, status pill & essential links) lulus 100%.
+3. Seluruh 15 suite pengujian proyek yang relevan lulus 100%:
+   - 	ests/absensi-pretes-integration-test.php (PASS: tautan absensi pretes tunggal di submenu, tanpa tryout/scan lama)
+   - 	ests/mahasiswa-unregistered-hide-menu-test.php (PASS: menu Pretes, Tutorial, dan Absensi terisolasi sempurna pada mahasiswa belum daftar dan role admin/dosen)
+   - 	ests/pretes-aktif-hide-tutorial-menu-test.php (PASS: label menu Tutorial & Absensi tersembunyi saat pretes aktif, tampil saat periode selesai)
+   - 	ests/pretes-pengaturan-tutor-test.php (PASS: tautan Pengaturan Tutor admin tersedia)
+   - 	ests/pretes-rekap-nilai-test.php (PASS: rekapitulasi nilai pretes admin & dosen tersedia)
+   - 	ests/theme-emerald-royale-test.php (PASS: tema Emerald Royale, Obsidian Forest, & status pill LPPAI Core Online terverifikasi)
+   - 	ests/user-profile-avatar-menu-test.php (PASS: 32 uji profil & pengaturan lulus)
+   - 	ests/tutorial-pretes-menu-test.py (PASS: isolasi hak akses mahasiswa pretes/tutorial pada sidebar sesungguhnya)
+   - 	ests/pretes-peserta-columns-test.php (PASS: kolom status/kredensial tersembunyi)
+   - 	ests/admin-tables-jenis-program-test.php (PASS: 38 pattern jenis program valid)
+   - 	ests/admin-user-profile-test.py (PASS: profil pengguna admin & navigasi)
+   - 	ests/admin-profile-photo-zoom-test.py (PASS: zoom foto & proteksi klik kanan)
+   - 	ests/pretes-target-program-test.php (PASS: filtering target pretes)
+   - 	ests/pretes-tryout-test.php (PASS: tryout CBT)
+   - 	ests/pretes-exam-access-test.php (PASS: akses ujian pretes)
+4. Pemeriksaan git diff --check bersih tanpa error trailing whitespace atau tab.
+
+**Batas verifikasi:** Pengujian dilakukan pada lingkungan PHP dan browser Chromium lokal yang merefleksikan alur kerja produksi; server hosting live tidak dimodifikasi secara langsung. Peringatan OpenSSL duplikat bawaan PHP CLI lokal diabaikan karena merupakan konfigurasi runtime lokal. Push Git memindahkan kode ke upstream branch main.
+
+**Pelacakan:** Cari commit dengan ID SIDEBAR-ACCORDION-BEAUTIFY.
+
+---
+
 ## 2026-11-15 19:21:10 +0700 — Menu Kembali modern pada profil pengguna admin
 
 **ID:** ADMIN-PROFILE-BACK-NAVIGATION · **Parent Git:** `17608b1`.
