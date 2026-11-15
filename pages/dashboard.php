@@ -504,7 +504,7 @@ include __DIR__ . '/../includes/header.php';
                     </strong>
                     1. Berdoa &amp; belajar dengan sungguh-sungguh | 2. Wajib dikerjakan sendiri secara mandiri &amp; jujur | 3. Dilarang membuka web/aplikasi lain | 4. Dilarang menggunakan HP lain.
                     <div style="margin-top:4px; font-size:12px; color:#2563eb;">
-                        🔍 Ujian diverifikasi di awal (Check-in) dan diawasi berkala setiap 5 menit dengan sistem kamera <strong>AI Face Recognition</strong>.
+                        🔍 Ujian diverifikasi di awal (Check-in) dan diawasi selama pengerjaan dengan sistem <strong>AI Face Recognition</strong>.
                     </div>
                 </div>
             </div>

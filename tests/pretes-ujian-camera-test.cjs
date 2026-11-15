@@ -7,6 +7,14 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const page = fs.readFileSync(path.join(root, 'pages/pretes-ujian.php'), 'utf8');
+for (const file of ['pages/pretes-ujian.php', 'pages/tryout.php', 'pages/dashboard.php']) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    const captions = source.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '').replace(/<\?[\s\S]*?\?>/g, '');
+    assert.doesNotMatch(captions, /\b(?:30\s*detik|15\s*detik|5\s*menit|00:30|Pengecekan Berikutnya)\b/i, file);
+    assert.doesNotMatch(source, /proctorTimerDisplay|updateTimerDisplay|Pemeriksaan wajah setiap 30 detik/, file);
+    if (file !== 'pages/dashboard.php') assert.match(source, /PROCTOR_INTERVAL_SECONDS = 30/, 'Keep internal interval unchanged');
+}
 const auth = fs.readFileSync(path.join(root, 'includes/auth.php'), 'utf8');
 const csrfFunction = auth.match(/function csrfToken\(\) \{[\s\S]*?\n\}/)[0];
 const template = page.match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -208,7 +216,7 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(verified.element('proctorVideo').style.transform, 'scaleX(-1)');
     assert.equal(typeof cbtSettings.request, 'function');
     cbtSettings.onStarted();
-    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    assert.equal(vm.runInContext('secondsRemaining', verified.sandbox), 30, 'Internal schedule remains 30 seconds');
     assert.equal(typeof verified.documentEvents.visibilitychange, 'function');
     let resolvePeriodic;
     let periodicRequests = 0;
@@ -222,11 +230,11 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(periodicRequests, 1, 'Concurrent checks must not overlap');
     resolvePeriodic({ ok: true, status: 200, json: () => Promise.resolve({ verified: true, score: 80 }) });
     await settle();
-    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    assert.equal(vm.runInContext('secondsRemaining', verified.sandbox), 30, 'Internal schedule remains 30 seconds');
     verified.sandbox.fetch = () => Promise.reject(new Error('VPS unavailable'));
     await verified.sandbox.runPeriodicProctoringCheck();
     assert.match(verified.element('lastCheckInfo').textContent, /bukan pelanggaran/);
-    assert.equal(verified.element('proctorTimerDisplay').textContent, '00:30');
+    assert.equal(vm.runInContext('secondsRemaining', verified.sandbox), 30, 'Internal schedule remains 30 seconds');
     assert.equal(interruptions.length, 0, 'Network failure is not a violation');
     verified.sandbox.fetch = () => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ verified: false, status: 'NO_FACE', message: 'Tidak ada wajah' }) });
     await verified.sandbox.runPeriodicProctoringCheck();
@@ -261,7 +269,6 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     clock = 200000; timerEnv.sandbox.tickProctoringTimer(); await settle();
     assert.equal(checks, 2, 'No checks after collection');
     cbtSettings.onSubmitted();
-    assert.equal(verified.element('proctorTimerDisplay').textContent, 'Selesai');
     assert.equal(verified.element('proctorStatusTitle').textContent, 'Ujian Selesai');
     console.log('PASS: PHP/JS runtime, aktivasi satu kali, balik kamera, request verifikasi, izin ditolak, browser tidak mendukung, dan sesi terverifikasi.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

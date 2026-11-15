@@ -5,6 +5,25 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 11:00:50 +0700 — Hapus informasi interval pemeriksaan dari tampilan mahasiswa
+
+**ID:** STUDENT-PROCTORING-HIDE-INTERVAL-CAPTIONS · **Parent Git:** `b42d83a`.
+**Permintaan:** hilangkan keterangan 5 menit atau 30 detik kepada mahasiswa. Dashboard, pretes resmi dan tryout kini menyatakan pengawasan kamera secara umum tanpa interval atau hitung mundur pemeriksaan. Pemberitahuan pengawasan dan popup pelanggaran tetap ada. Hitung mundur waktu pengerjaan soal tetap ada; hanya countdown pemeriksaan kamera yang dihapus.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 10:59:01 | `pages/dashboard.php` | 507 | Caption pengawasan mahasiswa | Hapus keterangan setiap 5 menit; pertahankan informasi verifikasi awal dan pengawasan AI selama pengerjaan. |
+| 2026-11-15 10:59:01 | `pages/pretes-ujian.php` | 296, 310, 484-496, 523, 1040, 1067-1090, 1167 | Caption dan tampilan timer pemeriksaan resmi | Ganti label interval dengan Pengawasan Kamera; hilangkan countdown pemeriksaan dan formatter/penulisan DOM proctorTimerDisplay. Tata tertib dan status dinamis tidak menyebut durasi. Caption panel tester/tombol uji generik. Interval internal PROCTOR_INTERVAL_SECONDS=30 dan trigger/background scheduling tetap. |
+| 2026-11-15 10:59:01 | `pages/tryout.php` | 382, 594-607, 634, 1129, 1155-1178, 1250 | Caption dan tampilan timer pemeriksaan tryout | Perubahan tampilan setara pretes resmi: tanpa caption interval atau countdown pengawasan; pengawasan kamera, mini video, status mandiri/selesai dan peringatan tetap. Scheduler dan durasi ujian CBT tidak diubah. |
+| 2026-11-15 10:59:01 | `tests/pretes-ujian-camera-test.cjs` | 10-17, 219, 233, 237, 271 | Regresi caption dan timer internal | Pastikan caption HTML mahasiswa tidak menyebut 5 menit, 30 detik, 15 detik pengujian, atau waktu pengecekan berikutnya; tidak ada elemen/formatter countdown proctor. Asersi tampilan 00:30 diganti nilai internal secondsRemaining=30. Uji trigger pada 30 detik, permintaan tidak overlap, tab kembali dan penghentian saat submit tetap berjalan. |
+
+**Verifikasi:** `node tests/pretes-ujian-camera-test.cjs`, `php tests/pretes-tryout-camera-test.php`, lint 3 page PHP dan `git diff --check` pada file perubahan ini: PASS. Uji JavaScript aktual memastikan tidak ada request sebelum 30 detik, ada request pada 30 detik, satu pemeriksaan susulan setelah tab kembali, serta pemeriksaan berhenti setelah submit. Pencarian caption mahasiswa tidak menemukan durasi pengawasan; sisa angka 30 dalam komentar/konstanta internal dan menu admin bukan caption mahasiswa. Instruksi hadir 15 menit sebelum ujian serta timer/durasi pengerjaan soal tidak diubah. Data produksi tidak diubah; tidak ada perubahan endpoint, interval backend, atau retensi snapshot.
+**Penerapan:** commit `Remove proctoring interval captions and countdowns from student pages`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 10:55:00 +0700 — Paginasi Hasil Ujian CBT dan Pemisahan Sub-Tab Live vs Selesai
 
 **ID:** CBT-RESULTS-PAGINATION-SUBTABS · **Parent Git:** `cb3185a`.

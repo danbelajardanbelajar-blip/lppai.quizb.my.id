@@ -293,7 +293,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <strong style="color:#92400e;font-size:14px;display:block;">Panel Percobaan Ujian Pretes (Hak Akses Akun: <?= sanitize($user['username'] ?? '12345') ?>)</strong>
                     <div style="color:#b45309;font-size:12px;margin-top:2px;">
-                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan 30 Detik) secara langsung.
+                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan Kamera) secara langsung.
                     </div>
                 </div>
             </div>
@@ -307,7 +307,7 @@ include __DIR__ . '/../includes/header.php';
                 </a>
                 <?php endif; ?>
                 <button type="button" onclick="testFastPeriodicTimer()" class="btn btn-sm btn-warning" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
-                    ⏱️ Set Timer 15 Detik
+                    ⏱️ Uji Timer Pengawasan
                 </button>
                 <button type="button" onclick="runPeriodicProctoringCheck()" class="btn btn-sm btn-success" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
                     📸 Test Snapshot Sekarang
@@ -470,7 +470,7 @@ include __DIR__ . '/../includes/header.php';
 
     <!-- ═════════════════════════════════════════════════════════════════════
          BAGIAN 2: SKENARIO B — RUANG PENGERJAAN UJIAN DENGAN PENGAWAS AI
-         Pengecekan Wajah Berkala Setiap 30 Detik Selama Ujian Aktif
+         Pengecekan Wajah Berkala Selama Ujian Aktif
          ═════════════════════════════════════════════════════════════════════ -->
     <div id="sectionExamRoom" style="<?= $isVerified ? 'display:block;' : 'display:none;' ?>">
         
@@ -481,7 +481,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <div style="font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px;">
                         <span id="proctorStatusTitle">Kamera Siap untuk Ujian</span>
-                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengecekan Tiap 30 Detik</span>
+                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengawasan Kamera</span>
                     </div>
                     <div style="font-size:12px; color:#ccfbf1; margin-top:2px;" id="lastCheckInfo">
                         Sesi diverifikasi. Pemeriksaan berkala dimulai saat ujian dikerjakan.
@@ -489,12 +489,8 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- Countdown Timer 30 Detik -->
+            <!-- Status pengawasan kamera -->
             <div style="display:flex; align-items:center; gap:16px;">
-                <div style="text-align:right;">
-                    <div style="font-size:11px; color:#ccfbf1; text-transform:uppercase; font-weight:700;">Pengecekan Berikutnya:</div>
-                    <div style="font-size:18px; font-weight:800; font-family:monospace;" id="proctorTimerDisplay">00:30</div>
-                </div>
                 <!-- Mini Video Stream Hidden/Background -->
                 <div style="width:48px; height:64px; border-radius:6px; overflow:hidden; border:1.5px solid rgba(255,255,255,0.5); background:#000;">
                     <video id="proctorVideo" playsinline autoplay muted style="width:100%; height:100%; object-fit:cover;"></video>
@@ -524,7 +520,7 @@ include __DIR__ . '/../includes/header.php';
                 <li>1. Wajib dikerjakan secara mandiri dan jujur tanpa bantuan orang lain (tidak memakai joki).</li>
                 <li>2. Pastikan wajah selalu menghadap ke arah layar dan tidak meninggalkan kamera selama ujian berlangsung.</li>
                 <li>3. Dilarang membuka website lain atau menggunakan HP tambahan saat mengerjakan soal.</li>
-                <li>4. Sistem AI akan mengambil snapshot otomatis tiap 30 detik untuk memastikan kontinuitas peserta asli.</li>
+                <li>4. Sistem AI memeriksa kesesuaian wajah selama pengerjaan berlangsung.</li>
             </ul>
         </div>
 
@@ -1000,8 +996,6 @@ function initProctoringExamRoom() {
         if (freq) freq.textContent = 'Tanpa Kamera';
         const info = document.getElementById('lastCheckInfo');
         if (info) info.textContent = 'Sesi ujian ini tidak mewajibkan pengawasan kamera web.';
-        const timerDisp = document.getElementById('proctorTimerDisplay');
-        if (timerDisp) timerDisp.textContent = 'Mandiri';
     } else if (video) {
         if (activeStream) {
             video.srcObject = activeStream;
@@ -1043,7 +1037,7 @@ function initProctoringExamRoom() {
                     const title = document.getElementById('proctorStatusTitle');
                     if (title) title.textContent = 'Pengawas Kamera Aktif';
                     const info = document.getElementById('lastCheckInfo');
-                    if (info) info.textContent = 'Pemeriksaan wajah setiap 30 detik selama ujian aktif.';
+                    if (info) info.textContent = 'Pemeriksaan wajah aktif selama ujian berlangsung.';
                     startProctoringTimer();
                 }
             },
@@ -1053,8 +1047,6 @@ function initProctoringExamRoom() {
                 if (proctorInterval) clearInterval(proctorInterval);
                 if (activeStream) activeStream.getTracks().forEach(function(track) { track.stop(); });
                 activeStream = null;
-                const timer = document.getElementById('proctorTimerDisplay');
-                if (timer) timer.textContent = 'Selesai';
                 const title = document.getElementById('proctorStatusTitle');
                 if (title) title.textContent = 'Ujian Selesai';
                 const frequency = document.getElementById('proctorFrequency');
@@ -1075,14 +1067,12 @@ function initProctoringExamRoom() {
 function scheduleProctoringCheck(seconds) {
     nextProctorCheckAt = Date.now() + seconds * 1000;
     secondsRemaining = seconds;
-    updateTimerDisplay();
 }
 
 function tickProctoringTimer() {
     if (cbtCompleted || periodicCheckPending || !nextProctorCheckAt) return;
     secondsRemaining = Math.max(0, Math.ceil((nextProctorCheckAt - Date.now()) / 1000));
     if (secondsRemaining <= 0) { runPeriodicProctoringCheck(); return; }
-    updateTimerDisplay();
 }
 
 function startProctoringTimer() {
@@ -1099,13 +1089,6 @@ function startProctoringTimer() {
     }
 }
 
-function updateTimerDisplay() {
-    const disp = document.getElementById('proctorTimerDisplay');
-    if (!disp) return;
-    const m = Math.floor(secondsRemaining / 60);
-    const s = secondsRemaining % 60;
-    disp.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-}
 
 /**
  * ── Eksekusi Skenario B: Pengambilan Snapshot Berkala Tiap 30 Detik ──
@@ -1129,8 +1112,6 @@ function runPeriodicProctoringCheck() {
     }
 
     periodicCheckPending = true;
-    const timer = document.getElementById('proctorTimerDisplay');
-    if (timer) timer.textContent = 'Memeriksa…';
     return requestProctoringCheck({
         action: 'periodic_check',
         live_photo: livePhotoData
@@ -1183,7 +1164,7 @@ function recordProctoringViolation(msg) {
 
 function testFastPeriodicTimer() {
     scheduleProctoringCheck(15);
-    alert("⏱️ Timer pengawasan berkala disetel ke 15 detik untuk pengujian cepat!");
+    alert("⏱️ Timer pengawasan disetel untuk pengujian cepat!");
 }
 </script>
 
