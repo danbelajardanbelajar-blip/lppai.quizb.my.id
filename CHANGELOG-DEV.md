@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 07:33:30 +0700 — Menu Export ke PDF Data Peserta Pretes (NIM, Nama, Program RPL/Non RPL, Jurusan)
+
+**ID:** PRETES-PESERTA-EXPORT-PDF · **Parent Git:** `7b5dc9b`.
+**Permintaan:** https://lppai.quizb.my.id/admin/pretes-peserta.php — buatkan menu export ke pdf di halaman ini, berisi kolom nim, nama, program rpl non rpl dan jurusan.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 07:30:48 | `admin/pretes-peserta-pdf.php` | 1-460 | Generator Dokumen PDF Peserta Pretes A4 | Pembuatan file baru cetak PDF data peserta pretes: autentikasi `requireAdmin()`, kop surat resmi LPPAI UNISDA dan logo SVG, filter dinamis (periode, prodi, jenis program, hari, status, pencarian), box metadata dokumen dan tanggal cetak, tabel 5 kolom utama: No, NIM, Nama Mahasiswa, Program (badge RPL vs Non RPL Reguler), dan Jurusan / Program Studi, rekapitulasi jumlah (Total, RPL, Non RPL), kolom tanda tangan resmi administrator, toolbar aksi cetak layar `window.print()` dan aturan CSS `@media print` A4 portrait dengan `thead` berulang pada setiap lembar. |
+| 2026-11-15 07:31:56 | `admin/pretes-peserta.php` | 708-713, 747-752, 1610-1623, 1696-1704, 1740-1744 | Menu & Tombol Export PDF Halaman Peserta Pretes | Menambahkan tombol aksi `📄 Export ke PDF` pada header tabel peserta, tombol `📄 Export Sesuai Filter (.pdf)` pada panel filter multi-kolom di atas tabel, opsi unduh `📄 Export Dokumen PDF (NIM, Nama, Program, Jurusan)` pada modal export data, serta memperbarui fungsi JavaScript `exportCurrentFiltered(format)` untuk membuka tab baru `pretes-peserta-pdf.php` beserta query filter aktif saat format PDF dipilih. |
+| 2026-11-15 07:32:26 | `admin/pretes-peserta-export.php` | 53-57, 611-616, 794-798 | Integrasi Delegasi Format PDF | Menambahkan penanganan `$format === 'pdf'` yang mendelegasikan eksekusi langsung ke `pretes-peserta-pdf.php`, menambahkan tombol cepat `📄 Export ke PDF` pada card header ekspor, dan menambahkan radio option Dokumen PDF (.pdf) pada formulir kustomisasi. |
+| 2026-11-15 07:32:58 | `tests/pretes-peserta-pdf-test.php` | 1-168 | Test Suite Otomatis Export PDF Peserta Pretes | Pembuatan test suite otomatis memvalidasi 18 skenario: query data peserta RPL & Non RPL, filter dinamis periode & jurusan, verifikasi elemen kop surat, 5 kolom target (NIM, Nama, Program, Jurusan), styling badge RPL vs Non RPL (Reguler), tombol cetak `window.print()`, kehadiran tombol PDF pada header card, filter panel, modal export, serta delegasi format pada file export. |
+
+**Verifikasi:**
+1. Linting seluruh file PHP (`php -l`): PASS 100% tanpa error syntax.
+2. `php tests/pretes-peserta-pdf-test.php`: PASS (18 skenario validasi Export PDF peserta lulus 100%).
+3. `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file).
+4. `php tests/pretes-cbt-review-test.php`: PASS (22 skenario validasi review result).
+5. `php tests/user-jenis-program-test.php`: PASS (24 file verified).
+6. `php tests/pretes-rekap-nilai-test.php`: PASS (151 skenario kelulusan).
+
+**Penerapan:** commit `Add PDF export feature to pretes participants page with NIM, Nama, Program RPL/Non RPL, and Jurusan columns`; push ke `origin/main` lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 07:08:30 +0700 — Halaman Review Result Lembar Jawaban CBT Admin (Pretes Resmi & Tryout)
 
 **ID:** CBT-REVIEW-RESULT-ADMIN · **Parent Git:** `a02d6a0`.

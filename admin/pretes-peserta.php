@@ -705,13 +705,18 @@ include __DIR__ . '/../includes/header.php';
                style="background:#0f766e;color:#ffffff;border:1px solid #0d9488;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(15,118,110,0.25);">
                 ⚡ Generate Otomatis
             </button>
+            <a href="pretes-peserta-pdf.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>" target="_blank" class="btn btn-sm"
+               style="background:#dc2626;color:#ffffff;border:1px solid #b91c1c;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(220,38,38,0.25);"
+               title="Export data peserta ke dokumen PDF (NIM, Nama, Program RPL/Non RPL, Jurusan)">
+                📄 Export ke PDF
+            </a>
             <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>" class="btn btn-sm"
                style="background:#16a34a;color:#ffffff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(22,163,74,0.25);">
                 📗 Halaman Export ke Excel
             </a>
             <button type="button" class="btn btn-sm" onclick="openExportModal()"
                style="background:#334155;color:#ffffff;border:1px solid #1e293b;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(51,65,85,0.25);">
-                📥 Export ke Excel
+                📥 Export Data
             </button>
         </div>
     </div>
@@ -739,6 +744,11 @@ include __DIR__ . '/../includes/header.php';
                     </span>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <button type="button" id="btn-export-pdf-filtered" class="btn btn-sm" onclick="exportCurrentFiltered('pdf')" data-no-spa="true"
+                        title="Export dokumen PDF peserta dengan filter yang sedang aktif (NIM, Nama, Program RPL/Non RPL, Jurusan)"
+                        style="background:#dc2626;border:1px solid #b91c1c;color:#ffffff;font-weight:700;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                        📄 Export Sesuai Filter (.pdf)
+                    </button>
                     <button type="button" id="btn-export-filtered" class="btn btn-sm" onclick="exportCurrentFiltered('xlsx')" data-no-spa="true"
                         title="Unduh file Excel (.xlsx) dengan filter yang sedang aktif"
                         style="background:#15803d;border:1px solid #166534;color:#ffffff;font-weight:700;font-size:12px;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
@@ -1588,7 +1598,7 @@ try {
                     📗
                 </span>
                 <div>
-                    <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">Export Data ke Excel (.xlsx)</h3>
+                    <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">Export Data Peserta (PDF &amp; Excel)</h3>
                     <p style="margin:2px 0 0;font-size:12px;color:#64748b;">Pilih jenis ekspor data peserta & credentials pretes</p>
                 </div>
             </div>
@@ -1598,33 +1608,46 @@ try {
         </div>
 
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
-            <!-- Pilihan 1: Export Sesuai Filter Aktif -->
+            <!-- Pilihan 1: Export Dokumen PDF (NIM, Nama, Program, Jurusan) -->
+            <a href="javascript:void(0)" onclick="exportCurrentFiltered('pdf')" data-no-spa="true"
+               style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #dc2626;background:#fef2f2;border-radius:12px;text-decoration:none;transition:all 0.2s;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span style="font-size:20px;">📄</span>
+                    <div>
+                        <strong style="font-size:13.5px;color:#991b1b;display:block;">Export Dokumen PDF (NIM, Nama, Program, Jurusan)</strong>
+                        <span id="modal-export-pdf-desc" style="font-size:11.5px;color:#b91c1c;">Cetak dokumen PDF resmi berformat A4 sesuai filter yang sedang aktif</span>
+                    </div>
+                </div>
+                <span style="background:#dc2626;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.pdf</span>
+            </a>
+
+            <!-- Pilihan 2: Export Sesuai Filter Aktif (Excel) -->
             <a href="javascript:void(0)" onclick="exportCurrentFiltered('xlsx')" data-no-spa="true"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #16a34a;background:#f0fdf4;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">🎯</span>
                     <div>
-                        <strong style="font-size:13.5px;color:#166534;display:block;">Export Sesuai Filter Saat Ini</strong>
+                        <strong style="font-size:13.5px;color:#166534;display:block;">Export Excel Sesuai Filter Saat Ini</strong>
                         <span id="modal-export-filter-desc" style="font-size:11.5px;color:#15803d;">Mengekspor data berdasarkan pencarian, hari, prodi, dan status aktif</span>
                     </div>
                 </div>
                 <span style="background:#16a34a;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.xlsx</span>
             </a>
 
-            <!-- Pilihan 2: Export Semua Peserta -->
+            <!-- Pilihan 3: Export Semua Peserta (Excel) -->
             <a href="pretes-peserta-export.php?download=1&format=xlsx<?= $selectedPeriode !== '__all__' ? '&periode=' . urlencode($selectedPeriode) : '' ?>" data-no-spa="true"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#ffffff;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">👥</span>
                     <div>
-                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Export SEMUA Peserta <?= $selectedPeriode !== '__all__' ? sanitize($selectedPeriode) : 'Pretes' ?></strong>
+                        <strong style="font-size:13.5px;color:#0f172a;display:block;">Export SEMUA Peserta <?= $selectedPeriode !== '__all__' ? sanitize($selectedPeriode) : 'Pretes' ?> (.xlsx)</strong>
                         <span style="font-size:11.5px;color:#64748b;">Mengekspor seluruh <?= $totalPeserta ?> peserta pada periode terpilih (lengkap dengan username &amp; password)</span>
                     </div>
                 </div>
                 <span style="background:#0284c7;color:#fff;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:700;">.xlsx</span>
             </a>
 
-            <!-- Pilihan 3: Buka Halaman Export Lengkap -->
+            <!-- Pilihan 4: Buka Halaman Export Lengkap -->
             <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
@@ -1670,12 +1693,14 @@ function openExportModal() {
         if (nimVal) activeDesc.push('NIM: ' + nimVal);
 
         var descEl = document.getElementById('modal-export-filter-desc');
-        if (descEl) {
-            if (activeDesc.length > 0) {
-                descEl.textContent = 'Filter aktif: ' + activeDesc.join(', ');
-            } else {
-                descEl.textContent = 'Tidak ada filter aktif (semua data diexport)';
-            }
+        var descPdfEl = document.getElementById('modal-export-pdf-desc');
+        if (activeDesc.length > 0) {
+            var activeText = 'Filter aktif: ' + activeDesc.join(', ');
+            if (descEl) descEl.textContent = activeText;
+            if (descPdfEl) descPdfEl.textContent = 'Mencetak dokumen PDF A4 dengan ' + activeText;
+        } else {
+            if (descEl) descEl.textContent = 'Tidak ada filter aktif (semua data diexport)';
+            if (descPdfEl) descPdfEl.textContent = 'Mencetak seluruh peserta terdaftar ke dokumen PDF A4';
         }
         modal.style.display = 'flex';
     }
@@ -1712,7 +1737,11 @@ function exportCurrentFiltered(format) {
     if (credVal) params.set('cred', credVal);
 
     closeExportModal();
-    window.location.href = 'pretes-peserta-export.php?' + params.toString();
+    if (format === 'pdf') {
+        window.open('pretes-peserta-pdf.php?' + params.toString(), '_blank');
+    } else {
+        window.location.href = 'pretes-peserta-export.php?' + params.toString();
+    }
 }
 
 // Tutup modal export bila klik di luar modal

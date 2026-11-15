@@ -51,6 +51,10 @@ $filterStatus = trim($_GET['status'] ?? '');
 $filterCred   = trim($_GET['cred'] ?? '');
 $filterSearch = trim($_GET['q'] ?? ($_GET['nama'] ?? ($_GET['nim'] ?? '')));
 $format       = strtolower(trim($_GET['format'] ?? 'xlsx'));
+if ($format === 'pdf') {
+    require __DIR__ . '/pretes-peserta-pdf.php';
+    exit;
+}
 if (!in_array($format, ['xlsx', 'csv'])) {
     $format = 'xlsx';
 }
@@ -599,10 +603,16 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body" style="padding:18px 20px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <!-- Unduh Semua -->
+            <!-- Unduh Semua Excel -->
             <a href="pretes-peserta-export.php?download=1&format=xlsx<?= sanitize($periodeQuery) ?>" data-no-spa="true"
                class="btn" style="background:#1a5632;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(26,86,50,0.25);transition:all 0.2s;">
-                📥 Unduh SEMUA Peserta (<?= $totalPesertaAll ?>)
+                📥 Unduh Excel SEMUA (<?= $totalPesertaAll ?>)
+            </a>
+
+            <!-- Export ke PDF -->
+            <a href="pretes-peserta-pdf.php<?= sanitize($periodeQuery ? '?' . ltrim($periodeQuery, '&') : '') ?>" target="_blank" data-no-spa="true"
+               class="btn" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);transition:all 0.2s;" title="Cetak atau simpan data peserta ke dokumen PDF">
+                📄 Export ke PDF (<?= $totalPesertaAll ?>)
             </a>
 
             <!-- Per Hari -->
@@ -779,6 +789,10 @@ include __DIR__ . '/../includes/header.php';
                     <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;color:#1e293b;">
                         <input type="radio" name="format" value="csv" <?= ($format === 'csv') ? 'checked' : '' ?> style="accent-color:#1a5632;width:16px;height:16px;">
                         <span>CSV (.csv)</span>
+                    </label>
+                    <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer;color:#1e293b;">
+                        <input type="radio" name="format" value="pdf" <?= ($format === 'pdf') ? 'checked' : '' ?> style="accent-color:#dc2626;width:16px;height:16px;">
+                        <span>Dokumen PDF (.pdf) <small style="color:#dc2626;font-weight:bold;">[A4 Cetak]</small></span>
                     </label>
                 </div>
 
