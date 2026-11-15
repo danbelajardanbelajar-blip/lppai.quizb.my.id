@@ -190,6 +190,10 @@ if (isset($_GET['download'])) {
 $message = ''; $errors = []; $form = null; $pkgForm = null; $sesForm = null;
 $allowedTabs = ['packages', 'sessions', 'import', 'results'];
 $rawTab = $_GET['tab'] ?? '';
+if ($rawTab === 'review') {
+    require __DIR__ . '/pretes-cbt-review.php';
+    exit;
+}
 if ($rawTab === 'bank' || $rawTab === 'form') {
     $activeTab = 'packages';
 } else {

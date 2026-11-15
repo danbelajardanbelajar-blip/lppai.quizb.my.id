@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 07:08:30 +0700 — Halaman Review Result Lembar Jawaban CBT Admin (Pretes Resmi & Tryout)
+
+**ID:** CBT-REVIEW-RESULT-ADMIN · **Parent Git:** `a02d6a0`.
+**Permintaan:** Buatkan halaman review result untuk menampilkan jawaban salah dan benar di halaman admin baik untuk pretes resmi atau try out, tampilkan menu di table yang ada pada hasil ujian, baik ujian sudah selesai atau belum selesai, tampilkan pula jawaban yang salah dan yang benar.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 07:06:39 | `admin/pretes-cbt-review.php` | 1-847 | Halaman Review Lembar Jawaban CBT Admin | Pembuatan file baru controller & view review jawaban CBT: autentikasi `requireAdmin()`, pembacaan data peserta (Nama, NIM, Prodi, badge program RPL/Reguler via `renderJenisProgramBadge()`), pembacaan sesi ujian & paket soal, query `pretes_cbt_items` per nomor soal, pembeda Pretes Resmi (`registration_id > 0`) vs Try Out Mandiri (`registration_id < 0`), metrik ringkasan (Skor live/final, Total Soal, Benar, Salah, Ragu, Belum Dijawab), Quick Jump Number Palette berpenanda warna, tombol filter butir soal interaktif (Semua, Benar, Salah, Ragu, Belum Dijawab), rendering kartu butir soal berpenanda kunci jawaban (`opt-is-key`), jawaban mahasiswa benar (`opt-user-correct`), dan jawaban mahasiswa salah (`opt-user-wrong`), serta tombol cetak/PDF (`window.print()`). |
+| 2026-11-15 07:04:55 | `includes/pretes-cbt-admin-view.php` | 605-617, 973 | Tabel Hasil Ujian CBT Admin (Kolom Aksi) & Global JS Config | Menambahkan tombol aksi `👁️ Review` di samping tombol Hapus pada setiap baris hasil ujian CBT (baik ujian selesai maupun sedang berlangsung), mempertahankan parameter filter saat navigasi, dan mengekspos konfigurasi `window.CBT_BASE_URL` untuk dynamic client-side rendering. |
+| 2026-11-15 07:05:05 | `assets/js/pretes-cbt-admin.js` | 889-902 | Live Dynamic Row Updater CBT Admin | Memperbarui generator `renderAttemptRow(att)` agar baris tabel yang diperbarui secara asinkron (AJAX polling) tetap menyertakan tombol aksi `👁️ Review` lengkap dengan URL tujuan dinamis dan preservasi filter aktif. |
+| 2026-11-15 07:05:11 | `pages/pretes-ujian.php` | 32-36 | Router Halaman Ujian Pretes | Menambahkan routing handler `cbt_review`: memuat `admin/pretes-cbt-review.php` jika parameter `?cbt_review=1` dikirimkan (diamankan oleh `requireAdmin()`). |
+| 2026-11-15 07:05:17 | `admin/pretes-bank-soal.php` | 193-196 | Tab Handler Bank Soal CBT | Menambahkan delegasi router: jika tab yang diminta adalah `?tab=review`, delegasikan eksekusi langsung ke `admin/pretes-cbt-review.php`. |
+| 2026-11-15 07:07:37 | `tests/pretes-cbt-review-test.php` | 1-248 | Test Suite Otomatis Review Result CBT | Pembuatan test suite otomatis memvalidasi 22 skenario: attempt resmi (selesai), attempt tryout (ongoing), akurasi penghitungan benar/salah/ragu/kosong, penandaan kelas opsi kunci & jawaban peserta, keberadaan tombol review pada view & JS updater, serta delegasi routing kedua endpoint. |
+
+**Verifikasi:**
+1. Linting seluruh file PHP (`php -l`): PASS 100% tanpa error syntax.
+2. `php tests/pretes-cbt-review-test.php`: PASS (22 skenario validasi Review Result CBT resmi & tryout lulus 100%).
+3. `php tests/pretes-cbt-live-monitoring-test.php`: PASS (32 skenario live monitoring CBT).
+4. `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file).
+5. `php tests/pretes-cbt-admin-buttons-test.php`: PASS.
+6. `php tests/pretes-cbt-export-scope-test.php`: PASS.
+7. `php tests/pretes-tryout-test.php`: PASS.
+8. `php tests/pretes-rekap-nilai-test.php`: PASS.
+9. `php tests/user-jenis-program-test.php`: PASS.
+10. `python tests/activity-log-visibility-test.py`: PASS.
+
+**Penerapan:** commit `Implement admin CBT review result sheet for official exam and tryout attempts with answer key highlights`; push ke `origin/main` lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 07:04:08 +0700 — Sembunyikan aktivitas username zainulhakim pada halaman log
 
 **ID:** ACTIVITY-LOG-HIDE-ZAINULHAKIM · **Parent Git:** `e66befe`.

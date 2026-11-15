@@ -603,12 +603,15 @@
                             <?php endif; ?>
                         </td>
                         <td style="text-align:center">
-                            <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
-                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-                                <input type="hidden" name="action" value="delete_attempt">
-                                <input type="hidden" name="attempt_id" value="<?= (int)$attempt['id'] ?>">
-                                <button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT peserta ini">🗑️ Hapus</button>
-                            </form>
+                            <div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">
+                                <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_review=1&amp;attempt_id=<?= (int)$attempt['id'] ?><?= $resultFilter !== 'all' ? '&amp;result_filter=' . urlencode($resultFilter) : '' ?>" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" title="Review lembar jawaban peserta (soal benar, salah, dan ragu)">👁️ Review</a>
+                                <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="action" value="delete_attempt">
+                                    <input type="hidden" name="attempt_id" value="<?= (int)$attempt['id'] ?>">
+                                    <button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT peserta ini">🗑️ Hapus</button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -967,6 +970,7 @@
 <script>
 window.CBT_PACKAGE_CATEGORIES = <?= json_encode($packageCategoriesMap, JSON_UNESCAPED_UNICODE) ?>;
 window.CBT_CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
+window.CBT_BASE_URL = <?= json_encode(BASE_URL) ?>;
 window.CBT_BANK_URL = <?= json_encode($bankUrl) ?>;
 window.CBT_RESULT_FILTER = <?= json_encode($resultFilter) ?>;
 </script>

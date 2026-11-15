@@ -886,13 +886,20 @@
             const safeNim = escapeHtml(att.nim);
             const programBadge = att.jenis_program_badge || ('<span class="badge-jenis-program badge-jenis-' + (att.jenis_program || 'reguler').toLowerCase() + '">' + escapeHtml(att.jenis_program || 'Reguler') + '</span>');
 
+            const baseUrl = window.CBT_BASE_URL || '';
+            const filterQuery = (currentFilter && currentFilter !== 'all') ? '&result_filter=' + encodeURIComponent(currentFilter) : '';
+            const reviewUrl = baseUrl + '/pretes-ujian.php?cbt_review=1&attempt_id=' + att.id + filterQuery;
+
             const actionCellHtml =
-                '<form method="post" action="' + bankUrl + '&tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.\')">' +
-                    '<input type="hidden" name="csrf_token" value="' + escapeHtml(csrfToken) + '">' +
-                    '<input type="hidden" name="action" value="delete_attempt">' +
-                    '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
-                    '<button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT peserta ini">🗑️ Hapus</button>' +
-                '</form>';
+                '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">' +
+                    '<a href="' + reviewUrl + '" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" title="Review lembar jawaban peserta (soal benar, salah, dan ragu)">👁️ Review</a>' +
+                    '<form method="post" action="' + bankUrl + '&tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.\')">' +
+                        '<input type="hidden" name="csrf_token" value="' + escapeHtml(csrfToken) + '">' +
+                        '<input type="hidden" name="action" value="delete_attempt">' +
+                        '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
+                        '<button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT peserta ini">🗑️ Hapus</button>' +
+                    '</form>' +
+                '</div>';
 
             return '<tr id="attemptRow_' + att.id + '" data-attempt-id="' + att.id + '">' +
                 '<td><strong>' + safeName + '</strong></td>' +

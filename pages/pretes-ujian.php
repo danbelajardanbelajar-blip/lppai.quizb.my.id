@@ -29,6 +29,11 @@ if (isset($_GET['cbt_bank'])) {
     require __DIR__ . '/../admin/pretes-bank-soal.php';
     exit;
 }
+if (isset($_GET['cbt_review'])) {
+    // Admin controller enforces requireAdmin() before rendering student review sheets.
+    require __DIR__ . '/../admin/pretes-cbt-review.php';
+    exit;
+}
 if (isset($_GET['cbt_style'])) {
     $styles = ['bank' => 'pretes-cbt-admin.css', 'exam' => 'pretes-cbt-exam.css'];
     $key = is_string($_GET['cbt_style']) ? $_GET['cbt_style'] : '';
