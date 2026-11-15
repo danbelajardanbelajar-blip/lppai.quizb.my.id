@@ -311,15 +311,21 @@
             document.addEventListener('visibilitychange', () => { if (document.hidden) interrupt('page_hidden'); });
             window.addEventListener('pagehide', () => interrupt('page_hidden'));
             window.addEventListener('blur', () => interrupt('page_hidden'));
-            if (window.TOKEN_REQUIRED && el('cbtTokenBox')) {
-                el('cbtTokenBox').style.display = 'block';
+            const tokenRequired = window.TOKEN_REQUIRED === true;
+            if (el('cbtTokenBox')) {
+                el('cbtTokenBox').style.display = tokenRequired ? 'block' : 'none';
+            }
+            if (el('cbtInputToken')) {
+                el('cbtInputToken').disabled = !tokenRequired;
+                el('cbtInputToken').required = tokenRequired;
+                if (!tokenRequired) el('cbtInputToken').value = '';
             }
             el('cbtStart').onclick = async () => {
                 let token = '';
                 const tokenInput = el('cbtInputToken');
-                if (tokenInput && (window.TOKEN_REQUIRED || tokenInput.value.trim())) {
+                if (tokenInput && tokenRequired) {
                     token = tokenInput.value.trim();
-                    if (window.TOKEN_REQUIRED && !token) {
+                    if (!token) {
                         message('Silakan masukkan token ujian terlebih dahulu.', true);
                         tokenInput.focus();
                         return;
@@ -332,7 +338,7 @@
                 } catch (error) {
                     message(error.message, true);
                     el('cbtStart').disabled = false;
-                    if (el('cbtTokenBox')) {
+                    if (tokenRequired && el('cbtTokenBox')) {
                         el('cbtTokenBox').style.display = 'block';
                         if (tokenInput) tokenInput.focus();
                     }

@@ -666,7 +666,7 @@ include __DIR__ . '/../includes/header.php';
 
         </div>
 
-        <script>window.TOKEN_REQUIRED = <?= !empty($session['token_required']) ? 'true' : 'false' ?>;</script>
+        <script>window.TOKEN_REQUIRED = <?= json_encode(!empty($session['token_required']) && !empty($session['token'])) ?>;</script>
         <script src="<?= BASE_URL ?>/pretes-ujian.php?cbt_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt.js') ?>"></script>
         <script>
         const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;

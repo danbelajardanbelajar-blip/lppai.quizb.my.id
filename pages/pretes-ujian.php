@@ -543,7 +543,7 @@ const REGISTRATION_ID = <?= (int)$regId ?>;
 const API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?face_api=1') ?>;
 const CBT_API_URL = <?= json_encode(BASE_URL . '/pretes-ujian.php?cbt_api=1') ?>;
 const IS_CAMERA_REQUIRED = <?= json_encode($isCameraRequired ?? true) ?>;
-const TOKEN_REQUIRED = <?= json_encode(!empty($activeSession['token_required']) && !empty($activeSession['token'])) ?>;
+window.TOKEN_REQUIRED = <?= json_encode(!empty($activeSession['token_required']) && !empty($activeSession['token'])) ?>;
 
 let proctorInterval = null;
 let countdownTimer = null;

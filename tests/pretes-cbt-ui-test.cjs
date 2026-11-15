@@ -10,6 +10,7 @@ function environment(settings = {}) {
     function node() {
         return { style: {}, children: [], textContent: '', className: '', disabled: false, value: '',
             addEventListener() {},
+            focus() { this.focused = true; },
             replaceChildren(...children) { this.children = children; },
             append(...children) { this.children.push(...children); },
             appendChild(child) { this.children.push(child); },
@@ -18,6 +19,7 @@ function environment(settings = {}) {
     }
     const elements = new Map(), events = {}, intervals = [], requests = [], deferred = [];
     let now = 1000, stored = settings.attempt ? clone(settings.attempt) : null, mode = 'immediate', submitted = false, started = 0;
+    let startFailures = settings.startFailures || 0;
     const element = id => { if (!elements.has(id)) elements.set(id, node()); return elements.get(id); };
     const sandbox = {
         document: { getElementById: element, createElement: node, addEventListener: (name, fn) => { events[name] = fn; } },
@@ -26,10 +28,13 @@ function environment(settings = {}) {
         confirm: () => true, addEventListener: (name, fn) => { events[name] = fn; }
     };
     sandbox.window = sandbox;
+    sandbox.TOKEN_REQUIRED = settings.tokenRequired ?? false;
+    element('cbtInputToken').value = settings.savedToken || '';
     vm.createContext(sandbox);
     vm.runInContext(source, sandbox);
     const request = async payload => {
         requests.push(clone(payload));
+        if (payload.action === 'start' && startFailures-- > 0) throw new Error('Server busy');
         if (payload.action === 'start' && !stored) stored = {
             id: 1, submitted: false, remaining_seconds: 1800, total: 25, answered: 0, score: null, correct: null,
             questions: Array.from({ length: 25 }, (_, index) => ({ position: index + 1, text: '<img onerror=alert(1)> Soal ' + (index + 1),
@@ -61,6 +66,33 @@ function environment(settings = {}) {
 }
 
 (async () => {
+    const optional = environment({ tokenRequired: false, savedToken: 'STALE-TOKEN', startFailures: 1 });
+    await settle();
+    assert.equal(optional.element('cbtTokenBox').style.display, 'none');
+    assert.equal(optional.element('cbtInputToken').disabled, true);
+    assert.equal(optional.element('cbtInputToken').value, '');
+    await optional.element('cbtStart').onclick();
+    assert.equal(optional.element('cbtTokenBox').style.display, 'none', 'Network/server errors must not ask for an optional token');
+    assert.equal(optional.element('cbtInputToken').focused, undefined);
+    assert.equal(optional.requests.find(r => r.action === 'start').token, '');
+    await optional.element('cbtStart').onclick();
+    assert.equal(optional.started, 1, 'Optional-token session can start without a token');
+
+    const mandatory = environment({ tokenRequired: true, startFailures: 1 });
+    await settle();
+    assert.equal(mandatory.element('cbtTokenBox').style.display, 'block');
+    assert.equal(mandatory.element('cbtInputToken').disabled, false);
+    assert.equal(mandatory.element('cbtInputToken').required, true);
+    await mandatory.element('cbtStart').onclick();
+    assert.equal(mandatory.requests.filter(r => r.action === 'start').length, 0, 'Required blank token must block starting');
+    assert.equal(mandatory.element('cbtInputToken').focused, true);
+    mandatory.element('cbtInputToken').value = 'ABC123';
+    await mandatory.element('cbtStart').onclick();
+    assert.equal(mandatory.element('cbtTokenBox').style.display, 'block', 'Required token remains visible after an error');
+    await mandatory.element('cbtStart').onclick();
+    assert.equal(mandatory.requests.find(r => r.action === 'start').token, 'ABC123');
+    assert.equal(mandatory.started, 1);
+
     const env = environment();
     await settle();
     assert.equal(env.element('cbtStart').disabled, false);

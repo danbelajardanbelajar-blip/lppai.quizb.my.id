@@ -5,6 +5,26 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 08:40:16 +0700 — Token hanya ditanyakan jika diwajibkan admin
+
+**ID:** CBT-OPTIONAL-TOKEN-NO-PROMPT · **Parent Git:** `ae69883`.
+**Permintaan:** mahasiswa tidak diminta token jika admin tidak mencentang Wajibkan Token Ujian saat membuat sesi. Penyebab di frontend: catch start sebelumnya selalu membuka kotak token untuk semua jenis error. Flag pretes resmi juga sebelumnya berupa const, sedangkan klien membaca window.TOKEN_REQUIRED. Keduanya diperbaiki; backend existing tetap memeriksa token sesuai token_required.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 08:37:05 | `assets/js/pretes-cbt.js` | 314-344 | Input dan validasi token frontend | Baca flag kewajiban token boolean. Tanpa kewajiban: sembunyikan/nonaktifkan input, kosongkan nilai lama/autofill dan kirim token kosong. Error start tidak lagi memunculkan input token bila opsional. Jika wajib: tampil sejak awal, cegah mulai saat kosong, tetap tampil/fokus setelah error. |
+| 2026-11-15 08:37:05 | `pages/pretes-ujian.php` | 546 | Flag sesi resmi | Publikasikan window.TOKEN_REQUIRED yang benar-benar dibaca klien, menggantikan const lexical. Flag mengikuti token_required dan token sesi, sama dengan pemeriksaan server existing. |
+| 2026-11-15 08:37:05 | `pages/tryout.php` | 669 | Flag sesi tryout | Selaraskan window.TOKEN_REQUIRED dengan token_required dan token sesi agar konsisten dengan pretes resmi/server. |
+| 2026-11-15 08:37:52 | `tests/pretes-cbt-ui-test.cjs` | 10, 22, 28-37, 69-95 | Regresi UI token wajib dan opsional | Uji input opsional tetap tersembunyi setelah error, nilai lama dikosongkan, mulai/retry tanpa token; input wajib terlihat, token kosong diblokir, nilai dikirim setelah terisi, dan retry berhasil. Seluruh uji navigasi/autosave/popup existing tetap dijalankan. |
+| 2026-11-15 08:38:34 | `tests/pretes-cbt-token-test.php` | 1-49 | Integrasi sesi dan mulai ujian | Gunakan PDO SQLite in-memory dan pretesCbtSaveSession/pretesCbtStart aktual: checkbox tidak dikirim menghasilkan token_required=0, token tersimpan tidak memaksa entry, token kosong/salah diabaikan saat opsional; sesi wajib menolak token kosong/salah dan menerima token benar untuk mode resmi/tryout. Periksa rollback dan flag kedua entry page. |
+
+**Verifikasi:** `node tests/pretes-cbt-ui-test.cjs`, `node tests/pretes-ujian-camera-test.cjs`, `php tests/pretes-tryout-test.php`, `php tests/pretes-cbt-token-test.php`, `node --check assets/js/pretes-cbt.js`, lint 2 page PHP dan `git diff --check` pada file perubahan ini: PASS. Chrome headless dengan view PHP dan JavaScript CBT aktual pada 390px: token opsional tersembunyi sebelum/sesudah error; token wajib terlihat, kosong mencegah request dan input terisi dikirim. Screenshot opsional diperiksa; tidak ada input token walau pesan gangguan koneksi muncul. Artefak di `scratch/cbt-token-preview/` (diabaikan Git). Pengujian database memakai SQLite in-memory; data produksi tidak diubah. Tidak ada perubahan kamera, timer, nilai atau validasi server untuk sesi wajib.
+**Penerapan:** commit `Ask for CBT tokens only when the session requires them`; push lalu pull lokal `--ff-only`. Hosting: `cd ~/public_html/lppai.quizb.my.id/web && git pull --ff-only`, lalu Ctrl+F5. Tidak ada migrasi database.
+
+---
+
 ## 2026-11-15 07:56:30 +0700 — Pengecualian Akun Percobaan (Username 12345) dari Seluruh Hasil Export
 
 **ID:** PRETES-EXCLUDE-USER-12345-EXPORT · **Parent Git:** `6845a51`.
