@@ -16,6 +16,8 @@ with tempfile.TemporaryDirectory(prefix='admin-profile-') as directory:
     root = Path(directory)
     for file in ['admin/profil-pengguna.php', 'admin/ajax-user-profile-links.php',
                  'includes/admin-user-profile.php', 'includes/user-table-avatar.php',
+                 'includes/admin-profile-academic-view.php', 'includes/pretes-helper.php',
+                 'includes/pretes-face-engine.php',
                  'assets/js/admin-user-profile-links.js', 'assets/js/pretes-cbt-admin.js']:
         target = root/file
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -32,7 +34,34 @@ with tempfile.TemporaryDirectory(prefix='admin-profile-') as directory:
         CREATE TABLE tutorial_classes(id INTEGER,nama_kelas TEXT,hari TEXT,jam TEXT,ruangan TEXT,dosen_pengampu TEXT,semester TEXT,gelombang TEXT);
         INSERT INTO tutorial_classes VALUES(1,'Kelas Dosen Satu','Senin','08:00','R1','Dosen Satu','Ganjil','gel1');
         CREATE TABLE tutorial_registrations(id INTEGER,user_id INTEGER,tutorial_class_id INTEGER,status TEXT,tahun_ajaran TEXT,gelombang TEXT,hari_pilihan TEXT,nilai_akhir REAL);
-        INSERT INTO tutorial_registrations VALUES(1,1,1,'aktif','2026','gel1','Senin',85);''')
+        INSERT INTO tutorial_registrations VALUES(1,1,1,'aktif','2026','gel1','Senin',85);
+        ALTER TABLE pretes_registrations ADD COLUMN dosen_penguji TEXT;
+        ALTER TABLE pretes_registrations ADD COLUMN foto TEXT;
+        UPDATE pretes_registrations SET dosen_penguji='Dosen Satu',foto='https://example.com/student.png' WHERE user_id=1;
+        CREATE TABLE master_pretes(id INTEGER PRIMARY KEY,periode TEXT,status TEXT);
+        INSERT INTO master_pretes VALUES(1,'Periode Milik Satu','aktif');
+        CREATE TABLE pretes_assessments(registration_id INTEGER PRIMARY KEY,scores_json TEXT);
+        INSERT INTO pretes_assessments VALUES(1,'{"ujian_tulis":0}');
+        CREATE TABLE pretes_results(id INTEGER PRIMARY KEY,user_id INTEGER,status_lulus TEXT,nilai REAL,keterangan TEXT);
+        INSERT INTO pretes_results VALUES(1,1,'tidak_lulus',0,'Perlu tutorial <script>bad</script>');
+        ALTER TABLE tutorial_registrations ADD COLUMN nomor_sertifikat TEXT;
+        ALTER TABLE tutorial_registrations ADD COLUMN nilai_thaharah REAL;
+        UPDATE tutorial_registrations SET nilai_thaharah=0;
+        INSERT INTO users VALUES(5,'Mahasiswa Pretes','pretes','005','mahasiswa','PAI',1,NULL,'SECRET-HASH');
+        INSERT INTO users VALUES(6,'Mahasiswa Lulus','lulus','006','mahasiswa','PAI',1,NULL,'SECRET-HASH');
+        INSERT INTO users VALUES(7,'Mahasiswa Menunggu','menunggu','007','mahasiswa','PAI',1,NULL,'SECRET-HASH');
+        INSERT INTO users VALUES(8,'Mahasiswa Mundur','mundur','008','mahasiswa','PAI',1,NULL,'SECRET-HASH');
+        INSERT INTO pretes_registrations(id,user_id,periode,status) VALUES(3,5,'Periode Milik Satu','terdaftar');
+        INSERT INTO tutorial_registrations(id,user_id,status,nomor_sertifikat) VALUES(2,6,'lulus','LPPAI-006');
+        INSERT INTO tutorial_registrations(id,user_id,status) VALUES(3,7,'terdaftar');
+        INSERT INTO tutorial_registrations(id,user_id,status) VALUES(4,8,'mengundurkan_diri');''')
+        db.executemany('INSERT INTO pretes_registrations(id,user_id,periode,status) VALUES(?,?,?,?)',
+                       [(i, 8, f'Riwayat-{i}', 'terdaftar') for i in range(10, 65)])
+        db.execute("INSERT INTO pretes_registrations(id,user_id,periode,status) VALUES(4,6,'Periode Milik Satu','terdaftar')")
+        components = ['ujian_tulis', 'praktik_wudlu', 'doa_setelah_wudlu', 'praktik_tayammum',
+                      'niat_mandi_besar', 'niat_jamak_qashar', 'bacaan_shalat_subuh', 'al_bayyinah',
+                      'al_alaq', 'al_dluha', 'istighasah', 'shalat_jenazah']
+        db.execute('INSERT INTO pretes_assessments VALUES(4,?)', (json.dumps(dict.fromkeys(components, 85)),))
         db.commit()
         original = '\n'.join(db.iterdump())
     (root/'includes/auth.php').write_text('''<?php
@@ -102,8 +131,19 @@ adminUserProfileLink('Dosen Satu'),adminUserProfileLink('<script>bad</script>',1
         assert request('/admin/profil-pengguna.php?id=999')[0]==404
         assert request('/admin/profil-pengguna.php?id=1',{},method='POST')[0]==405
         status,body=request('/admin/profil-pengguna.php?id=1')
-        assert status==200 and 'Periode Milik Satu' in body and 'Kelas Dosen Satu' in body
+        assert status==200 and 'Periode Milik Satu' in body and 'Kelas Dosen Satu' in body, body
         assert 'Periode Rahasia Lain' not in body and 'SECRET-HASH' not in body and 'Admin 99' in body
+        assert 'Tidak Lulus' in body and 'Sedang Mengikuti Tutorial' in body
+        assert 'https://example.com/student.png' in body
+        assert 'Perlu tutorial &lt;script&gt;bad&lt;/script&gt;' in body
+        assert '<script>bad</script>' not in body
+        assert 'Thaharah</dt><dd>0</dd>' in body and 'Ujian tulis</dt><dd>0</dd>' in body
+        assert 'Sedang Mengikuti Pretes' in request('/admin/profil-pengguna.php?id=5')[1]
+        assert 'LPPAI-006' in request('/admin/profil-pengguna.php?id=6')[1]
+        assert 'Hasil Penilaian Pretes Terakhir</dt><dd>Lulus</dd>' in request('/admin/profil-pengguna.php?id=6')[1]
+        assert 'Menunggu Pembagian Kelas' in request('/admin/profil-pengguna.php?id=7')[1]
+        withdrawn=request('/admin/profil-pengguna.php?id=8')[1]
+        assert 'Mengundurkan Diri' in withdrawn and 'Riwayat-10' in withdrawn and 'Riwayat-64' in withdrawn
         assert 'Kelas Dosen Satu' in request('/admin/profil-pengguna.php?id=2')[1]
         assert '003' in request('/admin/profil-pengguna.php?nama=Nama%20Sama')[1]
         assert '004' in request('/admin/profil-pengguna.php?nama=Nama%20Sama')[1]
@@ -123,6 +163,8 @@ await page.locator('#student a').click();await page.waitForURL('**/profil-penggu
 if(!(await page.textContent('body')).includes('Admin 99'))throw Error('admin identity changed');
 await page.setViewportSize({width:390,height:844});
 if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('mobile overflow');
+await page.locator('details').first().locator('summary').click();
+if(!(await page.locator('details').first().innerText()).includes('Ujian tulis'))throw Error('pretes scores unavailable');
 await page.route('**/mock?**',route=>route.fulfill({json:{success:true,data:[
 {id:900,user_id:3,nama_lengkap:'Nama Sama',nim:'003',is_submitted:true},
 {id:901,user_id:4,nama_lengkap:'Nama Sama',nim:'004',is_submitted:true}
@@ -142,6 +184,13 @@ if(errors.length)throw Error(errors.join(';'));console.log('PASS browser: static
         print(result.stdout.strip())
         with contextlib.closing(sqlite3.connect(root/'test.sqlite')) as db:
             assert '\n'.join(db.iterdump())==original
+            db.execute('DROP TABLE pretes_assessments')
+            db.execute('DROP TABLE tutorial_classes')
+            db.commit()
+        status,body=request('/admin/profil-pengguna.php?id=1')
+        assert status==200 and 'Sebagian Informasi Belum Tersedia' in body
+        assert 'Periode Milik Satu' in body and 'Thaharah</dt><dd>0</dd>' in body
+        assert 'Rincian nilai pretes belum dapat dimuat.' in body
         print('PASS HTTP: admin-only, CSRF, validation, exact/duplicate names, scoped history, no secrets, no database mutations')
     finally:
         server.terminate()

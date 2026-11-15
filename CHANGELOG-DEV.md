@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 17:24:35 +0700 — Kelengkapan profil pengguna admin dan alur verifikasi Git
+
+**ID:** ADMIN-PROFILE-COMPLETE · **Parent Git:** `6523501`.
+**Permintaan:** Tampilkan status pretes/tutorial, kelas, ikon/foto profil, kelulusan dan tidak lulus secara lengkap; verifikasi sebelum setiap push, lakukan pull/push, dan dokumentasikan perubahan secara sistematis.
+
+**Perubahan:** Profil admin menampilkan seluruh riwayat milik akun tujuan, rincian kelas/jadwal/penguji/dosen, 12 komponen nilai pretes, nilai tutorial, hasil resmi pretes, nomor sertifikat, serta keterangan ketika sumber data tidak tersedia. Status pendaftaran, hasil penilaian, dan hasil resmi dipisahkan agar data yang berbeda tidak tercampur. Foto menggunakan akun yang dilihat dengan cadangan pasfoto pretes tanpa membaca atau mengubah foto sesi admin. Riwayat dan kelas dosen tidak lagi dibatasi 50 baris. `AGENTS.md` menyimpan alur kerja yang diminta pengguna untuk pekerjaan berikutnya.
+
+Waktu edit berikut adalah **penyimpanan terakhir file** yang tersedia, bukan rekonstruksi setiap penekanan tombol. Baris merujuk awal blok perubahan (atau seluruh file baru) pada snapshot commit entri ini. Semua waktu WIB sampai detik.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-15 17:21:02 | `admin/profil-pengguna.php` | 28, 40, 57, 60, 68, 76, 81 | Avatar akun tujuan dengan cadangan pasfoto pretes; pemberitahuan data gagal dimuat; tanggal akun; integrasi detail akademik; seluruh kelas dosen. |
+| 2026-11-15 17:20:00 | `includes/admin-user-profile.php` | 40, 43, 45, 47, 50, 52, 97, 99, 104 | adminProfileHistory: seluruh riwayat, hasil resmi, nilai 12 komponen, periode dan fallback query; helper label status dan kegiatan. |
+| 2026-11-15 17:20:44 | `includes/admin-profile-academic-view.php` | 1–85 | Tampilan baru: ringkasan kegiatan/kelulusan, kelas pretes/tutorial, penguji/dosen, hasil resmi, nilai nol, serta nomor sertifikat; escaping keluaran. |
+| 2026-11-15 17:22:17 | `tests/admin-user-profile-test.py` | 19, 37, 134, 136, 166, 187 | Fixture dan uji HTTP/browser: pretes aktif, lulus/tidak lulus, tutorial aktif/menunggu/mundur, foto akun tujuan, nilai nol, >50 riwayat, escaping, dan tabel tidak tersedia. |
+| 2026-11-15 17:24:34 | `AGENTS.md` | 1–9 | Instruksi kerja proyek: verifikasi sebelum push, changelog rinci WIB, commit/pull/push, dan pelaporan hasil. |
+| 2026-11-15 17:24:35 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-PROFILE-COMPLETE: kronologi file, alasan perubahan, cakupan dan bukti verifikasi. |
+
+**Verifikasi:** `php -l` untuk ketiga file PHP berubah; `python tests/admin-user-profile-test.py`; `git diff --check`. Uji profil telah lulus pada 2026-11-15 sebelum pencatatan ini: akses admin-only, validasi/CSRF endpoint terkait, identitas admin tetap, data sesuai pengguna, tanpa hash/password, tanpa mutasi database aplikasi, desktop/seluler tanpa error JavaScript, status dan nilai, riwayat >50, serta fallback tabel hilang. Pemeriksaan akhir dijalankan kembali sebelum commit/push.
+
+**Batas verifikasi:** Database/akun produksi ID 18310 belum dapat diperiksa langsung. Verifikasi menggunakan database SQLite terisolasi dan browser Chrome. PHP CLI mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali; sintaks file lulus. Push ke GitHub tidak dengan sendirinya membuktikan deployment hosting.
+
+**Pelacakan commit:** Cari pesan commit dengan ID `ADMIN-PROFILE-COMPLETE`; parent tercatat di atas. Tidak ada perubahan skema atau data produksi.
+
+---
+
 ## 2026-11-15 13:05:04 +0700 — Tautan profil pada tabel di seluruh tampilan role admin
 
 **ID:** ADMIN-PROFILE-ALL-TABLES · **Parent Git:** `af56086`.

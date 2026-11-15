@@ -25,12 +25,19 @@ if (isset($_GET['id'])) {
     }
 } else { http_response_code(400); exit('Pilih pengguna dari nama pada tabel.'); }
 $profileHistory = $profileUser ? adminProfileHistory($pdo, $profileUser) : null;
+// Resolve only the viewed account's photo, without reading or modifying the admin session.
+$profileIdentity = $profileUser;
+if ($profileIdentity && empty($profileIdentity['foto'])) {
+    foreach ($profileHistory['pretes'] as $registration) {
+        if (!empty($registration['foto'])) { $profileIdentity['foto'] = $registration['foto']; break; }
+    }
+}
 include __DIR__ . '/../includes/header.php';
 ?>
 <style>
 .admin-profile-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
 .admin-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.admin-profile-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.admin-profile-fields dt{font-size:12px;color:#64748b;margin-bottom:5px}.admin-profile-fields dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.admin-profile-record{border-top:1px solid #e2e8f0;padding:16px 0;min-width:0}.admin-profile-record h3{overflow-wrap:anywhere}.admin-profile-record summary{cursor:pointer;color:#166534;font-weight:600;padding:8px 0}.admin-profile-fields dt{font-size:12px;color:#64748b;margin-bottom:5px}.admin-profile-fields dd{margin:0;font-weight:600;overflow-wrap:anywhere}
 .admin-profile-identity .users-table-user-icon{width:88px!important;height:88px!important;flex-basis:88px!important}.admin-profile-identity .users-table-user-icon svg{width:44px;height:44px}
 .admin-profile-identity .users-table-user-cell{font-size:22px;font-weight:800;gap:18px!important}.admin-profile-table{overflow-x:auto}.admin-profile-table table{min-width:600px;width:100%}
 @media(max-width:700px){.admin-profile-grid,.admin-profile-fields{grid-template-columns:minmax(0,1fr)}.admin-profile-identity .users-table-user-cell{font-size:18px}}
@@ -47,13 +54,18 @@ include __DIR__ . '/../includes/header.php';
 </div></section>
 <?php else: ?>
 <section class="card"><div class="card-body admin-profile-identity">
-    <?= renderUserTableName($profileUser) ?>
+    <?= renderUserTableName($profileIdentity) ?>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;"><span class="badge badge-info"><?= sanitize(ucfirst($profileUser['role'])) ?></span><span class="badge <?= !empty($profileUser['is_active']) ? 'badge-success' : 'badge-danger' ?>"><?= !empty($profileUser['is_active']) ? 'Akun Aktif' : 'Akun Nonaktif' ?></span></div>
 </div></section>
+<?php if ($profileHistory['errors']): ?>
+<section class="card" role="status"><div class="card-header">Sebagian Informasi Belum Tersedia</div><div class="card-body"><ul>
+<?php foreach ($profileHistory['errors'] as $message): ?><li><?= sanitize($message) ?></li><?php endforeach; ?>
+</ul></div></section>
+<?php endif; ?>
 <div class="admin-profile-grid">
 <?php foreach ([
     'Informasi Akun & Akademik' => ['id'=>'ID Pengguna','username'=>'Username','nim'=>'NIM / NIDN','jenis_program'=>'Jenis Program','program_studi'=>'Program Studi','fakultas'=>'Fakultas','angkatan'=>'Angkatan'],
-    'Kontak & Data Pribadi' => ['email'=>'Email','no_hp'=>'Nomor HP / WhatsApp','tempat_lahir'=>'Tempat Lahir','tanggal_lahir'=>'Tanggal Lahir'],
+    'Kontak & Data Pribadi' => ['email'=>'Email','no_hp'=>'Nomor HP / WhatsApp','tempat_lahir'=>'Tempat Lahir','tanggal_lahir'=>'Tanggal Lahir','created_at'=>'Akun Dibuat','updated_at'=>'Terakhir Diperbarui'],
 ] as $title => $fields): ?>
 <section class="card"><div class="card-header"><?= sanitize($title) ?></div><div class="card-body"><dl class="admin-profile-fields">
     <?php foreach ($fields as $field => $label): ?><div><dt><?= sanitize($label) ?></dt><dd><?= sanitize((string)($profileUser[$field] ?? '') !== '' ? (string)$profileUser[$field] : '-') ?></dd></div><?php endforeach; ?>
@@ -61,21 +73,12 @@ include __DIR__ . '/../includes/header.php';
 <?php endforeach; ?>
 </div>
 <?php if ($profileUser['role'] === 'mahasiswa'): ?>
-<section class="card"><div class="card-header">Riwayat Pendaftaran Pretes</div><div class="card-body">
-<?php if (!$profileHistory['pretes']): ?><p>Belum ada riwayat pretes yang tersedia.</p><?php else: ?>
-<p style="font-size:12px;color:#64748b;">Maksimal 50 pendaftaran terakhir.</p><div class="admin-profile-table"><table><thead><tr><th>Periode</th><th>Hari</th><th>Jam</th><th>Ruangan</th><th>Status</th></tr></thead><tbody>
-<?php foreach ($profileHistory['pretes'] as $row): ?><tr><?php foreach (['periode','hari_pilihan','jam','ruangan','status'] as $field): ?><td><?= sanitize($row[$field] ?: '-') ?></td><?php endforeach; ?></tr><?php endforeach; ?>
-</tbody></table></div><?php endif; ?></div></section>
-<section class="card"><div class="card-header">Riwayat Tutorial</div><div class="card-body">
-<?php if (!$profileHistory['tutorial']): ?><p>Belum ada riwayat tutorial yang tersedia.</p><?php else: ?>
-<p style="font-size:12px;color:#64748b;">Maksimal 50 pendaftaran terakhir.</p><div class="admin-profile-table"><table><thead><tr><th>Tahun / Gelombang</th><th>Kelas</th><th>Dosen</th><th>Hari / Jam</th><th>Ruangan</th><th>Status</th><th>Nilai</th></tr></thead><tbody>
-<?php foreach ($profileHistory['tutorial'] as $row): ?><tr><td><?= sanitize(($row['tahun_ajaran'] ?? '-') . ' / ' . ($row['gelombang'] ?? '-')) ?></td><td><?= sanitize($row['nama_kelas'] ?: 'Menunggu Pembagian Kelas') ?></td><td><?= adminUserProfileLink($row['dosen_pengampu'] ?: '-') ?></td><td><?= sanitize(($row['hari'] ?: $row['hari_pilihan']) . ' / ' . ($row['jam'] ?: '-')) ?></td><td><?= sanitize($row['ruangan'] ?: '-') ?></td><td><?= sanitize($row['status']) ?></td><td><?= $row['nilai_akhir'] !== null ? sanitize($row['nilai_akhir']) : '-' ?></td></tr><?php endforeach; ?>
-</tbody></table></div><?php endif; ?></div></section>
+<?php include __DIR__ . '/../includes/admin-profile-academic-view.php'; ?>
 <?php elseif ($profileUser['role'] === 'dosen'): ?>
 <section class="card"><div class="card-header">Kelas Tutorial yang Diampu</div><div class="card-body">
 <?php if ($profileHistory['ambiguous_teacher']): ?><p>Ada akun dosen lain dengan nama sama. Jadwal tidak ditampilkan agar tidak tertukar.</p>
 <?php elseif (!$profileHistory['teaching']): ?><p>Belum ada kelas tutorial yang tersedia.</p>
-<?php else: ?><p style="font-size:12px;color:#64748b;">Maksimal 50 kelas terakhir.</p><div class="admin-profile-table"><table><thead><tr><th>Kelas</th><th>Semester / Gelombang</th><th>Hari</th><th>Jam</th><th>Ruangan</th></tr></thead><tbody>
+<?php else: ?><p style="font-size:12px;color:#64748b;">Seluruh kelas yang diampu.</p><div class="admin-profile-table"><table><thead><tr><th>Kelas</th><th>Semester / Gelombang</th><th>Hari</th><th>Jam</th><th>Ruangan</th></tr></thead><tbody>
 <?php foreach ($profileHistory['teaching'] as $row): ?><tr><td><?= sanitize($row['nama_kelas']) ?></td><td><?= sanitize($row['semester'] . ' / ' . $row['gelombang']) ?></td><td><?= sanitize($row['hari'] ?: '-') ?></td><td><?= sanitize($row['jam'] ?: '-') ?></td><td><?= sanitize($row['ruangan'] ?: '-') ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?></div></section>
 <?php endif; ?>
