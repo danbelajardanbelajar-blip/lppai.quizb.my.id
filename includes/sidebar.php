@@ -290,6 +290,12 @@ if (!function_exists('menuActive')) {
         </a>
 
         <div class="menu-label">Akun</div>
+        <a href="<?= BASE_URL ?>/profil.php" class="page-nav <?= menuActive('profil.php') ?>">
+            <span class="icon">👤</span> Profil Saya
+        </a>
+        <a href="<?= BASE_URL ?>/pengaturan.php" class="page-nav <?= menuActive('pengaturan.php') ?>">
+            <span class="icon">⚙️</span> Pengaturan
+        </a>
         <a href="<?= BASE_URL ?>/logout.php" style="margin-bottom:14px;">
             <span class="icon">🚪</span> Keluar
         </a>

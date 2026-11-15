@@ -5,6 +5,40 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-15 08:42:00 +0700 — Ikon Avatar Foto Profil & Dropdown Menu Profil dan Pengaturan Seluruh Role
+
+**ID:** USER-AVATAR-PROFILE-SETTINGS-MENU · **Parent Git:** `ed889f2`.
+**Permintaan:** pada halaman seluruh role, jadikan agar icon diisi jika user sudah memiliki foto dan icon tersebut bisa diklik dan memunculkan menu profil dan pengaturan.
+
+Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| 2026-11-15 08:36:34 | `includes/user-helper.php` | 792-974 | Helper Resolusi & Manajemen Foto Profil Pengguna | Menambahkan fungsi `ensureUserPhotoColumn(PDO $pdo)` untuk memastikan ketersediaan kolom `users.foto` secara idempoten (MySQL & SQLite). Menambahkan fungsi `getUserAvatarUrl(?array $user, ?PDO $pdo)` yang memprioritaskan `users.foto`, secara otomatis fallback ke pasfoto pretes resmi mahasiswa (`pretes_registrations.foto`) jika ada, dan mengembalikan `null` untuk fallback ke inisial nama. Menambahkan fungsi `saveUserUploadedPhoto()` (validasi ekstensi/MIME gambar, kompresi/penyimpanan ke `uploads/profil/` berpelindung `.htaccess`) dan `deleteUserPhoto()`. |
+| 2026-11-15 08:37:16 | `includes/auth.php` | 128, 211, 274 | Session & Model Pengguna Aktif | Menyimpan atribut `foto` pada sesi `loginUser()`, mengekspos field `'foto'` pada array hasil `getCurrentUser()`, serta menyelaraskan foto pada fitur penyamaran `return_admin`. |
+| 2026-11-15 08:37:48 | `includes/header.php` | 41-140 | Topbar Avatar Interaktif & Dropdown Menu Pengguna | Memperbarui topbar seluruh role: membungkus info pengguna dalam `.user-menu-container` dengan tombol `#userMenuBtn`. Jika pengguna memiliki foto aktif, avatar merender `<img>` foto (`.has-photo`) dengan fail-safe `onerror` yang otomatis beralih ke inisial huruf nama. Menambahkan ikon chevron penanda interaktif dan panel dropdown menu elegan (`#userDropdownMenu`) yang memuat avatar besar, nama, badge role & identitas (NIM/username), tautan navigasi `👤 Profil Saya` (`profil.php`), `⚙️ Pengaturan` (`pengaturan.php`), dan `🚪 Keluar` (`logout.php`), disertai JavaScript pengendali toggle klik luar dan keyboard Escape. |
+| 2026-11-15 08:38:29 | `assets/css/style.css` | 626-805 | Styling Emerald Royale Avatar & Dropdown Menu | Menambahkan CSS rules untuk `.user-menu-container`, `.user-info.user-menu-btn`, `.topbar .user-info .avatar.has-photo`, `.avatar-img`, `.user-menu-chevron`, `.user-dropdown-menu`, `.user-dropdown-header`, `.dropdown-avatar`, `.dropdown-user-name`, `.user-dropdown-item`, hover effects, focus outline aksesibilitas, serta animasi transisi micro-interaction. |
+| 2026-11-15 08:39:19 | `pages/profil.php` | 1-285 | Halaman Profil Pengguna Terpadu | Pembuatan halaman profil pengguna untuk seluruh role (Admin, Dosen, Mahasiswa): autentikasi `requireLogin()`, pratinjau avatar 130px, formulir unggah pasfoto baru (JPG, PNG, WEBP maks 5MB) dengan preview instan, tombol hapus foto profil, formulir pembaruan data diri (Nama Lengkap, No WhatsApp/HP dengan auto-format 628, Email, Tempat & Tanggal Lahir), pembacaan data akademik (NIM/Username, Role, Prodi, Jenis Program RPL/Reguler, Angkatan), serta proteksi CSRF. |
+| 2026-11-15 08:39:23 | `profil.php` | 1-6 | Entrypoint Root Profil | Delegator root aman yang memuat `pages/profil.php` untuk kompatibilitas lintas environment. |
+| 2026-11-15 08:39:47 | `pages/pengaturan.php` | 1-175 | Halaman Pengaturan Akun & Keamanan | Pembuatan halaman pengaturan akun untuk seluruh role: formulir ganti kata sandi (verifikasi kata sandi lama via `password_verify`, validasi panjang baru minimal 6 karakter, konfirmasi kecocokan, dan enkripsi `password_hash`), panel informasi keamanan sesi login (Alamat IP, User-Agent perangkat/browser, proteksi Session Fixation & CSRF), serta tautan bantuan. |
+| 2026-11-15 08:39:51 | `pengaturan.php` | 1-6 | Entrypoint Root Pengaturan | Delegator root aman yang memuat `pages/pengaturan.php`. |
+| 2026-11-15 08:40:06 | `includes/sidebar.php` | 293-298 | Tautan Navigasi Menu Akun Sidebar | Menambahkan menu `👤 Profil Saya` (`profil.php`) dan `⚙️ Pengaturan` (`pengaturan.php`) pada kelompok navigasi Akun di sidebar untuk mempermudah akses cepat pengguna di seluruh role. |
+| 2026-11-15 08:40:46 | `tests/user-profile-avatar-menu-test.php` | 1-105 | Test Suite Otomatis Avatar & Menu Profil/Pengaturan | Pembuatan 32 pengujian otomatis memvalidasi migrasi kolom `users.foto`, resolusi URL avatar admin, fallback otomatis pasfoto pretes mahasiswa, fallback inisial user tanpa foto, komponen elemen header & dropdown HTML, handler keyboard Escape, styling CSS Emerald Royale, fungsionalitas controller `profil.php` & `pengaturan.php`, serta integritas tautan navigasi sidebar. |
+
+**Verifikasi:**
+1. Linting seluruh file PHP (`php -l`): PASS 100% tanpa error syntax.
+2. `php tests/user-profile-avatar-menu-test.php`: PASS (32 skenario validasi Avatar Foto & Menu Profil/Pengaturan lulus 100%).
+3. `php tests/theme-emerald-royale-test.php`: PASS (Verifikasi tema Emerald Royale & Champagne Prestige lulus 100%).
+4. `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file).
+5. `php tests/pretes-peserta-pdf-test.php`: PASS (24 skenario export PDF peserta).
+6. `php tests/pretes-cbt-review-test.php`: PASS (22 skenario review CBT).
+7. `php tests/user-jenis-program-test.php`: PASS (24 file verified).
+8. `php tests/pretes-rekap-nilai-test.php`: PASS (151 skenario kelulusan).
+
+**Penerapan:** commit `Add user profile photo avatar support and interactive profile and settings dropdown menu for all roles`; push ke `origin/main` lalu pull lokal `--ff-only`.
+
+---
+
 ## 2026-11-15 08:40:16 +0700 — Token hanya ditanyakan jika diwajibkan admin
 
 **ID:** CBT-OPTIONAL-TOKEN-NO-PROMPT · **Parent Git:** `ae69883`.

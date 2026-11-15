@@ -125,6 +125,7 @@ function loginUser($username, $password) {
         $_SESSION['jenis_program'] = normalizeJenisProgram($user['jenis_program'] ?? 'Reguler');
         $_SESSION['fakultas'] = $user['fakultas'];
         $_SESSION['angkatan'] = $user['angkatan'] ?? '';
+        $_SESSION['foto'] = $user['foto'] ?? null;
         
         // Cek kolom is_active jika ada di array user
         $isActive = isset($user['is_active']) ? (int)$user['is_active'] : 0;
@@ -207,6 +208,7 @@ function getCurrentUser() {
         'fakultas' => $_SESSION['fakultas'] ?? '',
         'angkatan' => $_SESSION['angkatan'] ?? '',
         'is_active' => $_SESSION['is_active'] ?? 0,
+        'foto' => $_SESSION['foto'] ?? null,
     ];
 }
 
@@ -269,6 +271,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_admin') {
             $_SESSION['fakultas'] = $user['fakultas'];
             $_SESSION['angkatan'] = $user['angkatan'] ?? '';
             $_SESSION['is_active'] = isset($user['is_active']) ? (int)$user['is_active'] : 1;
+            $_SESSION['foto'] = $user['foto'] ?? null;
             unset($_SESSION['admin_login_as']);
             header('Location: ' . BASE_URL . '/admin/users.php');
             exit;

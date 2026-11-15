@@ -788,3 +788,277 @@ if (!function_exists('renderDosenWithWa')) {
     }
 }
 
+
+
+if (!function_exists('ensureUserPhotoColumn')) {
+    /**
+     * Memastikan kolom `foto` tersedia di tabel `users`.
+     */
+    function ensureUserPhotoColumn(PDO $pdo): void {
+        static $verified = false;
+        if ($verified) return;
+        $driver = '';
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        } catch (Throwable $e) {
+            $driver = 'mysql';
+        }
+
+        if ($driver === 'mysql' && !empty($_SESSION['_schema_user_photo_ok'])) {
+            $verified = true;
+            return;
+        }
+
+        try {
+            if ($driver === 'sqlite') {
+                $cols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
+                $names = array_map(fn($c) => strtolower((string)($c['name'] ?? '')), $cols ?: []);
+                if (!in_array('foto', $names, true) && !empty($cols)) {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN foto TEXT DEFAULT NULL");
+                }
+            } else {
+                $col = $pdo->query("SHOW COLUMNS FROM users LIKE 'foto'")->fetch();
+                if (!$col) {
+                    $pdo->exec("ALTER TABLE users ADD COLUMN foto VARCHAR(255) DEFAULT NULL AFTER role");
+                }
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    $_SESSION['_schema_user_photo_ok'] = true;
+                }
+            }
+            $verified = true;
+        } catch (Throwable $e) {
+            error_log('ensureUserPhotoColumn warning: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('getUserAvatarUrl')) {
+    /**
+     * Mendapatkan URL foto profil / avatar pengguna.
+     * Mengutamakan users.foto, kemudian fallback ke pasfoto pretes untuk mahasiswa jika tersedia.
+     */
+    function getUserAvatarUrl(?array $user = null, ?PDO $pdo = null): ?string {
+        if ($user === null && function_exists('getCurrentUser')) {
+            $user = getCurrentUser();
+        }
+        if (!$user || !is_array($user)) {
+            return null;
+        }
+
+        $userId = (int)($user['id'] ?? ($_SESSION['user_id'] ?? 0));
+        $baseUrl = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
+
+        // 1. Cek dari field user atau session
+        $candidate = trim((string)($user['foto'] ?? ($_SESSION['foto'] ?? '')));
+        if ($candidate !== '') {
+            if (preg_match('#^https?://#i', $candidate) || str_starts_with($candidate, 'data:image/')) {
+                return $candidate;
+            }
+            $clean = ltrim($candidate, '/\\');
+            $fullPath = __DIR__ . '/../' . $clean;
+            if (file_exists($fullPath) || (defined('LPPAI_TEST_MODE') && LPPAI_TEST_MODE)) {
+                return ($baseUrl !== '' ? $baseUrl . '/' : '/') . $clean;
+            }
+        }
+
+        // Jika tidak ada PDO, coba koneksi
+        if (!$pdo && function_exists('getDBConnection')) {
+            try {
+                $pdo = getDBConnection();
+            } catch (Throwable $e) {
+                $pdo = null;
+            }
+        }
+
+        // 2. Cek kolom foto di tabel users jika belum ada di sesi
+        if ($userId > 0 && $pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT foto FROM users WHERE id = ? LIMIT 1");
+                $stmt->execute([$userId]);
+                $dbFoto = trim((string)$stmt->fetchColumn());
+                if ($dbFoto !== '') {
+                    if (preg_match('#^https?://#i', $dbFoto) || str_starts_with($dbFoto, 'data:image/')) {
+                        if (session_status() === PHP_SESSION_ACTIVE) $_SESSION['foto'] = $dbFoto;
+                        return $dbFoto;
+                    }
+                    $clean = ltrim($dbFoto, '/\\');
+                    $fullPath = __DIR__ . '/../' . $clean;
+                    if (file_exists($fullPath) || (defined('LPPAI_TEST_MODE') && LPPAI_TEST_MODE)) {
+                        if (session_status() === PHP_SESSION_ACTIVE) $_SESSION['foto'] = $clean;
+                        return ($baseUrl !== '' ? $baseUrl . '/' : '/') . $clean;
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        // 3. Fallback untuk Mahasiswa: jika belum punya foto profil kustom, gunakan pasfoto pretes resmi
+        if ($userId > 0 && ($user['role'] ?? '') === 'mahasiswa' && $pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT foto FROM pretes_registrations WHERE user_id = ? AND foto IS NOT NULL AND TRIM(foto) != '' ORDER BY id DESC LIMIT 1");
+                $stmt->execute([$userId]);
+                $pretesFoto = trim((string)$stmt->fetchColumn());
+                if ($pretesFoto !== '') {
+                    $clean = ltrim($pretesFoto, '/\\');
+                    $fullPath = __DIR__ . '/../' . $clean;
+                    if (file_exists($fullPath) || (defined('LPPAI_TEST_MODE') && LPPAI_TEST_MODE)) {
+                        if (session_status() === PHP_SESSION_ACTIVE) $_SESSION['foto'] = $clean;
+                        return ($baseUrl !== '' ? $baseUrl . '/' : '/') . $clean;
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('saveUserUploadedPhoto')) {
+    /**
+     * Memvalidasi dan menyimpan unggahan foto profil pengguna ke uploads/profil/.
+     *
+     * @return array{success:bool, error?:string, path?:string, url?:string}
+     */
+    function saveUserUploadedPhoto(array $file, int $userId, ?PDO $pdo = null): array {
+        if ($userId <= 0) {
+            return ['success' => false, 'error' => 'Identitas pengguna tidak valid.'];
+        }
+        if (!isset($file['error']) || $file['error'] !== UPLOAD_ERR_OK) {
+            $errCode = $file['error'] ?? -1;
+            $msg = ($errCode === UPLOAD_ERR_INI_SIZE || $errCode === UPLOAD_ERR_FORM_SIZE)
+                ? 'Ukuran file melebihi batas maksimal yang diizinkan (maksimal 5 MB).'
+                : 'Terjadi kegagalan saat mengunggah file foto.';
+            return ['success' => false, 'error' => $msg];
+        }
+
+        // Validasi ukuran (maks 5MB)
+        if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            return ['success' => false, 'error' => 'Ukuran foto maksimal 5 MB.'];
+        }
+
+        // Validasi ekstensi & MIME tipe gambar asli
+        $tmpPath = $file['tmp_name'] ?? '';
+        if (!file_exists($tmpPath)) {
+            return ['success' => false, 'error' => 'File sementara tidak ditemukan.'];
+        }
+
+        $imgInfo = @getimagesize($tmpPath);
+        if ($imgInfo === false) {
+            return ['success' => false, 'error' => 'File yang diunggah bukan format gambar yang valid.'];
+        }
+
+        $allowedTypes = [
+            IMAGETYPE_JPEG => 'jpg',
+            IMAGETYPE_PNG  => 'png',
+            IMAGETYPE_WEBP => 'webp'
+        ];
+        if (defined('IMAGETYPE_GIF')) {
+            $allowedTypes[IMAGETYPE_GIF] = 'gif';
+        }
+
+        $detectedType = $imgInfo[2] ?? 0;
+        if (!isset($allowedTypes[$detectedType])) {
+            return ['success' => false, 'error' => 'Format gambar harus berupa JPG, PNG, atau WEBP.'];
+        }
+        $ext = $allowedTypes[$detectedType];
+
+        // Direktori tujuan uploads/profil
+        $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+        $targetDir = $baseDir . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'profil';
+        if (!is_dir($targetDir)) {
+            if (!@mkdir($targetDir, 0755, true)) {
+                return ['success' => false, 'error' => 'Gagal membuat folder penyimpanan foto profil.'];
+            }
+        }
+
+        // Amankan folder dengan .htaccess
+        $htaccess = $targetDir . DIRECTORY_SEPARATOR . '.htaccess';
+        if (!file_exists($htaccess)) {
+            @file_put_contents($htaccess, "# Keamanan Folder Foto\n<FilesMatch \"\\.(php|phtml|php3|php4|php5|php7|phps|cgi|pl|exe|sh)$\">\nOrder Deny,Allow\nDeny from all\n</FilesMatch>\nOptions -ExecCGI -Indexes\n");
+        }
+
+        $fileName = 'avatar_' . $userId . '_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $destPath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
+
+        if (!@move_uploaded_file($tmpPath, $destPath)) {
+            // Fallback copy jika di lingkungan non-standard upload
+            if (!@copy($tmpPath, $destPath)) {
+                return ['success' => false, 'error' => 'Gagal memindahkan file foto ke folder tujuan.'];
+            }
+            @unlink($tmpPath);
+        }
+
+        $relPath = 'uploads/profil/' . $fileName;
+
+        // Update database
+        if (!$pdo && function_exists('getDBConnection')) {
+            try { $pdo = getDBConnection(); } catch (Throwable $e) {}
+        }
+        if ($pdo) {
+            ensureUserPhotoColumn($pdo);
+            // Hapus file lama jika ada dan berada di uploads/profil
+            try {
+                $stmtOld = $pdo->prepare("SELECT foto FROM users WHERE id = ?");
+                $stmtOld->execute([$userId]);
+                $oldFoto = trim((string)$stmtOld->fetchColumn());
+                if ($oldFoto !== '' && str_starts_with($oldFoto, 'uploads/profil/')) {
+                    $oldFullPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $oldFoto);
+                    if (file_exists($oldFullPath) && basename($oldFullPath) !== $fileName) {
+                        @unlink($oldFullPath);
+                    }
+                }
+
+                $stmtUp = $pdo->prepare("UPDATE users SET foto = ? WHERE id = ?");
+                $stmtUp->execute([$relPath, $userId]);
+            } catch (Throwable $e) {
+                error_log('saveUserUploadedPhoto DB error: ' . $e->getMessage());
+            }
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['foto'] = $relPath;
+        }
+
+        $baseUrl = defined('BASE_URL') ? rtrim(BASE_URL, '/') : '';
+        return [
+            'success' => true,
+            'path'    => $relPath,
+            'url'     => ($baseUrl !== '' ? $baseUrl . '/' : '/') . $relPath
+        ];
+    }
+}
+
+if (!function_exists('deleteUserPhoto')) {
+    /**
+     * Menghapus foto profil pengguna (mengembalikan ke tampilan inisial).
+     */
+    function deleteUserPhoto(int $userId, ?PDO $pdo = null): bool {
+        if ($userId <= 0) return false;
+        if (!$pdo && function_exists('getDBConnection')) {
+            try { $pdo = getDBConnection(); } catch (Throwable $e) {}
+        }
+        if ($pdo) {
+            ensureUserPhotoColumn($pdo);
+            try {
+                $stmt = $pdo->prepare("SELECT foto FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $oldFoto = trim((string)$stmt->fetchColumn());
+                if ($oldFoto !== '' && str_starts_with($oldFoto, 'uploads/profil/')) {
+                    $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+                    $oldFullPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $oldFoto);
+                    if (file_exists($oldFullPath)) {
+                        @unlink($oldFullPath);
+                    }
+                }
+                $pdo->prepare("UPDATE users SET foto = NULL WHERE id = ?")->execute([$userId]);
+            } catch (Throwable $e) {
+                error_log('deleteUserPhoto error: ' . $e->getMessage());
+                return false;
+            }
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            unset($_SESSION['foto']);
+        }
+        return true;
+    }
+}

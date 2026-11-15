@@ -38,12 +38,106 @@ $currentUser = getCurrentUser();
                 <button class="hamburger" aria-label="Toggle Navigation Menu">&#9776;</button>
                 <span class="page-title"><?= sanitize(PAGE_TITLE) ?></span>
             </div>
-            <div class="user-info">
-                <div style="text-align:right;">
-                    <div class="name"><?= sanitize($currentUser['nama_lengkap']) ?></div>
-                    <span class="role-badge"><?= $currentUser['role'] === 'admin' ? 'Admin' : ($currentUser['role'] === 'dosen' ? 'Dosen / Tutor' : 'Mahasiswa') ?></span>
+            <?php
+            $userPhotoUrl = function_exists('getUserAvatarUrl') ? getUserAvatarUrl($currentUser) : null;
+            $userInitial = strtoupper(substr($currentUser['nama_lengkap'] ?? 'U', 0, 1));
+            $userRoleLabel = ($currentUser['role'] ?? '') === 'admin' ? 'Admin' : (($currentUser['role'] ?? '') === 'dosen' ? 'Dosen / Tutor' : 'Mahasiswa');
+            ?>
+            <div class="user-menu-container" id="userMenuContainer">
+                <button type="button" class="user-info user-menu-btn" id="userMenuBtn" aria-haspopup="true" aria-expanded="false" title="Menu Pengguna: Profil & Pengaturan">
+                    <div class="user-info-text" style="text-align:right;">
+                        <div class="name"><?= sanitize($currentUser['nama_lengkap']) ?></div>
+                        <span class="role-badge"><?= $userRoleLabel ?></span>
+                    </div>
+                    <div class="avatar <?= !empty($userPhotoUrl) ? 'has-photo' : '' ?>" title="<?= sanitize($currentUser['nama_lengkap']) ?>">
+                        <?php if (!empty($userPhotoUrl)): ?>
+                            <img src="<?= sanitize($userPhotoUrl) ?>" alt="<?= sanitize($currentUser['nama_lengkap']) ?>" class="avatar-img" onerror="this.onerror=null;this.style.display='none';this.parentElement.classList.remove('has-photo');var init=this.parentElement.querySelector('.avatar-initial');if(init)init.style.display='flex';">
+                            <span class="avatar-initial" style="display:none;"><?= $userInitial ?></span>
+                        <?php else: ?>
+                            <span class="avatar-initial"><?= $userInitial ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <span class="user-menu-chevron" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="user-dropdown-menu" id="userDropdownMenu" role="menu" aria-labelledby="userMenuBtn">
+                    <div class="user-dropdown-header">
+                        <div class="dropdown-avatar <?= !empty($userPhotoUrl) ? 'has-photo' : '' ?>">
+                            <?php if (!empty($userPhotoUrl)): ?>
+                                <img src="<?= sanitize($userPhotoUrl) ?>" alt="<?= sanitize($currentUser['nama_lengkap']) ?>" class="dropdown-avatar-img">
+                            <?php else: ?>
+                                <span><?= $userInitial ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="dropdown-user-meta">
+                            <div class="dropdown-user-name"><?= sanitize($currentUser['nama_lengkap']) ?></div>
+                            <div class="dropdown-user-badges">
+                                <span class="role-badge"><?= $userRoleLabel ?></span>
+                                <span class="user-id-badge"><?= sanitize(!empty($currentUser['nim']) ? $currentUser['nim'] : $currentUser['username']) ?></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="user-dropdown-divider"></div>
+                    <div class="user-dropdown-nav">
+                        <a href="<?= BASE_URL ?>/profil.php" class="user-dropdown-item" role="menuitem">
+                            <span class="dropdown-icon">👤</span>
+                            <div class="dropdown-item-text">
+                                <div class="dropdown-item-title">Profil Saya</div>
+                                <div class="dropdown-item-desc">Lihat & perbarui data profil serta foto</div>
+                            </div>
+                        </a>
+                        <a href="<?= BASE_URL ?>/pengaturan.php" class="user-dropdown-item" role="menuitem">
+                            <span class="dropdown-icon">⚙️</span>
+                            <div class="dropdown-item-text">
+                                <div class="dropdown-item-title">Pengaturan</div>
+                                <div class="dropdown-item-desc">Ubah kata sandi & info keamanan akun</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="user-dropdown-divider"></div>
+                    <a href="<?= BASE_URL ?>/logout.php" class="user-dropdown-item user-dropdown-logout" role="menuitem">
+                        <span class="dropdown-icon">🚪</span>
+                        <div class="dropdown-item-text">
+                            <div class="dropdown-item-title">Keluar</div>
+                            <div class="dropdown-item-desc">Akhiri sesi aktif Anda</div>
+                        </div>
+                    </a>
                 </div>
-                <div class="avatar" title="<?= sanitize($currentUser['nama_lengkap']) ?>"><?= strtoupper(substr($currentUser['nama_lengkap'], 0, 1)) ?></div>
             </div>
+            <script>
+            (function() {
+                function setupUserMenu() {
+                    var container = document.getElementById('userMenuContainer');
+                    var btn = document.getElementById('userMenuBtn');
+                    if (!container || !btn || btn.dataset.menuReady) return;
+                    btn.dataset.menuReady = '1';
+
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var open = container.classList.toggle('open');
+                        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    });
+
+                    document.addEventListener('click', function(e) {
+                        if (!container.contains(e.target) && container.classList.contains('open')) {
+                            container.classList.remove('open');
+                            btn.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+
+                    document.addEventListener('keydown', function(e) {
+                        if ((e.key === 'Escape' || e.key === 'Esc') && container.classList.contains('open')) {
+                            container.classList.remove('open');
+                            btn.setAttribute('aria-expanded', 'false');
+                            btn.focus();
+                        }
+                    });
+                }
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', setupUserMenu);
+                } else {
+                    setupUserMenu();
+                }
+            })();
+            </script>
         </div>
         <div class="content-area">
