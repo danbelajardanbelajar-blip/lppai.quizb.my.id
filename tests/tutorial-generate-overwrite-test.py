@@ -10,10 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def scenario(mode, overwrite, failure=None):
+def scenario(mode, overwrite, failure=None, reuse=False):
     with tempfile.TemporaryDirectory(prefix='tutorial-plotting-') as directory:
         root = Path(directory)
-        for file in ['admin/tutorial-generate.php', 'includes/tutorial-plotting.php']:
+        for file in ['admin/tutorial-generate.php', 'includes/tutorial-plotting.php', 'includes/tutorial-fill-existing.php']:
             target = root / file
             target.parent.mkdir(exist_ok=True)
             shutil.copy2(ROOT / file, target)
@@ -50,6 +50,12 @@ def scenario(mode, overwrite, failure=None):
                     (9,9,NULL,'2026-2027','gel2','terdaftar','2026-11-02','Senin',NULL,NULL),
                     (10,10,NULL,NULL,'gel1','terdaftar','2026-11-02','Senin',NULL,NULL);
             ''')
+            if reuse:
+                db.executescript("""UPDATE tutorial_classes SET dosen_pengampu='Tutor A',kuota=3 WHERE id=1;
+                    UPDATE tutorial_classes SET dosen_pengampu='Tutor B',kuota=2 WHERE id=4;
+                    INSERT INTO tutorial_registrations VALUES(11,11,NULL,'2026-2027','gel1','terdaftar','2026-11-02','Senin',NULL,NULL);
+                    ALTER TABLE users ADD COLUMN id INTEGER;
+                    INSERT INTO users(nim,nama_lengkap,role,id) VALUES('11','Mahasiswa Sisa <uji>','mahasiswa',11);""")
             if failure == 'tutor':
                 db.execute("UPDATE master_gelombang SET tutors_senin = '' WHERE id = 1")
             if failure == 'insert':
@@ -70,10 +76,13 @@ def scenario(mode, overwrite, failure=None):
         ''', encoding='utf-8')
         post = {'csrf_token': 'invalid' if failure == 'csrf' else 'valid',
                 'generate_mode': mode, 'min_per_class': '2'}
+        if reuse:
+            post['fill_existing_classes'] = '1'
+            post['existing_tutor_quota'] = '3'
         if overwrite:
             post['overwrite_plotting'] = '1'
         runner = root / 'run.php'
-        runner.write_text("<?php $_SERVER['REQUEST_METHOD'] = 'POST'; $_POST = json_decode('"
+        runner.write_text("<?php $_SESSION=[]; register_shutdown_function(function(){file_put_contents(__DIR__.'/report.json',json_encode($_SESSION));}); $_SERVER['REQUEST_METHOD'] = 'POST'; $_POST = json_decode('"
                           + json.dumps(post) + "', true); require __DIR__ . '/admin/tutorial-generate.php';",
                           encoding='utf-8')
 
@@ -95,7 +104,16 @@ def scenario(mode, overwrite, failure=None):
             for index in [3, 4, 5, 6, 7, 8]:
                 assert after_regs[index] == before_regs[index], 'Unrelated period/status modified'
             assert after_regs[2][2] is not None and after_regs[9][2] is not None
-            if overwrite:
+            if reuse:
+                assert after_classes == before_classes, 'Reuse must not create/delete/change any class'
+                assert after_regs[:2] == before_regs[:2], 'Existing memberships must remain'
+                assert after_regs[2][2] in [1,4] and after_regs[9][2] in [1,4]
+                assert after_regs[10] == before_regs[10], 'Overflow student must remain waiting without edits'
+                report=json.loads((root/'report.json').read_text())['tutorial_fill_existing_result']
+                assert report['assigned']==2 and len(report['waiting'])==1
+                assert report['waiting'][0]['nama_lengkap']=='Mahasiswa Sisa <uji>'
+                assert after_regs[2][2] == (1 if mode=='fill_first' else 4), 'Mode must affect class selection'
+            elif overwrite:
                 assert all(after_regs[i][2] not in [None, 1, 2, 3, 4] for i in [0, 1, 2, 9])
                 assert not any(c[0] == 4 for c in after_classes), 'Empty replaced class remains'
                 assert after_classes[:3] == before_classes[:3], 'Shared/historical/completed classes must remain'
@@ -106,12 +124,15 @@ def scenario(mode, overwrite, failure=None):
             run()
             with closing(sqlite3.connect(database)) as db:
                 assert db.execute('SELECT COUNT(*) FROM tutorial_classes').fetchone()[0] == len(after_classes), 'Repeated generation accumulates classes'
-        print(f'PASS: {mode}, overwrite={overwrite}, failure={failure}')
+        print(f'PASS: {mode}, overwrite={overwrite}, failure={failure}, reuse={reuse}')
 
 
 for mode in ['fill_first', 'distribute_evenly']:
     for overwrite in [False, True]:
         scenario(mode, overwrite)
+for mode in ['fill_first', 'distribute_evenly']:
+    scenario(mode, False, reuse=True)
+scenario('fill_first', True, reuse=True, failure='conflict')
 scenario('fill_first', True, 'tutor')
 scenario('fill_first', True, 'insert')
 scenario('fill_first', True, 'csrf')

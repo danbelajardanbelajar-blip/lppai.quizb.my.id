@@ -7,6 +7,8 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+$fillExistingResult = $_SESSION['tutorial_fill_existing_result'] ?? null;
+unset($_SESSION['tutorial_fill_existing_result']);
 
 // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users (role = dosen)
 try {
@@ -521,6 +523,7 @@ $allRegistrations = $pdo->query("
 $listJurusan = $pdo->query("SELECT DISTINCT program_studi FROM users WHERE program_studi IS NOT NULL AND program_studi != '' ORDER BY program_studi")->fetchAll(PDO::FETCH_COLUMN);
 
 include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/tutorial-fill-existing-report.php';
 ?>
 
 <?php if ($message): ?>
@@ -764,6 +767,15 @@ function addQETutorRow(day) {
                         </div>
                     </div>
                 </label>
+                <label style="display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid #e2e8f0;cursor:pointer;">
+                    <input type="checkbox" name="fill_existing_classes" id="fillExistingClasses" value="1" aria-describedby="fillExistingClassesHelp" style="margin-top:4px;">
+                    <span style="color:#1e3a8a;"><strong>Masukkan ke kelas yang sudah ada selama belum mencapai kuota per dosen</strong>
+                        <small id="fillExistingClassesHelp" style="display:block;margin-top:5px;line-height:1.6;">Berlaku untuk kedua mode, sesuai hari dan periode. Kuota kelas dan total mahasiswa per dosen per hari dibatasi. Tidak membuat kelas baru; sisa mahasiswa tetap menunggu dan daftar namanya ditampilkan setelah proses selesai. Dosen dan ruangan kelas lama dipertahankan.</small>
+                        <span style="display:block;font-size:13px;margin-top:8px;">Batas mahasiswa per dosen per hari:
+                            <input type="number" name="existing_tutor_quota" id="existingTutorQuota" value="30" min="1" max="1000" disabled aria-label="Batas mahasiswa per dosen per hari" style="width:70px;padding:4px;border:1px solid #cbd5e1;border-radius:5px;text-align:center;">
+                        </span>
+                    </span>
+                </label>
             </div>
             
             <label style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; cursor: pointer; color: #1e3a8a;">
@@ -776,6 +788,12 @@ function addQETutorRow(day) {
             <button type="submit" class="btn btn-primary" style="background-color: #2563eb; width: auto;">🚀 Generate Jadwal secara otomatis</button>
         </form>
         <script>
+            document.getElementById('fillExistingClasses').addEventListener('change', function() {
+                document.getElementById('existingTutorQuota').disabled = !this.checked;
+                var overwrite = this.form.querySelector('[name="overwrite_plotting"]');
+                if (this.checked) overwrite.checked = false;
+                overwrite.disabled = this.checked;
+            });
             document.getElementById('modeFillFirst').addEventListener('change', function() {
                 document.getElementById('minPerClass').focus();
             });

@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:26:52 +0700 — Isi kelas lama sesuai kuota dosen dan laporkan peserta menunggu
+
+**ID:** TUTORIAL-GENERATE-FILL-EXISTING · **Parent Git:** `588caf4`.
+**Permintaan:** Tambah centang Masukkan ke kelas yang sudah ada selama belum mencapai kuota per dosen untuk kedua mode pembagian. Klarifikasi pengguna: masukkan yang masih muat, tampilkan seluruh nama beserta jumlah mahasiswa yang belum masuk, lalu biarkan sisanya belum mendapat kelas sementara.
+
+**Perubahan dan alasan:** Checkbox tunggal berlaku untuk fill_first dan distribute_evenly. Saat aktif, hanya mahasiswa belum memiliki kelas pada periode generate yang diproses ke kelas lama dengan hari/periode/dosen terpilih yang sesuai. Mode memenuhi kuota mengisi menurut urutan kelas; mode meratakan memilih dosen dengan beban peserta terendah, kemudian kelas dengan peserta lebih sedikit. Batas dosen dihitung total semua kelasnya pada hari/periode yang sama; batas kuota tiap kelas juga berlaku. Patokan lama proyek adalah 30 peserta per dosen, sehingga ditambahkan input batas per dosen per hari dengan nilai awal 30 dan rentang 1–1000. Tidak membuat kelas baru pada opsi ini. Sisa tetap belum terplot dan dilaporkan melalui flash sesi berisi nama, NIM, hari, jumlah ditempatkan/menunggu dan batas yang dipakai. Kelas, dosen, jadwal dan ruangan lama dipertahankan. Opsi ini tidak dapat digabung dengan overwrite; dibatasi di UI dan backend. Jika tidak dicentang, alur generate lama tetap digunakan.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 11:26:08 | `admin/tutorial-generate.php` | 8, 21, 89, 99, 131, 221, 236 | Opsi fill_existing_classes, validasi batas dosen/konflik overwrite, penempatan kelas lama di dalam transaksi/lock periode; kumpulkan laporan nama/NIM/hari peserta tersisa dan redirect ke pengaturan. |
+| 2026-11-16 11:24:04 | `admin/tutorial-pengaturan-generate.php` | 10, 526, 770, 791 | Centang baru di bawah kedua mode, batas dosen per hari default30, keterangan mahasiswa sisa tetap menunggu; cegah centang bersamaan overwrite; baca flash laporan setelah generate. |
+| 2026-11-16 11:22:57 | `includes/tutorial-fill-existing.php` | 1–51 | Allocator kelas lama sesuai periode/hari/dosen terpilih; isi berurutan atau prioritaskan total dosen terendah; batasi kuota kelas dan akumulasi dosen lintas kelas, pertahankan atribut kelas dan kembalikan sisa. |
+| 2026-11-16 11:26:08 | `includes/tutorial-fill-existing-report.php` | 1–23 | Laporan hasil berisi periode, batas yang dipakai, jumlah ditempatkan, jumlah menunggu, serta seluruh nama/NIM/pilihan hari peserta sisa dengan escaping. |
+| 2026-11-16 11:25:15 | `tests/tutorial-fill-existing-test.php` | 1–63 | Uji allocator dua mode, batas kumulatif dosen multikelas, kelas penuh/kuota nol, isolasi hari/periode/dosen, rollback, serta laporan nama/count/escaping. |
+| 2026-11-16 11:25:18 | `tests/tutorial-fill-existing-ui-test.cjs` | 1–32 | Uji Chrome dari form asli: checkbox tunggal kedua mode, kuota dapat diubah, overwrite saling eksklusif, payload POST dan seluler. |
+| 2026-11-16 11:24:35 | `tests/tutorial-generate-overwrite-test.py` | 13, 16, 53, 79, 85, 107, 127, 133 | Uji endpoint asli opsi baru dalam dua mode, sisa belum terplot dan laporan sesi; regresi mode lama/overwrite, konflik opsi dan transaksi gagal. |
+| 2026-11-16 11:26:52 | `CHANGELOG-DEV.md` | 8 | Entri TUTORIAL-GENERATE-FILL-EXISTING beserta klarifikasi pengguna, keputusan kuota dan verifikasi. |
+
+**Verifikasi:** PHP lint empat file aplikasi dan file pengujian; node --check file uji UI; `php tests/tutorial-fill-existing-test.php`; `node tests/tutorial-fill-existing-ui-test.cjs`; `python tests/tutorial-generate-overwrite-test.py` (10 skenario endpoint asli); `git diff --check` lulus. Uji membuktikan dua mode memilih kelas sesuai aturan, tidak membuat/mengubah kelas lama, dosen dengan beberapa kelas tetap dibatasi total kuota, kelas/periode/hari/dosen lain tidak ikut diisi, mahasiswa berlebih tetap tanpa kelas, nama/count peserta sisa benar dan aman di-render. Browser memverifikasi satu checkbox, perpindahan mode, batas dosen, payload, larangan overwrite dan lebar ponsel 390 px. Regresi generate lama/overwrite tetap lulus, termasuk rollback karena tutor belum diatur/INSERT gagal/CSRF invalid dan kombinasi opsi konflik.
+
+**Batas verifikasi:** Fixture SQLite dan Chrome lokal, bukan database produksi. Lock periode MySQL memakai mekanisme FOR UPDATE yang sudah ada; belum dilakukan uji konkurensi MySQL live. Laporan berbentuk flash satu kali setelah generate. Data produksi dan skema tidak dimigrasi. PHP CLI masih memberi peringatan konfigurasi OpenSSL dimuat dua kali. Push Git tidak membuktikan deployment hosting.
+
+**Pelacakan:** Cari commit dengan ID `TUTORIAL-GENERATE-FILL-EXISTING`.
+
+---
+
 ## 2026-11-16 11:21:40 +0700 — Peningkatan sempurna tampilan absensi tutorial mahasiswa dan dosen berstandar modern mobile view
 
 **ID:** TUTORIAL-ATTENDANCE-MOBILE-MODERN · **Parent Git:** `6995db9`.

@@ -5,6 +5,7 @@
 define('PAGE_TITLE', 'Generate Jadwal Otomatis');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-plotting.php';
+require_once __DIR__ . '/../includes/tutorial-fill-existing.php';
 requireAdmin();
 
 $pdo = getDBConnection();
@@ -17,6 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $generateMode = $_POST['generate_mode'] ?? 'distribute_evenly';
     $overwritePlotting = ($_POST['overwrite_plotting'] ?? '') === '1';
+    $fillExisting = ($_POST['fill_existing_classes'] ?? '') === '1';
+    $existingTutorQuota = filter_var($_POST['existing_tutor_quota'] ?? 30, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 1000]]);
     $minPerClass = (int)($_POST['min_per_class'] ?? 30);
     if ($minPerClass < 1) $minPerClass = 1;
 
@@ -83,6 +86,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pdo->beginTransaction();
 
     try {
+        if ($fillExisting && ($overwritePlotting || !$existingTutorQuota)) {
+            throw new RuntimeException('Pengisian kelas lama tidak dapat digabung dengan Tindih Plotting. Kuota per dosen harus 1–1000.');
+        }
         // Kunci periode agar dua permintaan generate tidak memplot peserta yang sama.
         if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
             $lock = $pdo->prepare('SELECT id FROM master_gelombang WHERE id = ? FOR UPDATE');
@@ -90,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC")->fetchAll();
         $candidates = tutorialPlottingCandidates($pdo, $gel, $overwritePlotting);
+        $existingAssigned = 0;
         $oldClassIds = [];
         if ($overwritePlotting) {
             $reset = $pdo->prepare('UPDATE tutorial_registrations SET tutorial_class_id = NULL WHERE id = ?');
@@ -120,6 +127,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $N = count($students);
             $C = count($tutors);
+
+            if ($fillExisting) {
+                $resolvedTutors = [];
+                $resolve = $pdo->prepare("SELECT nama_lengkap FROM users WHERE role = 'dosen' AND nama_lengkap LIKE CONCAT('%', ?, '%') LIMIT 1");
+                foreach ($tutors as $tutor) {
+                    $resolve->execute([$tutor]);
+                    $resolvedTutors[] = $resolve->fetchColumn() ?: $tutor;
+                }
+                $result = tutorialFillExistingClasses($pdo, $gel, $hari, $students, $resolvedTutors, $generateMode, (int)$existingTutorQuota);
+                $existingAssigned += $result['assigned'];
+                continue; // This option never creates a new class or exceeds a teacher's quota.
+            }
 
             if ($overwritePlotting && $N > 0 && $C === 0) {
                 throw new RuntimeException("Tutor hari $hari belum diatur. Plotting lama tetap dipertahankan.");
@@ -199,7 +218,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         // Nama tutor sudah di-resolve saat membuat kelas; jangan ubah kelas periode lain.
         
+        $existingReport = null;
+        if ($fillExisting) {
+            $waiting = [];
+            $ids = array_column($candidates, 'id');
+            if ($ids) {
+                $marks = implode(',', array_fill(0, count($ids), '?'));
+                $report = $pdo->prepare("SELECT u.nama_lengkap, u.nim, tr.hari_pilihan FROM tutorial_registrations tr
+                    JOIN users u ON u.id = tr.user_id WHERE tr.id IN ($marks) AND tr.tutorial_class_id IS NULL ORDER BY u.nama_lengkap, tr.id");
+                $report->execute($ids);
+                $waiting = $report->fetchAll(PDO::FETCH_ASSOC);
+            }
+            $existingReport = ['assigned' => $existingAssigned, 'waiting' => $waiting, 'tutor_quota' => (int)$existingTutorQuota,
+                'period' => $tahun_ajaran . ' / ' . $semester . ' / ' . $gelombang_name];
+        }
         $pdo->commit();
+        if ($existingReport !== null) {
+            $_SESSION['tutorial_fill_existing_result'] = $existingReport;
+            header('Location: tutorial-pengaturan-generate.php');
+            exit;
+        }
         
         // Redirect ke halaman pilih ruangan
         header("Location: tutorial-pilih-ruangan.php");
