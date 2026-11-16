@@ -503,6 +503,20 @@ select {
     font-weight: 400;
 }
 
+.sidebar-search{padding:14px 16px 4px;flex-shrink:0}
+.sidebar-search label{display:block;margin-bottom:7px;color:rgba(255,255,255,.7);font-size:11px;font-weight:600;letter-spacing:.3px}
+.sidebar-search-field{display:flex;align-items:center;gap:8px;padding:0 10px;border:1px solid rgba(255,255,255,.18);border-radius:12px;background:rgba(255,255,255,.07);color:#9bd8b8;transition:border-color .15s,background .15s}
+.sidebar-search-field:focus-within{border-color:#6ee7b7;background:rgba(255,255,255,.11);box-shadow:0 0 0 3px rgba(16,185,129,.12)}
+.sidebar-search-field svg{flex-shrink:0}
+.sidebar-search-field input{min-width:0;width:100%;height:40px;padding:0;border:0;background:transparent;color:#fff;font:inherit;font-size:13px;outline:none;box-shadow:none}
+.sidebar-search-field input::placeholder{color:rgba(255,255,255,.45)}
+.sidebar-search-field button{width:26px;height:26px;flex-shrink:0;border:0;border-radius:7px;background:rgba(255,255,255,.1);color:#fff;font-size:20px;cursor:pointer;line-height:1}
+.sidebar-search-field button:focus-visible{outline:2px solid #6ee7b7;outline-offset:2px}
+.sidebar-search p{margin:8px 0 0;color:#c2e7d3;font-size:11px;line-height:1.5}
+.sidebar .sidebar-search-hidden{display:none!important}
+.sidebar-searching .nav-group-content,.sidebar-searching .submenu{display:block!important;animation:none}
+.sidebar-searching .nav-group-toggle .chevron,.sidebar-searching .submenu-toggle .arrow{transform:rotate(180deg)!important}
+
 .sidebar-menu {
     padding: 10px 0 20px;
     flex: 1;

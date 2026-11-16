@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 10:51:12 +0700 — Pencarian menu pada bagian atas sidebar
+
+**ID:** SIDEBAR-MENU-SEARCH · **Parent Git:** `89076ed`.
+**Permintaan:** Tambahkan pencarian di atas sidebar agar menu mudah ditemukan.
+
+**Perubahan dan alasan:** Kolom Cari menu ditempatkan di bawah identitas aplikasi, sebelum daftar menu. Pencarian langsung memfilter menu yang sudah dirender sesuai role, termasuk item dalam grup/submenu tertutup; nama kelompok dapat dipakai sebagai kata pencarian. Grup/submenu yang cocok ditampilkan selama pencarian tanpa mengubah status buka/tutup yang disimpan. Tombol hapus dan Escape memulihkan daftar awal; Enter memfokuskan hasil pertama. Hasil kosong diberi pesan, jumlah menu diumumkan melalui aria-live. Navigasi asli tetap dipakai dan pencarian direset sebelum link diproses. Tidak ada request database/API untuk pencarian dan tidak menambahkan menu yang tidak tersedia bagi role pengguna.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 10:49:07 | `includes/sidebar.php` | 37, 471, 479, 519 | Markup kolom Cari menu di bawah identitas aplikasi, tombol hapus/status hasil, pemuatan JS berversi, serta pembatasan toggle accordion selama pencarian. |
+| 2026-11-16 10:49:08 | `assets/css/style.css` | 506 | Gaya kolom pencarian bernuansa hijau, fokus keyboard, status hasil, filter item, dan pembukaan grup/submenu yang cocok saat mencari. |
+| 2026-11-16 10:49:55 | `assets/js/sidebar-search.js` | 1–74 | Filter nama dan konteks grup/submenu per kata tanpa membedakan kapital/aksen; hitung hasil, tampilkan kondisi kosong, Escape/hapus, Enter fokus hasil pertama, pulihkan aria/state accordion dan reset sebelum navigasi. |
+| 2026-11-16 10:50:38 | `tests/sidebar-search-browser-test.py` | 1–89 | Fixture sidebar PHP asli untuk admin/dosen/mahasiswa; Chrome memeriksa hasil tersembunyi/nested/kategori, kosong, keyboard, pemulihan state, tautan, dan lebar seluler. |
+| 2026-11-16 10:51:12 | `CHANGELOG-DEV.md` | 8 | Entri SIDEBAR-MENU-SEARCH beserta alasan dan bukti verifikasi. |
+
+**Verifikasi:** `php -l includes/sidebar.php`, `node --check assets/js/sidebar-search.js`, `python tests/sidebar-search-browser-test.py`, `php -d zend.assertions=1 -d assert.exception=1 tests/sidebar-accordion-compact-test.php`, `php tests/pretes-aktif-hide-tutorial-menu-test.php`, dan `git diff --check` lulus. Browser memakai sidebar PHP dan stylesheet asli; memeriksa tiga role, pencarian CBT beda kapital, submenu Pendaftaran Kolektif, kategori Manajemen Tutorial, hasil kosong, Enter/Escape/hapus, pemulihan state accordion/submenu dan aria, tujuan tautan tetap, serta lebar ponsel 390 px tanpa overflow/error JavaScript. Aturan penyembunyian menu tutorial/absensi bagi mahasiswa pretes aktif tetap lulus.
+
+**Batas verifikasi:** Fixture PHP/Chrome lokal, bukan sesi hosting produksi. PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali. Push Git tidak membuktikan deployment hosting. File `database.sqlite` yang sudah ada dan tidak terlacak berada di luar cakupan serta tidak disertakan. Tidak ada perubahan skema atau data produksi.
+
+**Pelacakan:** Cari commit dengan ID `SIDEBAR-MENU-SEARCH`.
+
+---
+
 ## 2026-11-15 19:35:45 +0700 — Penataan sidebar modern, elegan, dan compact berbasis accordion group
 
 **ID:** SIDEBAR-ACCORDION-BEAUTIFY · **Parent Git:** 5d43e68.

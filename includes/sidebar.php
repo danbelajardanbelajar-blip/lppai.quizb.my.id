@@ -34,7 +34,16 @@ if (!function_exists('isNavGroupActive')) {
         <h2><?= APP_NAME ?></h2>
         <small>Lembaga Pengembangan Pendidikan Agama Islam</small>
     </div>
-    <nav class="sidebar-menu">
+    <div class="sidebar-search" role="search" aria-label="Pencarian menu">
+        <label for="sidebar-menu-search">Cari menu</label>
+        <div class="sidebar-search-field">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>
+            <input id="sidebar-menu-search" type="search" placeholder="Ketik nama menu…" autocomplete="off" aria-controls="sidebar-navigation" aria-describedby="sidebar-search-status">
+            <button id="sidebar-search-clear" type="button" aria-label="Hapus pencarian menu" hidden>×</button>
+        </div>
+        <p id="sidebar-search-status" role="status" aria-live="polite" hidden></p>
+    </div>
+    <nav class="sidebar-menu" id="sidebar-navigation" aria-label="Menu utama">
         <?php if ($isAdmin): ?>
             <!-- ADMIN MENU -->
             <div class="menu-label">Menu Utama</div>
@@ -459,6 +468,7 @@ if (!function_exists('isNavGroupActive')) {
         </div>
     </nav>
 </aside>
+<script defer src="<?= BASE_URL ?>/assets/js/sidebar-search.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar-search.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Nav group accordion toggles
@@ -466,6 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
     groupToggles.forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
+            if (this.closest('.sidebar-searching')) return;
             var group = this.closest('.nav-group');
             if (!group) return;
             var isOpen = group.classList.contains('open');
@@ -505,6 +516,7 @@ document.addEventListener('DOMContentLoaded', function() {
     subToggles.forEach(function(toggle) {
         toggle.addEventListener('click', function(e) {
             e.preventDefault();
+            if (this.closest('.sidebar-searching')) return;
             var submenu = this.nextElementSibling;
             if (submenu) {
                 var isVisible = submenu.style.display === 'block';
