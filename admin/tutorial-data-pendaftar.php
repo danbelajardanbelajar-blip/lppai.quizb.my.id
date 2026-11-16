@@ -7,6 +7,7 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
+require_once __DIR__ . '/../includes/admin-tutorial-registration.php';
 
 // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users (role = dosen)
 try {
@@ -34,17 +35,30 @@ foreach ($allGelombang as $g) {
     }
 }
 
+$selected_gel_id = isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active';
+$current_gel = null;
+
+if ($selected_gel_id === 'all') {
+    $current_gel = null;
+} elseif (is_numeric($selected_gel_id)) {
+    foreach ($allGelombang as $g) {
+        if ($g['id'] == $selected_gel_id) {
+            $current_gel = $g;
+            break;
+        }
+    }
+    if (!$current_gel) {
+        $current_gel = $active_gel;
+        $selected_gel_id = $active_gel ? (string)$active_gel['id'] : 'all';
+    }
+} else {
+    $selected_gel_id = 'active';
+    $current_gel = $active_gel;
+}
+
+
 // Condition to exclude Lulus
-$notLulusSQL = "u.id NOT IN (
-    SELECT tr_sub.user_id FROM tutorial_registrations tr_sub 
-    WHERE tr_sub.nilai_thaharah IS NOT NULL AND tr_sub.nilai_shalat IS NOT NULL AND tr_sub.nilai_surat_pendek IS NOT NULL AND tr_sub.nilai_amaliyah IS NOT NULL AND tr_sub.nilai_jenazah IS NOT NULL AND tr_sub.nilai_ujian_tulis IS NOT NULL
-    AND tr_sub.nilai_thaharah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_shalat >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_surat_pendek >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_amaliyah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_jenazah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_ujian_tulis >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-)";
+$notLulusSQL = adminTutorialUnpassedStudentSql();
 
 // AJAX API Endpoint: Ambil daftar mahasiswa berdasarkan jurusan
 if (isset($_GET['ajax_jurusan'])) {
@@ -250,36 +264,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         /* ---- PENDAFTARAN SINGLE (DARI TABEL KOLEKTIF) ---- */
         } elseif ($action === 'add_single_registration') {
             $user_id = (int)($_POST['user_id'] ?? 0);
-            $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
-            $gelombang = $active_gel['gelombang'] ?? 'gel1';
-
-            if ($user_id > 0 && $hari_pilihan !== '') {
-                $stmtCek = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE user_id = ? AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
-                $stmtCek->execute([$user_id]);
-                if ($stmtCek->fetchColumn() > 0) {
-                    $message = 'Mahasiswa ini sudah terdaftar sebelumnya.';
-                    $msgType = 'warning';
-                } else {
-                    $dayLower = strtolower($hari_pilihan);
-                    $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
-                    
-                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
-                    $stmtCount->execute([$hari_pilihan]);
-                    $terisi = $stmtCount->fetchColumn();
-                    $sisaKuota = $totalKuota - $terisi;
-                    
-                    if ($sisaKuota <= 0) {
-                        $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
-                        $msgType = 'danger';
-                    } else {
-                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
-                        $stmtInsert->execute([$user_id, $hari_pilihan, $gelombang]);
-                        $message = 'Mahasiswa berhasil didaftarkan.';
-                        $msgType = 'success';
-                    }
-                }
-            } else {
-                $message = 'Data tidak valid.';
+            $hari_pilihan = trim((string)($_POST['hari_pilihan'] ?? ''));
+            $periodId = (int)($_POST['registration_period_id'] ?? 0);
+            try {
+                adminTutorialRegisterStudent($pdo, $user_id, $periodId, $hari_pilihan);
+                $message = 'Mahasiswa berhasil didaftarkan pada periode tutorial tujuan.';
+                $msgType = 'success';
+            } catch (PDOException $error) {
+                error_log('Admin tutorial registration: ' . $error->getMessage());
+                $message = 'Pendaftaran gagal disimpan. Silakan coba lagi atau periksa konfigurasi periode.';
+                $msgType = 'danger';
+            } catch (RuntimeException $error) {
+                $message = $error->getMessage();
                 $msgType = 'danger';
             }
 
@@ -520,27 +516,6 @@ $allStudents = $pdo->query("
 // =============================================================
 // FILTER & DATA PENDAFTAR TUTORIAL
 // =============================================================
-$selected_gel_id = isset($_GET['gelombang_id']) ? trim($_GET['gelombang_id']) : 'active';
-$current_gel = null;
-
-if ($selected_gel_id === 'all') {
-    $current_gel = null;
-} elseif (is_numeric($selected_gel_id)) {
-    foreach ($allGelombang as $g) {
-        if ($g['id'] == $selected_gel_id) {
-            $current_gel = $g;
-            break;
-        }
-    }
-    if (!$current_gel) {
-        $current_gel = $active_gel;
-        $selected_gel_id = $active_gel ? (string)$active_gel['id'] : 'all';
-    }
-} else {
-    $selected_gel_id = 'active';
-    $current_gel = $active_gel;
-}
-
 $allRegistrations = [];
 
 if ($selected_gel_id === 'all') {
@@ -559,46 +534,16 @@ if ($selected_gel_id === 'all') {
     ");
     $allRegistrations = $stmtRegistrations->fetchAll(PDO::FETCH_ASSOC);
 } elseif ($current_gel) {
-    $targetYear = str_replace('/', '-', trim($current_gel['tahun_ajaran']));
-    $targetSemester = trim($current_gel['semester']);
+    $periodIdsSql = adminTutorialPeriodRegistrationIdsSql();
     $stmtRegistrations = $pdo->prepare("
         SELECT tr.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, tc.nama_kelas, tc.dosen_pengampu as dosen_kelas
         FROM tutorial_registrations tr
         JOIN users u ON tr.user_id = u.id
         LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-        WHERE tr.id IN (
-            SELECT MAX(candidate.id)
-            FROM tutorial_registrations candidate
-            LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
-            WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
-              AND (
-                  REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
-                  OR (
-                      (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
-                      AND (
-                          REPLACE(TRIM(period_class.semester), '/', '-') = ?
-                          OR (period_class.id IS NULL AND candidate.created_at >= ?)
-                      )
-                  )
-              )
-              AND (
-                  period_class.id IS NULL
-                  OR TRIM(period_class.semester) = ?
-                  OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
-              )
-            GROUP BY candidate.user_id
-        )
-          AND $notLulusSQL
+        WHERE tr.id IN ($periodIdsSql) AND $notLulusSQL
         ORDER BY tr.created_at DESC
     ");
-    $stmtRegistrations->execute([
-        $current_gel['gelombang'],
-        $targetYear,
-        $targetYear . '-' . $targetSemester,
-        $current_gel['created_at'],
-        $targetSemester,
-        $targetYear . '-' . $targetSemester,
-    ]);
+    $stmtRegistrations->execute(adminTutorialPeriodRegistrationParams($current_gel));
     $allRegistrations = $stmtRegistrations->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -1691,11 +1636,13 @@ window.closeEditPendaftarModal = function() {
     <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
         <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Daftarkan Mahasiswa</h3>
         <p style="margin-bottom:16px; font-size:14px; color:#64748b;">Mendaftarkan: <strong id="add_single_nama_lengkap" style="color:#0f172a;"></strong></p>
-        <form method="POST">
+        <form method="POST" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="add_single_registration">
+            <input type="hidden" name="registration_period_id" value="<?= (int)(($current_gel ?: $active_gel)['id'] ?? 0) ?>">
             <input type="hidden" name="user_id" id="add_single_user_id" value="">
             
+            <p style="font-size:13px;color:#475569;">Periode tujuan: <strong><?= sanitize(($current_gel ?: $active_gel) ? (($current_gel ?: $active_gel)['tahun_ajaran'] . ' / ' . ($current_gel ?: $active_gel)['semester'] . ' / ' . ($current_gel ?: $active_gel)['gelombang']) : 'Belum ada periode aktif') ?></strong></p>
             <div class="form-group" style="margin-bottom:24px;">
                 <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
                 <select name="hari_pilihan" required
@@ -1704,12 +1651,22 @@ window.closeEditPendaftarModal = function() {
                     <?php 
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
                     $modalGel = $current_gel ?: $active_gel;
+                    $modalDayCounts = [];
+                    if ($modalGel) {
+                        $modalIdsSql = adminTutorialPeriodRegistrationIdsSql();
+                        $modalCount = $pdo->prepare("SELECT hari_pilihan, COUNT(*) AS cnt FROM tutorial_registrations WHERE id IN ($modalIdsSql) GROUP BY hari_pilihan");
+                        $modalCount->execute(adminTutorialPeriodRegistrationParams($modalGel));
+                        foreach ($modalCount->fetchAll(PDO::FETCH_ASSOC) as $dayCount) {
+                            $key = ucfirst(strtolower(trim((string)$dayCount['hari_pilihan'])));
+                            $modalDayCounts[$key] = ($modalDayCounts[$key] ?? 0) + (int)$dayCount['cnt'];
+                        }
+                    }
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
                         $kuota = $modalGel["kuota_$dayLower"] ?? 0;
-                        $terisi = $statsHari[$day] ?? 0;
+                        $terisi = $modalDayCounts[$day] ?? 0;
                         $sisa = $kuota - $terisi;
-                        $isFull = ($kuota > 0 && $sisa <= 0);
+                        $isFull = ($kuota <= 0 || $sisa <= 0 || ($modalGel['status'] ?? '') !== 'aktif');
                     ?>
                     <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
                         <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
@@ -1736,23 +1693,6 @@ window.openAddSingleRegistrationModal = function(userId, namaLengkap) {
 window.closeAddSingleRegistrationModal = function() {
     document.getElementById('addSingleRegistrationModal').style.display = 'none';
 };
-
-if (document.querySelector('#addSingleRegistrationModal form')) {
-    document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        fetch('', { method: 'POST', body: formData })
-        .then(res => res.text())
-        .then(html => {
-            closeAddSingleRegistrationModal();
-            alert('Mahasiswa berhasil didaftarkan.');
-            window.location.reload();
-        })
-        .catch(err => {
-            alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
-        });
-    });
-}
 
 if (document.querySelector('#editPendaftarModal form')) {
     document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {

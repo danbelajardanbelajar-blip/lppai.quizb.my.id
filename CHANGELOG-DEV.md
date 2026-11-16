@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:09:10 +0700 — Perbaiki tombol Daftarkan dan pesan berhasil palsu pada tutorial
+
+**ID:** ADMIN-TUTORIAL-REGISTER-REAL-RESULT · **Parent Git:** `d23103c`.
+**Permintaan:** Telusuri tombol Daftarkan pada Data Pendaftar Tutorial yang memberi pesan berhasil walau mahasiswa belum terdaftar.
+
+**Penyebab yang ditemukan di kode:** Handler browser membaca semua respons sebagai teks kemudian selalu alert berhasil dan reload, termasuk respons berisi penolakan kuota, duplikasi, CSRF atau kesalahan server. Handler single menganggap registrasi tahun 2025–2030 sebagai duplikasi dan menghitung kuota lintas periode; tujuan insert selalu gelombang aktif terbaru meski admin memfilter periode lain. Insert tidak mengisi tahun ajaran, sehingga identitas periode bergantung inferensi tanggal pendaftaran pada pembacaan berikutnya.
+
+**Perubahan:** Form Daftarkan memakai POST server biasa dengan data-no-spa; notifikasi yang ditampilkan adalah hasil handler server. Periode tujuan dikirim eksplisit dan hanya periode aktif diterima. Duplikasi, kuota modal/backend, serta verifikasi visibilitas baris baru memakai scope periode yang sama dengan roster. Tahun ajaran dan gelombang disimpan eksplisit. Penyimpanan dijalankan dalam transaksi, dengan lock baris periode di MySQL agar perhitungan kuota terserialisasi, lalu memverifikasi baris benar-benar terbaca sebagai pendaftaran periode tujuan sebelum commit. Mahasiswa yang sudah memenuhi syarat kelulusan tutorial tidak diterima sebagai pendaftaran baru yang akan disembunyikan roster. Perubahan terfokus pada tombol single; alur kolektif dan edit hari tetap memakai handler terpisah yang sudah ada.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 11:06:52 | `admin/tutorial-data-pendaftar.php` | 10, 38, 61, 267, 518, 537, 543, 546, 1639, 1642, 1645, 1654, 1667, 1669, 1696 | Resolusi periode dipindahkan sebelum POST; handler single memakai service transaksi; tabel dan modal memakai scope periode yang sama; form membawa ID periode dan tahun tujuan ditampilkan; hapus fetch/alert sukses tanpa validasi, gunakan POST biasa data-no-spa. |
+| 2026-11-16 11:09:22 | `includes/admin-tutorial-registration.php` | 1–85 | Helper kelayakan dan scope periode bersama; validasi mahasiswa/periode aktif/hari, lock periode MySQL, duplikasi dan kuota per periode, simpan tahun ajaran, verifikasi baris masuk scope roster sebelum commit, rollback saat gagal. |
+| 2026-11-16 11:07:53 | `tests/admin-tutorial-registration-test.py` | 1–97 | Fixture endpoint PHP asli, SQLite, dan Chrome; POST nyata membuktikan mahasiswa masuk daftar terpilih/keluar daftar belum terdaftar, serta skenario tahun lama, dua periode aktif, duplikasi, kuota, CSRF dan write failure. |
+| 2026-11-16 11:09:10 | `CHANGELOG-DEV.md` | 8 | Entri ADMIN-TUTORIAL-REGISTER-REAL-RESULT beserta penyebab, batas scope dan bukti verifikasi. |
+
+**Verifikasi lulus:** PHP lint kedua file aplikasi; `python tests/admin-tutorial-registration-test.py`; `php tests/admin-tables-jenis-program-test.php` (38 pemeriksaan); `php tests/admin-dashboard-active-period-test.php`; `git diff --check`. Uji browser mengirim form asli lalu membuktikan mahasiswa terlihat di tabel pendaftar periode terpilih dan hilang dari tabel belum terdaftar. HTTP/SQLite membuktikan registrasi tahun lalu tidak menghalangi/memakan kuota periode tujuan, tahun/gelombang tersimpan sesuai periode yang dipilih meski ada periode aktif lain lebih baru, serta penolakan duplikat, kuota penuh/nol, hari/periode invalid, CSRF invalid dan trigger kegagalan INSERT tidak memberikan sukses palsu atau insert parsial.
+
+**Uji tambahan yang belum lulus:** `php tests/user-jenis-program-test.php` gagal pada pemeriksaan statis lama yang mengharuskan teks `jenis_program` langsung berada di `admin/dashboard.php`; kode dashboard sudah memindahkan query/render ke helper pada perubahan sebelumnya. File dashboard dan file pengujian tersebut tidak diubah oleh paket ini. Uji dashboard nyata SQLite/render dan pengujian jenis program 38 pola tetap lulus. Tidak menyimpulkan seluruh suite proyek lulus.
+
+**Batas verifikasi:** Akun/database produksi belum diperiksa langsung; data lama tidak diubah otomatis. Fixture memakai SQLite sehingga perilaku lock MySQL FOR UPDATE belum diuji pada database MySQL live. PHP CLI masih mengeluarkan peringatan konfigurasi OpenSSL dimuat dua kali. Push Git tidak membuktikan deployment hosting. Tidak ada perubahan skema atau migrasi data produksi.
+
+**Pelacakan:** Cari commit dengan ID `ADMIN-TUTORIAL-REGISTER-REAL-RESULT`.
+
+---
+
 ## 2026-11-16 10:51:12 +0700 — Pencarian menu pada bagian atas sidebar
 
 **ID:** SIDEBAR-MENU-SEARCH · **Parent Git:** `89076ed`.
