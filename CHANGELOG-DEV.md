@@ -5,6 +5,31 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 15:54:00 +0700 — Tahap 2 Tutorial RPL Online: Manajemen & Plotting Kolektif Peserta RPL
+
+**ID:** TUTORIAL-RPL-ONLINE-PHASE-2 · **Parent Git:** `0d6ee59`.
+**Permintaan pengguna:** lanjut tahap 2 (manajemen dan plotting peserta Tutorial RPL Online).
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/tutorial-rpl-helper.php` | 2026-11-16 15:52:28 | 192–388 | Fungsi Plotting & Pretes | Menambahkan helper `tutorialRplBatchPlot` (plotting massal multi-select dengan kontrol sisa kuota dan pencegahan duplikasi), `tutorialRplBatchUnplot` (pelepasan massal), `tutorialRplAutoDistribute` (auto-distribusi merata mahasiswa belum terplot secara round-robin load-balancing), dan `tutorialRplGetStudentsWithPretes` (kueri data mahasiswa RPL dengan integrasi status nilai CBT Pretes resmi: Lolos CBT, Nilai < 80, atau Belum CBT, filter kelas, status plot, dan pencarian). |
+| `admin/tutorial-rpl-peserta.php` | 2026-11-16 15:53:20 | 1–347 | Interface Plotting Kolektif | Menambahkan fitur multi-select checkbox (centang semua / per baris), floating batch action bar (pilih kelompok tujuan lalu plotkan massal, atau lepas massal), tombol header "Auto-Distribusi Merata", filter kelompok & status plot (Belum Terplot vs Sudah Terplot), pencarian realtime, kolom status CBT Pretes resmi, dan modal plotting/pindah kelompok individu. |
+| `tests/tutorial-rpl-plotting-test.php` | 2026-11-16 15:53:46 | 1–156 | Pengujian Otomatis | Unit dan integration test memverifikasi pembatasan kuota batch plot, pemindahan kelompok tanpa duplikasi, pelepasan massal unplot, pembagian merata auto-distribute sesuai kapasitas kuota, serta deteksi nilai CBT Pretes dan filter pencarian. |
+
+**Verifikasi:**
+1. `php -l includes/tutorial-rpl-helper.php` -> Syntax OK.
+2. `php -l admin/tutorial-rpl-peserta.php` -> Syntax OK.
+3. `php tests/tutorial-rpl-plotting-test.php` -> PASS (100%).
+4. `php tests/tutorial-rpl-structure-test.php` -> PASS (100%).
+5. `php tests/dashboard-cbt-submitted-test.php` -> PASS.
+6. `php tests/pretes-cbt-result-card-test.php` -> PASS.
+7. `php tests/tutorial-rekap-absensi-test.php` -> PASS (26 pengujian).
+8. `php tests/dosen-dashboard-examiner-test.php` -> PASS.
+9. `python tests/tutorial-pendaftaran-kolektif-test.py` -> PASS.
+10. `git diff --check ..` -> Bersih tanpa konflik/whitespace issue.
+
+---
+
 ## 2026-11-16 15:48:30 +0700 — Tahap 1 Tutorial RPL Online: Menu Utama Mandiri Sidebar, Helper, Skema Data, & Halaman Dasar
 
 **ID:** TUTORIAL-RPL-ONLINE-PHASE-1 · **Parent Git:** `62bc678`.

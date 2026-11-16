@@ -188,3 +188,247 @@ if (!function_exists('tutorialRplGetTutors')) {
         }
     }
 }
+
+/**
+ * Plotting massal/kolektif mahasiswa ke suatu kelompok kelas Tutorial RPL.
+ */
+if (!function_exists('tutorialRplBatchPlot')) {
+    function tutorialRplBatchPlot(PDO $pdo, array $userIds, int $classId): array {
+        ensureTutorialRplTables($pdo);
+        $cls = tutorialRplGetClassById($pdo, $classId);
+        if (!$cls || empty($cls['is_active'])) {
+            throw new InvalidArgumentException('Kelompok kelas tidak valid atau tidak aktif.');
+        }
+
+        $kuota = (int)($cls['kuota'] ?? 50);
+        $terisi = (int)($cls['terisi'] ?? 0);
+        $sisaKuota = max(0, $kuota - $terisi);
+
+        $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), fn($id) => $id > 0)));
+        if (empty($userIds)) {
+            return ['success' => 0, 'skipped_quota' => 0, 'total' => 0];
+        }
+
+        $success = 0;
+        $skipped = 0;
+
+        $pdo->beginTransaction();
+        try {
+            $stmtCheck = $pdo->prepare("SELECT class_id FROM tutorial_rpl_members WHERE user_id = ?");
+            $stmtDel = $pdo->prepare("DELETE FROM tutorial_rpl_members WHERE user_id = ?");
+            $stmtIns = $pdo->prepare("INSERT INTO tutorial_rpl_members (class_id, user_id) VALUES (?, ?)");
+
+            foreach ($userIds as $uid) {
+                $stmtCheck->execute([$uid]);
+                $existingClassId = $stmtCheck->fetchColumn();
+
+                if ($existingClassId !== false && (int)$existingClassId === $classId) {
+                    $success++;
+                    continue;
+                }
+
+                if ($sisaKuota <= 0) {
+                    $skipped++;
+                    continue;
+                }
+
+                $stmtDel->execute([$uid]);
+                $stmtIns->execute([$classId, $uid]);
+                $sisaKuota--;
+                $success++;
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+
+        return ['success' => $success, 'skipped_quota' => $skipped, 'total' => count($userIds)];
+    }
+}
+
+/**
+ * Lepas plotting massal berdasarkan ID anggota (member_id).
+ */
+if (!function_exists('tutorialRplBatchUnplot')) {
+    function tutorialRplBatchUnplot(PDO $pdo, array $memberIds): int {
+        ensureTutorialRplTables($pdo);
+        $memberIds = array_values(array_unique(array_filter(array_map('intval', $memberIds), fn($id) => $id > 0)));
+        if (empty($memberIds)) return 0;
+
+        $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_members WHERE id IN ($placeholders)");
+        $stmt->execute($memberIds);
+        return $stmt->rowCount();
+    }
+}
+
+/**
+ * Pembagian mahasiswa RPL yang belum memiliki kelompok secara otomatis dan merata ke kelompok aktif.
+ */
+if (!function_exists('tutorialRplAutoDistribute')) {
+    function tutorialRplAutoDistribute(PDO $pdo, ?string $periode = null): array {
+        ensureTutorialRplTables($pdo);
+        $classes = tutorialRplGetClasses($pdo, $periode);
+        $activeClasses = array_values(array_filter($classes, fn($c) => !empty($c['is_active']) && ($c['terisi'] < $c['kuota'])));
+
+        if (empty($activeClasses)) {
+            return ['plotted' => 0, 'classes_used' => 0, 'remaining_unassigned' => 0, 'message' => 'Tidak ada kelompok aktif yang memiliki sisa kuota.'];
+        }
+
+        $unassigned = $pdo->query("
+            SELECT u.id
+            FROM users u
+            LEFT JOIN tutorial_rpl_members m ON u.id = m.user_id
+            WHERE u.role = 'mahasiswa'
+              AND (
+                  UPPER(u.jenis_program) = 'RPL'
+                  OR u.id IN (SELECT user_id FROM pretes_registrations WHERE periode LIKE '%RPL%')
+              )
+              AND m.id IS NULL
+            ORDER BY u.nama_lengkap ASC
+        ")->fetchAll(PDO::FETCH_COLUMN);
+
+        if (empty($unassigned)) {
+            return ['plotted' => 0, 'classes_used' => 0, 'remaining_unassigned' => 0, 'message' => 'Semua mahasiswa RPL sudah memiliki kelompok kelas.'];
+        }
+
+        usort($activeClasses, fn($a, $b) => $a['terisi'] <=> $b['terisi']);
+
+        $plotted = 0;
+        $classesUsed = [];
+
+        $pdo->beginTransaction();
+        try {
+            $stmtIns = $pdo->prepare("INSERT INTO tutorial_rpl_members (class_id, user_id) VALUES (?, ?)");
+            $classIndex = 0;
+            $totalClasses = count($activeClasses);
+
+            foreach ($unassigned as $uid) {
+                $found = false;
+                for ($attempt = 0; $attempt < $totalClasses; $attempt++) {
+                    $c = &$activeClasses[$classIndex];
+                    if ($c['terisi'] < $c['kuota']) {
+                        $stmtIns->execute([$c['id'], (int)$uid]);
+                        $c['terisi']++;
+                        $classesUsed[$c['id']] = true;
+                        $plotted++;
+                        $found = true;
+                        $classIndex = ($classIndex + 1) % $totalClasses;
+                        break;
+                    }
+                    $classIndex = ($classIndex + 1) % $totalClasses;
+                }
+                if (!$found) break;
+            }
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+
+        $remaining = count($unassigned) - $plotted;
+        return [
+            'plotted' => $plotted,
+            'classes_used' => count($classesUsed),
+            'remaining_unassigned' => $remaining,
+            'message' => "Berhasil membagikan $plotted mahasiswa ke " . count($classesUsed) . " kelompok kelas."
+        ];
+    }
+}
+
+/**
+ * Mengambil data mahasiswa program RPL lengkap dengan status plotting dan hasil CBT Pretes.
+ */
+if (!function_exists('tutorialRplGetStudentsWithPretes')) {
+    function tutorialRplGetStudentsWithPretes(PDO $pdo, array $filters = []): array {
+        ensureTutorialRplTables($pdo);
+
+        $sql = "
+            SELECT u.id, u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.whatsapp, u.jenis_program,
+                   m.id AS member_id, m.class_id, m.drive_submitted, m.drive_verified, m.exam_submitted,
+                   m.nilai_ujian_tulis, m.nilai_praktik, m.nilai_akhir, m.status_lulus,
+                   c.nama_kelompok, c.dosen_nama, c.dosen_wa, c.drive_url
+            FROM users u
+            LEFT JOIN tutorial_rpl_members m ON u.id = m.user_id
+            LEFT JOIN tutorial_rpl_classes c ON m.class_id = c.id
+            WHERE u.role = 'mahasiswa'
+              AND (
+                  UPPER(u.jenis_program) = 'RPL'
+                  OR u.id IN (SELECT user_id FROM pretes_registrations WHERE periode LIKE '%RPL%')
+              )
+        ";
+
+        $params = [];
+
+        $statusPlot = $filters['status_plot'] ?? 'all';
+        if ($statusPlot === 'plotted') {
+            $sql .= " AND m.class_id IS NOT NULL ";
+        } elseif ($statusPlot === 'unplotted') {
+            $sql .= " AND m.class_id IS NULL ";
+        }
+
+        if (!empty($filters['class_id'])) {
+            $sql .= " AND m.class_id = ? ";
+            $params[] = (int)$filters['class_id'];
+        }
+
+        if (!empty($filters['search'])) {
+            $term = '%' . trim((string)$filters['search']) . '%';
+            $sql .= " AND (u.nama_lengkap LIKE ? OR u.nim LIKE ? OR u.program_studi LIKE ?) ";
+            $params[] = $term;
+            $params[] = $term;
+            $params[] = $term;
+        }
+
+        $sql .= " ORDER BY (m.class_id IS NULL) DESC, u.nama_lengkap ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $hasCbtTable = false;
+        try {
+            $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlite') {
+                $hasCbtTable = (bool)$pdo->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pretes_cbt_attempts'")->fetchColumn();
+            } else {
+                $hasCbtTable = (bool)$pdo->query("SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='pretes_cbt_attempts'")->fetchColumn();
+            }
+        } catch (Throwable $e) {}
+
+        $stmtCbt = null;
+        if ($hasCbtTable) {
+            try {
+                $stmtCbt = $pdo->prepare("
+                    SELECT score, submitted
+                    FROM pretes_cbt_attempts
+                    WHERE user_id = ? AND registration_id > 0
+                    ORDER BY id DESC LIMIT 1
+                ");
+            } catch (Throwable $e) {}
+        }
+
+        foreach ($rows as &$r) {
+            $r['cbt_score'] = null;
+            $r['cbt_status'] = 'Belum CBT';
+
+            if ($stmtCbt) {
+                try {
+                    $stmtCbt->execute([(int)$r['id']]);
+                    $cbt = $stmtCbt->fetch(PDO::FETCH_ASSOC);
+                    if ($cbt && !empty($cbt['submitted'])) {
+                        $score = (float)($cbt['score'] ?? 0);
+                        $r['cbt_score'] = $score;
+                        $r['cbt_status'] = $score >= 80.0 ? "Lolos CBT ($score)" : "Nilai $score (< 80)";
+                    } elseif ($cbt) {
+                        $r['cbt_status'] = 'Sedang CBT';
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+}
