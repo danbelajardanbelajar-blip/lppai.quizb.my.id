@@ -1,5 +1,6 @@
 <?php
 /** Penyimpanan nilai rinci dan sesi absensi pretes. */
+require_once __DIR__ . '/pretes-components.php';
 function ensurePretesFeatures($pdo) {
     static $ready = false;
     if ($ready) return;
@@ -58,27 +59,19 @@ function ensurePretesFeatures($pdo) {
     }
 }
 
-function pretesComponents() {
-    return [
-        'ujian_tulis' => 'Ujian tulis',
-        'praktik_wudlu' => 'Praktik wudlu',
-        'doa_setelah_wudlu' => 'Doa setelah wudlu',
-        'praktik_tayammum' => 'Praktik tayammum',
-        'niat_mandi_besar' => 'Niat mandi besar',
-        'niat_jamak_qashar' => 'Niat jamak qashar',
-        'bacaan_shalat_subuh' => 'Bacaan shalat Subuh',
-        'al_bayyinah' => 'Al Bayyinah',
-        'al_alaq' => "Al 'Alaq",
-        'al_dluha' => 'Al Dluha',
-        'istighasah' => 'Istighasah',
-        'shalat_jenazah' => 'Shalat jenazah',
-    ];
+/**
+ * Komponen pretes wajib (kunci => label): Ujian tulis (CBT) + komponen praktik aktif program.
+ * Dikelola admin di admin/pretes-tugas.php (includes/pretes-components.php).
+ * $program: 'rpl' | 'reguler' | null (gabungan semua program, untuk kolom rekap/impor).
+ */
+function pretesComponents(?string $program = null) {
+    return pretesComponentsFor($program);
 }
 
 /** Lulus hanya jika setiap komponen wajib bernilai minimal 80. */
-function getPretesStatusLulus($scores) {
+function getPretesStatusLulus($scores, ?string $program = null) {
     $complete = true;
-    foreach (pretesComponents() as $key => $label) {
+    foreach (pretesComponents($program) as $key => $label) {
         $value = is_array($scores) ? ($scores[$key] ?? null) : null;
         if ($value === null || $value === '' || !is_numeric($value)
             || !is_finite((float)$value) || (float)$value < 0 || (float)$value > 100) {
@@ -93,6 +86,13 @@ function getPretesStatusLulus($scores) {
 /** Cek apakah user telah dinyatakan lulus pretes (baik dari tabel pretes_results maupun asesmen 12 komponen). */
 function isUserLulusPretes($pdo, $userId) {
     if (!$pdo || !$userId) return false;
+    $program = null; // program mahasiswa menentukan daftar komponen wajib
+    try {
+        $stmtProg = $pdo->prepare('SELECT jenis_program FROM users WHERE id = ?');
+        $stmtProg->execute([$userId]);
+        $jp = $stmtProg->fetchColumn();
+        if ($jp !== false) $program = pretesProgramKey($jp);
+    } catch (Throwable $e) {}
 
     // 1. Cek dari tabel pretes_results
     try {
@@ -118,7 +118,7 @@ function isUserLulusPretes($pdo, $userId) {
         if ($json) {
             $scores = json_decode($json, true);
             if (is_array($scores) && function_exists('getPretesStatusLulus')) {
-                if (getPretesStatusLulus($scores) === 'lulus') {
+                if (getPretesStatusLulus($scores, $program) === 'lulus') {
                     return true;
                 }
             }
@@ -140,10 +140,10 @@ if (!function_exists('getPretesPredikat')) {
     }
 }
 
-function pretesValidateScores($input) {
+function pretesValidateScores($input, ?string $program = null) {
     if (!is_array($input)) throw new InvalidArgumentException('Data nilai tidak valid.');
     $scores = [];
-    foreach (pretesComponents() as $key => $label) {
+    foreach (pretesComponents($program) as $key => $label) {
         $raw = $input[$key] ?? '';
         if (!is_scalar($raw) && $raw !== null) throw new InvalidArgumentException('Nilai ' . $label . ' tidak valid.');
         $raw = trim((string)$raw);
@@ -201,11 +201,12 @@ function pretesProgress($participants) {
         if (($row['status'] ?? '') === 'hadir') $progress['hadir']++;
         $scores = json_decode($row['scores_json'] ?? '{}', true);
         $filled = 0;
-        foreach (pretesComponents() as $key => $label) {
+        $rowComponents = pretesComponents(array_key_exists('jenis_program', $row) ? pretesProgramKey($row['jenis_program']) : null);
+        foreach ($rowComponents as $key => $label) {
             $value = is_array($scores) ? ($scores[$key] ?? null) : null;
             if ($value !== null && $value !== '' && is_numeric($value) && (float)$value >= 0 && (float)$value <= 100) $filled++;
         }
-        if ($filled === count(pretesComponents())) $progress['lengkap']++;
+        if ($filled === count($rowComponents)) $progress['lengkap']++;
         elseif ($filled > 0) $progress['sebagian']++;
         else $progress['kosong']++;
     }

@@ -1,6 +1,14 @@
 <?php
 $istighasah = require __DIR__ . '/../data/pretes-istighasah.php';
-$preparationComponents = pretesComponents();
+// Komponen materi mengikuti program mahasiswa (RPL / Reguler), dikelola admin di admin/pretes-tugas.php
+$preparationProgram = pretesProgramKey($user['jenis_program'] ?? '');
+$preparationRows = [];
+if (function_exists('pretesComponentsPdo') && ($preparationPdo = pretesComponentsPdo())) {
+    try { $preparationRows = pretesComponentRows($preparationPdo, $preparationProgram); } catch (Throwable $e) { $preparationRows = []; }
+}
+if (!$preparationRows) $preparationRows = pretesDefaultComponentRows();
+$preparationComponents = ['ujian_tulis' => ['label' => 'Ujian tulis', 'bentuk' => 'CBT / Ujian tulis']];
+foreach ($preparationRows as $prepRow) $preparationComponents[$prepRow['comp_key']] = $prepRow + ['bentuk' => 'Lisan / Praktik'];
 $learningVideos = require __DIR__ . '/../data/pretes-learning-videos.php';
 $learningReadings = json_decode(file_get_contents(__DIR__ . '/../data/pretes-learning-readings.json'), true, 512, JSON_THROW_ON_ERROR);
 ?>
@@ -46,18 +54,25 @@ $learningReadings = json_decode(file_get_contents(__DIR__ . '/../data/pretes-lea
             Materi Persiapan &amp; Praktik Pretes
         </h2>
         <p class="pretes-istighasah-intro" style="margin:0 0 20px;color:#4b6358;font-size:13.5px;line-height:1.65;">
-            Persiapkan seluruh 12 komponen materi yang diujikan dalam pretes LPPAI berikut, mencakup ujian tulis CBT, hafalan surah pilihan, dzikir/amaliyah, serta praktik ibadah ubudiyah lengkap dengan bacaan dan video tutorial resmi.
+            Persiapkan seluruh <?= count($preparationComponents) ?> komponen materi yang diujikan dalam pretes LPPAI berikut, mencakup ujian tulis CBT, hafalan surah pilihan, dzikir/amaliyah, serta praktik ibadah ubudiyah lengkap dengan bacaan dan video tutorial resmi.
         </p>
 
         <ol class="pretes-material-list">
-            <?php foreach ($preparationComponents as $key => $label): ?>
+            <?php foreach ($preparationComponents as $key => $prep): $label = $prep['label']; ?>
                 <li data-pretes-component="<?= sanitize($key) ?>">
                     <strong><?= sanitize($label) ?></strong>
-                    <span class="pretes-material-type"><?= $key === 'ujian_tulis' ? 'CBT / Ujian tulis' : 'Lisan / Praktik' ?></span>
-                    <?php if (isset($learningVideos[$key])): ?>
+                    <span class="pretes-material-type"><?= sanitize($prep['bentuk']) ?></span>
+                    <?php if (!empty($prep['video_url'])): ?>
+                        <a class="pretes-video-link" href="<?= sanitize($prep['video_url']) ?>" target="_blank" rel="noopener noreferrer">▶ <?= sanitize($prep['video_title'] ?: ('Video ' . $label)) ?> ↗</a>
+                    <?php elseif (!array_key_exists('video_url', $prep) && isset($learningVideos[$key])): ?>
                         <a class="pretes-video-link" href="https://www.youtube.com/watch?v=<?= sanitize($learningVideos[$key]['id']) ?>" target="_blank" rel="noopener noreferrer">▶ <?= sanitize($learningVideos[$key]['title']) ?> — NU Online ↗</a>
                     <?php endif; ?>
-                    <?php if ($key === 'istighasah' || isset($learningReadings[$key])): ?>
+                    <?php if (!empty($prep['reading_text'])): ?>
+                        <details id="bacaan-<?= sanitize(str_replace('_', '-', $key)) ?>" class="pretes-reading">
+                            <summary>Lihat bacaan <?= sanitize($prep['reading_title'] ?: $label) ?></summary>
+                            <div class="pretes-reading-body"><div style="white-space:pre-wrap;line-height:2;font-size:16px;"><?= sanitize($prep['reading_text']) ?></div></div>
+                        </details>
+                    <?php elseif ($key === 'istighasah' || isset($learningReadings[$key])): ?>
                         <?php include __DIR__ . '/pretes-learning-reading-view.php'; ?>
                     <?php endif; ?>
                 </li>

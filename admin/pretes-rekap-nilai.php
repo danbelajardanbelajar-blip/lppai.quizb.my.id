@@ -80,9 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             // Ambil semua peserta di periode terpilih yang memiliki asesmen
             $stmtSync = $pdo->prepare("
-                SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json
+                SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json, u.jenis_program
                 FROM pretes_registrations pr
                 JOIN pretes_assessments pa ON pa.registration_id = pr.id
+                LEFT JOIN users u ON u.id = pr.user_id
                 WHERE pr.periode = ?
             ");
             $stmtSync->execute([$periodeName]);
@@ -129,7 +130,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $scores = json_decode($item['scores_json'] ?? '{}', true);
                 $sum = 0;
                 $filled = 0;
-                foreach ($componentKeys as $ck) {
+                // Komponen wajib mengikuti program mahasiswa (RPL / Reguler), lihat admin/pretes-tugas.php
+                $itemProgram = pretesProgramKey($item['jenis_program'] ?? '');
+                $itemKeys = array_keys(pretesComponents($itemProgram));
+                $itemTotal = count($itemKeys);
+                foreach ($itemKeys as $ck) {
                     $val = is_array($scores) ? ($scores[$ck] ?? null) : null;
                     if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
                         $sum += (float)$val;
@@ -137,12 +142,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : 0.00;
-                $rawStatus = getPretesStatusLulus($scores);
-                $statusLulus = ($filled === $totalComponents && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
+                $avg = ($filled > 0) ? round($sum / $itemTotal, 2) : 0.00;
+                $rawStatus = getPretesStatusLulus($scores, $itemProgram);
+                $statusLulus = ($filled === $itemTotal && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
                 
                 $predikat = getPretesPredikat($avg);
-                $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$totalComponents} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
+                $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$itemTotal} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
 
                 // Check pretes_results
                 $check = $pdo->prepare("SELECT id FROM pretes_results WHERE user_id = ?");
@@ -298,28 +303,34 @@ foreach ($rawRows as $row) {
     $filledScores = [];
     $sum = 0;
     $filled = 0;
+    // Komponen wajib mengikuti program mahasiswa; kolom tabel tetap gabungan semua program
+    $rowProgram = pretesProgramKey($row['jenis_program'] ?? '');
+    $rowComponents = pretesComponents($rowProgram);
+    $rowTotal = count($rowComponents);
 
     foreach ($components as $key => $label) {
         $val = is_array($scores) ? ($scores[$key] ?? null) : null;
         if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
             $fVal = (float)$val;
             $filledScores[$key] = $fVal;
-            $sum += $fVal;
-            $filled++;
+            if (isset($rowComponents[$key])) {
+                $sum += $fVal;
+                $filled++;
+            }
         } else {
             $filledScores[$key] = null;
         }
     }
 
-    $avg = ($filled > 0) ? round($sum / $totalComponents, 2) : 0.00;
+    $avg = ($filled > 0) ? round($sum / $rowTotal, 2) : 0.00;
     $predikat = getPretesPredikat($avg);
-    $rawStatus = getPretesStatusLulus($scores);
-    $statusLulus = ($filled === $totalComponents && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
+    $rawStatus = getPretesStatusLulus($scores, $rowProgram);
+    $statusLulus = ($filled === $rowTotal && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
 
     if ($statusLulus === 'lulus') $lulusCount++;
     else $tidakLulusCount++;
 
-    if ($filled === $totalComponents) {
+    if ($filled === $rowTotal) {
         $lengkapCount++;
     } elseif ($filled > 0) {
         $sebagianCount++;
@@ -347,6 +358,7 @@ foreach ($rawRows as $row) {
         'is_hadir'      => $isHadir,
         'scores'        => $filledScores,
         'filled_count'  => $filled,
+        'total_count'   => $rowTotal,
         'average'       => $avg,
         'predikat'      => $predikat,
         'status_lulus'  => $statusLulus,
@@ -355,8 +367,8 @@ foreach ($rawRows as $row) {
 
     // Filter Kelengkapan di memori jika diset
     if (!empty($filterKelengkapan)) {
-        if ($filterKelengkapan === 'lengkap' && $filled < $totalComponents) continue;
-        if ($filterKelengkapan === 'sebagian' && ($filled === 0 || $filled === $totalComponents)) continue;
+        if ($filterKelengkapan === 'lengkap' && $filled < $rowTotal) continue;
+        if ($filterKelengkapan === 'sebagian' && ($filled === 0 || $filled === $rowTotal)) continue;
         if ($filterKelengkapan === 'kosong' && $filled > 0) continue;
     }
 
@@ -551,7 +563,7 @@ if (!function_exists('pretesExportRosterToXlsxNative')) {
                 }
 
                 // 22. Komponen Terisi
-                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . ($r['filled_count'] ?? 0) . '/' . $totalComponents . '</t></is></c>';
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . ($r['filled_count'] ?? 0) . '/' . ($r['total_count'] ?? $totalComponents) . '</t></is></c>';
                 // 23. Rata-Rata
                 if (isset($r['average']) && $r['average'] !== null && is_numeric($r['average'])) {
                     $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . round((float)$r['average'], 2) . '</v></c>';
@@ -685,7 +697,7 @@ if (!function_exists('pretesExportRosterToXlsXml')) {
                     }
                 }
 
-                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . ($r['filled_count'] ?? 0) . '/' . $totalComponents . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . ($r['filled_count'] ?? 0) . '/' . ($r['total_count'] ?? $totalComponents) . '</Data></Cell>' . "\n";
                 if (isset($r['average']) && $r['average'] !== null && is_numeric($r['average'])) {
                     echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . round((float)$r['average'], 2) . '</Data></Cell>' . "\n";
                 } else {
@@ -747,7 +759,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
                 $val = $r['scores'][$ck] ?? null;
                 $rowCSV[] = ($val !== null) ? $val : '-';
             }
-            $rowCSV[] = ($r['filled_count'] ?? 0) . "/{$totalComponents}";
+            $rowCSV[] = ($r['filled_count'] ?? 0) . '/' . ($r['total_count'] ?? $totalComponents);
             $rowCSV[] = ($r['average'] !== null) ? $r['average'] : '-';
             $rowCSV[] = $r['predikat'] ?? '-';
             $rowCSV[] = (($r['status_lulus'] ?? '') === 'lulus') ? 'LULUS' : 'TIDAK LULUS';
@@ -839,7 +851,7 @@ if (in_array($exportFormat, ['xlsx', 'csv', 'excel'], true)) {
                         $c++;
                     }
 
-                    $sheet->setCellValue("{$c}{$rowNum}", ($r['filled_count'] ?? 0) . "/{$totalComponents}"); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", ($r['filled_count'] ?? 0) . '/' . ($r['total_count'] ?? $totalComponents)); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", ($r['average'] !== null) ? $r['average'] : '-'); $c++;
                     $sheet->setCellValue("{$c}{$rowNum}", $r['predikat'] ?? '-'); $c++;
                     

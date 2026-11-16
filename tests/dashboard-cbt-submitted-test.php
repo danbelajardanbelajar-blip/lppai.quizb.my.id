@@ -18,6 +18,7 @@ mkdir($temporary . '/data', 0777, true);
 $copyFiles = [
     'pages/dashboard.php',
     'includes/pretes-helper.php',
+    'includes/pretes-components.php',
     'includes/user-helper.php',
     'includes/tutorial-membership.php',
     'includes/announcement-helper.php',

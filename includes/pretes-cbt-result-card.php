@@ -93,7 +93,7 @@ function renderPretesCbtResultCard(array $result, string $linkUjian, string $tut
                 🎉 Selamat, Saudara diperkenankan melanjutkan ke tahap pretes secara online. Berikut adalah tugas pretes RPL (online):
             </p>
             <ol type="a" id="pretes-rpl-online-tasks" style="margin:0 0 4px;padding-left:22px;color:#1f2937;font-size:13.5px;line-height:1.7;">
-                <li>Membuat <strong>video rekaman hafalan</strong> yang jelas dan baik sesuai <strong>11 kompetensi</strong> (yang sudah dijelaskan di halaman pretes, lihat <a href="<?= BASE_URL ?>/pretes-peserta.php#pretes-active-preparation" style="color:#15803d;font-weight:700;">materi persiapan di halaman pretes</a>).</li>
+                <li>Membuat <strong>video rekaman hafalan</strong> yang jelas dan baik sesuai <strong><?= function_exists('pretesPracticalCount') ? pretesPracticalCount('rpl') : 11 ?> kompetensi</strong> (yang sudah dijelaskan di halaman pretes, lihat <a href="<?= BASE_URL ?>/pretes-peserta.php#pretes-active-preparation" style="color:#15803d;font-weight:700;">materi persiapan di halaman pretes</a>).</li>
                 <li>Melakukan <strong>upload ke Google Drive</strong> di alamat berikut:
                     <a href="<?= $e(PRETES_RPL_DRIVE_URL) ?>" id="link-drive-pretes-rpl" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;font-weight:700;word-break:break-all;">📁 Folder Google Drive Tugas Pretes RPL ↗</a></li>
                 <li><strong>Melaporkan ke Tutor</strong> bahwa tugas telah diupload.</li>

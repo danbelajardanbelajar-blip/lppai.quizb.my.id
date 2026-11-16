@@ -9,6 +9,7 @@ mkdir($temporary . '/includes', 0777, true);
 $fixtureFiles = [
     'dosen/dashboard.php',
     'includes/pretes-helper.php',
+    'includes/pretes-components.php',
     'includes/pretes-examiner.php',
     'includes/pretes-face-engine.php'
 ];
@@ -117,7 +118,7 @@ try {
 
     echo "PASS: Dosen dashboard pretes cards properly gated. Visible for examiners, hidden for non-examiners.\n";
 } finally {
-    foreach (['dosen/dashboard.php', 'includes/pretes-helper.php', 'includes/pretes-examiner.php', 'includes/pretes-face-engine.php', 'includes/auth.php', 'includes/header.php', 'includes/footer.php'] as $f) {
+    foreach (['dosen/dashboard.php', 'includes/pretes-helper.php', 'includes/pretes-components.php', 'includes/pretes-examiner.php', 'includes/pretes-face-engine.php', 'includes/auth.php', 'includes/header.php', 'includes/footer.php'] as $f) {
         if (file_exists($temporary . '/' . $f)) unlink($temporary . '/' . $f);
     }
     rmdir($temporary . '/dosen');

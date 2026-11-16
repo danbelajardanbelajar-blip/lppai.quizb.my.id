@@ -50,11 +50,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$registration || !pretesCanAssess($user, $registration)) {
                 throw new InvalidArgumentException('Peserta bukan penugasan Anda atau sudah dipindahkan.');
             }
-            $scores = pretesValidateScores($_POST['scores'] ?? null);
+            // Komponen sesuai program mahasiswa; nilai komponen lain (mis. yang dinonaktifkan) tetap dipertahankan
+            $stmtProg = $pdo->prepare('SELECT jenis_program FROM users WHERE id = ?');
+            $stmtProg->execute([(int)$registration['user_id']]);
+            $regProgram = pretesProgramKey($stmtProg->fetchColumn() ?: '');
+            $validated = pretesValidateScores($_POST['scores'] ?? null, $regProgram);
+            $stmtOld = $pdo->prepare('SELECT scores_json FROM pretes_assessments WHERE registration_id = ?');
+            $stmtOld->execute([$regId]);
+            $oldScores = json_decode((string)($stmtOld->fetchColumn() ?: '{}'), true) ?: [];
+            $storedScores = array_merge($oldScores, $validated);
+            $scores = $validated;
             $stmt = $pdo->prepare('INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by) VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE scores_json = VALUES(scores_json), assessed_by = VALUES(assessed_by), updated_at = CURRENT_TIMESTAMP');
-            $stmt->execute([$regId, json_encode($scores), $user['id']]);
-            $message = 'Nilai 12 komponen berhasil disimpan dengan sukses.';
+            $stmt->execute([$regId, json_encode($storedScores), $user['id']]);
+            $message = 'Nilai ' . count($validated) . ' komponen berhasil disimpan dengan sukses.';
 
             $pdo->commit();
 
@@ -62,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $count = count($scores);
                 $sum = array_sum($scores);
                 $avg = $count > 0 ? round($sum / $count, 2) : 0;
-                $statusLulus = getPretesStatusLulus($scores);
+                $statusLulus = getPretesStatusLulus($scores, $regProgram);
                 $predikat = getPretesPredikat($avg);
                 header('Content-Type: application/json; charset=utf-8');
                 echo json_encode([
@@ -1245,11 +1254,14 @@ include __DIR__ . '/header.php';
                     <?php foreach ($participants as $row):
                         $rId = (int)$row['id'];
                         $rowScores = json_decode($row['scores_json'] ?? '{}', true) ?: [];
+                        $rowProgram = pretesProgramKey($row['jenis_program'] ?? '');
+                        $rowCategories = pretesComponentCategoriesFor($rowProgram);
+                        $rowScores = array_intersect_key($rowScores, pretesComponents($rowProgram));
                         $isAttended = !empty($row['attended_at']) || ($row['status'] ?? '') === 'hadir';
                         $rCount = count($rowScores);
                         $rSum = array_sum($rowScores);
                         $rAvg = $rCount > 0 ? round($rSum / $rCount, 2) : 0;
-                        $rStatusLulus = getPretesStatusLulus($rowScores);
+                        $rStatusLulus = getPretesStatusLulus($rowScores, $rowProgram);
                         $rPredikat = getPretesPredikat($rAvg);
                         $isOpen = ($selectedId === $rId);
                     ?>
@@ -1368,7 +1380,7 @@ include __DIR__ . '/header.php';
 
                                         <?php 
                                         $compNum = 0;
-                                        foreach ($componentCategories as $catTitle => $catItems): 
+                                        foreach ($rowCategories as $catTitle => $catItems):
                                         ?>
                                             <div style="margin-bottom:18px;">
                                                 <div class="pretes-category-heading">

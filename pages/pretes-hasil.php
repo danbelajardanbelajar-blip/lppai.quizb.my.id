@@ -85,12 +85,15 @@ if (!empty($myReg['scores_json'])) {
     $scores = json_decode($myReg['scores_json'], true) ?: [];
 }
 
+// Komponen wajib mengikuti program mahasiswa (RPL / Reguler), dikelola di admin/pretes-tugas.php
+$pretesProgram = pretesProgramKey($user['jenis_program'] ?? '');
+
 // ── Alur Pretes RPL berbasis CBT (sumber status yang sama dengan halaman Peserta Pretes) ──
 require_once __DIR__ . '/../includes/pretes-rpl-flow.php';
 $rpl = ['stage' => 'none', 'cbt' => null];
 if ($myReg) {
     try {
-        $rpl = pretesRplStage($pdo, (int)$user['id'], $myReg, $scores);
+        $rpl = pretesRplStage($pdo, (int)$user['id'], $myReg, $scores, null, $pretesProgram);
     } catch (Throwable $e) {
         error_log('pretesRplStage: ' . $e->getMessage());
     }
@@ -104,7 +107,7 @@ $showRplPanel = in_array($rpl['stage'], $rplPanelStages, true);
 $tutorialCtaUrl = $rpl['stage'] !== 'none' ? BASE_URL . '/tutorial-rpl.php' : BASE_URL . '/tutorial-pendaftaran.php';
 $tutorialCtaLabel = $rpl['stage'] !== 'none' ? PRETES_RPL_TUTORIAL_LABEL : 'Daftar Program Tutorial Gelombang 1';
 
-$components = pretesComponents();
+$components = pretesComponents($pretesProgram);
 $componentDetails = [];
 $sum = 0;
 $filledCount = 0;

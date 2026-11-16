@@ -21,7 +21,7 @@ if (!function_exists('getStudentPretesStage')) {
     {
         $stage = [
             'state' => 'none', 'reg' => null, 'period' => null,
-            'filled' => 0, 'total' => count(pretesComponents()), 'tanggal' => '',
+            'filled' => 0, 'total' => count(pretesComponents(pretesProgramKey($user['jenis_program'] ?? ''))), 'tanggal' => '',
             'tutorialReg' => null, 'isTutorialLulus' => false, 'isTutorialOngoing' => false,
             'showOngoing' => false, 'showLulus' => false,
         ];
@@ -63,11 +63,11 @@ if (!function_exists('getStudentPretesStage')) {
                 $stage['state'] = 'lulus';
             } elseif ($reg) {
                 $scores = json_decode($reg['scores_json'] ?? '{}', true);
-                foreach (pretesComponents() as $ck => $cl) {
+                foreach (pretesComponents(pretesProgramKey($user['jenis_program'] ?? '')) as $ck => $cl) {
                     $v = is_array($scores) ? ($scores[$ck] ?? null) : null;
                     if ($v !== null && $v !== '' && is_numeric($v)) $stage['filled']++;
                 }
-                $rawStatus = getPretesStatusLulus($scores);
+                $rawStatus = getPretesStatusLulus($scores, pretesProgramKey($user['jenis_program'] ?? ''));
 
                 $resultStatus = '';
                 try {

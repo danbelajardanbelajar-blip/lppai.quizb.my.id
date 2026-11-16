@@ -61,7 +61,8 @@ if (!function_exists('isNavGroupActive')) {
                 'pretes-peserta.php',
                 'pretes-peserta-export.php',
                 'pretes-nilai.php',
-                'pretes-rekap-nilai.php'
+                'pretes-rekap-nilai.php',
+                'pretes-tugas.php'
             ];
             $isPretesGroupActive = isNavGroupActive($pretesPages, isset($_GET['cbt_bank']));
             ?>
@@ -69,7 +70,7 @@ if (!function_exists('isNavGroupActive')) {
                 <button type="button" class="nav-group-toggle <?= $isPretesGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isPretesGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🧑‍🏫</span>
                     <span class="nav-text">Manajemen Pretes</span>
-                    <span class="nav-badge">7</span>
+                    <span class="nav-badge">8</span>
                     <span class="chevron">▾</span>
                 </button>
                 <div class="nav-group-content">
@@ -87,6 +88,9 @@ if (!function_exists('isNavGroupActive')) {
                     </a>
                     <a href="<?= BASE_URL ?>/admin/pretes-nilai.php" class="<?= menuActive('pretes-nilai.php') ?>" data-no-spa>
                         <span class="icon">📚</span> Nilai Rinci & Absensi Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-tugas.php" class="page-nav <?= menuActive('pretes-tugas.php') ?>">
+                        <span class="icon">📋</span> Kelola Tugas Pretes
                     </a>
                     <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_bank=1" class="<?= isset($_GET['cbt_bank']) ? 'active' : '' ?>" data-no-spa>
                         <span class="icon">🧩</span> Bank Soal & Hasil CBT

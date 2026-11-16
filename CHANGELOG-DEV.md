@@ -5,6 +5,45 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 00:22:30 +0700 — Kelola Tugas Pretes (komponen selain CBT) per program RPL / Reguler
+
+**ID:** PRETES-TUGAS-KELOLA · **Parent Git:** `bf012f9`.
+**Permintaan pengguna:** halaman admin untuk mengatur komponen nomor 2–12 (tambah, kurangi, edit, simpan), dengan opsi program RPL dan Reguler.
+**Sebelumnya:** daftar 12 komponen ditulis langsung di `pretesComponents()`. Video ada di `data/pretes-learning-videos.php`, bacaan di `data/pretes-learning-readings.json`, dan tidak ada halaman pengelolanya.
+
+**Rancangan:**
+- Tabel baru `pretes_components` (program, comp_key, label, bentuk, kategori, video, bacaan, urutan, aktif). Saat pertama dipakai, tiap program diisi 11 komponen bawaan, jadi tampilan dan nilai tidak berubah sampai admin mengedit.
+- Ujian tulis (CBT) tetap komponen 1 dan tidak bisa diedit.
+- "Mengurangi" komponen berarti menonaktifkan; nilai yang sudah tersimpan tetap aman. Hapus permanen hanya untuk komponen tanpa nilai.
+- Komponen wajib mengikuti program mahasiswa (`users.jenis_program` → `pretesProgramKey`). `pretesComponents(null)` berarti gabungan semua program (kolom rekap, impor).
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-components.php` (baru) | 2026-11-17 00:18:03 | 1–332 | Tabel & helper komponen | `ensurePretesComponentTable` (MySQL/SQLite + seed), `pretesComponentRows`, `pretesComponentsFor` (cache per program, tanpa DB → bawaan), `pretesComponentCategoriesFor`, `pretesPracticalCount`, `pretesComponentSave` (validasi nama, URL http/https, panjang bacaan), `SetActive` (minimal 1 aktif), `Move`, `Delete` (ditolak bila sudah bernilai), `pretesProgramKey`. `pretesComponentsPdo` diberi pengaman rekursi bila `getDBConnection()` memanggil daftar komponen. |
+| `admin/pretes-tugas.php` (baru) | 2026-11-17 00:22:30 | 1–246 | Halaman admin | Tab Program Reguler/RPL. Tabel berisi Ujian tulis terkunci, komponen, materi (video/bacaan), status, dan aksi (Edit, ⬆/⬇, Nonaktifkan/Aktifkan, Hapus). Ada form tambah/edit dengan CSRF, PRG redirect, dan flash. |
+| `includes/sidebar.php` | 2026-11-17 00:10:14 | 64–65, 73, 92–94 | Menu Manajemen Pretes | Menu "📋 Kelola Tugas Pretes" ditambahkan; grup aktif mengenali `pretes-tugas.php`; badge 7 → 8. |
+| `includes/pretes-helper.php` | 2026-11-17 00:08:41 | 3, 62–68, 72–74, 89–95, 121, 143–146, 204–209 | `pretesComponents`, `getPretesStatusLulus`, `isUserLulusPretes`, `pretesValidateScores`, `pretesProgress` | `pretesComponents(?string $program)` mendelegasikan ke tabel. Status, validasi, dan progres memakai komponen sesuai program mahasiswa. |
+| `includes/pretes-panel.php` | 2026-11-17 00:21:34 | 53–62, 65–66, 74, 1257–1259, 1264, 1383 | Simpan & form nilai dosen | Validasi nilai per program. Nilai lama digabung (`array_merge`) agar nilai komponen nonaktif tidak terhapus. Kelompok input dibentuk per baris dari program mahasiswa. Status memakai program. |
+| `admin/pretes-rekap-nilai.php` | 2026-11-17 00:11:33 | 83–86, 133–150, 306–333, 361–371, 566, 700, 762, 854 | Sinkron hasil, roster, filter, ekspor | Jumlah, rata-rata, dan status dihitung dari komponen program mahasiswa. Kolom tabel tetap gabungan. Ekspor memakai `total_count` per baris. |
+| `pages/pretes-hasil.php` | 2026-11-17 00:11:33 | 88–90, 96, 110 | Hasil Pretes | `$pretesProgram` dipakai untuk daftar komponen dan tahap RPL. |
+| `includes/pretes-rpl-flow.php` | 2026-11-17 00:11:33 | 23, 25, 112 | `pretesRplStage`, panel | Parameter `$program`; "11 kompetensi" diganti jumlah dinamis. |
+| `includes/pretes-cbt-result-card.php` | 2026-11-17 00:11:33 | 96 | Kartu ≥ 80 | Jumlah kompetensi RPL dinamis. |
+| `includes/pretes-stage.php` | 2026-11-17 00:11:33 | 24, 66, 70 | Tahap pretes mahasiswa | Total, terisi, dan status per program. |
+| `includes/pretes-preparation-view.php` | 2026-11-17 00:11:33 | 3–11, 57–79 | Materi persiapan peserta | Komponen, bentuk, video, dan bacaan khusus diambil dari tabel per program. Bacaan bawaan (JSON/istighasah) tetap dipakai bila bacaan khusus kosong. |
+| `tests/pretes-components-test.php` (baru) | 2026-11-17 00:19:07 | 1–145 | Test | Mencakup seed, tambah/kunci unik, validasi, edit, urut, status dan validasi per program, nonaktif tanpa hapus nilai, hapus aman, minimal 1 aktif, kelompok panel, dan render halaman admin (Reguler, RPL, mode edit). |
+| `tests/dashboard-cbt-submitted-test.php`, `tests/dosen-dashboard-examiner-test.php`, `tests/pretes-hasil-preparation-test.py` | 00:15:33 / 00:17:41 / 00:15:33 | 21 / 12, 121 / 14 | Harness salinan file | Menyalin dependensi baru `includes/pretes-components.php` (dan membersihkannya). |
+
+**Verifikasi:**
+- `php -l` OK untuk semua file PHP yang berubah; `git diff --check` OK.
+- `pretes-components-test`, `pretes-rpl-flow-test`, seluruh `tests/pretes-*.php`, `dashboard-cbt-submitted`, `dosen-dashboard-examiner`, dan `pretes-hasil-preparation-test.py` PASS.
+- Uji browser lokal (php -S + SQLite): tambah, naikkan, nonaktifkan, dan hapus berjalan dengan redirect dan pesan. Hapus ditolak bila tabel nilai belum pasti, sehingga halaman kini memanggil `ensurePretesFeatures`. Pada lebar 375px tidak ada scroll horizontal halaman.
+- Test yang **sudah gagal di HEAD `bf012f9` sebelum paket ini** (dibandingkan lewat worktree bersih) dan tidak terkait perubahan ini: `login-wa-help`, `tutorial-rekap-absensi`, `tutorial-rekap-nilai-ui`, `tutorial-sisa-kuota`, `user-jenis-program`, serta py `activity-log-visibility`, `admin-profile-photo-zoom`, `admin-user-profile`, `pretes-cbt-api/bulk-http/xlsx-http`, `sidebar-search-browser`, `tutorial-pretes-menu`.
+- Belum diuji di hosting live. Tabel `pretes_components` dibuat otomatis saat halaman pertama kali dibuka.
+
+---
+
 ## 2026-11-16 16:23:00 +0700 — Perbaikan HTTP ERROR 500 Halaman Peserta & Presensi Tutorial RPL: Penyelarasan Kolom `no_hp`
 
 **ID:** FIX-TUTORIAL-RPL-500-USERS-SCHEMA — **Parent Git:** `2daf5e3`.

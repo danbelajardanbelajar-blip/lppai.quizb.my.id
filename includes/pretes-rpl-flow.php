@@ -20,9 +20,9 @@ const PRETES_RPL_TUTORIAL_LABEL = 'Pendaftaran Tutorial RPL Gelombang 1';
  * @return array{stage:string, cbt:?array, assessed:int, total:int, practical_done:int, practical_total:int,
  *               deadline_ts:int, deadline_passed:bool}
  */
-function pretesRplStage(PDO $pdo, int $userId, ?array $registration, array $scores, ?int $now = null): array {
+function pretesRplStage(PDO $pdo, int $userId, ?array $registration, array $scores, ?int $now = null, ?string $program = null): array {
     $now ??= time();
-    $components = pretesComponents();
+    $components = pretesComponents($program);
     $deadlineTs = (new DateTimeImmutable(PRETES_RPL_TASK_DEADLINE_AT, new DateTimeZone('Asia/Jakarta')))->getTimestamp();
     $out = ['stage' => 'none', 'cbt' => null, 'assessed' => 0, 'total' => count($components),
         'practical_done' => 0, 'practical_total' => count($components) - 1,
@@ -109,7 +109,7 @@ function renderPretesRplStagePanel(array $rpl, string $tutorialUrl, string $tuto
                 🎉 Selamat, nilai CBT Anda <?= $e($score) ?>. Saudara diperkenankan melanjutkan ke tahap pretes secara online. Berikut adalah tugas pretes RPL (online):
             </p>
             <ol type="a" style="margin:0 0 12px;padding-left:22px;color:#1f2937;font-size:13.5px;line-height:1.7;">
-                <li>Membuat <strong>video rekaman hafalan</strong> yang jelas dan baik sesuai <strong>11 kompetensi</strong> (lihat <a href="<?= BASE_URL ?>/pretes-peserta.php#pretes-active-preparation" style="color:#15803d;font-weight:700;">materi pretes</a>).</li>
+                <li>Membuat <strong>video rekaman hafalan</strong> yang jelas dan baik sesuai <strong><?= (int)$rpl['practical_total'] ?> kompetensi</strong> (lihat <a href="<?= BASE_URL ?>/pretes-peserta.php#pretes-active-preparation" style="color:#15803d;font-weight:700;">materi pretes</a>).</li>
                 <li>Melakukan <strong>upload ke Google Drive</strong>: <a href="<?= $e(PRETES_RPL_DRIVE_URL) ?>" target="_blank" rel="noopener noreferrer" style="color:#1d4ed8;font-weight:700;">📁 Folder Google Drive Tugas Pretes RPL ↗</a></li>
                 <li><strong>Melaporkan ke Tutor</strong> bahwa tugas telah diupload<?= $tutorHtml !== '' ? ': ' . $tutorHtml : '.' ?></li>
                 <li>Akhir pengumpulan adalah sampai tanggal <strong>22 November 2026</strong>.</li>
