@@ -5,6 +5,7 @@
 define('PAGE_TITLE', 'Pendaftaran Kolektif');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/admin-tutorial-registration.php';
 
 $pdo = getDBConnection();
 
@@ -27,27 +28,18 @@ $isMessageHtml = false;
 $active_gel = $pdo->query("SELECT * FROM master_gelombang WHERE status = 'aktif' ORDER BY created_at DESC, id DESC LIMIT 1")->fetch() ?: $pdo->query("SELECT * FROM master_gelombang ORDER BY created_at DESC LIMIT 1")->fetch();
 
 // Condition to exclude Lulus
-$notLulusSQL = "u.id NOT IN (
-    SELECT tr_sub.user_id FROM tutorial_registrations tr_sub 
-    WHERE tr_sub.nilai_thaharah IS NOT NULL AND tr_sub.nilai_shalat IS NOT NULL AND tr_sub.nilai_surat_pendek IS NOT NULL AND tr_sub.nilai_amaliyah IS NOT NULL AND tr_sub.nilai_jenazah IS NOT NULL AND tr_sub.nilai_ujian_tulis IS NOT NULL
-    AND tr_sub.nilai_thaharah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_shalat >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_surat_pendek >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_amaliyah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_jenazah >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-    AND tr_sub.nilai_ujian_tulis >= (CASE WHEN LOWER(tr_sub.tipe_nilai) = 'pretest' THEN 80 ELSE 70 END)
-)";
+$notLulusSQL = adminTutorialUnpassedStudentSql();
 
 // AJAX API Endpoint: Ambil daftar mahasiswa berdasarkan jurusan
 if (isset($_GET['ajax_jurusan'])) {
     header('Content-Type: application/json');
     $jurusan = $_GET['ajax_jurusan'];
     $stmt = $pdo->prepare("
-        SELECT u.id as user_id, u.nim, u.nama_lengkap, 
+        SELECT u.id as user_id, u.nim, u.nama_lengkap,
                MAX(tr.id) as reg_id,
                (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered,
                MAX(tr.hari_pilihan) as hari_pilihan
-        FROM users u 
+        FROM users u
         LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
         WHERE u.program_studi = ? AND u.role = 'mahasiswa' AND $notLulusSQL
         GROUP BY u.id
@@ -84,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $tahun = date('Y');
             $semester = $tahun . '-' . ($tahun+1) . '-Ganjil';
             $tahun_ajaran = $tahun . '-' . ($tahun+1);
-            
+
             $tipe_nilai = 'mandiri';
             if ($gelombang === 'gel1') $tipe_nilai = 'gel 1';
             else if ($gelombang === 'gel2') $tipe_nilai = 'gel 2';
@@ -95,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             } else {
                 $pdo->prepare("INSERT INTO tutorial_classes (nama_kelas, dosen_pengampu, hari, jam, ruangan, gelombang, semester, kuota) VALUES (?,?,?,?,?,?,?,?)")
                     ->execute([$namaKelas, $dosen, $hari, $jam, $ruangan, $gelombang, $semester, $kuota]);
-                
+
                 $classId = (int)$pdo->lastInsertId();
 
                 $added = 0;
@@ -139,12 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $classData = $stmtClass->fetch();
                 $semStr = $classData ? $classData['semester'] : '';
                 $gel = $classData ? $classData['gelombang'] : '';
-                
+
                 $tahun_ajaran = '';
                 if (preg_match('/^(\d{4}[-\/]\d{4})/', $semStr, $m)) {
                     $tahun_ajaran = str_replace('/', '-', $m[1]);
                 }
-                
+
                 $tipe_nilai = 'mandiri';
                 if ($gel === 'gel1') $tipe_nilai = 'gel 1';
                 else if ($gel === 'gel2') $tipe_nilai = 'gel 2';
@@ -184,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = count($regIds) . ' peserta berhasil dihapus dari kelas (dikembalikan ke status Menunggu).';
                 $msgType = 'success';
             }
-        
+
         /* ---- HAPUS PENDAFTARAN TOTAL ---- */
         } elseif ($action === 'delete_registration') {
             $regId = (int)($_POST['reg_id'] ?? 0);
@@ -228,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $msgType = 'danger';
                 }
             }
-            
+
         /* ---- EDIT PENDAFTARAN ---- */
         } elseif ($action === 'edit_pendaftaran') {
             $regId = (int)($_POST['reg_id'] ?? 0);
@@ -238,40 +230,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Pilihan hari pendaftar berhasil diperbarui.';
                 $msgType = 'success';
             }
-            
+
         /* ---- PENDAFTARAN SINGLE (DARI TABEL KOLEKTIF) ---- */
         } elseif ($action === 'add_single_registration') {
             $user_id = (int)($_POST['user_id'] ?? 0);
-            $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
-            $gelombang = $active_gel['gelombang'] ?? 'gel1';
-
-            if ($user_id > 0 && $hari_pilihan !== '') {
-                $stmtCek = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE user_id = ? AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
-                $stmtCek->execute([$user_id]);
-                if ($stmtCek->fetchColumn() > 0) {
-                    $message = 'Mahasiswa ini sudah terdaftar sebelumnya.';
-                    $msgType = 'warning';
-                } else {
-                    $dayLower = strtolower($hari_pilihan);
-                    $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
-                    
-                    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)");
-                    $stmtCount->execute([$hari_pilihan]);
-                    $terisi = $stmtCount->fetchColumn();
-                    $sisaKuota = $totalKuota - $terisi;
-                    
-                    if ($sisaKuota <= 0) {
-                        $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh.";
-                        $msgType = 'danger';
-                    } else {
-                        $stmtInsert = $pdo->prepare("INSERT INTO tutorial_registrations (user_id, status, hari_pilihan, gelombang) VALUES (?, 'terdaftar', ?, ?)");
-                        $stmtInsert->execute([$user_id, $hari_pilihan, $gelombang]);
-                        $message = 'Mahasiswa berhasil didaftarkan.';
-                        $msgType = 'success';
-                    }
-                }
-            } else {
-                $message = 'Data tidak valid.';
+            $hari_pilihan = trim((string)($_POST['hari_pilihan'] ?? ''));
+            $periodId = (int)($_POST['registration_period_id'] ?? ($active_gel['id'] ?? 0));
+            try {
+                adminTutorialRegisterStudent($pdo, $user_id, $periodId, $hari_pilihan);
+                $message = 'Mahasiswa berhasil didaftarkan pada periode tutorial tujuan.';
+                $msgType = 'success';
+            } catch (PDOException $error) {
+                error_log('Admin tutorial registration: ' . $error->getMessage());
+                $message = 'Pendaftaran gagal disimpan. Silakan coba lagi atau periksa konfigurasi periode.';
+                $msgType = 'danger';
+            } catch (RuntimeException $error) {
+                $message = $error->getMessage();
                 $msgType = 'danger';
             }
 
@@ -284,19 +258,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($jurusan !== '' && $hari_pilihan !== '') {
                 $dayLower = strtolower($hari_pilihan);
                 $totalKuota = $active_gel["kuota_$dayLower"] ?? 0;
-                
+
                 $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM tutorial_registrations WHERE LOWER(hari_pilihan) = LOWER(?) AND (tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%')");
                 $stmtCount->execute([$hari_pilihan]);
                 $terisi = $stmtCount->fetchColumn();
                 $sisaKuota = $totalKuota - $terisi;
-                
+
                 if ($sisaKuota <= 0) {
                     $message = "Maaf, kuota untuk hari $hari_pilihan sudah penuh. Silakan tambah kuota hari tersebut di tab Pengaturan.";
                     $msgType = 'danger';
                 } else {
                     $stmt = $pdo->prepare("
                         SELECT u.id, u.nama_lengkap FROM users u
-                        WHERE u.program_studi = ? 
+                        WHERE u.program_studi = ?
                           AND u.id NOT IN (SELECT user_id FROM tutorial_registrations WHERE tahun_ajaran LIKE '2025%' OR tahun_ajaran LIKE '2026%' OR tahun_ajaran LIKE '2027%' OR tahun_ajaran LIKE '2028%' OR tahun_ajaran LIKE '2029%' OR tahun_ajaran LIKE '2030%' OR tahun_ajaran IS NULL)
                           AND $notLulusSQL
                     ");
@@ -315,7 +289,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             $stmtInsert->execute([$u['id'], $hari_pilihan, $gelombang]);
                             $added++;
                         }
-                        
+
                         if (!empty($failedToRegister)) {
                             $failedNames = array_map(function($u) { return "<li><strong>" . htmlspecialchars($u['nama_lengkap']) . "</strong></li>"; }, $failedToRegister);
                             $failedCount = count($failedToRegister);
@@ -341,16 +315,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $kuota_rabu = (int)($_POST['kuota_rabu'] ?? 0);
                 $kuota_kamis = (int)($_POST['kuota_kamis'] ?? 0);
                 $kuota_jumat = (int)($_POST['kuota_jumat'] ?? 0);
-                
+
                 $tutors_senin = isset($_POST['tutors_senin']) && is_array($_POST['tutors_senin']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_senin']))) : '';
                 $tutors_selasa = isset($_POST['tutors_selasa']) && is_array($_POST['tutors_selasa']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_selasa']))) : '';
                 $tutors_rabu = isset($_POST['tutors_rabu']) && is_array($_POST['tutors_rabu']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_rabu']))) : '';
                 $tutors_kamis = isset($_POST['tutors_kamis']) && is_array($_POST['tutors_kamis']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_kamis']))) : '';
                 $tutors_jumat = isset($_POST['tutors_jumat']) && is_array($_POST['tutors_jumat']) ? implode('|||', array_filter(array_map('trim', $_POST['tutors_jumat']))) : '';
-                
+
                 $pdo->prepare("UPDATE master_gelombang SET kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?, tutors_senin=?, tutors_selasa=?, tutors_rabu=?, tutors_kamis=?, tutors_jumat=? WHERE id=?")
                     ->execute([$kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat, $tutors_senin, $tutors_selasa, $tutors_rabu, $tutors_kamis, $tutors_jumat, $active_gel_id]);
-                
+
                 $message = 'Pengaturan Dosen dan Kuota berhasil disimpan.';
                 $msgType = 'success';
             }
@@ -375,59 +349,12 @@ $tutorsList = $pdo->query("SELECT nim as id, nama_lengkap as nama FROM users WHE
 
 $registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
 if ($active_gel) {
-    $targetYear = str_replace('/', '-', trim($active_gel['tahun_ajaran']));
-    $targetSemester = trim($active_gel['semester']);
-    $targetGelombang = trim($active_gel['gelombang']);
-    $targetYearSem = $targetYear . '-' . $targetSemester;
-    $targetCreatedAt = $active_gel['created_at'];
-
     try {
-        $stmtCount = $pdo->prepare("
-            SELECT tr.hari_pilihan, COUNT(*) as cnt
-            FROM tutorial_registrations tr
-            JOIN users u ON tr.user_id = u.id
-            LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
-            WHERE tr.id IN (
-                SELECT MAX(candidate.id)
-                FROM tutorial_registrations candidate
-                LEFT JOIN tutorial_classes period_class ON candidate.tutorial_class_id = period_class.id
-                WHERE COALESCE(NULLIF(period_class.gelombang, ''), candidate.gelombang) = ?
-                  AND (
-                      REPLACE(TRIM(candidate.tahun_ajaran), '/', '-') = ?
-                      OR candidate.tahun_ajaran LIKE ?
-                      OR (
-                          (candidate.tahun_ajaran IS NULL OR TRIM(candidate.tahun_ajaran) = '')
-                          AND (
-                              REPLACE(TRIM(period_class.semester), '/', '-') = ?
-                              OR TRIM(period_class.semester) = ?
-                              OR candidate.created_at >= ?
-                          )
-                      )
-                  )
-                  AND (
-                      period_class.id IS NULL
-                      OR TRIM(period_class.semester) = ?
-                      OR REPLACE(TRIM(period_class.semester), '/', '-') = ?
-                      OR period_class.semester LIKE ?
-                  )
-                GROUP BY candidate.user_id
-            )
-              AND $notLulusSQL
-            GROUP BY tr.hari_pilihan
-        ");
-        $stmtCount->execute([
-            $targetGelombang,
-            $targetYear,
-            '%' . $targetYear . '%',
-            $targetYearSem,
-            $targetSemester,
-            $targetCreatedAt,
-            $targetSemester,
-            $targetYearSem,
-            '%' . $targetYear . '%'
-        ]);
+        $periodIdsSql = adminTutorialPeriodRegistrationIdsSql();
+        $stmtCount = $pdo->prepare("SELECT hari_pilihan, COUNT(*) as cnt FROM tutorial_registrations WHERE id IN ($periodIdsSql) GROUP BY hari_pilihan");
+        $stmtCount->execute(adminTutorialPeriodRegistrationParams($active_gel));
         foreach ($stmtCount->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $hari = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
+            $hari = ucfirst(strtolower(trim((string)($row['hari_pilihan'] ?? ''))));
             if (isset($registeredCounts[$hari])) {
                 $registeredCounts[$hari] = (int)$row['cnt'];
             }
@@ -497,16 +424,31 @@ $registrations = $pdo->query("
     ORDER BY tc.gelombang, tc.nama_kelas, u.nama_lengkap
 ")->fetchAll();
 
-$allStudents = $pdo->query("
-    SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program, 
-           MAX(tr.id) as reg_id, MAX(tr.hari_pilihan) as hari_pilihan,
-           (CASE WHEN MAX(tr.id) IS NOT NULL THEN 1 ELSE 0 END) as is_registered
-    FROM users u
-    LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND (tr.tahun_ajaran LIKE '2025%' OR tr.tahun_ajaran LIKE '2026%' OR tr.tahun_ajaran LIKE '2027%' OR tr.tahun_ajaran LIKE '2028%' OR tr.tahun_ajaran LIKE '2029%' OR tr.tahun_ajaran LIKE '2030%' OR tr.tahun_ajaran IS NULL)
-    WHERE u.role = 'mahasiswa' AND $notLulusSQL
-    GROUP BY u.id
-    ORDER BY u.program_studi, u.nama_lengkap
-")->fetchAll(PDO::FETCH_ASSOC);
+$allStudents = [];
+if ($active_gel) {
+    $periodIdsSql = adminTutorialPeriodRegistrationIdsSql();
+    $periodParams = adminTutorialPeriodRegistrationParams($active_gel);
+    $stmtStudents = $pdo->prepare("
+        SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program,
+               tr.id as reg_id, tr.hari_pilihan as hari_pilihan,
+               (CASE WHEN tr.id IS NOT NULL THEN 1 ELSE 0 END) as is_registered
+        FROM users u
+        LEFT JOIN tutorial_registrations tr ON u.id = tr.user_id AND tr.id IN ($periodIdsSql)
+        WHERE u.role = 'mahasiswa' AND $notLulusSQL
+        ORDER BY u.program_studi, u.nama_lengkap
+    ");
+    $stmtStudents->execute($periodParams);
+    $allStudents = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $stmtStudents = $pdo->query("
+        SELECT u.id as user_id, u.nim, u.nama_lengkap, u.program_studi, u.jenis_program,
+               NULL as reg_id, NULL as hari_pilihan, 0 as is_registered
+        FROM users u
+        WHERE u.role = 'mahasiswa' AND $notLulusSQL
+        ORDER BY u.program_studi, u.nama_lengkap
+    ");
+    $allStudents = $stmtStudents->fetchAll(PDO::FETCH_ASSOC);
+}
 
 
 $allRegistrations = $pdo->query("
@@ -584,9 +526,9 @@ include __DIR__ . '/../includes/header.php';
         <form method="POST" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="pendaftaran_kolektif">
-            
+
             <div style="background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #a7f3d0; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
-                
+
                 <div style="flex: 1; min-width: 250px;">
                     <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Jurusan:</label>
                     <select name="jurusan" id="selectJurusanKolektif" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
@@ -601,9 +543,9 @@ include __DIR__ . '/../includes/header.php';
                     <label style="display: block; font-weight: 600; color: #064e3b; margin-bottom: 8px;">Pilih Hari Tutorial:</label>
                     <select name="hari_pilihan" required style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
                         <option value="">-- Pilih Hari --</option>
-                        <?php 
+                        <?php
                         $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                        foreach ($days as $day): 
+                        foreach ($days as $day):
                             $dayLower = strtolower($day);
                             $kuota = $active_gel["kuota_$dayLower"] ?? 0;
                             $terisi = $registeredCounts[$day] ?? 0;
@@ -618,7 +560,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
 
             </div>
-            
+
             <button type="submit" class="btn btn-success" style="background-color: #10b981; width: auto;" data-confirm="Yakin ingin mendaftarkan semua mahasiswa jurusan ini ke hari yang dipilih?">✅ Daftarkan Kolektif Sekarang</button>
         </form>
 
@@ -635,7 +577,7 @@ include __DIR__ . '/../includes/header.php';
                 <label style="display: block; font-weight: 600; color: #475569; margin-bottom: 8px; font-size: 13px;">Filter Angkatan:</label>
                 <select id="filterAngkatanSemua" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
                     <option value="">-- Semua Angkatan --</option>
-                    <?php 
+                    <?php
                     $angkatanList = [];
                     foreach ($allStudents as $m) {
                         $nim = trim($m['nim']);
@@ -675,7 +617,7 @@ include __DIR__ . '/../includes/header.php';
                 </thead>
                 <tbody>
                     <?php foreach ($allStudents as $m): ?>
-                        <?php 
+                        <?php
                         $isReg = $m['is_registered'] == 1;
                         ?>
                         <tr>
@@ -693,10 +635,10 @@ include __DIR__ . '/../includes/header.php';
                             </td>
                             <td style="padding: 10px 16px; text-align: center;">
                                 <?php if ($isReg): ?>
-                                    <button type="button" class="btn btn-sm btn-warning" style="padding:4px 8px; font-size:11px;" 
+                                    <button type="button" class="btn btn-sm btn-warning" style="padding:4px 8px; font-size:11px;"
                                             onclick="openEditPendaftarModal(<?= (int)$m['reg_id'] ?>, <?= htmlspecialchars(json_encode($m['hari_pilihan'] ?: ''), ENT_QUOTES) ?>)">Edit</button>
                                 <?php else: ?>
-                                    <button type="button" class="btn btn-sm btn-success" style="padding:4px 8px; font-size:11px; background:#10b981; border-color:#10b981;" 
+                                    <button type="button" class="btn btn-sm btn-success" style="padding:4px 8px; font-size:11px; background:#10b981; border-color:#10b981;"
                                             onclick="openAddSingleRegistrationModal(<?= (int)$m['user_id'] ?>, <?= htmlspecialchars(json_encode($m['nama_lengkap']), ENT_QUOTES) ?>)">Daftarkan</button>
                                 <?php endif; ?>
                             </td>
@@ -740,10 +682,14 @@ window.closeEditPendaftarModal = function() {
     document.getElementById('editPendaftarModal').style.display = 'none';
 };
 
-document.getElementById('edit_class_id').addEventListener('change', function() {
-    var classId = this.value;
-    document.getElementById('display_dosen').textContent = classDosenMap[classId] || '-';
-});
+var editClassEl = document.getElementById('edit_class_id');
+if (editClassEl) {
+    editClassEl.addEventListener('change', function() {
+        var classId = this.value;
+        var displayDosenEl = document.getElementById('display_dosen');
+        if (displayDosenEl) displayDosenEl.textContent = classDosenMap[classId] || '-';
+    });
+}
 
 window.closeEditModal = function() {
     document.getElementById('editPesertaModal').style.display = 'none';
@@ -755,7 +701,7 @@ window.closeEditModal = function() {
     setTimeout(function() {
         if (window.jQuery && window.jQuery.fn.DataTable) {
             var $ = window.jQuery;
-            
+
             // Inisialisasi DataTable untuk Data Pendaftar
             $('#tablePendaftar').DataTable({
                 "destroy": true,
@@ -773,54 +719,62 @@ window.closeEditModal = function() {
                 }
             });
             var tableEl = $('#participantTable');
-            
-            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-                if (settings.nTable.id !== 'participantTable') return true;
-                
-                var selectedClassId = filterKelasBottom.value;
-                if (!selectedClassId || selectedClassId === 'ALL') return true;
-                
-                var tr = settings.aoData[dataIndex].nTr;
-                var rowClassId = tr.getAttribute('data-class-id');
-                return rowClassId === selectedClassId;
-            });
-            
-            filterKelasBottom.addEventListener('change', function() {
-                if ($.fn.DataTable.isDataTable(tableEl)) {
-                    tableEl.DataTable().draw();
-                }
-                
-                var selectedClassId = filterKelasBottom.value;
-                var countBadge = document.querySelector('.card-header span.badge-count');
-                var emptyState = document.getElementById('tableEmptyState');
-                var tableDiv = document.getElementById('tableResponsiveContainer');
-                
-                if (selectedClassId === '') {
-                    if (emptyState) {
-                        emptyState.style.display = 'flex';
-                        emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
-                        emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial.';
-                    }
-                    if (tableDiv) tableDiv.style.display = 'none';
-                    if (countBadge) countBadge.textContent = '0';
-                    var bulkContainer = document.getElementById('bulkActionsContainer');
-                    if (bulkContainer) bulkContainer.style.display = 'none';
-                    var btnDeleteClass = document.getElementById('btnDeleteClass');
-                    if (btnDeleteClass) btnDeleteClass.style.display = 'none';
-                } else {
+
+            if (filterKelasBottom) {
+                $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                    if (settings.nTable.id !== 'participantTable') return true;
+
+                    var selectedClassId = filterKelasBottom.value;
+                    if (!selectedClassId || selectedClassId === 'ALL') return true;
+
+                    var tr = settings.aoData[dataIndex].nTr;
+                    var rowClassId = tr.getAttribute('data-class-id');
+                    return rowClassId === selectedClassId;
+                });
+
+                filterKelasBottom.addEventListener('change', function() {
                     if ($.fn.DataTable.isDataTable(tableEl)) {
-                        var info = tableEl.DataTable().page.info();
-                        var count = info.recordsDisplay;
-                        if (countBadge) countBadge.textContent = count;
-                        
-                        if (count === 0 && emptyState) {
+                        tableEl.DataTable().draw();
+                    }
+
+                    var selectedClassId = filterKelasBottom.value;
+                    var countBadge = document.querySelector('.card-header span.badge-count');
+                    var emptyState = document.getElementById('tableEmptyState');
+                    var tableDiv = document.getElementById('tableResponsiveContainer');
+
+                    if (selectedClassId === '') {
+                        if (emptyState) {
                             emptyState.style.display = 'flex';
-                            emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
-                            emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
-                            if (tableDiv) tableDiv.style.display = 'none';
-                            var bulkContainer = document.getElementById('bulkActionsContainer');
-                            if (bulkContainer) bulkContainer.style.display = 'none';
-                        } else {
+                            emptyState.querySelector('h3').textContent = 'Pilih Kelas Terlebih Dahulu';
+                            emptyState.querySelector('p').textContent = 'Daftar peserta akan muncul setelah Anda memilih kelas tutorial.';
+                        }
+                        if (tableDiv) tableDiv.style.display = 'none';
+                        if (countBadge) countBadge.textContent = '0';
+                        var bulkContainer = document.getElementById('bulkActionsContainer');
+                        if (bulkContainer) bulkContainer.style.display = 'none';
+                        var btnDeleteClass = document.getElementById('btnDeleteClass');
+                        if (btnDeleteClass) btnDeleteClass.style.display = 'none';
+                    } else {
+                        if ($.fn.DataTable.isDataTable(tableEl)) {
+                            var info = tableEl.DataTable().page.info();
+                            var count = info.recordsDisplay;
+                            if (countBadge) countBadge.textContent = count;
+
+                            if (count === 0 && emptyState) {
+                                emptyState.style.display = 'flex';
+                                emptyState.querySelector('h3').textContent = 'Belum ada peserta di kelas ini';
+                                emptyState.querySelector('p').textContent = 'Tambahkan mahasiswa ke kelas melalui form di atas.';
+                                if (tableDiv) tableDiv.style.display = 'none';
+                                var bulkContainer = document.getElementById('bulkActionsContainer');
+                                if (bulkContainer) bulkContainer.style.display = 'none';
+                            } else {
+                                if (emptyState) emptyState.style.display = 'none';
+                                if (tableDiv) tableDiv.style.display = 'block';
+                                var bulkContainer = document.getElementById('bulkActionsContainer');
+                                if (bulkContainer) bulkContainer.style.display = 'block';
+                                var btnDeleteClass = document.getElementById('btnDeleteClass');
+                                if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
+                            }
                             if (emptyState) emptyState.style.display = 'none';
                             if (tableDiv) tableDiv.style.display = 'block';
                             var bulkContainer = document.getElementById('bulkActionsContainer');
@@ -828,19 +782,13 @@ window.closeEditModal = function() {
                             var btnDeleteClass = document.getElementById('btnDeleteClass');
                             if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
                         }
-                        if (emptyState) emptyState.style.display = 'none';
-                        if (tableDiv) tableDiv.style.display = 'block';
-                        var bulkContainer = document.getElementById('bulkActionsContainer');
-                        if (bulkContainer) bulkContainer.style.display = 'block';
-                        var btnDeleteClass = document.getElementById('btnDeleteClass');
-                        if (btnDeleteClass) btnDeleteClass.style.display = 'inline-block';
                     }
-                }
-            });
-            
-            setTimeout(function() {
-                filterKelasBottom.dispatchEvent(new Event('change'));
-            }, 100);
+                });
+
+                setTimeout(function() {
+                    filterKelasBottom.dispatchEvent(new Event('change'));
+                }, 100);
+            }
 
             // Logic untuk Check All
             var btnCheckAll = document.getElementById('btnCheckAll');
@@ -850,7 +798,7 @@ window.closeEditModal = function() {
                     var newCheckedState = !isChecked;
                     this.setAttribute('data-checked', newCheckedState);
                     this.innerHTML = newCheckedState ? '☐ Batal Centang' : '☑️ Centang Semua';
-                    
+
                     if ($.fn.DataTable.isDataTable(tableEl)) {
                         var dt = tableEl.DataTable();
                         $(dt.rows({ search: 'applied' }).nodes()).find('.check-peserta').prop('checked', newCheckedState);
@@ -945,12 +893,12 @@ window.closeEditModal = function() {
                             checked.push(cb);
                         });
                     }
-                    
+
                     if (checked.length === 0) {
                         alert('Silakan centang minimal satu peserta terlebih dahulu.');
                         return;
                     }
-                    
+
                     if (confirm('Yakin ingin mengeluarkan ' + checked.length + ' peserta yang dicentang dari kelas ini?')) {
                         var form = document.getElementById('formBulkDelete');
                         if (form) {
@@ -968,7 +916,7 @@ window.closeEditModal = function() {
                     }
                 });
             }
-            
+
             // Fitur Checkbox untuk tabel Data Pendaftar Tutorial
             const checkAllPendaftarBtn = document.getElementById('btnCheckAllPendaftar');
             const bulkDeletePendaftarBtn = document.getElementById('btnBulkDeletePendaftar');
@@ -984,15 +932,17 @@ window.closeEditModal = function() {
             function updateBulkPendaftarButtons() {
                 const checkedCount = $(getPendaftarNodes()).find('.check-pendaftar:checked').length;
                 const totalCount = $(getPendaftarNodes()).find('.check-pendaftar').length;
-                if (totalCount > 0) {
-                    bulkActionsPendaftarContainer.style.display = 'block';
-                    bulkDeletePendaftarBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
-                } else {
-                    bulkActionsPendaftarContainer.style.display = 'none';
+                if (bulkActionsPendaftarContainer) {
+                    if (totalCount > 0) {
+                        bulkActionsPendaftarContainer.style.display = 'block';
+                        if (bulkDeletePendaftarBtn) bulkDeletePendaftarBtn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                    } else {
+                        bulkActionsPendaftarContainer.style.display = 'none';
+                    }
                 }
             }
 
-            if (document.querySelectorAll('.check-pendaftar').length > 0) {
+            if (document.querySelectorAll('.check-pendaftar').length > 0 && bulkActionsPendaftarContainer) {
                 bulkActionsPendaftarContainer.style.display = 'block';
             }
 
@@ -1000,12 +950,12 @@ window.closeEditModal = function() {
                 checkAllPendaftarBtn.addEventListener('click', function() {
                     const isChecked = this.getAttribute('data-checked') === 'true';
                     const newValue = !isChecked;
-                    
+
                     $(getPendaftarNodes()).find('.check-pendaftar').prop('checked', newValue);
-                    
+
                     this.setAttribute('data-checked', newValue);
                     this.innerHTML = newValue ? '🔳 Hapus Centang' : '☑️ Centang Semua';
-                    
+
                     updateBulkPendaftarButtons();
                 });
             }
@@ -1022,14 +972,14 @@ window.closeEditModal = function() {
             if (bulkDeletePendaftarBtn) {
                 bulkDeletePendaftarBtn.addEventListener('click', function() {
                     const checked = $(getPendaftarNodes()).find('.check-pendaftar:checked');
-                    
+
                     if (checked.length === 0) {
                         alert('Silakan centang minimal satu pendaftar terlebih dahulu.');
                         return;
                     }
 
                     if (!confirm('Hapus ' + checked.length + ' pendaftar yang dicentang secara permanen?')) return;
-                    
+
                     const form = document.getElementById('formBulkDeletePendaftar');
                     if (form) {
                         form.innerHTML = `<input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
@@ -1045,7 +995,7 @@ window.closeEditModal = function() {
                     }
                 });
             }
-            
+
             // Inisialisasi DataTable untuk Semua Mahasiswa
             var tableSemua = $('#tableSemuaMahasiswa').DataTable({
                 "destroy": true,
@@ -1085,10 +1035,10 @@ window.closeEditModal = function() {
                     }
                     var filterAngkatan = $('#filterAngkatanSemua').val();
                     var filterStatus = $('#filterStatusSemua').val();
-                    
+
                     var angkatan = data[1] || ""; // Index 1: Angkatan
                     var status = data[4] || "";   // Index 4: Status
-                    
+
                     if (filterAngkatan && angkatan.indexOf(filterAngkatan) === -1) {
                         return false;
                     }
@@ -1116,15 +1066,15 @@ window.closeEditModal = function() {
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="edit_pendaftaran">
             <input type="hidden" name="reg_id" id="edit_pendaftar_reg_id" value="">
-            
+
             <div class="form-group" style="margin-bottom:24px;">
                 <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
                 <select name="hari_pilihan" id="edit_pendaftar_hari" required
                     style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
                     <option value="">-- Pilih Hari --</option>
-                    <?php 
+                    <?php
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                    foreach ($days as $day): 
+                    foreach ($days as $day):
                         $dayLower = strtolower($day);
                         $kuota = $active_gel["kuota_$dayLower"] ?? 0;
                         $terisi = $registeredCounts[$day] ?? 0;
@@ -1151,24 +1101,26 @@ window.closeEditModal = function() {
     <div style="background:#fff; width:90%; max-width:500px; border-radius:12px; padding:24px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
         <h3 style="margin-top:0; margin-bottom:20px; font-size:18px; color:#1e293b;">Daftarkan Mahasiswa</h3>
         <p style="margin-bottom:16px; font-size:14px; color:#64748b;">Mendaftarkan: <strong id="add_single_nama_lengkap" style="color:#0f172a;"></strong></p>
-        <form method="POST">
+        <form method="POST" data-no-spa>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="add_single_registration">
+            <input type="hidden" name="registration_period_id" value="<?= (int)($active_gel['id'] ?? 0) ?>">
             <input type="hidden" name="user_id" id="add_single_user_id" value="">
-            
+
+            <p style="font-size:13px;color:#475569;">Periode tujuan: <strong><?= sanitize($active_gel ? ($active_gel['tahun_ajaran'] . ' / ' . $active_gel['semester'] . ' / ' . $active_gel['gelombang']) : 'Belum ada periode aktif') ?></strong></p>
             <div class="form-group" style="margin-bottom:24px;">
                 <label style="display:block; margin-bottom:8px; font-size:14px; color:#475569;">Pilihan Hari</label>
                 <select name="hari_pilihan" required
                     style="width:100%; padding:10px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:14px;">
                     <option value="">-- Pilih Hari --</option>
-                    <?php 
+                    <?php
                     $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                    foreach ($days as $day): 
+                    foreach ($days as $day):
                         $dayLower = strtolower($day);
                         $kuota = $active_gel["kuota_$dayLower"] ?? 0;
                         $terisi = $registeredCounts[$day] ?? 0;
                         $sisa = $kuota - $terisi;
-                        $isFull = $sisa <= 0;
+                        $isFull = ($kuota <= 0 || $sisa <= 0 || ($active_gel['status'] ?? '') !== 'aktif');
                     ?>
                     <option value="<?= $day ?>" <?= $isFull ? 'disabled' : '' ?>>
                         <?= $day ?> <?= $isFull ? '(Penuh)' : "(Sisa $sisa kursi)" ?>
@@ -1195,23 +1147,6 @@ window.openAddSingleRegistrationModal = function(userId, namaLengkap) {
 window.closeAddSingleRegistrationModal = function() {
     document.getElementById('addSingleRegistrationModal').style.display = 'none';
 };
-
-if (document.querySelector('#addSingleRegistrationModal form')) {
-    document.querySelector('#addSingleRegistrationModal form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const formData = new FormData(this);
-        fetch('', { method: 'POST', body: formData })
-        .then(res => res.text())
-        .then(html => {
-            closeAddSingleRegistrationModal();
-            alert('Mahasiswa berhasil didaftarkan.');
-            window.location.reload();
-        })
-        .catch(err => {
-            alert('Terjadi kesalahan saat mendaftarkan mahasiswa.');
-        });
-    });
-}
 
 if (document.querySelector('#editPendaftarModal form')) {
     document.querySelector('#editPendaftarModal form').addEventListener('submit', function(e) {

@@ -25,11 +25,17 @@ foreach ([null, '', '13.00 WIB', '13.00 WIB (Jam 1)'] as $time) {
 foreach (['periode' => 'Pretes Lama', 'hari_pilihan' => 'Selasa', 'dosen_penguji' => 'Tutor B', 'ruangan' => 'Ruang B'] as $key => $value) {
     checkPretes(pretesScopeHash(pretesScope(array_merge($registration, [$key => $value]))) !== $hash, 'Perbedaan periode/hari/penguji/ruangan harus memisahkan sesi.');
 }
-checkPretes(pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor A'], $registration), 'Dosen harus dapat menilai penugasannya sendiri.');
-checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor B'], $registration), 'Dosen tidak boleh menilai penugasan orang lain.');
-checkPretes(!pretesCanAssess(['role' => 'mahasiswa', 'nama_lengkap' => 'Tutor A'], $registration), 'Mahasiswa tidak boleh menilai.');
-checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => ''], ['dosen_penguji' => '']), 'Nama dosen kosong tidak boleh mendapatkan akses.');
-checkPretes(pretesCanAssess(['role' => 'admin'], $registration), 'Admin harus dapat memeriksa nilai.');
+// Izin penilaian berbasis NIM akun dosen (bukan nama)
+$pdoA = new PDO('sqlite::memory:');
+$pdoA->exec("CREATE TABLE users (id INTEGER PRIMARY KEY, nama_lengkap TEXT, nim TEXT, role TEXT)");
+$pdoA->exec("INSERT INTO users VALUES (1, 'Tutor A', 'NIDN-A', 'dosen'), (2, 'Tutor B', 'NIDN-B', 'dosen')");
+checkPretes(pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor A', 'nim' => 'NIDN-A'], $registration, $pdoA), 'Dosen harus dapat menilai penugasannya sendiri (NIM).');
+checkPretes(pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor A, M.Pd.', 'nim' => 'NIDN-A'], $registration + ['dosen_penguji_nim' => 'NIDN-A'], $pdoA), 'Perbedaan penulisan nama tidak memengaruhi bila NIM cocok.');
+checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor A', 'nim' => 'NIDN-B'], $registration, $pdoA), 'Nama sama tetapi NIM berbeda tidak boleh menilai.');
+checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor B', 'nim' => 'NIDN-B'], $registration, $pdoA), 'Dosen tidak boleh menilai penugasan orang lain.');
+checkPretes(!pretesCanAssess(['role' => 'mahasiswa', 'nama_lengkap' => 'Tutor A', 'nim' => 'NIDN-A'], $registration, $pdoA), 'Mahasiswa tidak boleh menilai.');
+checkPretes(!pretesCanAssess(['role' => 'dosen', 'nama_lengkap' => 'Tutor A', 'nim' => ''], $registration, $pdoA), 'Dosen tanpa NIM tidak boleh mendapatkan akses.');
+checkPretes(pretesCanAssess(['role' => 'admin'], $registration, $pdoA), 'Admin harus dapat memeriksa nilai.');
 $allZero = array_fill_keys(array_keys(pretesComponents()), 0);
 $progress = pretesProgress([
     ['status' => 'hadir', 'scores_json' => json_encode($allZero)],

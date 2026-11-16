@@ -263,6 +263,18 @@ if (!function_exists('isNavGroupActive')) {
             </a>
 
             <div class="menu-label">Akademik</div>
+            <?php
+            // Menu pretes hanya untuk dosen yang terjadwal sebagai penguji pada periode pretes aktif
+            // (dicocokkan lewat NIM akun dosen, bukan nama). Lihat includes/pretes-examiner.php.
+            $showDosenPretesMenu = false;
+            if (function_exists('getDBConnection')) {
+                try {
+                    require_once __DIR__ . '/pretes-examiner.php';
+                    $showDosenPretesMenu = pretesExaminerIsScheduled(getDBConnection(), $currentUser ?? null);
+                } catch (Throwable $e) { $showDosenPretesMenu = false; }
+            }
+            ?>
+            <?php if ($showDosenPretesMenu): ?>
             <a href="<?= BASE_URL ?>/dosen/pretes.php" class="<?= menuActive('pretes.php') ?>" data-no-spa>
                 <span class="icon">📝</span>
                 <span class="nav-text">Penilaian & Absensi Pretes</span>
@@ -271,6 +283,7 @@ if (!function_exists('isNavGroupActive')) {
                 <span class="icon">🎓</span>
                 <span class="nav-text">Rekapitulasi Nilai Pretes</span>
             </a>
+            <?php endif; ?>
             <a href="<?= BASE_URL ?>/dosen/kelas.php" class="page-nav <?= menuActive('kelas.php') ?>">
                 <span class="icon">🏫</span>
                 <span class="nav-text">Kelas Anda</span>

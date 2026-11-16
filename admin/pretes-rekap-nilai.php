@@ -208,7 +208,10 @@ $filterKelengkapan  = trim($_GET['kelengkapan'] ?? '');
 $filterStatus       = trim($_GET['status_lulus'] ?? '');
 $filterSearch       = trim($_GET['q'] ?? '');
 
-// Jika Dosen login, otomatis kunci filter dosen ke namanya sendiri
+// Jika Dosen login, otomatis kunci ke penugasannya sendiri berdasarkan NIM akun (bukan nama)
+require_once __DIR__ . '/../includes/pretes-examiner.php';
+pretesExaminerEnsure($pdo);
+$dosenNim = $isDosen ? pretesExaminerUserNim($currentUser) : '';
 if ($isDosen) {
     $filterDosen = trim($currentUser['nama_lengkap'] ?? '');
 }
@@ -231,8 +234,8 @@ $sql = "
 $params = [$periodeName];
 
 if ($isDosen) {
-    $sql .= " AND TRIM(pr.dosen_penguji) = ?";
-    $params[] = $filterDosen;
+    $sql .= " AND pr.dosen_penguji_nim = ?";
+    $params[] = $dosenNim !== '' ? $dosenNim : '__tanpa_nim__';
 } elseif (!empty($filterDosen)) {
     $sql .= " AND TRIM(pr.dosen_penguji) = ?";
     $params[] = $filterDosen;

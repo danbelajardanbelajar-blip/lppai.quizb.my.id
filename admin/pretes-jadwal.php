@@ -334,6 +334,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
 
                     $pdo->commit();
+                    // Simpan identitas penguji berbasis NIM akun dosen untuk penugasan periode ini
+                    require_once __DIR__ . '/../includes/pretes-examiner.php';
+                    pretesExaminerResync($pdo, $active_pretes['periode']);
                     $message = "Sukses! Berhasil mengenerate jadwal pretes dan menugaskan dosen penguji untuk <strong>$totalAssigned</strong> mahasiswa.";
                     $msgType = 'success';
                 } catch (Exception $e) {
@@ -352,6 +355,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     WHERE periode = ?
                 ");
                 $stmt->execute([$active_pretes['periode']]);
+                require_once __DIR__ . '/../includes/pretes-examiner.php';
+                pretesExaminerResync($pdo, $active_pretes['periode']); // kosongkan NIM penguji periode ini
                 $message = 'Plotting jadwal pretes berhasil di-reset. Dosen penguji dan ruangan telah dikosongkan.';
                 $msgType = 'success';
             }
@@ -372,6 +377,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     WHERE id = ?
                 ");
                 $stmt->execute([$hari, $dosen ?: null, $ruang ?: null, $regId]);
+                // Identitas penguji = NIM akun dosen
+                require_once __DIR__ . '/../includes/pretes-examiner.php';
+                pretesExaminerEnsure($pdo);
+                $pdo->prepare('UPDATE pretes_registrations SET dosen_penguji_nim = ? WHERE id = ?')
+                    ->execute([$dosen !== '' ? pretesExaminerNimByName($pdo, $dosen) : null, $regId]);
                 $message = 'Penugasan penguji dan ruangan peserta berhasil diperbarui.';
                 $msgType = 'success';
             }

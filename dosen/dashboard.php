@@ -10,14 +10,16 @@ $user = getCurrentUser();
 $pdo = getDBConnection();
 require_once __DIR__ . '/../includes/pretes-helper.php';
 ensurePretesFeatures($pdo);
+require_once __DIR__ . '/../includes/pretes-examiner.php';
+pretesExaminerEnsure($pdo);
 $pretesPeriod = $pdo->query("SELECT id, periode FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1")->fetch();
 $pretesParticipants = [];
 if ($pretesPeriod) {
-    $stmt = $pdo->prepare('SELECT pr.dosen_penguji, pr.status, pa.scores_json FROM pretes_registrations pr
+    $stmt = $pdo->prepare('SELECT pr.dosen_penguji, pr.dosen_penguji_nim, pr.status, pa.scores_json FROM pretes_registrations pr
         JOIN users u ON u.id = pr.user_id
         LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
-        WHERE pr.periode = ? AND TRIM(pr.dosen_penguji) = ?');
-    $stmt->execute([$pretesPeriod['periode'], trim($user['nama_lengkap'])]);
+        WHERE pr.periode = ? AND pr.dosen_penguji_nim = ?');
+    $stmt->execute([$pretesPeriod['periode'], pretesExaminerUserNim($user) !== '' ? pretesExaminerUserNim($user) : '__tanpa_nim__']);
     $pretesParticipants = array_values(array_filter($stmt->fetchAll(), fn($row) => pretesCanAssess($user, $row)));
 }
 $pretesProgress = pretesProgress($pretesParticipants);

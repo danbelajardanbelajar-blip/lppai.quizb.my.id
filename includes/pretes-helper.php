@@ -185,10 +185,14 @@ function pretesAttendanceUrl($session) {
     return BASE_URL . '/absensi-pretes.php?token=' . rawurlencode($session['token']);
 }
 
-function pretesCanAssess($user, $registration) {
-    return $user['role'] === 'admin' || ($user['role'] === 'dosen'
-        && trim($user['nama_lengkap']) !== ''
-        && trim($registration['dosen_penguji'] ?? '') === trim($user['nama_lengkap']));
+function pretesCanAssess($user, $registration, ?PDO $pdo = null) {
+    if (($user['role'] ?? '') === 'admin') return true;
+    if (($user['role'] ?? '') !== 'dosen') return false;
+    // Identitas penguji = NIM akun dosen (bukan nama), lihat includes/pretes-examiner.php
+    require_once __DIR__ . '/pretes-examiner.php';
+    $pdo = $pdo ?? (function_exists('getDBConnection') ? getDBConnection() : null);
+    if (!$pdo) return false;
+    return pretesExaminerOwns($pdo, $user, (array)$registration);
 }
 
 function pretesProgress($participants) {

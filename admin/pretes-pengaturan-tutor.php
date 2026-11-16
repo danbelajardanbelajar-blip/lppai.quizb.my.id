@@ -368,6 +368,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                     $affected = $updMhs->rowCount();
                                     if ($affected > 0) {
                                         $mhsNotice = " (Penugasan $affected mahasiswa pada sesi ini otomatis diperbarui).";
+                                        // Identitas penguji = NIM akun dosen untuk penugasan sesi ini
+                                        require_once __DIR__ . '/../includes/pretes-examiner.php';
+                                        pretesExaminerEnsure($pdo);
+                                        $pdo->prepare('UPDATE pretes_registrations SET dosen_penguji_nim = ? WHERE periode = ? AND TRIM(dosen_penguji) = ?')
+                                            ->execute([trim((string)$newPenguji) !== '' ? pretesExaminerNimByName($pdo, (string)$newPenguji) : null, $oldSess['periode'], trim((string)$newPenguji)]);
                                     }
                                 } catch (Throwable $eSync) {
                                     error_log("Gagal sync penugasan mhs pada edit_session: " . $eSync->getMessage());
@@ -583,15 +588,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $message = 'Username/NIDN <strong>' . htmlspecialchars($username) . '</strong> sudah digunakan oleh pengguna lain.';
                     $msgType = 'danger';
                 } else {
-                    $stmtOld = $pdo->prepare("SELECT nama_lengkap FROM users WHERE id = ? AND role = 'dosen'");
+                    $stmtOld = $pdo->prepare("SELECT nama_lengkap, nim FROM users WHERE id = ? AND role = 'dosen'");
                     $stmtOld->execute([$id]);
-                    $oldName = $stmtOld->fetchColumn();
+                    $oldRow = $stmtOld->fetch(PDO::FETCH_ASSOC) ?: [];
+                    $oldName = $oldRow['nama_lengkap'] ?? false;
+                    $oldNim = trim((string)($oldRow['nim'] ?? ''));
 
                     $pdo->prepare("
-                        UPDATE users 
+                        UPDATE users
                         SET nama_lengkap = ?, nim = ?, username = ?, email = ?, no_hp = ?, is_active = ?
                         WHERE id = ? AND role = 'dosen'
                     ")->execute([$nama, $nim, $username, $email, $noHp, $isActive, $id]);
+
+                    // Penugasan pretes melekat pada NIM akun dosen: bila NIM diganti, pindahkan penugasan
+                    // dari NIM lama ke NIM baru (perubahan nama tidak memengaruhi penugasan).
+                    try {
+                        require_once __DIR__ . '/../includes/pretes-examiner.php';
+                        pretesExaminerEnsure($pdo);
+                        $newNim = trim((string)$nim);
+                        if ($oldNim !== '' && $newNim !== '' && $oldNim !== $newNim) {
+                            $pdo->prepare('UPDATE pretes_registrations SET dosen_penguji_nim = ? WHERE dosen_penguji_nim = ?')->execute([$newNim, $oldNim]);
+                        }
+                    } catch (Throwable $eNim) {
+                        error_log('Gagal sinkron NIM penguji: ' . $eNim->getMessage());
+                    }
 
                     if ($syncCascade && $oldName && trim($oldName) !== $nama) {
                         try {

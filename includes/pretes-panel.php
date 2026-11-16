@@ -15,6 +15,9 @@ if (!in_array($user['role'] ?? '', ['admin', 'dosen'], true)) {
 
 $pdo = getDBConnection();
 ensurePretesFeatures($pdo);
+// Identitas penguji berbasis NIM akun dosen (kolom pretes_registrations.dosen_penguji_nim)
+require_once __DIR__ . '/pretes-examiner.php';
+pretesExaminerEnsure($pdo);
 
 $message = '';
 $msgType = 'success';
@@ -188,8 +191,9 @@ if ($period) {
         WHERE pr.periode = ?';
     $params = [$period['periode']];
     if ($user['role'] !== 'admin') {
-        $sql .= ' AND TRIM(pr.dosen_penguji) = ?';
-        $params[] = trim($user['nama_lengkap']);
+        // Dosen hanya melihat peserta yang dipetakan ke NIM akunnya
+        $sql .= ' AND pr.dosen_penguji_nim = ?';
+        $params[] = pretesExaminerUserNim($user) !== '' ? pretesExaminerUserNim($user) : '__tanpa_nim__';
     }
     $stmt = $pdo->prepare($sql . ' ORDER BY pr.hari_pilihan, pr.ruangan, u.nama_lengkap, pr.id');
     $stmt->execute($params);

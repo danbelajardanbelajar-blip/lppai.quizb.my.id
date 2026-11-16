@@ -5,6 +5,47 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:54:10 +0700 — Perbaiki pendaftaran single mahasiswa pada tutorial pendaftaran kolektif
+
+**ID:** TUTORIAL-KOLEKTIF-SINGLE-REG-FIX · **Parent Git:** `ebf1e56`.
+**Permintaan:** Perbaiki menu "Daftarkan" pada tabel mahasiswa di halaman https://lppai.quizb.my.id/admin/tutorial-pendaftaran-kolektif.php agar mahasiswa benar-benar terdaftar dan tidak lagi memunculkan notifikasi berhasil palsu saat pendaftaran gagal.
+
+**Penyebab yang ditemukan di kode:**
+1. Event listener JavaScript pada form `#addSingleRegistrationModal` meng-intercept submit dengan `e.preventDefault()`, mengirimkan data via `fetch()`, lalu tanpa memeriksa isi respons server langsung mengeksekusi `alert('Mahasiswa berhasil didaftarkan.')` dan reload halaman. Apabila server menolak karena kuota penuh, CSRF tidak valid, atau duplikasi, pengguna tetap melihat pesan sukses palsu.
+2. Handler POST `add_single_registration` masih menggunakan logika query lama yang memeriksa duplikasi dan kuota secara global lintas tahun ajaran 2025–2030, serta melakukan `INSERT` tanpa menyertakan kolom `tahun_ajaran` dan tanpa lock transaksi.
+3. Query tabel mahasiswa `$allStudents` dan penghitungan kuota tersisa `$registeredCounts` belum disinkronkan dengan scope periode gelombang aktif (`tutorial_registration_periods`/`master_gelombang`), menyebabkan status pendaftaran mahasiswa tidak sinkron setelah submit.
+4. Terdapat pemanggilan listener pada elemen DOM yang bernilai null (`filterKelasBottom`, `edit_class_id`, `bulkActionsPendaftarContainer`) yang memicu error JavaScript di browser.
+
+**Perubahan:**
+1. Mengintegrasikan service transaksi `adminTutorialRegisterStudent()` dan kelayakan `adminTutorialUnpassedStudentSql()` dari `includes/admin-tutorial-registration.php`.
+2. Handler POST `add_single_registration` menerima `registration_period_id` eksplisit dan mendaftarkan mahasiswa melalui transaksi dengan lock row MySQL `FOR UPDATE`, validasi kuota hari pada periode aktif, pencatatan `tahun_ajaran` & `gelombang`, serta pengecekan duplikasi per periode.
+3. Query `$allStudents` dan `$registeredCounts` disinkronkan dengan scope periode gelombang aktif menggunakan helper `adminTutorialPeriodRegistrationIdsSql()` dan `adminTutorialPeriodRegistrationParams()`.
+4. Modal `#addSingleRegistrationModal` diperbarui dengan atribut `data-no-spa`, hidden field `registration_period_id`, indikator periode target aktif, dan penonaktifan opsi hari yang kuotanya telah penuh.
+5. Menghapus submit listener JavaScript yang memicu alert sukses palsu, sehingga form memanfaatkan standard native form POST dengan feedback alert bootstrap asli dari backend (`alert-success` / `alert-danger`).
+6. Menambahkan null safety guards pada script DOM legacy agar tidak menimbulkan exception di konsol browser.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 11:52:31 | `admin/tutorial-pendaftaran-kolektif.php` | 8, 31, 237, 362, 427, 680, 715, 930, 1104 | Integrasi `adminTutorialRegisterStudent`, pemutakhiran handler single transaksi, sinkronisasi scope query `$allStudents` & `$registeredCounts`, modal target periode & kuota akurat, pembersihan fake-alert submit listener, dan null safety guards script. |
+| 2026-11-16 11:50:34 | `tests/tutorial-pendaftaran-kolektif-test.py` | 1–148 | Test suite otomatis: verifikasi form modal, penolakan CSRF/kuota/periode nonaktif, pengujian Playwright Chromium headless native form POST + pemutakhiran badge status tabel, serta pengujian atomisitas transaksi & rollback. |
+| 2026-11-16 11:54:10 | `CHANGELOG-DEV.md` | 8 | Pencatatan entri TUTORIAL-KOLEKTIF-SINGLE-REG-FIX secara komprehensif. |
+
+**Verifikasi lulus:**
+1. `php -l admin/tutorial-pendaftaran-kolektif.php`: Sintaks valid tanpa error.
+2. `python tests/tutorial-pendaftaran-kolektif-test.py`: Lulus 100% (Browser test Playwright Chromium membuktikan form POST native mendaftarkan mahasiswa, menampilkan alert server asli, dan memperbarui baris mahasiswa menjadi 'Sudah Terdaftar (Senin)'. HTTP/SQLite membuktikan pembatasan kuota, penolakan duplikat, dan rollback transaksi berjalan sempurna).
+3. `python tests/admin-tutorial-registration-test.py`: Lulus 100%.
+4. `php tests/pretes-peserta-hide-manage-cred-test.php`: Lulus 100%.
+5. `php tests/admin-tables-jenis-program-test.php`: Lulus 100% (38 pattern check pada 17 file).
+6. `php tests/admin-dashboard-active-period-test.php`: Lulus.
+7. `git diff --check`: Bersih tanpa peringatan trailing whitespace.
+
+**Batas verifikasi:** Pengujian otomatis dijalankan pada database lokal SQLite & lingkungan headless Chromium. Push Git ke repositori tidak membuktikan deployment hosting secara otomatis.
+
+**Pelacakan:** Cari commit dengan ID `TUTORIAL-KOLEKTIF-SINGLE-REG-FIX`.
+
+---
 ## 2026-11-16 11:37:30 +0700 — Sembunyikan panel Kelola Kredensial Tes Tulis Pretes CBT secara default
 
 **ID:** PRETES-PESERTA-HIDE-MANAGE-CRED · **Parent Git:** `6f688b9`.
