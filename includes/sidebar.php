@@ -105,6 +105,7 @@ if (!function_exists('isNavGroupActive')) {
                 'tutorial-data-pendaftar.php',
                 'tutorial-pengaturan-generate.php',
                 'tutorial-hasil-plotting.php',
+                'tutorial-rekap-absensi.php',
                 'rekap-nilai.php',
                 'kelola-nilai.php'
             ];
@@ -120,7 +121,7 @@ if (!function_exists('isNavGroupActive')) {
                 <button type="button" class="nav-group-toggle <?= $isTutorialGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🏫</span>
                     <span class="nav-text">Manajemen Tutorial</span>
-                    <span class="nav-badge">4</span>
+                    <span class="nav-badge">5</span>
                     <span class="chevron">▾</span>
                 </button>
                 <div class="nav-group-content">
@@ -147,6 +148,9 @@ if (!function_exists('isNavGroupActive')) {
                             </a>
                         </div>
                     </div>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rekap-absensi.php" class="page-nav <?= menuActive('tutorial-rekap-absensi.php') ?>">
+                        <span class="icon">📊</span> Rekap Kehadiran
+                    </a>
                     <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                         <span class="icon">🎓</span> Rekapitulasi Nilai
                     </a>

@@ -5,6 +5,48 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 12:38:00 +0700 — Rekapitulasi Kehadiran Tutorial Terpadu (Mahasiswa & Dosen)
+
+**ID:** TUTORIAL-REKAP-ABSENSI-MHS-DOSEN · **Parent Git:** `8c69707`.
+**Permintaan:** Jalankan rekomendasi dengan sempurna: sediakan halaman dan tab rekap kehadiran kumulatif mahasiswa (matriks P1-P8, total H/I/S/A, persentase, status kelayakan ujian) serta kehadiran mengajar dosen (monitoring progres P1-P8, tanggal pelaksanaan, status tuntas/berjalan).
+
+**Penyebab dan Kebutuhan Sistem:**
+Sebelumnya, sistem absensi tutorial hanya mencatat presensi per sesi (`tutorial_attendance`) dan sesi QR (`tutorial_qr_sessions`), namun:
+1. Pada sisi Dosen (`dosen/detail-kelas.php`), hanya tersedia tab "Penilaian" dan tab "Absensi" per sesi tunggal (P1 sampai P8 satu per satu). Dosen tidak memiliki tab rekapitulasi kumulatif satu kelas untuk melihat progres mengajar seluruh pertemuan (1 s.d. 8) dan matriks kehadiran seluruh mahasiswa bimbingannya.
+2. Pada sisi Admin, belum ada halaman sentral untuk memonitor keterlaksanaan perkuliahan tutorial oleh para dosen pengampu maupun rekap presensi seluruh mahasiswa lintas kelas/periode.
+
+**Perubahan:**
+1. **Dosen Side (`dosen/detail-kelas.php`):**
+   - Menambahkan tab baru `tab=rekap_absensi` ("📊 Rekap Kehadiran") di bilah tab navigasi kelas dosen.
+   - Mengambil data presensi kumulatif dan sesi QR untuk kelas aktif, mengompilasi matriks pertemuan P1 s.d. P8.
+   - **Card 1 (Kehadiran Mengajar Dosen):** Menampilkan status penyelesaian (Tuntas 8 Pertemuan / Sedang Berjalan / Belum Mulai), visual progress bar persentase, dan grid ringkas 8 pertemuan dengan tanggal pelaksanaan & jumlah kehadiran mahasiswa.
+   - **Card 2 (Matriks Rekapitulasi Presensi Mahasiswa):** Menampilkan KPI stats (Total Mahasiswa, Rata-rata Kehadiran %, Memenuhi Syarat >= 75%, Perlu Perhatian < 75%), filter pencarian realtime (Nama/NIM), toolbar keterangan warna badge status (H, I, S, A, -), tabel matriks lengkap P1-P8, total H/I/S/A, persentase kehadiran, dan badge kelayakan ujian.
+   - Dilengkapi kop resmi LPPAI dan kolom tanda tangan khusus mode cetak (`window.print()` / `@media print`).
+2. **Dosen Navigasi Cepat (`dosen/kelas.php` & `dosen/dashboard.php`):**
+   - Menambahkan tombol shortcut `📊 Rekap` di samping tombol kelola kelas untuk mempermudah akses langsung ke tab rekapitulasi presensi.
+3. **Admin Side (`admin/tutorial-rekap-absensi.php`):**
+   - Membuat halaman sentral baru berarsitektur Emerald Royale dengan 2 tab utama:
+     - **Tab 1: Rekap Kehadiran Mahasiswa:** Dilengkapi filter periode (`master_gelombang`, default aktif), filter kelas, filter dosen pengampu, filter status kelayakan ujian, pencarian nama/NIM, 4 KPI stats, tabel matriks kumulatif lengkap P1-P8, fitur cetak resmi, serta export CSV/Excel streaming dengan UTF-8 BOM (`action=export_csv_mahasiswa`).
+     - **Tab 2: Rekap Kehadiran Mengajar Dosen:** Dilengkapi 4 KPI stats monitoring pengajar, tabel monitoring keterlaksanaan 8 pertemuan (centang ✓, tanggal, rasio terlaksana X/8, progress bar, badge status Tuntas/Berjalan/Belum Mulai), fitur cetak resmi, serta export CSV/Excel streaming (`action=export_csv_dosen`).
+4. **Navigasi Sidebar (`includes/sidebar.php`):**
+   - Mendaftarkan `tutorial-rekap-absensi.php` ke array `$tutorialPages`, menambahkan item menu navigasi "📊 Rekap Kehadiran" di bawah grup Manajemen Tutorial, memperbarui counter badge dari 4 menjadi 5, dan memastikan menu otomatis aktif (`active`) saat dikunjungi.
+5. **Pengujian Terpadu (`tests/tutorial-rekap-absensi-test.php`):**
+   - Membuat suite test otomatis end-to-end terisolasi dengan SQLite in-memory fixture menguji 26 poin asersi fungsi dosen dan admin.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 12:36:17 | `dosen/detail-kelas.php` | 5, 177–281, 308, 804–1035 | Penambahan logika kalkulasi matriks presensi P1-P8 & kehadiran mengajar dosen untuk `tab=rekap_absensi`, tab bar navigasi, Card status mengajar dosen, Card matriks presensi mahasiswa, pencarian realtime, kop dan tanda tangan cetak. |
+| 2026-11-16 12:36:22 | `dosen/kelas.php` | 5, 54–57 | Penambahan tombol shortcut `📊 Rekap` menuju `dosen/detail-kelas.php?id={id}&tab=rekap_absensi`. |
+| 2026-11-16 12:35:17 | `dosen/dashboard.php` | 161–164 | Penambahan tombol shortcut `📊 Rekap` pada tabel kelas terbaru dosen. |
+| 2026-11-16 12:36:13 | `admin/tutorial-rekap-absensi.php` | 1–550 | Halaman baru rekap kehadiran terpadu admin (Tab Mahasiswa & Tab Dosen, filter periode master_gelombang, 2 grid KPI, matriks P1-P8, export CSV UTF-8 BOM, print template). |
+| 2026-11-16 12:35:17 | `includes/sidebar.php` | 108, 124, 151–153 | Integrasi `tutorial-rekap-absensi.php` pada menu Manajemen Tutorial, penambahan link navigasi, dan update badge counter. |
+| 2026-11-16 12:37:08 | `tests/tutorial-rekap-absensi-test.php` | 1–245 | Test suite end-to-end SQLite: verifikasi 26 asersi (kalkulasi matriks dosen/mahasiswa, KPI cards, filter periode, export CSV, dan sidebar). |
+| 2026-11-16 12:38:00 | `CHANGELOG-DEV.md` | 8 | Pencatatan entri TUTORIAL-REKAP-ABSENSI-MHS-DOSEN. |
+
+---
+
 ## 2026-11-16 12:05:30 +0700 — Sembunyikan card pretes di dashboard dosen non-penguji
 
 **ID:** DOSEN-DASHBOARD-PRETES-EXAMINER-GATE · **Parent Git:** `fa6c702`.
@@ -1127,7 +1169,7 @@ Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris mer
 
 ## 2026-11-15 06:21:45 +0700 — Implementasi Sempurna Opsi 1: Live Monitoring & Pantauan Realtime Progres Soal CBT Pretes dan Tryout pada Admin
 
-**ID:** CBT-LIVE-MONITORING-OPTION-1 · **Parent Git:** `f8dbab0`.  
+**ID:** CBT-LIVE-MONITORING-OPTION-1 · **Parent Git:** `f8dbab0`.
 **Permintaan:** Implementasikan Opsi 1 dengan sempurna. Memperkaya tabel Hasil Ujian di admin (`admin/pretes-bank-soal.php?tab=results`) agar sesi pengerjaan yang berstatus "Berlangsung" tidak lagi menampilkan strip (—), melainkan menampilkan metrik live real-time: berapa soal sudah dikerjakan, berapa benar, berapa ragu, berapa salah, hitung mundur sisa waktu, dan estimasi nilai live, lengkap dengan kontrol Auto-refresh via AJAX.
 
 Waktu tabel adalah penyimpanan terakhir file (WIB sampai detik); nomor baris merujuk snapshot commit entri ini.

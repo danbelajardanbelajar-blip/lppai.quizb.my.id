@@ -2,7 +2,7 @@
 /**
  * LPPAI Corner - Detail Kelas Dosen
  */
-define('PAGE_TITLE', 'Detail & Kelola Kelas');
+if (!defined('PAGE_TITLE')) define('PAGE_TITLE', 'Detail & Kelola Kelas');
 require_once __DIR__ . '/../includes/auth.php';
 requireDosen();
 
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($action === 'save_nilai_detail') {
             $reg_id = (int)($_POST['reg_id'] ?? 0);
             $detail = $_POST['detail'] ?? [];
-            
+
             function calcAvg($detail, $keys) {
                 $sum = 0; $has_val = false;
                 foreach($keys as $k) {
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $json_detail = json_encode($detail);
                 $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? WHERE id=? AND tutorial_class_id=?");
                 $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $reg_id, $class_id]);
-                
+
                 $message = 'Nilai rincian berhasil disimpan.';
                 $msgType = 'success';
             } catch (Exception $e) {
@@ -98,12 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'danger';
             }
         }
-        
+
         // Simpan Absensi
         elseif ($action === 'save_absensi') {
             $pertemuan_ke = (int)($_POST['pertemuan_ke'] ?? 0);
             $tanggal = $_POST['tanggal'] ?? '';
-            $status_data = $_POST['status_hadir'] ?? []; 
+            $status_data = $_POST['status_hadir'] ?? [];
 
             if ($pertemuan_ke <= 0 || empty($tanggal)) {
                 $message = 'Pertemuan Ke dan Tanggal harus diisi.';
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
 // Get registered students
 $stmt = $pdo->prepare("
-    SELECT tr.id as reg_id, tr.user_id, tr.status, 
+    SELECT tr.id as reg_id, tr.user_id, tr.status,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek, tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nilai_detail,
            u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
     FROM tutorial_registrations tr
@@ -160,20 +160,124 @@ if ($activeTab === 'absensi') {
     $stmt = $pdo->prepare("SELECT DISTINCT pertemuan_ke, tanggal FROM tutorial_attendance WHERE tutorial_class_id = ? ORDER BY pertemuan_ke ASC");
     $stmt->execute([$class_id]);
     $meetings = $stmt->fetchAll();
-    
+
     $existingDate = '';
     $stmt = $pdo->prepare("SELECT user_id, status_hadir FROM tutorial_attendance WHERE tutorial_class_id = ? AND pertemuan_ke = ?");
     $stmt->execute([$class_id, $pertemuanSelected]);
     while ($row = $stmt->fetch()) {
         $attendanceData[$row['user_id']] = $row['status_hadir'];
     }
-    
+
     foreach ($meetings as $m) {
         if ($m['pertemuan_ke'] == $pertemuanSelected) {
             $tanggalSelected = $m['tanggal'];
             break;
         }
     }
+} elseif ($activeTab === 'rekap_absensi') {
+    $max_pertemuan = 8;
+    // 1. Ambil seluruh catatan absensi kelas ini
+    $stmtAtt = $pdo->prepare("SELECT user_id, pertemuan_ke, status_hadir, tanggal FROM tutorial_attendance WHERE tutorial_class_id = ? ORDER BY pertemuan_ke ASC");
+    $stmtAtt->execute([$class_id]);
+    $attendanceRows = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 2. Ambil sesi QR yang pernah dibuat
+    $stmtQr = $pdo->prepare("SELECT pertemuan_ke, created_at, expires_at FROM tutorial_qr_sessions WHERE tutorial_class_id = ? ORDER BY pertemuan_ke ASC");
+    $stmtQr->execute([$class_id]);
+    $qrRows = $stmtQr->fetchAll(PDO::FETCH_ASSOC);
+
+    $qrByMeeting = [];
+    foreach ($qrRows as $qr) {
+        $p = (int)$qr['pertemuan_ke'];
+        if (!isset($qrByMeeting[$p])) {
+            $qrByMeeting[$p] = $qr;
+        }
+    }
+
+    // 3. Susun matriks kehadiran mahasiswa dan statistik pertemuan
+    $matrixAbsensi = [];
+    $meetingDates = array_fill(1, $max_pertemuan, null);
+    $meetingHadirStats = array_fill(1, $max_pertemuan, 0);
+    $meetingTotalStats = array_fill(1, $max_pertemuan, 0);
+
+    foreach ($attendanceRows as $row) {
+        $uid = (int)$row['user_id'];
+        $p = (int)$row['pertemuan_ke'];
+        $st = strtolower(trim((string)$row['status_hadir']));
+        $matrixAbsensi[$uid][$p] = $st;
+
+        if (!empty($row['tanggal']) && empty($meetingDates[$p])) {
+            $meetingDates[$p] = $row['tanggal'];
+        }
+        if (in_array($st, ['hadir', 'izin', 'sakit', 'absen'], true)) {
+            $meetingTotalStats[$p]++;
+            if ($st === 'hadir') {
+                $meetingHadirStats[$p]++;
+            }
+        }
+    }
+
+    // Isi tanggal dari sesi QR jika belum tercatat di data absensi
+    for ($i = 1; $i <= $max_pertemuan; $i++) {
+        if (empty($meetingDates[$i]) && isset($qrByMeeting[$i]['created_at'])) {
+            $meetingDates[$i] = substr($qrByMeeting[$i]['created_at'], 0, 10);
+        }
+    }
+
+    // 4. Hitung kehadiran mengajar dosen
+    $dosenMeetingsHeld = 0;
+    $meetingProgressDetails = [];
+    for ($i = 1; $i <= $max_pertemuan; $i++) {
+        $isHeld = ($meetingTotalStats[$i] > 0 || isset($qrByMeeting[$i]));
+        if ($isHeld) {
+            $dosenMeetingsHeld++;
+        }
+        $meetingProgressDetails[$i] = [
+            'pertemuan_ke' => $i,
+            'is_held' => $isHeld,
+            'tanggal' => $meetingDates[$i],
+            'hadir' => $meetingHadirStats[$i],
+            'total_diisi' => $meetingTotalStats[$i]
+        ];
+    }
+    $dosenProgressPct = round(($dosenMeetingsHeld / $max_pertemuan) * 100);
+
+    // 5. Hitung ringkasan kumulatif per mahasiswa
+    $studentSummaries = [];
+    $totalHadirAll = 0;
+    $eligibleCount = 0;
+    $warningCount = 0;
+
+    foreach ($students as $st) {
+        $uid = (int)$st['user_id'];
+        $h = 0; $iz = 0; $sk = 0; $ab = 0;
+        for ($p = 1; $p <= $max_pertemuan; $p++) {
+            $status = $matrixAbsensi[$uid][$p] ?? 'belum';
+            if ($status === 'hadir') $h++;
+            elseif ($status === 'izin') $iz++;
+            elseif ($status === 'sakit') $sk++;
+            elseif ($status === 'absen') $ab++;
+        }
+        $pct = round(($h / $max_pertemuan) * 100, 1);
+        $isEligible = ($h >= 6); // Syarat minimal 75% kehadiran (>= 6 dari 8 pertemuan)
+        if ($isEligible) {
+            $eligibleCount++;
+        } else {
+            $warningCount++;
+        }
+        $totalHadirAll += $pct;
+
+        $studentSummaries[$uid] = [
+            'hadir' => $h,
+            'izin' => $iz,
+            'sakit' => $sk,
+            'absen' => $ab,
+            'persen' => $pct,
+            'is_eligible' => $isEligible
+        ];
+    }
+
+    $avgStudentPct = count($students) > 0 ? round($totalHadirAll / count($students), 1) : 0;
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -200,9 +304,10 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Tabs -->
-<div class="tabs" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0;">
-    <a href="?id=<?= $class_id ?>&tab=nilai" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='nilai' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='nilai' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='nilai' ? 'bold' : 'normal' ?>;">Penilaian</a>
-    <a href="?id=<?= $class_id ?>&tab=absensi" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='absensi' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='absensi' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='absensi' ? 'bold' : 'normal' ?>;">Absensi</a>
+<div class="tabs no-print" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
+    <a href="?id=<?= $class_id ?>&tab=nilai" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='nilai' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='nilai' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='nilai' ? 'bold' : 'normal' ?>;">📝 Penilaian</a>
+    <a href="?id=<?= $class_id ?>&tab=absensi" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='absensi' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='absensi' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='absensi' ? 'bold' : 'normal' ?>;">📱 Input Absensi & QR</a>
+    <a href="?id=<?= $class_id ?>&tab=rekap_absensi" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='rekap_absensi' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='rekap_absensi' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='rekap_absensi' ? 'bold' : 'normal' ?>;">📊 Rekap Kehadiran</a>
 </div>
 
 <?php if ($activeTab === 'nilai'): ?>
@@ -278,14 +383,14 @@ include __DIR__ . '/../includes/header.php';
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="action" value="save_nilai_detail">
                 <input type="hidden" name="reg_id" id="modal_reg_id" value="">
-                
+
                 <div style="padding:20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:#fff; z-index:10; border-radius:8px 8px 0 0;">
                     <h3 style="margin:0;">Input Nilai Rinci: <span id="modal_student_name"></span></h3>
                     <button type="button" onclick="closeNilaiModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
                 </div>
-                
+
                 <div style="padding:20px;">
-                    <?php 
+                    <?php
                     $categories = [
                         'thaharah' => 'Ketuntasan Hafalan Thaharah',
                         'shalat' => 'Ketuntasan Hafalan Bacaan Shalat',
@@ -322,7 +427,7 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <?php endforeach; ?>
                 </div>
-                
+
                 <div style="padding:20px; border-top:1px solid #e2e8f0; text-align:right; position:sticky; bottom:0; background:#fff; border-radius:0 0 8px 8px;">
                     <button type="button" class="btn btn-outline" onclick="closeNilaiModal()" style="margin-right:10px;">Batal</button>
                     <button type="submit" class="btn btn-primary">💾 Simpan Nilai</button>
@@ -330,16 +435,16 @@ include __DIR__ . '/../includes/header.php';
             </form>
         </div>
     </div>
-    
+
     <script>
     function openNilaiModal(regId, studentName, detailJson) {
         document.getElementById('modal_reg_id').value = regId;
         document.getElementById('modal_student_name').innerText = studentName;
-        
+
         // Clear all inputs first
         let inputs = document.querySelectorAll('#formNilaiRinci input[type="number"]');
         inputs.forEach(inp => inp.value = '');
-        
+
         // Parse and fill existing data
         if(detailJson && detailJson.trim() !== '') {
             try {
@@ -354,14 +459,14 @@ include __DIR__ . '/../includes/header.php';
                 console.error("Invalid JSON:", e);
             }
         }
-        
+
         document.getElementById('nilaiModal').style.display = 'block';
     }
-    
+
     function closeNilaiModal() {
         document.getElementById('nilaiModal').style.display = 'none';
     }
-    
+
     function setVal(key, val) {
         document.getElementById('input_' + key).value = val;
     }
@@ -623,6 +728,293 @@ include __DIR__ . '/../includes/header.php';
             <?php endif; ?>
         </div>
     </div>
+<?php elseif ($activeTab === 'rekap_absensi'): ?>
+    <!-- TAB REKAP KEHADIRAN (DOSEN & MAHASISWA) -->
+    <style>
+    @media print {
+        .no-print, .topbar, .sidebar, .sidebar-overlay, .btn, .tabs, .user-menu-container, footer, .app-logo, .sidebar-header {
+            display: none !important;
+        }
+        .main-content {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .card {
+            box-shadow: none !important;
+            border: 1px solid #94a3b8 !important;
+            margin-bottom: 20px !important;
+            page-break-inside: avoid;
+        }
+        .print-only {
+            display: block !important;
+        }
+        .badge {
+            border: 1px solid #334155 !important;
+            color: #0f172a !important;
+            background: transparent !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        table {
+            font-size: 11px !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+        }
+        th, td {
+            padding: 6px 4px !important;
+            border: 1px solid #cbd5e1 !important;
+        }
+    }
+    .print-only {
+        display: none;
+    }
+    .rekap-badge-status {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 11px;
+    }
+    .rekap-badge-hadir { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .rekap-badge-izin { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .rekap-badge-sakit { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .rekap-badge-absen { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .rekap-badge-belum { background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0; }
+    </style>
+
+    <!-- KOP RESMI KHUSUS CETAK -->
+    <div class="print-only" style="margin-bottom: 24px; text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px;">
+        <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; color: #0f172a; font-weight: 800;">LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI)</h2>
+        <h3 style="margin: 4px 0 0 0; font-size: 14px; font-weight: 700; color: #334155;">REKAPITULASI KEHADIRAN MAHASISWA & KEHADIRAN MENGAJAR DOSEN</h3>
+        <div style="font-size: 12px; margin-top: 8px; color: #475569; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+            <span><strong>Kelas:</strong> <?= sanitize($kelas['nama_kelas']) ?></span>
+            <span><strong>Dosen Pengampu:</strong> <?= sanitize($kelas['dosen_pengampu']) ?></span>
+            <span><strong>Jadwal:</strong> <?= sanitize($kelas['hari']) ?>, <?= sanitize($kelas['jam']) ?> (Ruang: <?= sanitize($kelas['ruangan']) ?>)</span>
+            <span><strong>Semester:</strong> <?= sanitize($kelas['semester']) ?> (<?= sanitize($kelas['gelombang']) ?>)</span>
+        </div>
+    </div>
+
+    <!-- CARD 1: KEHADIRAN MENGAJAR DOSEN -->
+    <div class="card" style="margin-bottom: 24px; border-top: 4px solid #10b981;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: #f8fafc;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">👨‍🏫</span>
+                <span style="font-weight: 700; color: #0f172a;">Status Kehadiran Mengajar Dosen</span>
+            </div>
+            <div>
+                <?php if ($dosenMeetingsHeld >= 8): ?>
+                    <span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-weight:700;padding:5px 12px;border-radius:9999px;">✓ Tuntas (8/8 Pertemuan)</span>
+                <?php elseif ($dosenMeetingsHeld > 0): ?>
+                    <span class="badge" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-weight:700;padding:5px 12px;border-radius:9999px;">● Sedang Berjalan (<?= $dosenMeetingsHeld ?>/8 Pertemuan)</span>
+                <?php else: ?>
+                    <span class="badge" style="background:#f1f5f9;color:#64748b;border:1px solid #cbd5e1;font-weight:700;padding:5px 12px;border-radius:9999px;">○ Belum Dimulai (0/8)</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Progress Bar -->
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155;">
+                    <span>Progres Perkuliahan Tutorial: <strong><?= $dosenMeetingsHeld ?> dari 8 Pertemuan</strong></span>
+                    <span><strong><?= $dosenProgressPct ?>%</strong></span>
+                </div>
+                <div style="background: #e2e8f0; border-radius: 9999px; height: 10px; overflow: hidden;">
+                    <div style="background: linear-gradient(90deg, #10b981, #059669); width: <?= $dosenProgressPct ?>%; height: 100%; border-radius: 9999px; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- Mini Grid 8 Pertemuan -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                <?php for ($p = 1; $p <= 8; $p++):
+                    $det = $meetingProgressDetails[$p];
+                    $isHeld = $det['is_held'];
+                    $tglFormatted = $det['tanggal'] ? date('d/m/Y', strtotime($det['tanggal'])) : '-';
+                ?>
+                    <div style="padding: 12px 10px; border-radius: 10px; border: 1px solid <?= $isHeld ? '#86efac' : '#e2e8f0' ?>; background: <?= $isHeld ? '#f0fdf4' : '#f8fafc' ?>; text-align: center;">
+                        <div style="font-size: 11px; font-weight: 700; color: <?= $isHeld ? '#166534' : '#64748b' ?>; text-transform: uppercase;">Pertemuan <?= $p ?></div>
+                        <div style="font-size: 18px; font-weight: 800; margin: 4px 0; color: <?= $isHeld ? '#047857' : '#94a3b8' ?>;">
+                            <?= $isHeld ? '✓' : '—' ?>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 600; color: #475569;"><?= $tglFormatted ?></div>
+                        <div style="font-size: 11px; color: <?= $isHeld ? '#065f46' : '#94a3b8' ?>; margin-top: 2px;">
+                            <?= $isHeld ? ($det['hadir'] . ' Hadir') : 'Belum Ada' ?>
+                        </div>
+                    </div>
+                <?php endfor; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD 2: MATRIKS REKAPITULASI KEHADIRAN MAHASISWA -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">📋</span>
+                <span style="font-weight: 700; color: #0f172a;">Matriks Rekapitulasi Presensi Mahasiswa</span>
+            </div>
+            <div class="no-print" style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="btn btn-sm btn-outline" onclick="window.print()" style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;">
+                    🖨️ Cetak Rekapitulasi
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Stat KPI Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                <div style="padding: 14px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Total Mahasiswa</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 4px;"><?= count($students) ?> <span style="font-size: 13px; font-weight: 500; color: #64748b;">Orang</span></div>
+                </div>
+                <div style="padding: 14px; border-radius: 12px; background: #eff6ff; border: 1px solid #bfdbfe;">
+                    <div style="font-size: 12px; color: #1e40af; font-weight: 600; text-transform: uppercase;">Rata-rata Kehadiran</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #1d4ed8; margin-top: 4px;"><?= $avgStudentPct ?>%</div>
+                </div>
+                <div style="padding: 14px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0;">
+                    <div style="font-size: 12px; color: #065f46; font-weight: 600; text-transform: uppercase;">Memenuhi Syarat (≥ 75%)</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #047857; margin-top: 4px;"><?= $eligibleCount ?> <span style="font-size: 13px; font-weight: 500; color: #065f46;">Mahasiswa</span></div>
+                </div>
+                <div style="padding: 14px; border-radius: 12px; background: #fff1f2; border: 1px solid #fecdd3;">
+                    <div style="font-size: 12px; color: #9f1239; font-weight: 600; text-transform: uppercase;">Perlu Perhatian (&lt; 75%)</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #be123c; margin-top: 4px;"><?= $warningCount ?> <span style="font-size: 13px; font-weight: 500; color: #9f1239;">Mahasiswa</span></div>
+                </div>
+            </div>
+
+            <!-- Toolbar & Legend (No Print) -->
+            <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding: 12px 14px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="flex: 1; min-width: 220px; max-width: 360px;">
+                    <input type="text" id="rekapSearchInput" placeholder="🔍 Cari nama atau NIM mahasiswa..." style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;" onkeyup="filterRekapTable()">
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px;">
+                    <span style="font-weight: 700; color: #475569;">Keterangan:</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;"><span class="rekap-badge-status rekap-badge-hadir" style="width:20px;height:20px;font-size:10px;">H</span> Hadir</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;"><span class="rekap-badge-status rekap-badge-izin" style="width:20px;height:20px;font-size:10px;">I</span> Izin</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;"><span class="rekap-badge-status rekap-badge-sakit" style="width:20px;height:20px;font-size:10px;">S</span> Sakit</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;"><span class="rekap-badge-status rekap-badge-absen" style="width:20px;height:20px;font-size:10px;">A</span> Alpa</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px;"><span class="rekap-badge-status rekap-badge-belum" style="width:20px;height:20px;font-size:10px;">-</span> Belum</span>
+                </div>
+            </div>
+
+            <?php if (empty($students)): ?>
+                <div class="empty-state" style="padding:40px 20px; text-align:center;">
+                    <p style="color:#64748b;">Belum ada mahasiswa yang terdaftar di kelas tutorial ini.</p>
+                </div>
+            <?php else: ?>
+                <div class="table-responsive">
+                    <table id="rekapAttendanceTable">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th width="35" style="text-align: center;">No</th>
+                                <th width="110">NIM</th>
+                                <th>Nama Mahasiswa</th>
+                                <th width="35" style="text-align: center;">P1</th>
+                                <th width="35" style="text-align: center;">P2</th>
+                                <th width="35" style="text-align: center;">P3</th>
+                                <th width="35" style="text-align: center;">P4</th>
+                                <th width="35" style="text-align: center;">P5</th>
+                                <th width="35" style="text-align: center;">P6</th>
+                                <th width="35" style="text-align: center;">P7</th>
+                                <th width="35" style="text-align: center;">P8</th>
+                                <th width="45" style="text-align: center; color: #166534;" title="Total Hadir">H</th>
+                                <th width="45" style="text-align: center; color: #0369a1;" title="Total Izin">I</th>
+                                <th width="45" style="text-align: center; color: #92400e;" title="Total Sakit">S</th>
+                                <th width="45" style="text-align: center; color: #991b1b;" title="Total Alpa">A</th>
+                                <th width="65" style="text-align: center;">% Hadir</th>
+                                <th width="130" style="text-align: center;">Status Kelayakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $no = 1; foreach ($students as $st):
+                                $uid = (int)$st['user_id'];
+                                $sum = $studentSummaries[$uid];
+                            ?>
+                            <tr class="rekap-student-row" data-name="<?= htmlspecialchars(strtolower($st['nama_lengkap'])) ?>" data-nim="<?= htmlspecialchars(strtolower($st['nim'])) ?>">
+                                <td align="center" style="color: #64748b;"><?= $no++ ?></td>
+                                <td><span style="font-family: monospace; font-size: 13px; font-weight: 600; color: #334155;"><?= sanitize($st['nim']) ?></span></td>
+                                <td>
+                                    <strong><?= adminUserProfileLink($st['nama_lengkap'], $uid) ?></strong><br>
+                                    <small style="color: #64748b;"><?= sanitize($st['program_studi']) ?> <?= renderJenisProgramBadge($st['jenis_program'] ?? 'Reguler', true) ?></small>
+                                </td>
+                                <?php for ($p = 1; $p <= 8; $p++):
+                                    $stVal = $matrixAbsensi[$uid][$p] ?? 'belum';
+                                    $badgeClass = 'rekap-badge-belum';
+                                    $label = '-';
+                                    if ($stVal === 'hadir') { $badgeClass = 'rekap-badge-hadir'; $label = 'H'; }
+                                    elseif ($stVal === 'izin') { $badgeClass = 'rekap-badge-izin'; $label = 'I'; }
+                                    elseif ($stVal === 'sakit') { $badgeClass = 'rekap-badge-sakit'; $label = 'S'; }
+                                    elseif ($stVal === 'absen') { $badgeClass = 'rekap-badge-absen'; $label = 'A'; }
+                                ?>
+                                    <td align="center">
+                                        <span class="rekap-badge-status <?= $badgeClass ?>" title="Pertemuan <?= $p ?>: <?= strtoupper($stVal) ?>">
+                                            <?= $label ?>
+                                        </span>
+                                    </td>
+                                <?php endfor; ?>
+                                <td align="center"><strong style="color: #166534;"><?= $sum['hadir'] ?></strong></td>
+                                <td align="center" style="color: #0369a1;"><?= $sum['izin'] ?></td>
+                                <td align="center" style="color: #92400e;"><?= $sum['sakit'] ?></td>
+                                <td align="center" style="color: #991b1b;"><?= $sum['absen'] ?></td>
+                                <td align="center">
+                                    <strong style="color: <?= $sum['is_eligible'] ? '#059669' : '#e11d48' ?>; font-size: 13px;">
+                                        <?= $sum['persen'] ?>%
+                                    </strong>
+                                </td>
+                                <td align="center">
+                                    <?php if ($sum['is_eligible']): ?>
+                                        <span class="badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-weight:700;font-size:11px;">
+                                            ✓ Memenuhi
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="badge" style="background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-weight:700;font-size:11px;">
+                                            ⚠ Perlu Perhatian
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- TANDA TANGAN KHUSUS CETAK -->
+    <div class="print-only" style="margin-top: 36px; page-break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;">
+            <div style="text-align: center; width: 220px;">
+                <p>Mengetahui,<br>Koordinator Tutorial LPPAI</p>
+                <br><br><br><br>
+                <p><strong>( _______________________ )</strong></p>
+            </div>
+            <div style="text-align: center; width: 220px;">
+                <p><?= date('d F Y') ?><br>Dosen Pengampu Tutorial</p>
+                <br><br><br><br>
+                <p><strong><?= sanitize($kelas['dosen_pengampu']) ?></strong></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function filterRekapTable() {
+        var input = document.getElementById('rekapSearchInput');
+        var filter = input.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('.rekap-student-row');
+        rows.forEach(function(r) {
+            var name = r.getAttribute('data-name') || '';
+            var nim = r.getAttribute('data-nim') || '';
+            if (name.indexOf(filter) > -1 || nim.indexOf(filter) > -1) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+    }
+    </script>
 <?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

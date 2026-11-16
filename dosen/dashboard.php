@@ -40,9 +40,9 @@ $totalClasses = $stmt->fetchColumn();
 
 // Get total students in those classes
 $stmt = $pdo->prepare("
-    SELECT COUNT(tr.id) 
-    FROM tutorial_registrations tr 
-    JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
+    SELECT COUNT(tr.id)
+    FROM tutorial_registrations tr
+    JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
     WHERE tc.dosen_pengampu = ?
 ");
 $stmt->execute([$user['nama_lengkap']]);
@@ -85,7 +85,7 @@ include __DIR__ . '/../includes/header.php';
             <p>Kelas yang Diampu</p>
         </div>
     </div>
-    
+
     <div class="stat-card">
         <div class="stat-icon purple">👥</div>
         <div class="stat-info">
@@ -158,7 +158,10 @@ include __DIR__ . '/../includes/header.php';
                             <td><?= sanitize($kelas['ruangan']) ?></td>
                             <td><?= sanitize($kelas['semester']) ?></td>
                             <td>
-                                <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>" class="btn btn-sm btn-primary">Kelola Kelas</a>
+                                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>" class="btn btn-sm btn-primary">Kelola Kelas</a>
+                                    <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>&tab=rekap_absensi" class="btn btn-sm btn-outline" style="border-color:#10b981; color:#047857;" title="Rekap Kehadiran">📊 Rekap</a>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>

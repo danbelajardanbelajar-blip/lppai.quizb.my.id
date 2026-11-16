@@ -2,7 +2,7 @@
 /**
  * LPPAI Corner - Daftar Kelas Dosen
  */
-define('PAGE_TITLE', 'Kelas Anda');
+if (!defined('PAGE_TITLE')) define('PAGE_TITLE', 'Kelas Anda');
 require_once __DIR__ . '/../includes/auth.php';
 requireDosen();
 
@@ -51,7 +51,10 @@ include __DIR__ . '/../includes/header.php';
                             <td><?= sanitize($kelas['semester']) ?></td>
                             <td><span class="badge"><?= sanitize($kelas['gelombang']) ?></span></td>
                             <td>
-                                <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>" class="btn btn-sm btn-primary">Lihat & Kelola</a>
+                                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                    <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>" class="btn btn-sm btn-primary">Lihat & Kelola</a>
+                                    <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>&tab=rekap_absensi" class="btn btn-sm btn-outline" style="border-color:#10b981; color:#047857;" title="Rekap Kehadiran">📊 Rekap</a>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
