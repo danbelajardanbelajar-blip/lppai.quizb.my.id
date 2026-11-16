@@ -85,6 +85,25 @@ if (!empty($myReg['scores_json'])) {
     $scores = json_decode($myReg['scores_json'], true) ?: [];
 }
 
+// ── Alur Pretes RPL berbasis CBT (sumber status yang sama dengan halaman Peserta Pretes) ──
+require_once __DIR__ . '/../includes/pretes-rpl-flow.php';
+$rpl = ['stage' => 'none', 'cbt' => null];
+if ($myReg) {
+    try {
+        $rpl = pretesRplStage($pdo, (int)$user['id'], $myReg, $scores);
+    } catch (Throwable $e) {
+        error_log('pretesRplStage: ' . $e->getMessage());
+    }
+}
+if (!empty($rpl['cbt']) && (!isset($scores['ujian_tulis']) || !is_numeric($scores['ujian_tulis']))) {
+    $scores['ujian_tulis'] = round((float)$rpl['cbt']['score'], 2);
+}
+$rplPanelStages = ['cbt_failed', 'online_task', 'final_failed'];
+$showRplPanel = in_array($rpl['stage'], $rplPanelStages, true);
+// Tidak lulus pada alur CBT → Tutorial RPL Gelombang 1; selain itu tutorial reguler
+$tutorialCtaUrl = $rpl['stage'] !== 'none' ? BASE_URL . '/tutorial-rpl.php' : BASE_URL . '/tutorial-pendaftaran.php';
+$tutorialCtaLabel = $rpl['stage'] !== 'none' ? PRETES_RPL_TUTORIAL_LABEL : 'Daftar Program Tutorial Gelombang 1';
+
 $components = pretesComponents();
 $componentDetails = [];
 $sum = 0;
@@ -143,6 +162,11 @@ if ($isRegPeriodeAktif && $filledCount < $totalComponents) {
         }
     }
     $statusLulus = $isLulus ? 'lulus' : 'tidak_lulus';
+}
+
+if ($rpl['stage'] === 'cbt_failed') {
+    $statusLulus = 'tidak_lulus';
+    $avgScore = round((float)$rpl['cbt']['score'], 2); // nilai yang menentukan: CBT
 }
 
 $predikat = getPretesPredikat($avgScore);
@@ -322,6 +346,14 @@ include __DIR__ . '/../includes/header.php';
                 <span class="badge badge-success" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
                     Status Akhir: LULUS
                 </span>
+            <?php elseif ($rpl['stage'] === 'cbt_failed'): ?>
+                <span class="badge badge-danger" style="font-size:12.5px; padding:5px 12px; font-weight:700;">
+                    Status: TIDAK LULUS TAHAP CBT
+                </span>
+            <?php elseif ($rpl['stage'] === 'online_task'): ?>
+                <span class="badge" style="background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; font-size:12.5px; padding:5px 12px; font-weight:700;">
+                    Status: TAHAP 2 — TUGAS PRETES ONLINE
+                </span>
             <?php elseif ($statusLulus === 'menunggu'): ?>
                 <span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-size:12.5px; padding:5px 12px; font-weight:700;">
                     Status: SEDANG BERLANGSUNG / MENUNGGU PENILAIAN
@@ -486,8 +518,19 @@ include __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
                     <div>
+                        <?php if ($rpl['stage'] === 'cbt_failed'): ?>
+                        <strong style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Nilai CBT Pretes</strong>
+                            <p style="font-size:32px; font-weight:800; color:#dc2626; margin:2px 0 0 0; line-height:1.2;">
+                                <?= number_format((float)$rpl['cbt']['score'], 2) ?>
+                            </p>
+                            <small style="color:var(--text-muted); display:block; margin-top:2px;">
+                                Nilai minimal <strong><?= (int)PRETES_CBT_MIN_SCORE ?></strong> — tahap praktik tidak dilanjutkan
+                            </small>
+                        <?php else: ?>
                         <strong style="color:var(--text-muted); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">Nilai Rata-rata Keseluruhan</strong>
-                        <?php if ($statusLulus === 'menunggu'): ?>
+                        <?php endif; ?>
+                        <?php if ($rpl['stage'] === 'cbt_failed'): ?>
+                        <?php elseif ($statusLulus === 'menunggu'): ?>
                             <p style="font-size:26px; font-weight:800; color:#0284c7; margin:2px 0 0 0; line-height:1.2;">
                                 <?= $filledCount > 0 ? number_format($avgScore, 2) : '—' ?>
                             </p>
@@ -508,6 +551,8 @@ include __DIR__ . '/../includes/header.php';
                         <p style="margin:6px 0 0 0;">
                             <?php if ($statusLulus === 'lulus'): ?>
                                 <span class="badge badge-success" style="font-size:15px; padding:8px 18px; font-weight:700;">✅ LULUS</span>
+                            <?php elseif ($rpl['stage'] === 'online_task'): ?>
+                                <span class="badge" style="background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; font-size:13.5px; padding:8px 16px; font-weight:700;">📹 TAHAP 2 — TUGAS ONLINE</span>
                             <?php elseif ($statusLulus === 'menunggu'): ?>
                                 <span class="badge" style="background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; font-size:13.5px; padding:8px 16px; font-weight:700;">⏳ MENUNGGU PENILAIAN</span>
                             <?php else: ?>
@@ -521,7 +566,9 @@ include __DIR__ . '/../includes/header.php';
             <!-- ================================================================ -->
             <!-- PENGUMUMAN & PANDUAN TINDAK LANJUT HASIL PRETES (MODERN UI)      -->
             <!-- ================================================================ -->
-            <?php if ($statusLulus === 'lulus'): ?>
+            <?php if ($showRplPanel): ?>
+                <?php renderPretesRplStagePanel($rpl, $tutorialCtaUrl, '<strong>' . renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, 'Laporan upload tugas pretes RPL (online)', 'Tutor belum ditetapkan — hubungi admin LPPAI') . '</strong>'); ?>
+            <?php elseif ($statusLulus === 'lulus'): ?>
                 <div class="pretes-ann-box lulus">
                     <div class="pretes-ann-header">
                         <span class="pretes-ann-icon-bubble" style="background:#dcfce7; color:#15803d;">🎉</span>
@@ -702,7 +749,7 @@ include __DIR__ . '/../includes/header.php';
                             </p>
                         </div>
                         <div>
-                            <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 22px; font-weight:700; font-size:14px; border-radius:10px; box-shadow:0 4px 14px rgba(225,29,72,0.25); white-space:nowrap;">
+                            <a href="<?= sanitize($tutorialCtaUrl) ?>" class="btn btn-danger" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 22px; font-weight:700; font-size:14px; border-radius:10px; box-shadow:0 4px 14px rgba(225,29,72,0.25); white-space:nowrap;">
                                 <span>📝</span>
                                 <span>Daftar Tutorial Gelombang 1 Sekarang ➔</span>
                             </a>
@@ -760,7 +807,9 @@ include __DIR__ . '/../includes/header.php';
                                             <?= number_format($detail['value'], 1) ?>
                                         </strong>
                                     <?php else: ?>
-                                        <?php if ($statusLulus === 'menunggu'): ?>
+                                        <?php if ($rpl['stage'] === 'cbt_failed'): ?>
+                                            <span style="color:#94a3b8; font-size:13px; font-weight:600;">—</span>
+                                        <?php elseif ($statusLulus === 'menunggu'): ?>
                                             <span style="color:#94a3b8; font-size:13px; font-weight:600;">—</span>
                                             <small style="color:#94a3b8; display:block; font-size:11px;">(Belum Diuji)</small>
                                         <?php else: ?>
@@ -775,7 +824,11 @@ include __DIR__ . '/../includes/header.php';
                                     <?php elseif ($detail['value'] !== null): ?>
                                         <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Memenuhi (&lt;80)</span>
                                     <?php else: ?>
-                                        <?php if ($statusLulus === 'menunggu'): ?>
+                                        <?php if ($rpl['stage'] === 'cbt_failed'): ?>
+                                            <span class="badge" style="background:#f1f5f9; color:#64748b; font-size:11.5px;">⛔ Tidak dilanjutkan</span>
+                                        <?php elseif ($rpl['stage'] === 'online_task'): ?>
+                                            <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:11.5px;">⏳ Menunggu penilaian tutor</span>
+                                        <?php elseif ($statusLulus === 'menunggu'): ?>
                                             <span class="badge" style="background:#e0f2fe; color:#0369a1; font-size:11.5px;">⏳ Menunggu Pengujian</span>
                                         <?php else: ?>
                                             <span class="badge badge-danger" style="font-size:11.5px;">❌ Tidak Terpenuhi (0)</span>
@@ -788,7 +841,11 @@ include __DIR__ . '/../includes/header.php';
                         <tfoot>
                             <tr style="background:#f8fafc; border-top:2px solid #e2e8f0; font-weight:700;">
                                 <td colspan="4" style="text-align:right; padding:14px; font-size:14px; color:#1e293b;">
+                                    <?php if ($rpl['stage'] === 'cbt_failed'): ?>
+                                    NILAI CBT PRETES (tidak mencapai <?= (int)PRETES_CBT_MIN_SCORE ?> — komponen praktik tidak dilanjutkan):
+                                    <?php else: ?>
                                     RATA-RATA NILAI KESELURUHAN (Total Nilai: <?= number_format($sum, 1) ?> ÷ <?= $totalComponents ?> Komponen):
+                                    <?php endif; ?>
                                 </td>
                                 <td align="center" style="padding:14px; font-size:18px; color:<?= $statusLulus === 'lulus' ? '#16a34a' : ($statusLulus === 'menunggu' ? '#0284c7' : '#dc2626') ?>; font-weight:800;">
                                     <?= ($statusLulus === 'menunggu' && $filledCount === 0) ? '—' : number_format($avgScore, 2) ?>
@@ -814,10 +871,13 @@ include __DIR__ . '/../includes/header.php';
                 <?php if ($statusLulus === 'lulus'): ?>
                     <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-outline-success" style="text-decoration:none;">🕌 Presensi Al Khidmah</a>
                     <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="text-decoration:none;">📷 Ambil Sertifikat</a>
+                <?php elseif ($rpl['stage'] === 'online_task'): ?>
+                    <a href="<?= sanitize(PRETES_RPL_DRIVE_URL) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="text-decoration:none;">📁 Upload Video ke Google Drive</a>
+                    <a href="<?= BASE_URL ?>/pretes-peserta.php#pretes-active-preparation" class="btn btn-outline-success" style="text-decoration:none;">📖 Materi 11 Kompetensi</a>
                 <?php elseif ($statusLulus === 'menunggu'): ?>
                     <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-primary" style="text-decoration:none;">📅 Buka Halaman Jadwal & Ujian Pretes</a>
                 <?php else: ?>
-                    <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none;">📝 Daftar Program Tutorial Gelombang 1</a>
+                    <a href="<?= sanitize($tutorialCtaUrl) ?>" class="btn btn-danger" style="text-decoration:none;">📝 <?= sanitize($tutorialCtaLabel) ?></a>
                 <?php endif; ?>
             </div>
         <?php endif; ?>

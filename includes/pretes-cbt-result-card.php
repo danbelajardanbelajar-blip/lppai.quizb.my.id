@@ -100,6 +100,9 @@ function renderPretesCbtResultCard(array $result, string $linkUjian, string $tut
                 <li>Akhir pengumpulan adalah sampai tanggal <strong><?= $e(PRETES_RPL_TASK_DEADLINE) ?></strong>.</li>
             </ol>
         <?php endif; ?>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed <?= $passed ? '#bbf7d0' : '#fecaca' ?>;font-size:13px;">
+            <a href="<?= BASE_URL ?>/pretes-hasil.php" id="link-pretes-hasil-status" style="color:#1d4ed8;font-weight:700;text-decoration:none;">📊 Lihat status lengkap &amp; penilaian tutor di halaman Hasil Pretes →</a>
+        </div>
     </div>
     <?php
 }

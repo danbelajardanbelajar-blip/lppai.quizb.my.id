@@ -14,6 +14,7 @@ with tempfile.TemporaryDirectory(prefix='lppai-pretes-preparation-') as temp:
     for name in ['pages/pretes-hasil.php', 'pages/pretes-peserta.php', 'includes/pretes-helper.php', 'includes/user-helper.php', 'includes/pretes-face-engine.php',
                  'includes/pretes-active-page.php', 'includes/pretes-participant-view.php', 'includes/sync_eujian.php',
                  'includes/pretes-preparation-view.php', 'includes/pretes-learning-reading-view.php',
+                 'includes/pretes-rpl-flow.php', 'includes/pretes-cbt-result-card.php', 'includes/pretes-cbt.php', 'includes/pretes-cbt-interruption.php', 'data/pretes-cbt-bank.php', 'includes/pretes-exam-access.php',
                  'data/pretes-istighasah.php', 'data/pretes-learning-readings.json', 'data/pretes-learning-videos.php']:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -26,6 +27,7 @@ function isAdmin() { return false; }
 function isDosen() { return false; }
 function getCurrentUser() { global $argv; return ['id' => 7, 'role' => 'mahasiswa', 'jenis_program' => 'Reguler', 'username' => $argv[1] === 'tester' ? '12345' : 'student']; }
 function sanitize($text) { return htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8'); }
+function renderDosenWithWa($pdo, $name, $student = null, $keperluan = null, $fallback = '-') { return htmlspecialchars((string)($name ?: $fallback), ENT_QUOTES, 'UTF-8'); }
 function getDBConnection() {
     global $argv;
     $case = $argv[1];

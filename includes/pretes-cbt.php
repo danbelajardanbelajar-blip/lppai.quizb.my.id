@@ -248,7 +248,37 @@ function pretesCbtFinalize(PDO $pdo, array $attempt, int $now): array {
     $attempt['submitted_at'] = min($now, (int)$attempt['deadline_at']);
     $attempt['correct_count'] = $correct;
     $attempt['score'] = $score;
+    // Ujian RESMI (registration_id > 0, bukan tryout): nilai CBT otomatis menjadi komponen "Ujian tulis"
+    if ((int)$attempt['registration_id'] > 0) {
+        pretesCbtWriteUjianTulis($pdo, (int)$attempt['registration_id'], (float)$score);
+    }
     return $attempt;
+}
+
+/**
+ * Tulis nilai CBT resmi ke pretes_assessments.scores_json['ujian_tulis'] (satu sumber nilai dengan
+ * Hasil Pretes & rekap). Impor manual hasil CBT tetap dapat menimpa nilai ini bila admin perlu koreksi.
+ * Tidak pernah menggagalkan finalisasi ujian.
+ */
+function pretesCbtWriteUjianTulis(PDO $pdo, int $registrationId, float $score): bool {
+    if ($registrationId <= 0) return false;
+    try {
+        $stmt = $pdo->prepare('SELECT scores_json FROM pretes_assessments WHERE registration_id = ?');
+        $stmt->execute([$registrationId]);
+        $raw = $stmt->fetchColumn();
+        $scores = $raw !== false ? (json_decode((string)$raw, true) ?: []) : [];
+        $scores['ujian_tulis'] = round($score, 2);
+        $json = json_encode($scores, JSON_UNESCAPED_UNICODE);
+        if ($raw !== false) {
+            $pdo->prepare('UPDATE pretes_assessments SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE registration_id = ?')->execute([$json, $registrationId]);
+        } else {
+            $pdo->prepare('INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by, updated_at) VALUES (?, ?, 0, CURRENT_TIMESTAMP)')->execute([$registrationId, $json]);
+        }
+        return true;
+    } catch (Throwable $e) {
+        error_log('pretesCbtWriteUjianTulis: ' . $e->getMessage());
+        return false;
+    }
 }
 
 function pretesCbtPublic(PDO $pdo, ?array $attempt, int $now): array {

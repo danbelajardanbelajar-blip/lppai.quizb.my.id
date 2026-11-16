@@ -5,6 +5,32 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 13:06:10 +0700 — Hasil Pretes per tahap alur RPL (CBT < 80 / tugas online ≥ 80 / hasil akhir tutor)
+
+**ID:** PRETES-HASIL-RPL-FLOW · **Parent Git:** `13ba4d5`.
+**Permintaan (disetujui):** `pretes-hasil.php` dibedakan untuk nilai CBT ≥ 80 dan < 80, selaras dengan kartu hasil di `pretes-peserta.php`.
+**Aturan baru:**
+- Nilai CBT resmi otomatis menjadi komponen **Ujian tulis**. Impor manual masih dapat menimpanya.
+- CBT < 80 → "TIDAK LULUS TAHAP CBT" tanpa status menunggu. Halaman menampilkan nilai CBT, panel maaf, dan tombol ke `/tutorial-rpl.php`; komponen praktik ditandai "Tidak dilanjutkan".
+- CBT ≥ 80 dengan penilaian belum lengkap → "TAHAP 2 — TUGAS PRETES ONLINE". Halaman menampilkan stepper, tugas a–d, link Google Drive, tutor penguji dengan WA, dan hitung mundur sampai 22 Nov 2026 23.59 WIB. Setelah batas lewat, hitung mundur diganti peringatan.
+- Penilaian tutor lengkap: semua ≥ 80 → LULUS (alur lama Al Khidmah/sertifikat); ada yang < 80 → panel "Belum Lulus" dengan tombol ke Tutorial RPL Gelombang 1.
+- Peserta tanpa CBT resmi tetap memakai tampilan lama dengan link `tutorial-pendaftaran.php`.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). `pages/pretes-hasil.php` tercatat 13:05:54 karena ditulis ulang oleh `git stash`/`pop` saat uji regresi; isi patch dibuat sebelumnya. Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt.php` | 2026-11-16 12:59:12 | 251–254, 258–283 | `pretesCbtFinalize`, `pretesCbtWriteUjianTulis` (baru) | Setelah nilai dihitung, registrasi resmi (`registration_id > 0`, bukan tryout) menulis `scores_json.ujian_tulis`. Proses ini memakai UPDATE atau INSERT dengan `assessed_by = 0` dan tetap menyimpan nilai praktik lain. |
+| `includes/pretes-rpl-flow.php` (baru) | 2026-11-16 13:00:00 | 1–142 | `pretesRplStage`, `renderPretesRplStagePanel` | Fungsi tahap bersama: none / cbt_failed / online_task / final_passed / final_failed. Jika Ujian tulis kosong, nilainya diisi dari CBT. Batas waktu dihitung eksplisit di Asia/Jakarta. Panel menampilkan stepper 4 langkah, pesan maaf, tugas a–d, dan hitung mundur atau peringatan. |
+| `pages/pretes-hasil.php` | 2026-11-16 13:05:54 | 88–106, 167–171, 349–356, 521–533, 554–555, 569–571, 752, 810–831, 844–848, 874–880 | Perhitungan status, badge header, ringkasan, pengumuman, tabel, navigasi | Menghitung `$rpl` dan mengisi Ujian tulis dari CBT. `cbt_failed` memaksa `tidak_lulus` dan memakai nilai CBT. Badge dibedakan per tahap. Panel RPL menggantikan pengumuman generik. Sel kosong tabel diberi label "Tidak dilanjutkan" atau "Menunggu penilaian tutor". Link tutorial memakai `$tutorialCtaUrl`. Tahap online menampilkan tombol Drive dan materi. |
+| `includes/pretes-cbt-result-card.php` | 2026-11-16 13:03:06 | 103–105 | `renderPretesCbtResultCard` | Menambah link "Lihat status lengkap & penilaian tutor di halaman Hasil Pretes". |
+| `tests/pretes-rpl-flow-test.php` (baru) | 2026-11-16 13:04:31 | 1–158 | Test | Menguji hook Ujian tulis (nilai praktik tetap ada, tryout tidak ditulis), backfill, 5 tahap, batas tepat 23:59:59 WIB, render panel, dan render halaman `pretes-hasil.php` per tahap memakai stub auth/header dan SQLite. |
+| `tests/pretes-hasil-preparation-test.py` | 2026-11-16 13:06:10 | 17, 30 | Harness salinan file | Menyalin dependensi baru (rpl-flow, result-card, cbt, cbt-interruption, bank CBT, exam-access) dan menambah stub `renderDosenWithWa`. Test ini **sudah gagal sebelum paket ini** (fatal `renderDosenWithWa` di baris 659); kini kembali lulus. |
+
+**Verifikasi:** `php -l` OK untuk 5 file PHP; `git diff --check` OK. `pretes-rpl-flow-test` PASS. Seluruh `tests/pretes-*.php`, `dosen-wa-link`, `tutorial-lulus-pretes-lock`, dan `mahasiswa-unregistered-hide-menu` PASS. `pretes-hasil-preparation-test.py` PASS. Panel 3 kondisi sudah dicek visual di browser lokal. Belum diuji di hosting live dengan data nyata.
+
+---
+
 ## 2026-11-16 12:53:38 +0700 — Setelah CBT dikumpulkan: sembunyikan jadwal & tata tertib; materi persiapan hanya untuk nilai ≥ 80
 
 **ID:** PRETES-CBT-FINISHED-HIDE · **Parent Git:** `06c77ce`.
