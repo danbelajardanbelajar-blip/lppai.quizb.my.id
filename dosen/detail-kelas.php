@@ -368,105 +368,206 @@ include __DIR__ . '/../includes/header.php';
     </script>
 
 <?php elseif ($activeTab === 'absensi'): ?>
-    <!-- TAB ABSENSI -->
-    <div class="card" style="margin-bottom:20px;">
-        <div class="card-body" style="background:#f8fafc; display:flex; gap:15px; align-items:center; flex-wrap:wrap;">
-            <div style="font-weight:bold; margin-right:10px;">Pilih Pertemuan:</div>
+    <!-- TAB ABSENSI: PERTEMUAN SELECTOR (MODERN HORIZONTAL SCROLL) -->
+    <div style="margin-bottom: 20px;">
+        <div style="font-weight: 700; font-size: 13px; color: #475569; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;">
+            Pilih Pertemuan Tutorial
+        </div>
+        <div class="pertemuan-nav-scroll">
             <?php
             $max_pertemuan = 8;
-            for($i=1; $i<=$max_pertemuan; $i++): 
+            for ($i = 1; $i <= $max_pertemuan; $i++):
                 $isFilled = false;
-                foreach($meetings as $m) {
-                    if($m['pertemuan_ke'] == $i) { $isFilled = true; break; }
+                foreach ($meetings as $m) {
+                    if ((int)$m['pertemuan_ke'] === $i) {
+                        $isFilled = true;
+                        break;
+                    }
                 }
-                $btnClass = $i == $pertemuanSelected ? 'btn-primary' : ($isFilled ? 'btn-success' : 'btn-outline');
+                $pillClass = $i === $pertemuanSelected ? 'active' : ($isFilled ? 'completed' : '');
             ?>
-                <a href="?id=<?= $class_id ?>&tab=absensi&pertemuan=<?= $i ?>" class="btn btn-sm <?= $btnClass ?>" style="padding:4px 10px; <?= $isFilled && $i != $pertemuanSelected ? 'background:#dcfce7; color:#166534; border-color:#86efac;' : '' ?>">P-<?= $i ?></a>
+                <a href="?id=<?= $class_id ?>&tab=absensi&pertemuan=<?= $i ?>" class="pertemuan-pill-tab <?= $pillClass ?>">
+                    <span>Pertemuan <?= $i ?></span>
+                    <?php if ($i === $pertemuanSelected): ?>
+                        <span style="font-size: 10px; background: rgba(255,255,255,0.25); padding: 1px 6px; border-radius: 9999px;">Aktif</span>
+                    <?php elseif ($isFilled): ?>
+                        <span style="font-size: 11px;">✓</span>
+                    <?php endif; ?>
+                </a>
             <?php endfor; ?>
         </div>
     </div>
 
-    <!-- TAB ABSENSI: QR CODE CARD -->
-    <div class="card" style="margin-bottom:20px; border: 2px solid #3b82f6;">
-        <div class="card-header" style="background:#eff6ff; color:#1e40af; border-bottom: 1px solid #bfdbfe; font-weight: bold;">
-            📱 QR Code Absensi (Scan via HP Mahasiswa)
+    <!-- TAB ABSENSI: QR CODE CARD & PRESENTATION MODE -->
+    <div class="card" style="margin-bottom: 24px; border: 1px solid #bfdbfe; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
+        <div class="card-header" style="background: #eff6ff; color: #1e40af; border-bottom: 1px solid #bfdbfe; font-weight: 700; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <span>📱 QR Code Presensi Mahasiswa</span>
+            <span style="font-size: 12px; font-weight: 600; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 9999px;">Pertemuan Ke-<?= $pertemuanSelected ?></span>
         </div>
-        <div class="card-body" style="text-align: center;">
-            <p>Klik tombol di bawah untuk menampilkan QR Code. Mahasiswa dapat melakukan scan melalui menu <b>Absensi Tutorial</b> di dashboard mereka.</p>
-            <button type="button" class="btn btn-primary" id="btnGenerateQR" onclick="generateQR(false)">Generate QR Code (P-<?= $pertemuanSelected ?>)</button>
+        <div class="card-body" style="text-align: center; padding: 24px 20px;">
+            <p style="color: #475569; font-size: 14px; max-width: 560px; margin: 0 auto 16px auto;">
+                Tampilkan kode QR di proyektor kelas atau tunjukkan layar HP Anda. Mahasiswa melakukan pemindaian melalui menu <b>Absensi Tutorial</b> di akun mereka.
+            </p>
+
+            <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+                <button type="button" class="btn btn-primary" id="btnGenerateQR" onclick="generateQR(false)" style="font-weight: 600; padding: 9px 20px;">
+                    ✨ Tampilkan QR Code (P-<?= $pertemuanSelected ?>)
+                </button>
+                <button type="button" class="btn btn-outline" id="btnOpenFullscreenQR" onclick="openFullscreenQR()" style="display: none; font-weight: 600; padding: 9px 18px; border-color: #3b82f6; color: #1d4ed8;">
+                    🔍 Layar Penuh (Mode Presentasi / HP)
+                </button>
+            </div>
+
             <div id="qrContainer" style="display: none; margin-top: 20px;">
-                <div id="qrcode" style="display: inline-block; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
-                <div style="margin-top: 15px;">
-                    <p style="font-weight: bold; color: #10b981; font-size: 18px;" id="qrStatus">Aktif</p>
-                    <p>Berakhir pada: <span id="qrExpiry"></span></p>
-                    <button type="button" class="btn btn-sm btn-outline" onclick="generateQR(true)">Perbarui / Perpanjang QR</button>
+                <div id="qrcode" style="display: inline-block; padding: 16px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;"></div>
+                <div style="margin-top: 14px;">
+                    <div style="font-weight: 700; color: #10b981; font-size: 16px; margin-bottom: 4px;" id="qrStatus">● QR Code Aktif</div>
+                    <div style="font-size: 13px; color: #64748b; margin-bottom: 12px;">Berlaku hingga: <strong id="qrExpiry" style="color: #0f172a;"></strong></div>
+                    <button type="button" class="btn btn-sm btn-outline" onclick="generateQR(true)" style="font-size: 12px;">
+                        ↺ Perbarui / Perpanjang Masa Aktif
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
-
-
-    <div class="card">
-        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>📅 Absensi - Pertemuan Ke-<?= $pertemuanSelected ?></span>
+    <!-- FULLSCREEN MODAL FOR PRESENTATION / HP MODE -->
+    <div id="qrFullscreenModal" class="qr-fullscreen-modal" style="display: none;">
+        <div style="width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="text-align: left;">
+                <div style="font-size: 18px; font-weight: 700; color: #34d399;">Pertemuan Ke-<?= $pertemuanSelected ?> · <?= sanitize($kelas['nama_kelas']) ?></div>
+                <div style="font-size: 13px; color: #cbd5e1;">Pindai via Menu Absensi Tutorial Mahasiswa</div>
+            </div>
+            <button type="button" onclick="closeFullscreenQR()" aria-label="Tutup Layar Penuh" style="background: rgba(255,255,255,0.15); border: none; color: #ffffff; font-size: 20px; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                ✕
+            </button>
         </div>
-        <div class="card-body">
+
+        <div class="qr-fullscreen-box">
+            <div id="fullscreenQrcode" style="display: flex; justify-content: center;"></div>
+        </div>
+
+        <div style="margin-top: 8px; text-align: center;">
+            <div style="font-size: 14px; color: #e2e8f0; margin-bottom: 4px;">Arahkan kamera ke layar ini</div>
+            <div style="font-size: 13px; color: #94a3b8;">Berlaku hingga: <strong id="fullscreenQrExpiry" style="color: #fde047;"></strong></div>
+        </div>
+
+        <div style="margin-top: 24px;">
+            <button type="button" class="btn btn-outline" onclick="closeFullscreenQR()" style="color: #ffffff; border-color: rgba(255,255,255,0.4); padding: 8px 24px; border-radius: 9999px; font-weight: 600;">
+                Tutup Mode Layar Penuh (ESC)
+            </button>
+        </div>
+    </div>
+
+    <!-- FORM INPUT ABSENSI MAHASISWA -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <span style="font-weight: 700;">📅 Form Presensi Manual - Pertemuan Ke-<?= $pertemuanSelected ?></span>
+            <span style="font-size: 13px; color: #64748b; font-weight: 500;">Total: <?= count($students) ?> Mahasiswa</span>
+        </div>
+        <div class="card-body" style="padding: 20px;">
             <?php if (empty($students)): ?>
-                <div class="empty-state">
-                    <p>Belum ada mahasiswa yang terdaftar di kelas ini.</p>
+                <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                    <div style="font-size: 40px; margin-bottom: 8px;">👥</div>
+                    <h4 style="color: #1e293b; margin-bottom: 4px;">Belum Ada Mahasiswa</h4>
+                    <p style="color: #64748b; font-size: 14px;">Belum ada mahasiswa yang terdaftar di kelas tutorial ini.</p>
                 </div>
             <?php else: ?>
-                <form method="POST">
+                <form method="POST" id="formAttendance">
                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                     <input type="hidden" name="action" value="save_absensi">
                     <input type="hidden" name="pertemuan_ke" value="<?= $pertemuanSelected ?>">
-                    
-                    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;">
-                        <div style="width:300px;">
-                            <label style="display:block; margin-bottom:8px; font-weight:bold;">Tanggal Pertemuan *</label>
-                            <input type="date" name="tanggal" value="<?= sanitize($tanggalSelected) ?>" required style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
-                        </div>
+
+                    <!-- Baris Pengaturan Tanggal & Tombol Batch Aksi Cepat -->
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
                         <div>
-                            <button type="submit" class="btn btn-primary">💾 Update Data</button>
+                            <label style="display: block; margin-bottom: 6px; font-weight: 700; font-size: 13px; color: #334155;">
+                                Tanggal Pertemuan *
+                            </label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="date" name="tanggal" id="inputTanggalAbsensi" value="<?= sanitize($tanggalSelected) ?>" required style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('inputTanggalAbsensi').value = '<?= date('Y-m-d') ?>'" style="padding: 7px 12px; font-size: 12px; font-weight: 600;">
+                                    Hari Ini
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-sm" onclick="markAllHadir()" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 600; padding: 7px 14px;">
+                                ✨ Hadir Semua
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline" onclick="resetAllBelum()" style="font-weight: 600; padding: 7px 12px; font-size: 12px;">
+                                ↺ Reset Belum
+                            </button>
+                            <button type="submit" class="btn btn-primary" style="font-weight: 600; padding: 7px 18px;">
+                                💾 Simpan Absensi
+                            </button>
                         </div>
                     </div>
-                    
-                    <div class="table-responsive">
+
+                    <!-- Live Summary Badges -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; font-size: 12px; font-weight: 600;">
+                        <span style="background: #ecfdf5; color: #065f46; padding: 4px 10px; border-radius: 9999px; border: 1px solid #a7f3d0;">
+                            Hadir: <span id="countHadir">0</span>
+                        </span>
+                        <span style="background: #f0f9ff; color: #075985; padding: 4px 10px; border-radius: 9999px; border: 1px solid #bae6fd;">
+                            Izin: <span id="countIzin">0</span>
+                        </span>
+                        <span style="background: #fffbeb; color: #92400e; padding: 4px 10px; border-radius: 9999px; border: 1px solid #fde68a;">
+                            Sakit: <span id="countSakit">0</span>
+                        </span>
+                        <span style="background: #fef2f2; color: #991b1b; padding: 4px 10px; border-radius: 9999px; border: 1px solid #fecaca;">
+                            Alpa: <span id="countAbsen">0</span>
+                        </span>
+                        <span style="background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 9999px; border: 1px solid #cbd5e1;">
+                            Belum: <span id="countBelum">0</span>
+                        </span>
+                    </div>
+
+                    <!-- Desktop Table View (>= 768px) -->
+                    <div class="desktop-attendance-table table-responsive">
                         <table>
                             <thead>
                                 <tr>
-                                    <th width="50">No</th>
-                                    <th>NIM</th>
+                                    <th width="40" style="text-align: center;">No</th>
+                                    <th width="120">NIM</th>
                                     <th>Nama Mahasiswa</th>
-                                    <th>Status Kehadiran</th>
+                                    <th style="min-width: 320px;">Status Kehadiran</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php $no=1; foreach($students as $s): ?>
-                                <?php 
-                                    $status = $attendanceData[$s['user_id']] ?? 'belum'; 
+                                <?php $no = 1; foreach ($students as $s):
+                                    $userId = $s['user_id'];
+                                    $status = $attendanceData[$userId] ?? 'belum';
                                 ?>
-                                <tr>
-                                    <td align="center"><?= $no++ ?></td>
-                                    <td><?= sanitize($s['nim']) ?></td>
-                                    <td><strong><?= adminUserProfileLink($s['nama_lengkap'], $s['user_id'] ?? null) ?></strong></td>
+                                <tr data-student-row="<?= $userId ?>">
+                                    <td align="center" style="color: #64748b;"><?= $no++ ?></td>
+                                    <td><span style="font-family: monospace; font-size: 13px; font-weight: 600; color: #334155;"><?= sanitize($s['nim']) ?></span></td>
                                     <td>
-                                        <div style="display:flex; gap:15px; align-items:center;">
-                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#475569;">
-                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="belum" <?= $status === 'belum' ? 'checked' : '' ?>> Belum
+                                        <div style="font-weight: 600; color: #0f172a;"><?= adminUserProfileLink($s['nama_lengkap'], $userId) ?></div>
+                                        <small style="color: #64748b;"><?= sanitize($s['program_studi']) ?> <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></small>
+                                    </td>
+                                    <td>
+                                        <div class="status-pill-group">
+                                            <label class="status-pill-btn <?= $status === 'belum' ? 'active-belum' : '' ?>" style="margin: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                                <input type="radio" name="status_hadir[<?= $userId ?>]" value="belum" <?= $status === 'belum' ? 'checked' : '' ?> style="position: absolute; opacity: 0; pointer-events: none;" onchange="syncAttendanceStatus(<?= $userId ?>, 'belum')">
+                                                Belum
                                             </label>
-                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#166534;">
-                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="hadir" <?= $status === 'hadir' ? 'checked' : '' ?>> Hadir
+                                            <label class="status-pill-btn <?= $status === 'hadir' ? 'active-hadir' : '' ?>" style="margin: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                                <input type="radio" name="status_hadir[<?= $userId ?>]" value="hadir" <?= $status === 'hadir' ? 'checked' : '' ?> style="position: absolute; opacity: 0; pointer-events: none;" onchange="syncAttendanceStatus(<?= $userId ?>, 'hadir')">
+                                                ✓ Hadir
                                             </label>
-                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#991b1b;">
-                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="absen" <?= $status === 'absen' ? 'checked' : '' ?>> Absen (Alpa)
+                                            <label class="status-pill-btn <?= $status === 'absen' ? 'active-absen' : '' ?>" style="margin: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                                <input type="radio" name="status_hadir[<?= $userId ?>]" value="absen" <?= $status === 'absen' ? 'checked' : '' ?> style="position: absolute; opacity: 0; pointer-events: none;" onchange="syncAttendanceStatus(<?= $userId ?>, 'absen')">
+                                                ✗ Alpa
                                             </label>
-                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#0284c7;">
-                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="izin" <?= $status === 'izin' ? 'checked' : '' ?>> Izin
+                                            <label class="status-pill-btn <?= $status === 'izin' ? 'active-izin' : '' ?>" style="margin: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                                <input type="radio" name="status_hadir[<?= $userId ?>]" value="izin" <?= $status === 'izin' ? 'checked' : '' ?> style="position: absolute; opacity: 0; pointer-events: none;" onchange="syncAttendanceStatus(<?= $userId ?>, 'izin')">
+                                                ℹ Izin
                                             </label>
-                                            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; color:#ca8a04;">
-                                                <input type="radio" name="status_hadir[<?= $s['user_id'] ?>]" value="sakit" <?= $status === 'sakit' ? 'checked' : '' ?>> Sakit
+                                            <label class="status-pill-btn <?= $status === 'sakit' ? 'active-sakit' : '' ?>" style="margin: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                                <input type="radio" name="status_hadir[<?= $userId ?>]" value="sakit" <?= $status === 'sakit' ? 'checked' : '' ?> style="position: absolute; opacity: 0; pointer-events: none;" onchange="syncAttendanceStatus(<?= $userId ?>, 'sakit')">
+                                                ✚ Sakit
                                             </label>
                                         </div>
                                     </td>
@@ -475,9 +576,48 @@ include __DIR__ . '/../includes/header.php';
                             </tbody>
                         </table>
                     </div>
-                    
-                    <div style="margin-top:20px; text-align:right;">
-                        <!-- Button moved to top -->
+
+                    <!-- Mobile Cards View (< 768px) -->
+                    <div class="mobile-attendance-card-list">
+                        <?php foreach ($students as $s):
+                            $userId = $s['user_id'];
+                            $status = $attendanceData[$userId] ?? 'belum';
+                            $initial = strtoupper(mb_substr($s['nama_lengkap'], 0, 1, 'UTF-8'));
+                        ?>
+                        <div class="student-attendance-card" id="student-card-<?= $userId ?>">
+                            <div class="student-card-header">
+                                <div class="student-avatar-initial"><?= $initial ?></div>
+                                <div class="student-card-meta">
+                                    <div class="student-card-name"><?= sanitize($s['nama_lengkap']) ?></div>
+                                    <div class="student-card-sub">
+                                        <span style="font-family: monospace; font-weight: 600;"><?= sanitize($s['nim']) ?></span>
+                                        <span>•</span>
+                                        <span><?= sanitize($s['program_studi']) ?></span>
+                                        <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="status-pill-group">
+                                <button type="button" class="status-pill-btn btn-mob-belum <?= $status === 'belum' ? 'active-belum' : '' ?>" onclick="syncAttendanceStatus(<?= $userId ?>, 'belum')">Belum</button>
+                                <button type="button" class="status-pill-btn btn-mob-hadir <?= $status === 'hadir' ? 'active-hadir' : '' ?>" onclick="syncAttendanceStatus(<?= $userId ?>, 'hadir')">✓ Hadir</button>
+                                <button type="button" class="status-pill-btn btn-mob-absen <?= $status === 'absen' ? 'active-absen' : '' ?>" onclick="syncAttendanceStatus(<?= $userId ?>, 'absen')">✗ Alpa</button>
+                                <button type="button" class="status-pill-btn btn-mob-izin <?= $status === 'izin' ? 'active-izin' : '' ?>" onclick="syncAttendanceStatus(<?= $userId ?>, 'izin')">ℹ Izin</button>
+                                <button type="button" class="status-pill-btn btn-mob-sakit <?= $status === 'sakit' ? 'active-sakit' : '' ?>" onclick="syncAttendanceStatus(<?= $userId ?>, 'sakit')">✚ Sakit</button>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <!-- Floating Sticky Bottom Bar (Mobile & Desktop) -->
+                    <div class="floating-attendance-bar">
+                        <div class="floating-stats-text">
+                            Presensi: <strong id="floatingHadirCount">0</strong> dari <?= count($students) ?> Hadir
+                        </div>
+                        <div>
+                            <button type="submit" class="floating-save-btn">
+                                💾 Simpan Presensi (P-<?= $pertemuanSelected ?>)
+                            </button>
+                        </div>
                     </div>
                 </form>
             <?php endif; ?>
@@ -490,11 +630,13 @@ include __DIR__ . '/../includes/header.php';
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
     var qrcodeObj = null;
-    
+    var fullscreenQrcodeObj = null;
+    var currentToken = null;
+
     function generateQR(regenerate) {
         var btn = document.getElementById('btnGenerateQR');
-        if (!regenerate) btn.disabled = true;
-        
+        if (btn && !regenerate) btn.disabled = true;
+
         $.ajax({
             url: '<?= BASE_URL ?>/dosen/ajax-qr-generate.php',
             type: 'POST',
@@ -505,37 +647,173 @@ include __DIR__ . '/../includes/header.php';
             },
             dataType: 'json',
             success: function(res) {
-                if (!regenerate) btn.style.display = 'none';
-                
+                if (btn && !regenerate) btn.style.display = 'none';
+
                 if (res.status === 'success') {
+                    currentToken = res.token;
                     document.getElementById('qrContainer').style.display = 'block';
                     document.getElementById('qrExpiry').textContent = res.expires_at;
-                    
-                    if (qrcodeObj) {
-                        qrcodeObj.clear();
-                        qrcodeObj.makeCode(res.token);
-                    } else {
-                        qrcodeObj = new QRCode(document.getElementById("qrcode"), {
-                            text: res.token,
-                            width: 250,
-                            height: 250,
-                            colorDark : "#000000",
-                            colorLight : "#ffffff",
-                            correctLevel : QRCode.CorrectLevel.H
-                        });
-                    }
-                    Swal.fire('Berhasil', res.message, 'success');
+                    var fsExp = document.getElementById('fullscreenQrExpiry');
+                    if (fsExp) fsExp.textContent = res.expires_at;
+
+                    var btnFullscreen = document.getElementById('btnOpenFullscreenQR');
+                    if (btnFullscreen) btnFullscreen.style.display = 'inline-block';
+
+                    var qrTarget = document.getElementById("qrcode");
+                    qrTarget.innerHTML = '';
+                    qrcodeObj = new QRCode(qrTarget, {
+                        text: res.token,
+                        width: 240,
+                        height: 240,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'QR Code Siap!',
+                        text: res.message,
+                        confirmButtonColor: '#10b981'
+                    });
                 } else {
                     Swal.fire('Gagal', res.message, 'error');
-                    if (!regenerate) btn.style.display = 'inline-block';
-                    btn.disabled = false;
+                    if (btn && !regenerate) {
+                        btn.style.display = 'inline-block';
+                        btn.disabled = false;
+                    }
                 }
             },
             error: function() {
                 Swal.fire('Error', 'Gagal menghubungi server.', 'error');
-                if (!regenerate) btn.style.display = 'inline-block';
-                btn.disabled = false;
+                if (btn && !regenerate) {
+                    btn.style.display = 'inline-block';
+                    btn.disabled = false;
+                }
             }
         });
+    }
+
+    function openFullscreenQR() {
+        if (!currentToken) return;
+        var modal = document.getElementById('qrFullscreenModal');
+        var container = document.getElementById('fullscreenQrcode');
+        container.innerHTML = '';
+
+        var qrSize = Math.min(window.innerWidth - 60, window.innerHeight - 200, 320);
+        if (qrSize < 200) qrSize = 200;
+
+        fullscreenQrcodeObj = new QRCode(container, {
+            text: currentToken,
+            width: qrSize,
+            height: qrSize,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeFullscreenQR() {
+        var modal = document.getElementById('qrFullscreenModal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    // Close on ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeFullscreenQR();
+    });
+
+    // Attendance Sync & Live Counters
+    function syncAttendanceStatus(userId, status) {
+        // 1. Sync Radio Input in Desktop Form
+        var radio = document.querySelector('input[name="status_hadir[' + userId + ']"][value="' + status + '"]');
+        if (radio) {
+            radio.checked = true;
+        }
+
+        // 2. Sync Desktop Label Styling
+        var row = document.querySelector('tr[data-student-row="' + userId + '"]');
+        if (row) {
+            var labels = row.querySelectorAll('.status-pill-btn');
+            labels.forEach(function(lbl) {
+                lbl.classList.remove('active-belum', 'active-hadir', 'active-absen', 'active-izin', 'active-sakit');
+            });
+            var targetInput = row.querySelector('input[value="' + status + '"]');
+            if (targetInput) {
+                var targetLabel = targetInput.closest('.status-pill-btn');
+                if (targetLabel) targetLabel.classList.add('active-' + status);
+            }
+        }
+
+        // 3. Sync Mobile Card Button Styling
+        var mobCard = document.getElementById('student-card-' + userId);
+        if (mobCard) {
+            var btns = mobCard.querySelectorAll('.status-pill-btn');
+            btns.forEach(function(b) {
+                b.classList.remove('active-belum', 'active-hadir', 'active-absen', 'active-izin', 'active-sakit');
+            });
+            var targetBtn = mobCard.querySelector('.btn-mob-' + status);
+            if (targetBtn) {
+                targetBtn.classList.add('active-' + status);
+            }
+        }
+
+        // 4. Update Live Counters
+        updateLiveCounters();
+    }
+
+    function markAllHadir() {
+        var radios = document.querySelectorAll('input[type="radio"][value="hadir"]');
+        radios.forEach(function(r) {
+            var match = r.name.match(/status_hadir\[(\d+)\]/);
+            if (match && match[1]) {
+                syncAttendanceStatus(match[1], 'hadir');
+            }
+        });
+    }
+
+    function resetAllBelum() {
+        var radios = document.querySelectorAll('input[type="radio"][value="belum"]');
+        radios.forEach(function(r) {
+            var match = r.name.match(/status_hadir\[(\d+)\]/);
+            if (match && match[1]) {
+                syncAttendanceStatus(match[1], 'belum');
+            }
+        });
+    }
+
+    function updateLiveCounters() {
+        var counts = { belum: 0, hadir: 0, absen: 0, izin: 0, sakit: 0 };
+        var checkedRadios = document.querySelectorAll('input[name^="status_hadir["]:checked');
+        checkedRadios.forEach(function(r) {
+            var val = r.value;
+            if (counts[val] !== undefined) counts[val]++;
+        });
+
+        var elHadir = document.getElementById('countHadir');
+        if (elHadir) elHadir.textContent = counts.hadir;
+        var elIzin = document.getElementById('countIzin');
+        if (elIzin) elIzin.textContent = counts.izin;
+        var elSakit = document.getElementById('countSakit');
+        if (elSakit) elSakit.textContent = counts.sakit;
+        var elAbsen = document.getElementById('countAbsen');
+        if (elAbsen) elAbsen.textContent = counts.absen;
+        var elBelum = document.getElementById('countBelum');
+        if (elBelum) elBelum.textContent = counts.belum;
+
+        var elFloat = document.getElementById('floatingHadirCount');
+        if (elFloat) elFloat.textContent = counts.hadir;
+    }
+
+    // Initialize counters on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateLiveCounters();
+    });
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        updateLiveCounters();
     }
     </script>

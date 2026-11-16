@@ -1801,3 +1801,590 @@ table tbody tr.removing {
     }
 }
 
+
+/* ==========================================================================
+   MODERN MOBILE ATTENDANCE (TUTORIAL & DOSEN) - EMERALD ROYALE
+   ========================================================================== */
+
+/* Mahasiswa Tutorial Attendance Hero Card */
+.attendance-hero-card {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+    color: #ffffff;
+    border-radius: 16px;
+    padding: 24px 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.3), 0 8px 10px -6px rgba(6, 78, 59, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+.attendance-hero-card::after {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+    pointer-events: none;
+}
+.attendance-hero-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.attendance-class-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(4px);
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.attendance-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+.attendance-info-item {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+}
+.attendance-info-label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 2px;
+}
+.attendance-progress-box {
+    margin-top: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.attendance-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.attendance-progress-bar {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 9999px;
+    overflow: hidden;
+    position: relative;
+}
+.attendance-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #34d399, #10b981);
+    border-radius: 9999px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+}
+
+/* 8-Pertemuan Grid Tracker */
+.meetings-tracker-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+.meetings-tracker-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 14px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.meetings-badge-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+@media (min-width: 640px) {
+    .meetings-badge-grid {
+        grid-template-columns: repeat(8, 1fr);
+    }
+}
+.meeting-badge-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 6px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+.meeting-badge-item .p-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 4px;
+}
+.meeting-badge-item .p-status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 6px;
+    line-height: 1.2;
+}
+.meeting-badge-item.status-hadir {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+.meeting-badge-item.status-hadir .p-status {
+    background: #10b981;
+    color: #ffffff;
+}
+.meeting-badge-item.status-izin {
+    background: #f0f9ff;
+    border-color: #bae6fd;
+}
+.meeting-badge-item.status-izin .p-status {
+    background: #0284c7;
+    color: #ffffff;
+}
+.meeting-badge-item.status-sakit {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+.meeting-badge-item.status-sakit .p-status {
+    background: #f59e0b;
+    color: #ffffff;
+}
+.meeting-badge-item.status-absen {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+.meeting-badge-item.status-absen .p-status {
+    background: #ef4444;
+    color: #ffffff;
+}
+.meeting-badge-item.status-belum {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+.meeting-badge-item.status-belum .p-status {
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+/* Modern Scanner Card */
+.scanner-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    margin-bottom: 24px;
+}
+.scanner-card-header {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #ffffff;
+    padding: 16px 20px;
+    font-weight: 700;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.scanner-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px 10px;
+    border-radius: 9999px;
+    color: #d1fae5;
+}
+.scanner-live-badge::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 8px #34d399;
+    animation: livePulse 1.5s infinite;
+}
+@keyframes livePulse {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.8; }
+}
+.scanner-viewfinder-wrapper {
+    position: relative;
+    max-width: 480px;
+    margin: 16px auto;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #0f172a;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+}
+.scanner-overlay-guide {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scanner-target-box {
+    width: 240px;
+    height: 240px;
+    position: relative;
+}
+.corner-bracket {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-color: #10b981;
+    border-style: solid;
+}
+.corner-bracket.tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+.corner-bracket.tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+.corner-bracket.bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+.corner-bracket.br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+.scanner-laser-sweep {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #34d399, transparent);
+    box-shadow: 0 0 12px 2px #10b981;
+    animation: laserSweep 2s ease-in-out infinite alternate;
+}
+@keyframes laserSweep {
+    0% { top: 10px; }
+    100% { top: 226px; }
+}
+
+/* Style for HTML5-QRCode container elements */
+#reader {
+    border: none !important;
+}
+#reader video {
+    border-radius: 12px;
+    width: 100% !important;
+    height: auto !important;
+    display: block;
+}
+#reader button {
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease !important;
+    margin: 6px 4px !important;
+}
+#reader button:hover {
+    background: #059669 !important;
+}
+#reader select {
+    padding: 8px 12px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+    margin: 6px 4px !important;
+    background: #ffffff !important;
+}
+
+/* Dosen Tab Absensi Styles */
+.pertemuan-nav-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 6px 2px 10px 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+.pertemuan-nav-scroll::-webkit-scrollbar {
+    height: 5px;
+}
+.pertemuan-nav-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+.pertemuan-pill-tab {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #475569;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+.pertemuan-pill-tab:hover {
+    border-color: #10b981;
+    color: #065f46;
+    background: #f0fdf4;
+}
+.pertemuan-pill-tab.active {
+    background: #10b981;
+    color: #ffffff !important;
+    border-color: #059669;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+}
+.pertemuan-pill-tab.completed:not(.active) {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+/* Fullscreen QR Modal */
+.qr-fullscreen-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #ffffff;
+    text-align: center;
+}
+.qr-fullscreen-box {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+    max-width: 90vw;
+}
+.qr-fullscreen-box img,
+.qr-fullscreen-box canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block;
+}
+
+/* Status Pill Segmented Control */
+.status-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.status-pill-btn {
+    flex: 1 1 auto;
+    min-width: 55px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.status-pill-btn:hover {
+    background: #f1f5f9;
+}
+.status-pill-btn.active-hadir {
+    background: #10b981 !important;
+    border-color: #059669 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+}
+.status-pill-btn.active-izin {
+    background: #0284c7 !important;
+    border-color: #0369a1 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+.status-pill-btn.active-sakit {
+    background: #f59e0b !important;
+    border-color: #d97706 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+}
+.status-pill-btn.active-absen {
+    background: #ef4444 !important;
+    border-color: #dc2626 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);
+}
+.status-pill-btn.active-belum {
+    background: #64748b !important;
+    border-color: #475569 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(100, 116, 139, 0.35);
+}
+
+/* Mobile Attendance Student Card */
+.student-attendance-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.15s ease;
+}
+.student-attendance-card:focus-within {
+    border-color: #10b981;
+}
+.student-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.student-avatar-initial {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #047857);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.student-card-meta {
+    flex: 1;
+    min-width: 0;
+}
+.student-card-name {
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+.student-card-sub {
+    font-size: 12px;
+    color: #64748b;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Sticky Mobile Floating Action Bar */
+.floating-attendance-bar {
+    position: sticky;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-top: 20px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #ffffff;
+}
+.floating-stats-text {
+    font-size: 12px;
+    color: #e2e8f0;
+}
+.floating-stats-text strong {
+    color: #34d399;
+    font-size: 14px;
+}
+.floating-save-btn {
+    background: #10b981;
+    color: #ffffff !important;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+.floating-save-btn:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+/* Responsive Dual Visibility */
+@media (max-width: 767.98px) {
+    .desktop-attendance-table {
+        display: none !important;
+    }
+    .mobile-attendance-card-list {
+        display: block !important;
+    }
+}
+@media (min-width: 768px) {
+    .desktop-attendance-table {
+        display: block;
+    }
+    .mobile-attendance-card-list {
+        display: none !important;
+    }
+    .floating-attendance-bar {
+        position: static;
+        background: transparent;
+        backdrop-filter: none;
+        border: none;
+        box-shadow: none;
+        color: inherit;
+        padding: 10px 0 0 0;
+        margin-top: 10px;
+    }
+    .floating-stats-text {
+        color: #475569;
+    }
+    .floating-stats-text strong {
+        color: #047857;
+    }
+}

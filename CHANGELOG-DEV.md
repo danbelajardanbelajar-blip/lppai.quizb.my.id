@@ -5,6 +5,54 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:21:40 +0700 — Peningkatan sempurna tampilan absensi tutorial mahasiswa dan dosen berstandar modern mobile view
+
+**ID:** TUTORIAL-ATTENDANCE-MOBILE-MODERN · **Parent Git:** `6995db9`.
+**Permintaan:** Tingkatkan tampilan absensi kehadiran tutorial mahasiswa dan dosen agar 100% mendukung dan memenuhi standar modern mobile view secara sempurna.
+
+**Perubahan dan alasan:**
+1. **Sisi Mahasiswa (`absensi-tutorial.php`)**:
+   - Menambahkan Hero Card Tutorial Aktif bernuansa Emerald Royale dengan informasi lengkap: nama kelas, dosen pembimbing, jadwal tutorial (hari & jam), ruangan, semester/gelombang, serta progress bar kehadiran interaktif (X dari 8 pertemuan, persentase ketercapaian).
+   - Menambahkan Jejak Presensi 8 Pertemuan (`.meetings-tracker-card` & `.meetings-badge-grid`): grid 8 pill pertemuan (P-1 s.d. P-8) dengan indikator status berwarna (✓ Hadir [hijau], ℹ Izin [biru], ✚ Sakit [kuning], ✗ Alpa [merah], ○ Belum [abu-abu]) beserta tanggal kehadiran.
+   - Mengupgrade card pemindai QR (`.scanner-card`): viewfinder modern dengan 4 corner bracket bercahaya hijau emerald (`.corner-bracket.tl/.tr/.bl/.br`), animasi garis laser dinamis (`.scanner-laser-sweep`), dan status live badge (`.scanner-live-badge`).
+   - Menyempurnakan umpan balik pemindaian dengan getaran haptik mobile (`navigator.vibrate([80, 40, 80])`) dan notifikasi dialog SweetAlert2 bernuansa Emerald Royale, serta empty state informatif jika mahasiswa belum ditempatkan ke kelas.
+2. **Sisi Dosen (`dosen/detail-kelas.php` Tab Absensi)**:
+   - Mengubah navigasi pertemuan menjadi bilah segmented scroll horizontal (`.pertemuan-nav-scroll` & `.pertemuan-pill-tab`) yang sangat nyaman digeser/di-swipe pada layar sentuh ponsel, lengkap dengan badge status pertemuan aktif dan centang selesai.
+   - Menambahkan fitur Mode Presentasi / Layar Penuh QR Code (`.qr-fullscreen-modal`): dosen dapat menampilkan QR Code presensi dalam ukuran besar beresolusi tinggi dengan kontras tajam di layar HP atau saat disambungkan ke proyektor kelas, dilengkapi hitung mundur kedaluwarsa dan tombol tutup/ESC.
+   - Menambahkan tombol aksi cepat massal: "✨ Hadir Semua" (menandai seluruh mahasiswa hadir dalam satu sentuhan) dan "↺ Reset Belum", serta pemilih tanggal dengan tombol jalan pintas "Hari Ini".
+   - Mengimplementasikan tata letak ganda responsif (*Dual Responsive Layout*):
+     - Pada layar desktop (`>= 768px`): tabel ringkas dengan tombol radio segmented pill berwarna (`.status-pill-group`).
+     - Pada layar mobile (`< 768px`): daftar kartu kehadiran mandiri (`.mobile-attendance-card-list` & `.student-attendance-card`) menampilkan avatar inisial, nama mahasiswa, NIM, badge program studi, serta 5 tombol pilihan status berukuran sentuh nyaman (min. 44px) yang tersinkronisasi dua arah secara real-time dengan form.
+   - Menambahkan *Floating Sticky Bottom Bar* (`.floating-attendance-bar`) pada ponsel yang menampilkan live counter jumlah kehadiran dan tombol simpan besar yang selalu mudah dijangkau jempol tanpa perlu scroll ke ujung halaman.
+3. **Penyempurnaan Stylesheet (`assets/css/style.css`)**:
+   - Menambahkan aturan styling komprehensif untuk card hero, progress bar, 8-meeting grid, viewfinder kamera, scroll tab pertemuan, modal layar penuh, segmented pill button, mobile student card, floating bar, dan media queries breakpoint responsif.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 11:13:29 | `assets/css/style.css` | 1804–2391 | Styling modern mobile attendance hero card, meeting tracker grid, animated viewfinder laser, horizontal scroll tabs, presentation mode modal, segmented status pill buttons, mobile student cards, floating sticky action bar, dan media queries breakpoint. |
+| 2026-11-16 11:14:22 | `absensi-tutorial.php` | 27–195 | Query kelas & riwayat presensi mahasiswa; Hero card tutorial dan progress bar kehadiran; 8-meeting grid tracker; modern viewfinder pemindai QR dengan laser sweep; haptic vibration & SweetAlert feedback; empty state rombel belum ditetapkan. |
+| 2026-11-16 11:17:07 | `dosen/detail-kelas.php` | 370–615 | Tab absensi dengan horizontal swipeable meeting scroll pills; QR Code presentation mode dengan modal layar penuh proyektor/HP; tombol cepat Hadir Semua & Reset Belum; date picker Hari Ini; desktop segmented table vs mobile student cards; real-time live counters dan floating sticky bottom action bar. |
+| 2026-11-16 11:18:26 | `tests/tutorial-attendance-mobile-test.php` | 1–162 | Test suite otomatis: verifikasi kelengkapan aturan CSS di style.css, struktur elemen pada tampilan Mahasiswa dan Dosen, serta pengujian operasional database via in-memory SQLite mock. |
+| 2026-11-16 11:21:40 | `CHANGELOG-DEV.md` | 8 | Entri TUTORIAL-ATTENDANCE-MOBILE-MODERN beserta rincian perubahan, alasan, dan bukti verifikasi lengkap. |
+
+**Verifikasi lulus:**
+1. `php -l absensi-tutorial.php` & `php -l dosen/detail-kelas.php`: No syntax errors detected.
+2. `php tests/tutorial-attendance-mobile-test.php`: Seluruh 4 tahapan pengujian lulus 100% (CSS rules, komponen Mahasiswa, komponen Dosen, query & simpan database).
+3. `php tests/sidebar-accordion-compact-test.php`: Seluruh pengujian sidebar cantik dan compact BERHASIL 100%.
+4. `php tests/theme-emerald-royale-test.php`: Verifikasi tema Emerald Royale & Champagne Prestige BERHASIL 100%.
+5. `php tests/pretes-aktif-hide-tutorial-menu-test.php`: Validasi perlindungan & isolasi role BERHASIL 100%.
+6. `python tests/tutorial-pretes-menu-test.py`: Lulus seluruh skenario sidebar dan dashboard.
+7. `git diff --check`: Bersih tanpa trailing whitespace atau peringatan whitespace.
+
+**Batas verifikasi:** Pengujian kamera browser asli (`getUserMedia` / sensor kamera fisik ponsel) bergantung pada izin perangkat keras pengguna; pengujian getaran haptik (`navigator.vibrate`) aktif pada perangkat mobile pendukung. PHP CLI menampilkan peringatan modul openssl dimuat dua kali pada lingkungan lokal Windows. Push Git tidak membuktikan deployment hosting secara otomatis.
+
+**Pelacakan:** Cari commit dengan ID `TUTORIAL-ATTENDANCE-MOBILE-MODERN`.
+
+---
+
+
 ## 2026-11-16 11:09:10 +0700 — Perbaiki tombol Daftarkan dan pesan berhasil palsu pada tutorial
 
 **ID:** ADMIN-TUTORIAL-REGISTER-REAL-RESULT · **Parent Git:** `d23103c`.
