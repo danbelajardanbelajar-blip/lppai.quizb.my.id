@@ -500,3 +500,340 @@ if (!function_exists('tutorialRplBatchVerify')) {
         return $stmt->rowCount();
     }
 }
+
+/**
+ * Memastikan tabel CBT Tutorial RPL (sesi, bank soal, attempt) tersedia.
+ */
+if (!function_exists('ensureTutorialRplCbtTables')) {
+    function ensureTutorialRplCbtTables(PDO $pdo): void {
+        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $idType = ($driver === 'sqlite') ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
+        $engine = ($driver === 'mysql') ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_cbt_sessions (
+            id $idType,
+            code VARCHAR(64) NOT NULL UNIQUE,
+            title VARCHAR(150) NOT NULL,
+            duration_minutes INT NOT NULL DEFAULT 30,
+            passing_grade DECIMAL(5,2) NOT NULL DEFAULT 80.00,
+            token VARCHAR(32) DEFAULT 'TUTOR26',
+            exam_open INT NOT NULL DEFAULT 1,
+            is_active INT NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )$engine");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_cbt_questions (
+            id $idType,
+            code VARCHAR(64) NOT NULL UNIQUE,
+            category VARCHAR(80) NOT NULL,
+            question_text TEXT NOT NULL,
+            options_json TEXT NOT NULL,
+            correct_answer CHAR(1) NOT NULL,
+            is_active INT NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )$engine");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_cbt_attempts (
+            id $idType,
+            user_id INT NOT NULL,
+            class_id INT NOT NULL,
+            started_at INT NOT NULL,
+            submitted_at INT DEFAULT NULL,
+            correct_count INT DEFAULT NULL,
+            total_questions INT NOT NULL DEFAULT 25,
+            score DECIMAL(5,2) DEFAULT NULL,
+            submitted INT NOT NULL DEFAULT 0,
+            UNIQUE(user_id, class_id)
+        )$engine");
+
+        // Pastikan sesi default tersedia
+        $stmt = $pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions");
+        if ((int)$stmt->fetchColumn() === 0) {
+            $pdo->prepare("
+                INSERT INTO tutorial_rpl_cbt_sessions (code, title, duration_minutes, passing_grade, token, exam_open, is_active)
+                VALUES ('SESI-TUTORIAL-RPL-2026', 'Ujian Tulis Tutorial RPL 2026/2027', 30, 80.00, 'TUTOR26', 1, 1)
+            ")->execute();
+        }
+    }
+}
+
+/**
+ * Mengambil data sesi CBT Tutorial RPL yang aktif.
+ */
+if (!function_exists('tutorialRplCbtGetSession')) {
+    function tutorialRplCbtGetSession(PDO $pdo): array {
+        ensureTutorialRplCbtTables($pdo);
+        $ses = $pdo->query("SELECT * FROM tutorial_rpl_cbt_sessions WHERE is_active = 1 ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        if (!$ses) {
+            return [
+                'id' => 1,
+                'code' => 'SESI-TUTORIAL-RPL-2026',
+                'title' => 'Ujian Tulis Tutorial RPL 2026/2027',
+                'duration_minutes' => 30,
+                'passing_grade' => 80.00,
+                'token' => 'TUTOR26',
+                'exam_open' => 1,
+                'is_active' => 1
+            ];
+        }
+        return $ses;
+    }
+}
+
+/**
+ * Update pengaturan sesi CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtUpdateSession')) {
+    function tutorialRplCbtUpdateSession(PDO $pdo, array $data): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $ses = tutorialRplCbtGetSession($pdo);
+        $sesId = (int)($ses['id'] ?? 1);
+
+        $stmt = $pdo->prepare("
+            UPDATE tutorial_rpl_cbt_sessions SET
+                title = ?,
+                duration_minutes = ?,
+                passing_grade = ?,
+                token = ?,
+                exam_open = ?
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            trim((string)($data['title'] ?? 'Ujian Tulis Tutorial RPL')),
+            max(5, min(180, (int)($data['duration_minutes'] ?? 30))),
+            max(0, min(100, (float)($data['passing_grade'] ?? 80.0))),
+            trim((string)($data['token'] ?? 'TUTOR26')),
+            !empty($data['exam_open']) ? 1 : 0,
+            $sesId
+        ]);
+    }
+}
+
+/**
+ * Mengambil daftar butir soal CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtGetQuestions')) {
+    function tutorialRplCbtGetQuestions(PDO $pdo, ?string $category = null): array {
+        ensureTutorialRplCbtTables($pdo);
+        tutorialRplCbtSeedQuestionsIfEmpty($pdo);
+
+        $sql = "SELECT * FROM tutorial_rpl_cbt_questions WHERE is_active = 1";
+        $params = [];
+        if (!empty($category)) {
+            $sql .= " AND category = ?";
+            $params[] = $category;
+        }
+        $sql .= " ORDER BY id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+/**
+ * Menyimpan / memperbarui butir soal CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtSaveQuestion')) {
+    function tutorialRplCbtSaveQuestion(PDO $pdo, array $data): int {
+        ensureTutorialRplCbtTables($pdo);
+        $id = (int)($data['id'] ?? 0);
+        $category = trim((string)($data['category'] ?? 'Ubudiyah'));
+        $text = trim((string)($data['question_text'] ?? ''));
+        $correct = strtoupper(trim((string)($data['correct_answer'] ?? 'A')));
+        $options = $data['options_json'] ?? '[]';
+        if (is_array($options)) $options = json_encode($options, JSON_UNESCAPED_UNICODE);
+
+        if ($text === '') {
+            throw new InvalidArgumentException('Teks pertanyaan soal tidak boleh kosong.');
+        }
+
+        if ($id > 0) {
+            $stmt = $pdo->prepare("
+                UPDATE tutorial_rpl_cbt_questions SET
+                    category = ?, question_text = ?, options_json = ?, correct_answer = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$category, $text, $options, $correct, $id]);
+            return $id;
+        } else {
+            $code = 'Q-TUTOR-' . bin2hex(random_bytes(4));
+            $stmt = $pdo->prepare("
+                INSERT INTO tutorial_rpl_cbt_questions (code, category, question_text, options_json, correct_answer, is_active)
+                VALUES (?, ?, ?, ?, ?, 1)
+            ");
+            $stmt->execute([$code, $category, $text, $options, $correct]);
+            return (int)$pdo->lastInsertId();
+        }
+    }
+}
+
+/**
+ * Menghapus butir soal CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtDeleteQuestion')) {
+    function tutorialRplCbtDeleteQuestion(PDO $pdo, int $questionId): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_questions WHERE id = ?");
+        return $stmt->execute([$questionId]);
+    }
+}
+
+/**
+ * Inisialisasi butir soal bawaan Tutorial RPL jika tabel masih kosong.
+ */
+if (!function_exists('tutorialRplCbtSeedQuestionsIfEmpty')) {
+    function tutorialRplCbtSeedQuestionsIfEmpty(PDO $pdo, bool $forceReset = false): int {
+        ensureTutorialRplCbtTables($pdo);
+        if (!$forceReset) {
+            $count = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions")->fetchColumn();
+            if ($count > 0) return $count;
+        } else {
+            $pdo->exec("DELETE FROM tutorial_rpl_cbt_questions");
+        }
+
+        $seed = [
+            ['Thaharah', 'Rukun wudhu yang pertama sesuai syariat Islam adalah...', ['Niat', 'Membasuh muka', 'Membasuh kedua tangan', 'Mengusap kepala', 'Tertib'], 'A'],
+            ['Thaharah', 'Air yang suci sifat zatnya dan dapat menyucikan benda lain tanpa makruh disebut...', ['Air musta\'mal', 'Air mutanajis', 'Air mutlak', 'Air makruh', 'Air musyammas'], 'C'],
+            ['Sholat Wajib', 'Membaca Surat Al-Fatihah dalam setiap rakaat sholat termasuk kategori...', ['Syarat sah sholat', 'Rukun sholat', 'Sunnah ab\'adh', 'Sunnah hai\'ah', 'Syarat wajib'], 'B'],
+            ['Sholat Wajib', 'Duduk tasyahud akhir dalam sholat fardhu hukumnya adalah...', ['Sunnah muakkad', 'Rukun sholat', 'Syarat sholat', 'Sunnah ghairu muakkad', 'Mubah'], 'B'],
+            ['Sholat Jenazah', 'Jumlah takbir dalam pelaksanaan sholat jenazah menurut kesepakatan jumhur ulama adalah sebanyak...', ['3 takbir', '4 takbir', '5 takbir', '6 takbir', '7 takbir'], 'B'],
+            ['Sholat Jenazah', 'Setelah takbir kedua dalam sholat jenazah, bacaan yang disyariatkan adalah...', ['Surat Al-Fatihah', 'Shalawat atas Nabi Muhammad SAW', 'Doa khusus untuk jenazah', 'Doa iftitah', 'Salam'], 'B'],
+            ['Zikir & Doa', 'Hukum membaca doa Qunut pada sholat Subuh menurut mazhab Syafi\'i adalah...', ['Wajib', 'Rukun', 'Sunnah Ab\'adh', 'Sunnah Hai\'ah', 'Makruh'], 'C'],
+            ['Sholat Sunnah', 'Sholat sunnah dua rakaat yang dikerjakan saat memasuki masjid sebelum duduk dinamakan...', ['Sholat Dhuha', 'Sholat Tahiyatul Masjid', 'Sholat Hajat', 'Sholat Istikharah', 'Sholat Tasbih'], 'B'],
+            ['Ubudiyah Praktis', 'Apabila seseorang lupa tidak melakukan tasyahud awal, maka ia disunnahkan untuk melakukan...', ['Mengulang sholat dari awal', 'Sujud sahwi sebelum salam', 'Sujud tilawah', 'Sujud syukur setelah salam', 'Membatalkan sholat'], 'B'],
+            ['Ubudiyah Praktis', 'Batasan aurat laki-laki ketika melaksanakan sholat menurut mayoritas ulama adalah...', ['Seluruh tubuh kecuali wajah', 'Antara pusar hingga lutut', 'Dada hingga ujung kaki', 'Pundak hingga lutut', 'Antara leher hingga mata kaki'], 'B']
+        ];
+
+        $stmt = $pdo->prepare("
+            INSERT INTO tutorial_rpl_cbt_questions (code, category, question_text, options_json, correct_answer, is_active)
+            VALUES (?, ?, ?, ?, ?, 1)
+        ");
+
+        $inserted = 0;
+        foreach ($seed as $i => [$cat, $q, $opts, $ans]) {
+            $code = 'TUTOR-RPL-Q' . ($i + 1);
+            $stmt->execute([$code, $cat, $q, json_encode($opts, JSON_UNESCAPED_UNICODE), $ans]);
+            $inserted++;
+        }
+        return $inserted;
+    }
+}
+
+/**
+ * Mengambil riwayat attempt CBT Tutorial RPL seluruh mahasiswa atau per kelompok.
+ */
+if (!function_exists('tutorialRplCbtGetAttempts')) {
+    function tutorialRplCbtGetAttempts(PDO $pdo, ?int $classId = null): array {
+        ensureTutorialRplCbtTables($pdo);
+        $sql = "
+            SELECT a.*,
+                   u.nama_lengkap, u.nim, u.program_studi,
+                   c.nama_kelompok, c.dosen_nama
+            FROM tutorial_rpl_cbt_attempts a
+            JOIN users u ON a.user_id = u.id
+            JOIN tutorial_rpl_classes c ON a.class_id = c.id
+        ";
+        $params = [];
+        if (!empty($classId)) {
+            $sql .= " WHERE a.class_id = ?";
+            $params[] = $classId;
+        }
+        $sql .= " ORDER BY a.submitted_at DESC, a.id DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+/**
+ * Simpan / submit attempt pengerjaan CBT Tutorial RPL dan sinkronisasi ke tutorial_rpl_members.
+ */
+if (!function_exists('tutorialRplCbtSubmitAttempt')) {
+    function tutorialRplCbtSubmitAttempt(PDO $pdo, int $userId, int $classId, float $score, int $correctCount, int $totalQuestions = 25): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $now = time();
+
+        // Cek apakah sudah pernah ada attempt (portable across SQLite & MySQL)
+        $chk = $pdo->prepare("SELECT id FROM tutorial_rpl_cbt_attempts WHERE user_id = ? AND class_id = ?");
+        $chk->execute([$userId, $classId]);
+        $existingId = $chk->fetchColumn();
+
+        if ($existingId) {
+            $stmt = $pdo->prepare("
+                UPDATE tutorial_rpl_cbt_attempts SET
+                    submitted_at = ?,
+                    correct_count = ?,
+                    total_questions = ?,
+                    score = ?,
+                    submitted = 1
+                WHERE id = ?
+            ");
+            $stmt->execute([$now, $correctCount, $totalQuestions, $score, $existingId]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO tutorial_rpl_cbt_attempts (user_id, class_id, started_at, submitted_at, correct_count, total_questions, score, submitted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+            ");
+            $stmt->execute([$userId, $classId, $now - 1200, $now, $correctCount, $totalQuestions, $score]);
+        }
+
+        // Sinkronisasi ke tutorial_rpl_members
+        $stmtM = $pdo->prepare("SELECT id, nilai_praktik FROM tutorial_rpl_members WHERE user_id = ? AND class_id = ?");
+        $stmtM->execute([$userId, $classId]);
+        $mem = $stmtM->fetch(PDO::FETCH_ASSOC);
+
+        if ($mem) {
+            $memberId = (int)$mem['id'];
+            $nilaiPraktik = ($mem['nilai_praktik'] !== null) ? (float)$mem['nilai_praktik'] : null;
+            $nilaiAkhir = null;
+            $statusLulus = 'proses';
+
+            if ($nilaiPraktik !== null) {
+                $nilaiAkhir = round(($score + $nilaiPraktik) / 2.0, 2);
+                $statusLulus = ($nilaiAkhir >= 80.0) ? 'lulus' : 'tidak_lulus';
+            } else {
+                $nilaiAkhir = $score;
+            }
+
+            $stmtUpd = $pdo->prepare("
+                UPDATE tutorial_rpl_members SET
+                    exam_submitted = 1,
+                    nilai_ujian_tulis = ?,
+                    nilai_akhir = ?,
+                    status_lulus = ?
+                WHERE id = ?
+            ");
+            $stmtUpd->execute([$score, $nilaiAkhir, $statusLulus, $memberId]);
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('tutorialRplCbtResetAttempt')) {
+    function tutorialRplCbtResetAttempt(PDO $pdo, int $userId, int $classId): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $pdo->prepare("DELETE FROM tutorial_rpl_cbt_attempts WHERE user_id = ? AND class_id = ?")->execute([$userId, $classId]);
+
+        // Kembalikan status di tutorial_rpl_members
+        $stmtM = $pdo->prepare("SELECT id, nilai_praktik FROM tutorial_rpl_members WHERE user_id = ? AND class_id = ?");
+        $stmtM->execute([$userId, $classId]);
+        $mem = $stmtM->fetch(PDO::FETCH_ASSOC);
+
+        if ($mem) {
+            $memberId = (int)$mem['id'];
+            $nilaiPraktik = ($mem['nilai_praktik'] !== null) ? (float)$mem['nilai_praktik'] : null;
+            $pdo->prepare("
+                UPDATE tutorial_rpl_members SET
+                    exam_submitted = 0,
+                    nilai_ujian_tulis = NULL,
+                    nilai_akhir = ?,
+                    status_lulus = 'proses'
+                WHERE id = ?
+            ")->execute([$nilaiPraktik, $memberId]);
+        }
+        return true;
+    }
+}

@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 16:10:00 +0700 — Tahap 4 Tutorial RPL Online: Mesin Ujian Tulis CBT, Bank Soal & Rekapitulasi Nilai Akhir Kelulusan
+
+**ID:** TUTORIAL-RPL-ONLINE-PHASE-4 — **Parent Git:** `2379c42`.
+**Permintaan pengguna:** lanjut tahap 4 (mesin ujian tulis tutorial CBT dan rekapitulasi nilai akhir kelulusan RPL).
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/tutorial-rpl-helper.php` | 2026-11-16 16:06:38 | 506–752 | Mesin Sesi CBT, Bank Soal, Attempt & Nilai Akhir | Menambahkan skema tabel `tutorial_rpl_cbt_sessions`, `tutorial_rpl_cbt_questions`, `tutorial_rpl_cbt_attempts` beserta fungsi helper: `tutorialRplCbtGetSession`, `tutorialRplCbtUpdateSession`, `tutorialRplCbtGetQuestions`, `tutorialRplCbtSaveQuestion`, `tutorialRplCbtDeleteQuestion`, `tutorialRplCbtSeedQuestionsIfEmpty`, `tutorialRplCbtGetAttempts`, `tutorialRplCbtSubmitAttempt` (perhitungan nilai akhir otomatis CBT + Praktik / 2 dan penentuan kelulusan passing grade 80.0), serta `tutorialRplCbtResetAttempt` (reset attempt pengerjaan untuk kendala teknis). |
+| `admin/tutorial-rpl-cbt.php` | 2026-11-16 16:07:54 | 1–537 | Manajemen CBT Tutorial RPL | Implementasi antarmuka tabbed komprehensif: Tab 1 (Pengaturan Sesi Ujian, durasi menit, token akses, passing grade, tombol sakelar buka/tutup ujian), Tab 2 (Bank Soal CBT Tutorial RPL dengan filter kategori, modal interaktif tambah/edit butir soal pilihan ganda A–E + kunci jawaban, hapus soal, dan tombol pulihkan bank soal kurikulum standar LPPAI), Tab 3 (Riwayat pengerjaan attempt peserta, skor benar/salah, nilai CBT, waktu selesai, dan tombol reset attempt). |
+| `admin/tutorial-rpl-nilai.php` | 2026-11-16 16:08:42 | 1–305 | Rekapitulasi Nilai Akhir & Kelulusan | Menambahkan metrik ringkasan kelulusan (Total peserta, Jumlah Lulus, Belum Lulus, Dalam Proses, Rata-rata nilai akhir), filter kelompok, filter status kelulusan (Semua, Lulus, Belum Lulus, Proses), input pencarian mahasiswa realtime, tabel rekap nilai (CBT 50%, Praktik 50%, Nilai Akhir, Badge Kelulusan hijau/merah, Catatan Tutor), tombol cetak dokumen, dan ekspor data resmi ke CSV. |
+| `tests/tutorial-rpl-cbt-nilai-test.php` | 2026-11-16 16:09:57 | 1–131 | Pengujian Otomatis Tahap 4 | Unit & integration test memverifikasi inisialisasi tabel sesi & bank soal, update sesi, operasi CRUD bank soal, penggabungan nilai CBT dan praktik, penentuan kelulusan otomatis passing grade 80.0, reset attempt ujian, serta pengembalian status ke 'proses'. |
+
+**Verifikasi:**
+1. `php -l includes/tutorial-rpl-helper.php` -> Syntax OK.
+2. `php -l admin/tutorial-rpl-cbt.php` -> Syntax OK.
+3. `php -l admin/tutorial-rpl-nilai.php` -> Syntax OK.
+4. `php tests/tutorial-rpl-cbt-nilai-test.php` -> PASS (100%).
+5. `php tests/tutorial-rpl-verification-test.php` -> PASS (100%).
+6. `php tests/tutorial-rpl-plotting-test.php` -> PASS (100%).
+7. `php tests/tutorial-rpl-structure-test.php` -> PASS (100%).
+8. `php tests/dashboard-cbt-submitted-test.php` -> PASS.
+9. `php tests/pretes-cbt-result-card-test.php` -> PASS.
+10. `php tests/tutorial-rekap-absensi-test.php` -> PASS (26 pengujian).
+11. `php tests/dosen-dashboard-examiner-test.php` -> PASS.
+12. `python tests/tutorial-pendaftaran-kolektif-test.py` -> PASS.
+13. `git diff --check ..` -> Bersih tanpa konflik/whitespace issue.
+
+---
+
 ## 2026-11-16 16:00:00 +0700 — Tahap 3 Tutorial RPL Online: Form Evaluasi Praktik Hafalan, Verifikasi Tugas, & Presensi Dosen
 
 **ID:** TUTORIAL-RPL-ONLINE-PHASE-3 · **Parent Git:** `3014e6e`.
