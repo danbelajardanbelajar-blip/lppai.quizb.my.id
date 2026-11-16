@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 15:48:30 +0700 — Tahap 1 Tutorial RPL Online: Menu Utama Mandiri Sidebar, Helper, Skema Data, & Halaman Dasar
+
+**ID:** TUTORIAL-RPL-ONLINE-PHASE-1 · **Parent Git:** `62bc678`.
+**Permintaan pengguna:** mulai tahap 1 pembuatan menu baru Tutorial RPL Online (Opsi B: Menu Utama Mandiri di Sidebar) dengan batasan ketat: tidak merubah menu manajemen pretes & sub-menunya di admin, dan tidak merubah menu serta tampilan apapun pada role mahasiswa.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/sidebar.php` | 2026-11-16 15:46:51 | 163–200, 336–350 | Navigasi Admin & Dosen | Menambahkan nav-group mandiri `🌐 Tutorial RPL Online` (`data-group="admin-tutorial-rpl"`) pada role Admin dengan 5 submenu (Kelola Kelompok, Data Peserta & Plotting, Verifikasi Tugas & Presensi, Ujian Tulis CBT, dan Rekap Nilai RPL). Menambahkan menu `Tutorial RPL Online` pada role Dosen khusus jika dosen tersebut terdaftar sebagai tutor pengampu kelas RPL daring (`tutorialRplIsTutor`). Menu manajemen pretes admin dan seluruh menu mahasiswa dibiarkan utuh tanpa perubahan. |
+| `includes/tutorial-rpl-helper.php` | 2026-11-16 15:48:13 | 1–183 | Helper & Skema Data | Menyediakan fungsi `ensureTutorialRplTables` (tabel `tutorial_rpl_classes` & `tutorial_rpl_members`), `tutorialRplIsTutor` untuk otorisasi dosen tutor daring, `tutorialRplGetClasses`, `tutorialRplGetClassById`, `tutorialRplGetMembers`, dan `tutorialRplGetTutors`. |
+| `admin/tutorial-rpl-kelas.php` | 2026-11-16 15:43:32 | 1–345 | Kelola Kelompok RPL | Modul CRUD kelompok tutorial RPL online, penugasan dosen tutor beserta kontak WhatsApp, penetapan link folder Google Drive tugas video hafalan, kuota, serta status aktif. |
+| `admin/tutorial-rpl-peserta.php` | 2026-11-16 15:44:03 | 1–210 | Peserta & Plotting RPL | Modul data mahasiswa program RPL, plotting mahasiswa ke kelompok kelas RPL, filter kelompok, serta pelepasan anggota kelas. |
+| `admin/tutorial-rpl-presensi.php` | 2026-11-16 15:44:39 | 1–180 | Verifikasi & Presensi | Dashboard monitoring status presensi terpadu (Status upload drive, validasi verifikasi tutor, status penyelesaian CBT tutorial, dan konfirmasi presensi sah). |
+| `admin/tutorial-rpl-cbt.php` | 2026-11-16 15:44:58 | 1–85 | Ujian Tulis Tutorial | Modul pengawasan dan pengaturan sesi evaluasi ujian tulis tutorial CBT secara daring. |
+| `admin/tutorial-rpl-nilai.php` | 2026-11-16 15:45:23 | 1–172 | Rekapitulasi Nilai RPL | Modul rekapitulasi nilai komprehensif (Nilai Tugas Praktik Hafalan + Nilai CBT Tutorial), passing grade 80.0, dan fitur ekspor CSV resmi. |
+| `dosen/tutorial-rpl.php` | 2026-11-16 15:45:53 | 1–215 | Bimbingan Tutor Dosen | Halaman bimbingan khusus dosen tutor RPL online: daftar mahasiswa bimbingan, akses link folder Google Drive tugas, dan form verifikasi tugas video hafalan mahasiswa. |
+| `tests/tutorial-rpl-structure-test.php` | 2026-11-16 15:48:19 | 1–180 | Pengujian Otomatis | Unit & integration test memverifikasi pembentukan tabel, logika `isTutor`, kueri data kelas/anggota, struktur rendering sidebar untuk Admin, Dosen Tutor, Dosen Non-Tutor, dan Mahasiswa (terbukti menu pretes admin & seluruh menu mahasiswa tetap 100% utuh). |
+
+**Verifikasi:**
+1. `php -l` seluruh file yang dibuat dan dimodifikasi -> Syntax OK (0 error).
+2. `php tests/tutorial-rpl-structure-test.php` -> PASS (100%).
+3. `php tests/dashboard-cbt-submitted-test.php` -> PASS.
+4. `php tests/pretes-cbt-result-card-test.php` -> PASS.
+5. `php tests/tutorial-rekap-absensi-test.php` -> PASS (26 pengujian).
+6. `php tests/dosen-dashboard-examiner-test.php` -> PASS.
+7. `python tests/tutorial-pendaftaran-kolektif-test.py` -> PASS.
+8. `git diff --check ..` -> Bersih tanpa whitespace issue / conflict.
+
+---
+
 ## 2026-11-16 14:24:00 +0700 — Dashboard Mahasiswa: Sembunyikan Jadwal/Tryout & Tampilkan Kartu Hasil CBT Pretes Serta Info Tutorial
 
 **ID:** DASHBOARD-PRETES-CBT-SUBMITTED-RESULT · **Parent Git:** `9f72ef4`.

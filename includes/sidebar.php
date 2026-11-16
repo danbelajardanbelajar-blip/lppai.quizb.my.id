@@ -160,7 +160,44 @@ if (!function_exists('isNavGroupActive')) {
                 </div>
             </div>
 
-            <!-- KEUANGAN -->
+                        <!-- TUTORIAL RPL ONLINE -->
+            <?php
+            $tutorialRplPages = [
+                'tutorial-rpl-kelas.php',
+                'tutorial-rpl-peserta.php',
+                'tutorial-rpl-presensi.php',
+                'tutorial-rpl-cbt.php',
+                'tutorial-rpl-nilai.php'
+            ];
+            $isTutorialRplGroupActive = isNavGroupActive($tutorialRplPages);
+            ?>
+            <div class="nav-group <?= $isTutorialRplGroupActive ? 'open' : '' ?>" data-group="admin-tutorial-rpl">
+                <button type="button" class="nav-group-toggle <?= $isTutorialRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialRplGroupActive ? 'true' : 'false' ?>">
+                    <span class="icon">🌐</span>
+                    <span class="nav-text">Tutorial RPL Online</span>
+                    <span class="nav-badge">5</span>
+                    <span class="chevron">▾</span>
+                </button>
+                <div class="nav-group-content">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="page-nav <?= menuActive('tutorial-rpl-kelas.php') ?>">
+                        <span class="icon">🏫</span> Kelola Kelompok & Tutor
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php" class="page-nav <?= menuActive('tutorial-rpl-peserta.php') ?>">
+                        <span class="icon">👥</span> Data Peserta & Plotting
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-presensi.php" class="page-nav <?= menuActive('tutorial-rpl-presensi.php') ?>">
+                        <span class="icon">✅</span> Verifikasi Tugas & Presensi
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-cbt.php" class="page-nav <?= menuActive('tutorial-rpl-cbt.php') ?>">
+                        <span class="icon">🧩</span> Ujian Tulis Tutorial (CBT)
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-nilai.php" class="page-nav <?= menuActive('tutorial-rpl-nilai.php') ?>">
+                        <span class="icon">🎓</span> Rekapitulasi Nilai RPL
+                    </a>
+                </div>
+            </div>
+
+<!-- KEUANGAN -->
             <?php
             $isKeuanganGroupActive = ($currentPage === 'keuangan.php');
             ?>
@@ -296,7 +333,22 @@ if (!function_exists('isNavGroupActive')) {
                 <span class="icon">🎓</span>
                 <span class="nav-text">Rekapitulasi Nilai</span>
             </a>
-        <?php else: ?>
+                    <?php
+            $showDosenTutorialRpl = false;
+            if (function_exists('getDBConnection')) {
+                try {
+                    require_once __DIR__ . '/tutorial-rpl-helper.php';
+                    $showDosenTutorialRpl = tutorialRplIsTutor(getDBConnection(), $currentUser ?? null);
+                } catch (Throwable $e) { $showDosenTutorialRpl = false; }
+            }
+            ?>
+            <?php if ($showDosenTutorialRpl): ?>
+            <a href="<?= BASE_URL ?>/dosen/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
+                <span class="icon">🌐</span>
+                <span class="nav-text">Tutorial RPL Online</span>
+            </a>
+            <?php endif; ?>
+<?php else: ?>
             <?php
             require_once __DIR__ . '/pretes-helper.php';
             require_once __DIR__ . '/tutorial-membership.php';
