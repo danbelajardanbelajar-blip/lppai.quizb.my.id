@@ -79,15 +79,23 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
         error_log('pretesCbtResultFor: ' . $e->getMessage());
     }
     $tutorialRplUrl = BASE_URL . '/tutorial-rpl.php';
+    // Setelah CBT dikumpulkan: jadwal & tata tertib ujian disembunyikan (di view); materi persiapan hanya
+    // untuk nilai ≥ 80 (dibutuhkan untuk tugas video hafalan 11 kompetensi). Nilai < 80 → kartu hasil saja.
+    $cbtSubmitted = $cbtResult && ($cbtResult['status'] ?? '') === 'submitted';
+    $showPreparation = !$cbtSubmitted || pretesCbtResultPassed($cbtResult);
 
     define('PAGE_TITLE', 'Peserta, Jadwal & Persiapan Pretes');
     include __DIR__ . '/header.php';
     echo '<div id="pretes-active-information" style="max-width:1040px;margin:0 auto">';
     echo '<section id="pretes-active-participant" aria-label="Peserta dan jadwal pretes">';
     include __DIR__ . '/pretes-participant-view.php';
-    echo '</section><section id="pretes-active-preparation" aria-label="Persiapan materi pretes">';
-    include __DIR__ . '/pretes-preparation-view.php';
-    echo '</section></div>';
+    echo '</section>';
+    if ($showPreparation) {
+        echo '<section id="pretes-active-preparation" aria-label="Persiapan materi pretes">';
+        include __DIR__ . '/pretes-preparation-view.php';
+        echo '</section>';
+    }
+    echo '</div>';
     include __DIR__ . '/footer.php';
     return true;
 }

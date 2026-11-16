@@ -5,6 +5,25 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 12:53:38 +0700 — Setelah CBT dikumpulkan: sembunyikan jadwal & tata tertib; materi persiapan hanya untuk nilai ≥ 80
+
+**ID:** PRETES-CBT-FINISHED-HIDE · **Parent Git:** `06c77ce`.
+**Laporan pengguna:** peserta yang sudah menyelesaikan CBT dengan nilai < 80 masih melihat "Jadwal Pelaksanaan Pretes Anda", "Instruksi & Tata Tertib Pelaksanaan Ujian", dan "Materi Persiapan & Praktik Pretes".
+**Akar masalah:** paket `PRETES-CBT-RESULT-CARD` hanya mengganti kotak akses soal (yang berada di dalam kartu tata tertib); kartu jadwal, kartu tata tertib, akordeon sesi lain, dan materi persiapan tetap dirender tanpa melihat hasil CBT.
+**Aturan baru:** CBT sudah dikumpulkan → hanya judul "Hasil CBT Pretes Saya" + kartu hasil. Nilai < 80: tanpa materi persiapan. Nilai ≥ 80: materi persiapan tetap tampil (dirujuk tugas "video hafalan 11 kompetensi"). Belum mulai / sedang berjalan: tampilan tidak berubah.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-participant-view.php` | 2026-11-16 12:53:15 | 81–94 | Cabang awal view | Cabang baru `if ($myReg && CBT submitted)`: judul "Hasil CBT Pretes Saya" + `#pretes-cbt-finished` (kartu hasil); kartu jadwal, tata tertib, akses soal, dan sesi lain dipindah ke `elseif ($myReg)`. |
+| `includes/pretes-active-page.php` | 2026-11-16 12:53:15 | 82–85, 92–98 | Komposisi halaman | `$cbtSubmitted`, `$showPreparation = !$cbtSubmitted || pretesCbtResultPassed($cbtResult)`; `pretes-preparation-view.php` hanya dirender bila `$showPreparation`. |
+| `tests/pretes-cbt-result-card-test.php` | 2026-11-16 12:53:38 | 84–111 | Test view | Render view untuk lulus/gagal (jadwal, tata tertib, sesi lain, tombol ujian tidak muncul), berjalan & belum mulai (tampilan biasa), aturan materi persiapan. |
+
+**Verifikasi:** `php -l` OK (2 file), `git diff --check` OK; `pretes-cbt-result-card-test` PASS; regresi `pretes-peserta-instruksi`, `pretes-peserta-aktif`, `pretes-exam-access`, `pretes-stage` PASS. Belum diuji di hosting live.
+
+---
+
 ## 2026-11-16 12:46:30 +0700 — Kartu hasil CBT pretes di halaman peserta aktif (<80 → Tutorial RPL, ≥80 → tugas pretes online)
 
 **ID:** PRETES-CBT-RESULT-CARD · **Parent Git:** `1decefa`.

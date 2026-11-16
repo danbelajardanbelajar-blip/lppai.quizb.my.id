@@ -81,5 +81,33 @@ $check(str_contains($active, 'pretesCbtResultFor($pdo, (int)$user[\'id\'], (int)
 $page = file_get_contents("$root/pages/tutorial-rpl.php");
 $check(str_contains($page, 'Pendaftaran Tutorial RPL Gelombang 1 dimulai tanggal <strong>23 sampai 27 November 2026</strong>') && str_contains($page, 'requireLogin()'), 'Halaman Pendaftaran Tutorial RPL Gelombang 1');
 
+// Render halaman peserta (view) per kondisi: bagian jadwal/tata tertib/sesi lain hilang setelah CBT dikumpulkan
+if (!function_exists('sanitize')) { function sanitize($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); } }
+if (!function_exists('renderDosenWithWa')) { function renderDosenWithWa(...$a) { return 'Dosen'; } }
+$renderView = function (?array $cbtResultArg) use ($root): string {
+    $cbtResult = $cbtResultArg;
+    $user = ['id' => 1, 'nama_lengkap' => 'Mhs', 'nim' => '2401', 'username' => '2401', 'role' => 'mahasiswa'];
+    $myReg = ['id' => 10, 'periode' => 'Pretes RPL 2026/2027', 'hari_pilihan' => 'Senin', 'jam' => '13.00 WIB (Jam 1)', 'ruangan' => 'Lab 1', 'dosen_penguji' => 'D',
+        'status' => 'terdaftar', 'tanggal' => null, 'waktu_mulai' => null, 'waktu_selesai' => null, 'ruangan_tes' => null, 'foto' => 'x.jpg', 'username_tes' => '', 'password_tes' => ''];
+    $registeredForActivePretes = true; $schedules = [['periode' => 'Pretes RPL 2026/2027', 'tanggal' => '2026-11-16', 'waktu_mulai' => '13:00', 'waktu_selesai' => '15:00', 'ruangan' => 'Lab', 'terisi' => 1, 'kuota' => 30, 'status' => 'aktif']];
+    $pdo = null; $isTesterPrivileged = false; $isTesterPreview = false; $isUjianDibuka = true; $linkSoalPretes = '/pretes-ujian.php'; $tutorialRplUrl = '/tutorial-rpl.php';
+    $examClosedNotice = ''; $examSchedule = null; $examAccess = ['reason' => 'open']; $tryoutLink = null;
+    ob_start();
+    include "$root/includes/pretes-participant-view.php";
+    return ob_get_clean();
+};
+$hidden = ['Jadwal Pelaksanaan Pretes Anda', 'Instruksi &amp; Tata Tertib Pelaksanaan Ujian', 'Informasi Sesi Jadwal Lainnya', 'id="btn-kerjakan-pretes"'];
+foreach (['passed' => $r100, 'failed' => $r76] as $label => $res) {
+    $v = $renderView($res);
+    $check(str_contains($v, 'Hasil CBT Pretes Saya') && str_contains($v, 'id="pretes-cbt-finished"') && str_contains($v, 'data-state="' . $label . '"'), "View $label: hanya kartu hasil");
+    foreach ($hidden as $h) $check(!str_contains($v, $h), "View $label: '$h' disembunyikan");
+}
+$vRun = $renderView($run);
+$check(str_contains($vRun, 'Jadwal Pelaksanaan Pretes Anda') && str_contains($vRun, 'data-state="in_progress"'), 'View berjalan: jadwal tetap + kartu Lanjutkan Ujian');
+$vNone = $renderView(null);
+$check(str_contains($vNone, 'Jadwal Pelaksanaan Pretes Anda') && str_contains($vNone, 'id="btn-kerjakan-pretes"'), 'View belum mulai: tampilan biasa');
+// Materi persiapan: hanya bila belum dikumpulkan atau nilai ≥ 80
+$check(str_contains($active, '$showPreparation = !$cbtSubmitted || pretesCbtResultPassed($cbtResult);') && str_contains($active, 'if ($showPreparation) {'), 'Materi persiapan disembunyikan untuk nilai < 80, tetap untuk ≥ 80');
+
 if ($failures) { echo "FAIL:\n - " . implode("\n - ", $failures) . "\n"; exit(1); }
 echo "PASS: kartu hasil CBT pretes (berjalan, ≥80 tugas online, tepat 80, <80 link Tutorial RPL, 0) + halaman tutorial RPL.\n";

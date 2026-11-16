@@ -78,7 +78,20 @@
 <!-- ═══════════════════════════════════════════════════════════════════
      INFORMASI RESMI & PANDUAN PRETES MAHASISWA
 ═══════════════════════════════════════════════════════════════════ -->
-<?php if ($myReg): ?>
+<?php if ($myReg && !empty($cbtResult) && ($cbtResult['status'] ?? '') === 'submitted' && function_exists('renderPretesCbtResultCard')): ?>
+
+    <!-- ── CBT PRETES SUDAH DIKUMPULKAN: hanya kartu hasil (jadwal, tata tertib, sesi lain disembunyikan) ── -->
+    <div style="margin-bottom:20px;">
+        <h2 class="page-title" style="margin:0;">Hasil CBT Pretes Saya</h2>
+        <p style="margin:4px 0 0;color:#64748b;font-size:13.5px;">
+            <?= sanitize($myReg['periode'] ?? 'Pretes') ?> · CBT pretes Anda sudah selesai dikerjakan. Ikuti langkah berikut sesuai hasil Anda.
+        </p>
+    </div>
+    <div id="pretes-cbt-finished" style="margin-bottom:22px;">
+        <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php')); ?>
+    </div>
+
+<?php elseif ($myReg): ?>
 
     <div style="margin-bottom:20px;">
         <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
