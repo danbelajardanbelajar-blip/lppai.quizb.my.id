@@ -5,6 +5,29 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 14:24:00 +0700 — Dashboard Mahasiswa: Sembunyikan Jadwal/Tryout & Tampilkan Kartu Hasil CBT Pretes Serta Info Tutorial
+
+**ID:** DASHBOARD-PRETES-CBT-SUBMITTED-RESULT · **Parent Git:** `9f72ef4`.
+**Permintaan pengguna:** jangan tampilkan banner tryout dan jadwal/akses ujian pretes pada dashboard bagi mahasiswa yang sudah menyelesaikan ujian resmi pretes CBT, ganti dengan info yang sesuai yakni pendaftaran tutorial seperti pada `pretes-peserta.php`.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `pages/dashboard.php` | 2026-11-16 14:16:19 | 50–73, 112–115, 153–155, 350, 574–594, 596 | Pengecekan CBT & Card Mahasiswa | Mengambil data CBT resmi (`pretesCbtResultFor`), menyembunyikan banner tryout pretes dan card "Jadwal & Status Pretes Anda" jika mahasiswa sudah submit CBT (`$isCbtSubmitted`). Menampilkan kartu hasil resmi `renderPretesCbtResultCard` di dashboard (arahan pendaftaran ke `/tutorial-rpl.php` untuk RPL dengan nilai < 80 atau instruksi tugas online untuk nilai ≥ 80). Memperbarui stat card Status Pretes menjadi `✅ Lolos CBT` atau `❌ Lanjut Tutorial`. |
+| `includes/pretes-cbt-result-card.php` | 2026-11-16 14:16:32 | 96 | Tautan materi persiapan | Tautan anchor materi persiapan tugas video pretes RPL online diubah menjadi URL absolut `pretes-peserta.php#pretes-active-preparation` agar tautan berfungsi benar saat dibuka dari dashboard. |
+| `tests/dashboard-cbt-submitted-test.php` | 2026-11-16 14:22:52 | 1–347 | Pengujian otomatis | Test regresi menyeluruh 3 skenario mahasiswa (belum CBT, sudah submit CBT < 80, dan submit CBT ≥ 80) memastikan gating banner, visibilitas card jadwal vs hasil, stat card, link tutorial, dan tautan tugas online berjalan 100% akurat. |
+
+**Verifikasi:**
+1. `php -l includes/pretes-cbt-result-card.php` -> Syntax OK.
+2. `php -l pages/dashboard.php` -> Syntax OK.
+3. `php tests/dashboard-cbt-submitted-test.php` -> Semua skenario (belum CBT, CBT < 80, CBT ≥ 80) PASS (100%).
+4. `php tests/pretes-cbt-result-card-test.php` -> PASS.
+5. `php tests/tutorial-rekap-absensi-test.php` -> PASS (26 pengujian).
+6. `php tests/dosen-dashboard-examiner-test.php` -> PASS.
+7. `python tests/tutorial-pendaftaran-kolektif-test.py` -> PASS.
+8. `git diff --check ..` -> Bersih tanpa konflik/whitespace issue.
+
+---
+
 ## 2026-11-16 14:14:09 +0700 — Tanda silang pada langkah "Upload video hafalan" & "Penilaian tutor" untuk CBT < 80
 
 **ID:** PRETES-RPL-STEP-CROSS · **Parent Git:** `1344dba`.

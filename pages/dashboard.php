@@ -47,6 +47,30 @@ $stmt = $pdo->prepare("
 $stmt->execute([$user['id']]);
 $myPretesReg = $stmt->fetch();
 
+// Ambil hasil CBT resmi mahasiswa jika sudah mengerjakan/mengumpulkan ujian
+require_once __DIR__ . '/../includes/pretes-cbt-result-card.php';
+$cbtResult = null;
+if ($myPretesReg) {
+    try {
+        $cbtResult = pretesCbtResultFor($pdo, (int)$user['id'], (int)($myPretesReg['id'] ?? 0));
+    } catch (Throwable $e) {
+        error_log('dashboard pretesCbtResultFor: ' . $e->getMessage());
+    }
+}
+if (!$cbtResult) {
+    try {
+        ensurePretesCbtTables($pdo);
+        $stmtLatestAtt = $pdo->prepare("SELECT registration_id FROM pretes_cbt_attempts WHERE user_id = ? AND submitted = 1 ORDER BY id DESC LIMIT 1");
+        $stmtLatestAtt->execute([(int)$user['id']]);
+        $latestRegId = (int)$stmtLatestAtt->fetchColumn();
+        if ($latestRegId > 0) {
+            $cbtResult = pretesCbtResultFor($pdo, (int)$user['id'], $latestRegId);
+        }
+    } catch (Throwable $e) {}
+}
+$isCbtSubmitted = !empty($cbtResult) && ($cbtResult['status'] ?? '') === 'submitted';
+$isCbtPassed = pretesCbtResultPassed($cbtResult);
+
 // Cek status periode pretes aktif & kelayakan program mahasiswa
 $activePretes = getActivePretesPeriod($pdo);
 $isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
@@ -85,6 +109,9 @@ if ($isPretesSelesai) {
 } else {
     if ($isPretesLulus) {
         $pretesStatusText = '✅ Lulus';
+    } elseif ($isCbtSubmitted) {
+        $scoreFormatted = rtrim(rtrim(number_format((float)($cbtResult['score'] ?? 0), 1, ',', ''), '0'), ',');
+        $pretesStatusText = $isCbtPassed ? "✅ Lolos CBT ($scoreFormatted)" : "❌ Lanjut Tutorial ($scoreFormatted)";
     } elseif ($pretesResult && ($pretesResult['status_lulus'] ?? '') === 'tidak_lulus') {
         $pretesStatusText = '❌ Belum Lulus';
     } elseif ($myPretesReg || $pretesResult) {
@@ -113,7 +140,7 @@ if ($myPretesReg) {
 
 // Gating & Privilege Ujian Pretes
 // Link ujian dibuka/ditutup admin (Bank Soal CBT › Sesi Ujian › Buka/Tutup Ujian), bukan tanggal di kode
-$isTesterPrivileged  = (isset($user['username']) && (string)$user['username'] === '12345') 
+$isTesterPrivileged  = (isset($user['username']) && (string)$user['username'] === '12345')
                     || (isset($user['nim']) && (string)$user['nim'] === '12345')
                     || ((int)($user['id'] ?? 0) === 12345);
 $isUjianPretesDibuka = $isTesterPrivileged;
@@ -122,9 +149,9 @@ try {
     $isUjianPretesDibuka = pretesExamAccess($pdo, $user)['allowed'] || $isTesterPrivileged;
 } catch (Throwable $e) {}
 
-// Peringatan wajib tryout hanya untuk peserta pretes aktif saat sesi benar-benar dibuka.
+// Peringatan wajib tryout hanya untuk peserta pretes aktif saat sesi benar-benar dibuka dan BELUM menyelesaikan ujian resmi CBT.
 $dashboardTryoutLink = null;
-if (!$hidePretesMenus && !$isPretesLulus) {
+if (!$hidePretesMenus && !$isPretesLulus && !$isCbtSubmitted) {
     try {
         if (pretesExamIsRegisteredActive($pdo, $user)) {
             require_once __DIR__ . '/../includes/pretes-tryout.php';
@@ -142,10 +169,10 @@ if (!$hidePretesMenus && !$isPretesLulus) {
 
 // Get tutorial registrations (gunakan LEFT JOIN agar pendaftar yang belum di-plotting kelas tetap muncul hari pilihannya)
 $stmt = $pdo->prepare("
-    SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan, tc.dosen_pengampu as kelas_dosen_pengampu 
-    FROM tutorial_registrations tr 
-    LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id 
-    WHERE tr.user_id = ? AND (tr.tahun_ajaran LIKE '%2026%' OR tr.tahun_ajaran LIKE '%2027%' OR tr.tahun_ajaran LIKE '%2028%' OR tr.tahun_ajaran LIKE '%2029%' OR tr.tahun_ajaran LIKE '%2030%') 
+    SELECT tr.*, tc.nama_kelas, tc.gelombang as kelas_gelombang, tc.hari as kelas_hari, tc.jam as kelas_jam, tc.ruangan as kelas_ruangan, tc.dosen_pengampu as kelas_dosen_pengampu
+    FROM tutorial_registrations tr
+    LEFT JOIN tutorial_classes tc ON tr.tutorial_class_id = tc.id
+    WHERE tr.user_id = ? AND (tr.tahun_ajaran LIKE '%2026%' OR tr.tahun_ajaran LIKE '%2027%' OR tr.tahun_ajaran LIKE '%2028%' OR tr.tahun_ajaran LIKE '%2029%' OR tr.tahun_ajaran LIKE '%2030%')
     ORDER BY tr.created_at DESC
 ");
 $stmt->execute([$user['id']]);
@@ -188,7 +215,7 @@ foreach ($allAnnouncements as $ann) {
         || preg_match('~(?:^|/)(?:pretes[^/?]*|absensi-pretes)\.php(?:[?#]|$)~i', (string)($ann['link_tujuan'] ?? '')))) {
         continue;
     }
-    
+
     // 1. Jika sudah lulus tutorial ATAU sudah lulus pretes, jangan tampilkan pengumuman pendaftaran tutorial
     $isTutorialRegAnnouncement = (
         (strpos($tipe, 'pendaftaran_') === 0 && $tipe !== 'pendaftaran_pretes')
@@ -199,7 +226,7 @@ foreach ($allAnnouncements as $ann) {
     if (($isLulusTutorial || $isPretesLulus) && $isTutorialRegAnnouncement) {
         continue;
     }
-    
+
     // 1b. Sembunyikan pengumuman pendaftaran pretes jika tidak berhak (mis. khusus RPL), sudah terdaftar di periode aktif, atau sudah lulus pretes
     if ($tipe === 'pendaftaran_pretes') {
         $alreadyRegisteredPretes = $activePretes ? ($pretesRegisteredActive > 0) : ($pretesRegistered > 0);
@@ -207,19 +234,19 @@ foreach ($allAnnouncements as $ann) {
             continue;
         }
     }
-    
+
     // 2. Jika sudah terdaftar di gelombang tertentu, jangan tampilkan pengumuman pendaftarannya
     if (in_array('gel1', $registeredGels) && $tipe === 'pendaftaran_gel1') continue;
     if (in_array('gel2', $registeredGels) && $tipe === 'pendaftaran_gel2') continue;
     if (in_array('mandiri', $registeredGels) && $tipe === 'pendaftaran_mandiri') continue;
-    
+
     // 3. Jika NIM diawali dengan '23', jangan tampilkan pendaftaran mandiri
     if (strpos($user['nim'], '23') === 0 && $tipe === 'pendaftaran_mandiri') {
         continue;
     }
-    
+
     $recentAnnouncements[] = $ann;
-    
+
     if (count($recentAnnouncements) >= 5) break; // Batasi maksimal 5 pengumuman yang relevan
 }
 
@@ -304,7 +331,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="stat-icon orange">📚</div>
         <div class="stat-info">
             <?php if (!empty($tutorialRegs)): ?>
-                <?php 
+                <?php
                 $firstTutor = $tutorialRegs[0];
                 $hariPilihanTutor = !empty($firstTutor['hari_pilihan']) ? $firstTutor['hari_pilihan'] : (!empty($firstTutor['kelas_hari']) ? $firstTutor['kelas_hari'] : '');
                 ?>
@@ -320,8 +347,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- Pretes Registration & Schedule (Disembunyikan jika pretes dinyatakan selesai) -->
-<?php if (!$hidePretesMenus && $myPretesReg && !$isPretesSelesai): ?>
+<!-- Pretes Registration & Schedule (Disembunyikan jika pretes dinyatakan selesai atau CBT sudah selesai dikerjakan) -->
+<?php if (!$hidePretesMenus && $myPretesReg && !$isPretesSelesai && !$isCbtSubmitted): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary); box-shadow: var(--shadow);">
     <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#f8fafc;">
         <div style="display:flex; align-items:center; gap:10px;">
@@ -544,8 +571,30 @@ include __DIR__ . '/../includes/header.php';
 </div>
 <?php endif; ?>
 
-<!-- Banner Ringkasan Hasil Pretes (Tampil jika pretes dinyatakan selesai) -->
-<?php if (!$hidePretesMenus && $myPretesReg && $isPretesSelesai): ?>
+<!-- Kartu Hasil CBT Pretes (Tampil setelah mahasiswa menyelesaikan ujian resmi pretes) -->
+<?php if (!$hidePretesMenus && $myPretesReg && $isCbtSubmitted && function_exists('renderPretesCbtResultCard')): ?>
+<div style="margin-bottom: 24px;">
+    <div style="margin-bottom: 12px;">
+        <h3 style="margin:0 0 4px 0; font-size:17px; font-weight:700; color:var(--text-dark);">
+            Hasil CBT Pretes Saya
+        </h3>
+        <p style="margin:0; color:#64748b; font-size:13px;">
+            <?= sanitize($myPretesReg['periode'] ?? 'Pretes') ?> · CBT pretes resmi Anda sudah selesai dikerjakan. Ikuti instruksi berikut sesuai hasil Anda.
+        </p>
+    </div>
+    <div id="dashboard-pretes-cbt-result">
+        <?php
+        $linkSoalPretes = BASE_URL . '/pretes-ujian.php';
+        $isRplStudent = (isset($user['jenis_program']) && strtoupper(trim($user['jenis_program'])) === 'RPL');
+        $tutorialTargetUrl = $isRplStudent ? (BASE_URL . '/tutorial-rpl.php') : (BASE_URL . '/tutorial-pendaftaran.php');
+        renderPretesCbtResultCard($cbtResult, $linkSoalPretes, $tutorialTargetUrl);
+        ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Banner Ringkasan Hasil Pretes (Tampil jika pretes dinyatakan selesai dan belum ada kartu hasil CBT) -->
+<?php if (!$hidePretesMenus && $myPretesReg && $isPretesSelesai && !$isCbtSubmitted): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid <?= $isPretesLulus ? '#10b981' : '#ef4444' ?>; box-shadow: var(--shadow);">
     <div class="card-body" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:18px 22px;">
         <div style="display:flex; align-items:center; gap:14px;">
