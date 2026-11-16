@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 12:46:30 +0700 — Kartu hasil CBT pretes di halaman peserta aktif (<80 → Tutorial RPL, ≥80 → tugas pretes online)
+
+**ID:** PRETES-CBT-RESULT-CARD · **Parent Git:** `1decefa`.
+**Permintaan:** Setelah peserta pretes aktif menyelesaikan CBT, halaman `pretes-peserta.php` menampilkan: nilai di bawah 80 → "Mohon maaf, nilai CBT Pretes Anda tidak mencapai nilai minimal (80)…" + link ke halaman "Pendaftaran Tutorial RPL Gelombang 1 dimulai tanggal 23 sampai 27 November"; nilai 80 ke atas → "Selamat, Saudara diperkenankan melanjutkan ke tahap pretes secara online…" + tugas a–d (video hafalan 11 kompetensi, upload Google Drive, lapor tutor, batas 22 November 2026).
+**Sebelumnya:** halaman tidak mengecek CBT yang sudah dikumpulkan: tombol "Kerjakan Soal Pretes" tetap tampil di hari ujian, dan setelah harinya lewat muncul "Belum Dibuka… hubungi admin bila belum mengerjakan"; peserta lulus melihat judul "Belum Dibuka".
+**Catatan istilah:** teks permintaan menulis "CBPT"; ditulis "CBT" mengikuti istilah aplikasi. Nilai tepat 80 dianggap **memenuhi** (nilai minimal 80).
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt-result-card.php` (baru) | 2026-11-16 12:46:30 | 1–105 | Kartu hasil | Konstanta nilai minimal 80, URL Google Drive, batas 22 November 2026 (12–14); `pretesCbtResultFor()` (20, via `pretesCbtState` — memfinalisasi attempt lewat waktu); `pretesCbtResultPassed()` (42); `renderPretesCbtResultCard()` (47: lingkaran nilai, jumlah benar, waktu kumpul WIB eksplisit; in_progress → "Lanjutkan Ujian"; <80 → pesan maaf + tombol Pendaftaran Tutorial RPL Gelombang 1; ≥80 → selamat + daftar tugas a–d, link Drive `target=_blank rel=noopener`). |
+| `includes/pretes-active-page.php` | 2026-11-16 12:45:01 | 73–81 | Halaman peserta aktif | Menghitung `$cbtResult` dan `$tutorialRplUrl`. |
+| `includes/pretes-participant-view.php` | 2026-11-16 12:45:03 | 264–267, 290, 319 | Kotak akses soal | Kartu hasil menggantikan kotak akses saat CBT sudah dimulai/dikumpulkan; judul "Anda Sudah Dinyatakan Lulus Pretes" untuk status lulus; tautan try out kecil disembunyikan setelah CBT dikerjakan. |
+| `pages/tutorial-rpl.php` (baru) | 2026-11-16 12:45:21 | 1–61 | Halaman info `/tutorial-rpl.php` | "Pendaftaran Tutorial RPL Gelombang 1 dimulai tanggal 23 sampai 27 November 2026"; status otomatis belum dibuka / dibuka (tombol ke Pendaftaran Tutorial) / berakhir (WIB). |
+| `tests/pretes-cbt-result-card-test.php` (baru) | 2026-11-16 12:45:51 | 1–85 | Test (mesin CBT asli, SQLite) | Belum mulai, berjalan, 100, tepat 80, 76, 0; isi kartu lulus/gagal; integrasi view, halaman aktif, halaman tutorial RPL. |
+
+**Verifikasi:** `php -l` OK (4 file), `git diff --check` OK; `pretes-cbt-result-card-test` PASS; regresi `pretes-exam-access`, `pretes-peserta-instruksi`, `pretes-peserta-aktif`, `pretes-exam-open`, `pretes-cbt`, `pretes-tryout` PASS; render view lengkap (lulus/gagal/berjalan) tanpa error PHP & tanpa tombol "Kerjakan Soal Pretes"; tangkapan layar kartu lulus & gagal di browser lokal.
+**Keterbatasan:** keputusan lulus/tidak di kartu ini hanya berdasarkan nilai CBT (sesuai permintaan); halaman tutorial RPL bersifat informasi. Belum diuji di hosting live.
+
+---
+
 ## 2026-11-16 12:38:00 +0700 — Rekapitulasi Kehadiran Tutorial Terpadu (Mahasiswa & Dosen)
 
 **ID:** TUTORIAL-REKAP-ABSENSI-MHS-DOSEN · **Parent Git:** `8c69707`.

@@ -70,6 +70,15 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     // Link Try Out ditampilkan di kotak akses soal untuk peserta terdaftar
     $tryoutLink = $examAccess['registered'] || $isTesterPrivileged ? pretesExamTryoutLink($pdo) : null;
     $linkSoalPretes = BASE_URL . '/pretes-ujian.php';
+    // Hasil CBT resmi peserta (sudah dikerjakan / masih berjalan) → kartu hasil menggantikan kotak akses soal
+    require_once __DIR__ . '/pretes-cbt-result-card.php';
+    $cbtResult = null;
+    try {
+        $cbtResult = pretesCbtResultFor($pdo, (int)$user['id'], (int)($myReg['id'] ?? 0));
+    } catch (Throwable $e) {
+        error_log('pretesCbtResultFor: ' . $e->getMessage());
+    }
+    $tutorialRplUrl = BASE_URL . '/tutorial-rpl.php';
 
     define('PAGE_TITLE', 'Peserta, Jadwal & Persiapan Pretes');
     include __DIR__ . '/header.php';

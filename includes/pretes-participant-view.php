@@ -261,7 +261,10 @@
                     </div>
                 <?php endif; ?>
 
-                <?php if ($isUjianDibuka): ?>
+                <?php if (!empty($cbtResult) && function_exists('renderPretesCbtResultCard')): ?>
+                    <!-- KONDISI 0: CBT SUDAH DIKERJAKAN / MASIH BERJALAN → kartu hasil (includes/pretes-cbt-result-card.php) -->
+                    <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php')); ?>
+                <?php elseif ($isUjianDibuka): ?>
                     <!-- KONDISI A: PENGERJAAN DIBUKA ADMIN (sesuai jadwal sesi) / PRIVILEGE TESTER 12345 -->
                     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:22px 18px;text-align:center;box-shadow:0 4px 14px rgba(22,163,74,0.1);">
                         <span style="font-size:36px;display:block;margin-bottom:8px;">🚀</span>
@@ -284,7 +287,7 @@
                         <span style="font-size:30px;line-height:1;flex-shrink:0;">🔒</span>
                         <div style="font-size:13.5px;color:#1e40af;line-height:1.6;min-width:0;">
                             <strong style="display:block;font-size:15px;margin-bottom:4px;color:#1e3a8a;">
-                                Link Pengerjaan Soal Pretes Belum Dibuka
+                                <?= ($examAccess['reason'] ?? '') === 'already_passed' ? 'Anda Sudah Dinyatakan Lulus Pretes' : 'Link Pengerjaan Soal Pretes Belum Dibuka' ?>
                             </strong>
                             <?= sanitize($examClosedNotice ?? 'Pengerjaan ujian pretes belum dibuka oleh admin.') ?>
                             <?php if (!empty($examSchedule['label'])): ?>
@@ -313,7 +316,7 @@
                         </div>
                     </div>
                 <?php endif; ?>
-                <?php if ($isUjianDibuka && !empty($tryoutLink)): ?>
+                <?php if (empty($cbtResult) && $isUjianDibuka && !empty($tryoutLink)): ?>
                     <div style="margin-top:10px;text-align:center;font-size:12.5px;color:#475569;">
                         Ingin latihan dulu? <a href="<?= htmlspecialchars($tryoutLink['url']) ?>" style="font-weight:700;color:#1d4ed8;">Kerjakan TRY OUT (latihan, bukan ujian resmi)</a>
                     </div>
