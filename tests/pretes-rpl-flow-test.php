@@ -87,7 +87,7 @@ $panel = function (array $rpl, string $tutor = '') { ob_start(); renderPretesRpl
 $hFail = $panel(pretesRplStage($pdo, 1, $reg(10), $scoresOf(10)));
 $check(str_contains($hFail, 'data-stage="cbt_failed"') && str_contains($hFail, 'Tidak Lulus Tahap CBT') && str_contains($hFail, 'href="/tutorial-rpl.php"')
     && str_contains($hFail, 'Pendaftaran Tutorial RPL Gelombang 1') && !str_contains($hFail, PRETES_RPL_DRIVE_URL), 'Panel CBT gagal: maaf + Tutorial RPL, tanpa Drive');
-$check(substr_count($hFail, 'data-step-state="skip"') === 2, 'Panel CBT gagal: langkah upload & penilaian dilewati');
+$check(substr_count($hFail, 'data-step-state="skip"') === 2 && substr_count($hFail, 'Tidak dilanjutkan') === 2 && substr_count($hFail, '✕') === 4 && !str_contains($hFail, '–</span>'), 'Panel CBT gagal: langkah upload & penilaian bertanda silang (Tidak dilanjutkan)');
 $hTask = $panel(pretesRplStage($pdo, 3, $reg(30), $scoresOf(30), $deadline - 86400), '<strong>Ust. Tutor</strong>');
 foreach (['data-stage="online_task"', 'Tahap 2 — Tugas Pretes Online', 'video rekaman hafalan', PRETES_RPL_DRIVE_URL, 'target="_blank" rel="noopener noreferrer"',
           'Melaporkan ke Tutor', 'Ust. Tutor', '22 November 2026', 'id="pretes-rpl-countdown"', '1/11 kompetensi'] as $n) {

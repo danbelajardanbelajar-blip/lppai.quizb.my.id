@@ -5,6 +5,20 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 14:14:09 +0700 — Tanda silang pada langkah "Upload video hafalan" & "Penilaian tutor" untuk CBT < 80
+
+**ID:** PRETES-RPL-STEP-CROSS · **Parent Git:** `1344dba`.
+**Permintaan pengguna:** card langkah 2 (Upload video hafalan) dan 3 (Penilaian tutor) pada panel Alur Pretes RPL diberi tanda silang bagi peserta yang nilai CBT-nya di bawah 80.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-rpl-flow.php` | 2026-11-16 14:14:03 | 76–77, 82 | `renderPretesRplStagePanel` | Gaya state `skip` (hanya dipakai `cbt_failed`) berubah dari "–" abu-abu menjadi "✕" merah. Subjudul kedua langkah menjadi "Tidak dilanjutkan", menggantikan "Batas 22 Nov 2026" dan "0/11 kompetensi". |
+| `tests/pretes-rpl-flow-test.php` | 2026-11-16 14:14:09 | 90 | Test panel | Panel CBT gagal harus memiliki 2 langkah `skip`, 2 label "Tidak dilanjutkan", 4 tanda ✕, dan tanpa tanda "–". |
+
+**Verifikasi:** `php -l` OK; `git diff --check` OK; `pretes-rpl-flow-test` PASS; `pretes-hasil-preparation-test.py` PASS. Belum diuji di hosting live.
+
+---
+
 ## 2026-11-16 14:07:44 +0700 — Sembunyikan tabel rincian 12 komponen untuk CBT < 80
 
 **ID:** PRETES-HASIL-CBTFAIL-HIDE-TABLE · **Parent Git:** `a71c80c`.

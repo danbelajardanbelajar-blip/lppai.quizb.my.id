@@ -73,13 +73,13 @@ function renderPretesRplStagePanel(array $rpl, string $tutorialUrl, string $tuto
     $stage = $rpl['stage'];
     $steps = [
         ['CBT Pretes', $cbt ? 'Nilai ' . $score : '', $stage === 'cbt_failed' ? 'fail' : 'done'],
-        ['Upload video hafalan', 'Batas 22 Nov 2026', $stage === 'cbt_failed' ? 'skip' : ($rpl['practical_done'] > 0 || in_array($stage, ['final_passed', 'final_failed'], true) ? 'done' : 'active')],
-        ['Penilaian tutor', $rpl['practical_done'] . '/' . $rpl['practical_total'] . ' kompetensi', $stage === 'cbt_failed' ? 'skip' : (in_array($stage, ['final_passed', 'final_failed'], true) ? 'done' : ($rpl['practical_done'] > 0 ? 'active' : 'wait'))],
+        ['Upload video hafalan', $stage === 'cbt_failed' ? 'Tidak dilanjutkan' : 'Batas 22 Nov 2026', $stage === 'cbt_failed' ? 'skip' : ($rpl['practical_done'] > 0 || in_array($stage, ['final_passed', 'final_failed'], true) ? 'done' : 'active')],
+        ['Penilaian tutor', $stage === 'cbt_failed' ? 'Tidak dilanjutkan' : $rpl['practical_done'] . '/' . $rpl['practical_total'] . ' kompetensi', $stage === 'cbt_failed' ? 'skip' : (in_array($stage, ['final_passed', 'final_failed'], true) ? 'done' : ($rpl['practical_done'] > 0 ? 'active' : 'wait'))],
         ['Hasil akhir', $stage === 'final_passed' ? 'Lulus' : ($stage === 'final_failed' || $stage === 'cbt_failed' ? 'Tidak lulus' : 'Menunggu'), $stage === 'final_passed' ? 'done' : ($stage === 'final_failed' || $stage === 'cbt_failed' ? 'fail' : 'wait')],
     ];
     $stepStyle = [
         'done' => ['#dcfce7', '#16a34a', '✓'], 'active' => ['#fef3c7', '#d97706', '●'],
-        'wait' => ['#f1f5f9', '#94a3b8', '○'], 'fail' => ['#fee2e2', '#dc2626', '✕'], 'skip' => ['#f8fafc', '#cbd5e1', '–'],
+        'wait' => ['#f1f5f9', '#94a3b8', '○'], 'fail' => ['#fee2e2', '#dc2626', '✕'], 'skip' => ['#fee2e2', '#dc2626', '✕'],
     ];
     ?>
     <div id="pretes-rpl-stage" data-stage="<?= $e($stage) ?>" style="margin:0 0 22px;border-radius:14px;border:1.5px solid <?= $stage === 'online_task' ? '#bfdbfe' : '#fecaca' ?>;background:<?= $stage === 'online_task' ? '#f8fbff' : '#fff7f7' ?>;padding:18px 20px;">
