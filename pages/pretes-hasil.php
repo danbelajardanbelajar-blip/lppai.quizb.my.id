@@ -758,6 +758,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             <?php endif; ?>
 
+            <?php if ($rpl['stage'] !== 'cbt_failed'): /* CBT < 80: tabel 12 komponen tidak relevan, tidak ditampilkan */ ?>
             <!-- Tabel Rincian Nilai Keseluruhan (12 Komponen) -->
             <div style="margin-top:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
@@ -864,6 +865,8 @@ include __DIR__ . '/../includes/header.php';
                     </table>
                 </div>
             </div>
+
+            <?php endif; ?>
 
             <!-- Tombol Navigasi -->
             <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">

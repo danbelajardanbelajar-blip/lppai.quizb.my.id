@@ -5,6 +5,20 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 14:07:44 +0700 — Sembunyikan tabel rincian 12 komponen untuk CBT < 80
+
+**ID:** PRETES-HASIL-CBTFAIL-HIDE-TABLE · **Parent Git:** `a71c80c`.
+**Permintaan pengguna:** peserta pretes terdaftar yang CBT resminya < 80 tidak boleh lagi melihat tabel "Rincian Nilai Keseluruhan (12 Komponen Pretes Wajib)".
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `pages/pretes-hasil.php` | 2026-11-16 14:07:37 | 761, 869–870 | Tabel rincian nilai | Tabel dibungkus `if ($rpl['stage'] !== 'cbt_failed') … endif`. Ringkasan (nilai CBT, status), panel Tutorial RPL, dan tombol navigasi tetap tampil. |
+| `tests/pretes-rpl-flow-test.php` | 2026-11-16 14:07:44 | 137, 141 | Test halaman | Untuk CBT < 80, tabel dan baris komponen tidak boleh muncul. Untuk tahap tugas online, tabel tetap muncul. |
+
+**Verifikasi:** `php -l` OK; `git diff --check` OK; `pretes-rpl-flow-test` PASS; `pretes-hasil-*-test`, `pretes-pengumuman-hasil-test`, dan `pretes-hasil-preparation-test.py` PASS. Belum diuji di hosting live.
+
+---
+
 ## 2026-11-16 13:06:10 +0700 — Hasil Pretes per tahap alur RPL (CBT < 80 / tugas online ≥ 80 / hasil akhir tutor)
 
 **ID:** PRETES-HASIL-RPL-FLOW · **Parent Git:** `13ba4d5`.

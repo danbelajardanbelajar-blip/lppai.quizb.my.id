@@ -134,11 +134,11 @@ $renderPage = function (int $uid) use ($page): string {
     return ob_get_clean();
 };
 $p1 = $renderPage(1);
-$check(str_contains($p1, 'TIDAK LULUS TAHAP CBT') && str_contains($p1, 'data-stage="cbt_failed"') && str_contains($p1, 'Tidak dilanjutkan')
+$check(str_contains($p1, 'TIDAK LULUS TAHAP CBT') && str_contains($p1, 'data-stage="cbt_failed"') && !str_contains($p1, 'data-pretes-component=') && !str_contains($p1, 'Rincian Nilai Keseluruhan')
     && str_contains($p1, '/tutorial-rpl.php') && !str_contains($p1, 'MENUNGGU PENILAIAN') && !str_contains($p1, '/tutorial-pendaftaran.php'), 'Halaman: CBT <80 → tidak lulus tahap CBT + Tutorial RPL');
 $check(str_contains($p1, 'Nilai CBT Pretes') && str_contains($p1, '76.00'), 'Halaman: ringkasan menampilkan nilai CBT 76');
 $p3 = $renderPage(3);
-$check(str_contains($p3, 'TAHAP 2 — TUGAS PRETES ONLINE') && str_contains($p3, 'data-stage="online_task"') && str_contains($p3, 'Menunggu penilaian tutor')
+$check(str_contains($p3, 'TAHAP 2 — TUGAS PRETES ONLINE') && str_contains($p3, 'data-stage="online_task"') && str_contains($p3, 'Menunggu penilaian tutor') && str_contains($p3, 'data-pretes-component="ujian_tulis"')
     && str_contains($p3, 'TUTOR:Ust. Tutor') && str_contains($p3, PRETES_RPL_DRIVE_URL), 'Halaman: CBT ≥80 → tahap 2 tugas online + tutor WA + Drive');
 $p2 = $renderPage(2);
 $check(str_contains($p2, 'data-stage="final_failed"') && str_contains($p2, '/tutorial-rpl.php'), 'Halaman: penilaian lengkap ada <80 → Tutorial RPL');
