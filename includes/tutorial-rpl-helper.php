@@ -432,3 +432,71 @@ if (!function_exists('tutorialRplGetStudentsWithPretes')) {
         return $rows;
     }
 }
+
+/**
+ * Simpan evaluasi / penilaian hafalan & verifikasi tugas oleh Tutor Dosen.
+ * Otomatis menghitung nilai_akhir jika ujian tulis tutorial sudah ada.
+ */
+if (!function_exists('tutorialRplSaveEvaluation')) {
+    function tutorialRplSaveEvaluation(PDO $pdo, int $memberId, ?float $nilaiPraktik, int $driveVerified = 1, ?string $notes = null): bool {
+        ensureTutorialRplTables($pdo);
+
+        $stmtM = $pdo->prepare("SELECT * FROM tutorial_rpl_members WHERE id = ?");
+        $stmtM->execute([$memberId]);
+        $member = $stmtM->fetch(PDO::FETCH_ASSOC);
+        if (!$member) return false;
+
+        $nilaiUjianTulis = ($member['nilai_ujian_tulis'] !== null) ? (float)$member['nilai_ujian_tulis'] : null;
+
+        $nilaiAkhir = null;
+        $statusLulus = $member['status_lulus'] ?? 'proses';
+
+        if ($nilaiPraktik !== null && $nilaiUjianTulis !== null) {
+            $nilaiAkhir = round(($nilaiUjianTulis + $nilaiPraktik) / 2.0, 2);
+            $statusLulus = ($nilaiAkhir >= 80.0) ? 'lulus' : 'tidak_lulus';
+        } elseif ($nilaiPraktik !== null) {
+            $nilaiAkhir = $nilaiPraktik;
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE tutorial_rpl_members SET
+                drive_verified = ?,
+                drive_submitted = (CASE WHEN ? = 1 THEN 1 ELSE drive_submitted END),
+                drive_notes = ?,
+                nilai_praktik = ?,
+                nilai_akhir = ?,
+                status_lulus = ?
+            WHERE id = ?
+        ");
+        return $stmt->execute([
+            $driveVerified,
+            $driveVerified,
+            $notes ?: null,
+            $nilaiPraktik,
+            $nilaiAkhir,
+            $statusLulus,
+            $memberId
+        ]);
+    }
+}
+
+/**
+ * Verifikasi massal status tugas Google Drive oleh Tutor atau Admin.
+ */
+if (!function_exists('tutorialRplBatchVerify')) {
+    function tutorialRplBatchVerify(PDO $pdo, array $memberIds, int $verified = 1): int {
+        ensureTutorialRplTables($pdo);
+        $memberIds = array_values(array_unique(array_filter(array_map('intval', $memberIds), fn($id) => $id > 0)));
+        if (empty($memberIds)) return 0;
+
+        $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
+        $stmt = $pdo->prepare("
+            UPDATE tutorial_rpl_members SET
+                drive_verified = ?,
+                drive_submitted = (CASE WHEN ? = 1 THEN 1 ELSE drive_submitted END)
+            WHERE id IN ($placeholders)
+        ");
+        $stmt->execute(array_merge([$verified, $verified], $memberIds));
+        return $stmt->rowCount();
+    }
+}

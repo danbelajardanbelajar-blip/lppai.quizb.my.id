@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 16:00:00 +0700 — Tahap 3 Tutorial RPL Online: Form Evaluasi Praktik Hafalan, Verifikasi Tugas, & Presensi Dosen
+
+**ID:** TUTORIAL-RPL-ONLINE-PHASE-3 · **Parent Git:** `3014e6e`.
+**Permintaan pengguna:** lanjut tahap 3 (form verifikasi tugas dan presensi dosen tutor RPL).
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/tutorial-rpl-helper.php` | 2026-11-16 15:57:42 | 436–502 | Evaluasi & Batch Verify | Menambahkan fungsi `tutorialRplSaveEvaluation` untuk menyimpan nilai evaluasi praktik hafalan (skala 0–100), status verifikasi tugas video Drive, catatan bimbingan tutor, serta perhitungan otomatis nilai akhir jika nilai CBT tutorial sudah ada (bobot seimbang: CBT + Praktik / 2 dengan passing grade 80.0), serta fungsi `tutorialRplBatchVerify` untuk verifikasi massal status tugas. |
+| `dosen/tutorial-rpl.php` | 2026-11-16 15:58:31 | 1–326 | Panel Bimbingan Dosen | Menambahkan modal evaluasi hafalan & bimbingan per mahasiswa, input nilai praktik, input catatan/feedback tutor, aksi verifikasi massal (*batch verify*), filter pencarian bimbingan realtime, metrik progres kelas (Tugas diverifikasi, CBT diselesaikan, Presensi sah lengkap), dan akses langsung folder Google Drive kelas. |
+| `admin/tutorial-rpl-presensi.php` | 2026-11-16 15:59:11 | 1–285 | Monitoring Presensi Admin | Menambahkan filter presensi (Hadir Sah vs Belum Lengkap), pencarian realtime, aksi verifikasi/batal cepat satuan dan massal bagi admin, metrik persentase kehadiran sah lengkap kelas daring, serta fitur ekspor laporan presensi resmi dalam format CSV. |
+| `tests/tutorial-rpl-verification-test.php` | 2026-11-16 15:59:35 | 1–134 | Pengujian Otomatis | Unit dan integration test memverifikasi penyimpanan evaluasi praktik hafalan, perhitungan nilai akhir otomatis dan penentuan status kelulusan (lulus/tidak lulus), verifikasi massal multi-select, penentuan status presensi sah (wajib memenuhi kedua syarat: tugas terverifikasi dan ujian tulis selesai), serta smoke test ketersediaan file halaman. |
+
+**Verifikasi:**
+1. `php -l includes/tutorial-rpl-helper.php` -> Syntax OK.
+2. `php -l dosen/tutorial-rpl.php` -> Syntax OK.
+3. `php -l admin/tutorial-rpl-presensi.php` -> Syntax OK.
+4. `php tests/tutorial-rpl-verification-test.php` -> PASS (100%).
+5. `php tests/tutorial-rpl-plotting-test.php` -> PASS (100%).
+6. `php tests/tutorial-rpl-structure-test.php` -> PASS (100%).
+7. `php tests/dashboard-cbt-submitted-test.php` -> PASS.
+8. `php tests/pretes-cbt-result-card-test.php` -> PASS.
+9. `php tests/tutorial-rekap-absensi-test.php` -> PASS (26 pengujian).
+10. `php tests/dosen-dashboard-examiner-test.php` -> PASS.
+11. `python tests/tutorial-pendaftaran-kolektif-test.py` -> PASS.
+12. `git diff --check ..` -> Bersih tanpa konflik/whitespace issue.
+
+---
+
 ## 2026-11-16 15:54:00 +0700 — Tahap 2 Tutorial RPL Online: Manajemen & Plotting Kolektif Peserta RPL
 
 **ID:** TUTORIAL-RPL-ONLINE-PHASE-2 · **Parent Git:** `0d6ee59`.
