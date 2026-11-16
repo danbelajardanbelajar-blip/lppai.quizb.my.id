@@ -6,6 +6,10 @@
  * verifikasi tugas Google Drive, pengerjaan ujian tulis CBT, serta perizinan tutor).
  */
 
+if (file_exists(__DIR__ . '/user-helper.php')) {
+    require_once __DIR__ . '/user-helper.php';
+}
+
 if (!defined('TUTORIAL_RPL_DEFAULT_PERIODE')) {
     define('TUTORIAL_RPL_DEFAULT_PERIODE', 'Tutorial RPL 2026/2027');
 }
@@ -66,6 +70,29 @@ if (!function_exists('ensureTutorialRplTables')) {
         foreach ($neededClassCols as [$col, $def]) {
             try {
                 $pdo->exec("ALTER TABLE tutorial_rpl_classes ADD COLUMN $col $def");
+            } catch (Throwable $e) {}
+        }
+
+        $neededMemberCols = [
+            ['drive_submitted', 'INT NOT NULL DEFAULT 0'],
+            ['drive_verified', 'INT NOT NULL DEFAULT 0'],
+            ['drive_notes', 'TEXT DEFAULT NULL'],
+            ['exam_submitted', 'INT NOT NULL DEFAULT 0'],
+            ['nilai_ujian_tulis', 'DECIMAL(5,2) DEFAULT NULL'],
+            ['nilai_praktik', 'DECIMAL(5,2) DEFAULT NULL'],
+            ['nilai_akhir', 'DECIMAL(5,2) DEFAULT NULL'],
+            ['status_lulus', "VARCHAR(20) NOT NULL DEFAULT 'proses'"],
+            ['catatan', 'TEXT DEFAULT NULL']
+        ];
+        foreach ($neededMemberCols as [$col, $def]) {
+            try {
+                $pdo->exec("ALTER TABLE tutorial_rpl_members ADD COLUMN $col $def");
+            } catch (Throwable $e) {}
+        }
+
+        if (function_exists('ensureJenisProgramColumn')) {
+            try {
+                ensureJenisProgramColumn($pdo);
             } catch (Throwable $e) {}
         }
     }
@@ -164,7 +191,7 @@ if (!function_exists('tutorialRplGetMembers')) {
         ensureTutorialRplTables($pdo);
         $stmt = $pdo->prepare("
             SELECT m.*,
-                   u.nama_lengkap, u.nim, u.whatsapp, u.program_studi, u.fakultas, u.jenis_program
+                   u.nama_lengkap, u.nim, u.no_hp, u.no_hp AS whatsapp, u.program_studi, u.fakultas, u.jenis_program
             FROM tutorial_rpl_members m
             JOIN users u ON m.user_id = u.id
             WHERE m.class_id = ?
@@ -181,7 +208,7 @@ if (!function_exists('tutorialRplGetMembers')) {
 if (!function_exists('tutorialRplGetTutors')) {
     function tutorialRplGetTutors(PDO $pdo): array {
         try {
-            $stmt = $pdo->query("SELECT id, nim, nama_lengkap, whatsapp FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC");
+            $stmt = $pdo->query("SELECT id, nim, nama_lengkap, no_hp, no_hp AS whatsapp FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Throwable $e) {
             return [];
@@ -345,7 +372,7 @@ if (!function_exists('tutorialRplGetStudentsWithPretes')) {
         ensureTutorialRplTables($pdo);
 
         $sql = "
-            SELECT u.id, u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.whatsapp, u.jenis_program,
+            SELECT u.id, u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.no_hp, u.no_hp AS whatsapp, u.jenis_program,
                    m.id AS member_id, m.class_id, m.drive_submitted, m.drive_verified, m.exam_submitted,
                    m.nilai_ujian_tulis, m.nilai_praktik, m.nilai_akhir, m.status_lulus,
                    c.nama_kelompok, c.dosen_nama, c.dosen_wa, c.drive_url
@@ -383,9 +410,32 @@ if (!function_exists('tutorialRplGetStudentsWithPretes')) {
 
         $sql .= " ORDER BY (m.class_id IS NULL) DESC, u.nama_lengkap ASC";
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log('tutorialRplGetStudentsWithPretes error: ' . $e->getMessage());
+            // Fallback query jika terdapat perbedaan kolom pada skema tertentu
+            try {
+                $sqlFallback = "
+                    SELECT u.id, u.nama_lengkap, u.nim, u.program_studi, u.fakultas, u.no_hp, u.no_hp AS whatsapp, u.jenis_program,
+                           m.id AS member_id, m.class_id, m.drive_submitted, m.drive_verified, m.exam_submitted,
+                           m.nilai_ujian_tulis, m.nilai_praktik, m.nilai_akhir, m.status_lulus,
+                           c.nama_kelompok, c.dosen_nama, c.dosen_wa, c.drive_url
+                    FROM users u
+                    LEFT JOIN tutorial_rpl_members m ON u.id = m.user_id
+                    LEFT JOIN tutorial_rpl_classes c ON m.class_id = c.id
+                    WHERE u.role = 'mahasiswa'
+                    ORDER BY (m.class_id IS NULL) DESC, u.nama_lengkap ASC
+                ";
+                $stmt = $pdo->query($sqlFallback);
+                $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            } catch (Throwable $e2) {
+                error_log('tutorialRplGetStudentsWithPretes fallback error: ' . $e2->getMessage());
+                $rows = [];
+            }
+        }
 
         $hasCbtTable = false;
         try {

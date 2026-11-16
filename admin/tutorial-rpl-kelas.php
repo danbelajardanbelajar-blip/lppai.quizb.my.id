@@ -35,13 +35,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dosenNim = null;
             $dosenWa = null;
             if ($dosenId > 0) {
-                $stmtD = $pdo->prepare("SELECT id, nim, nama_lengkap, whatsapp FROM users WHERE id = ? AND role = 'dosen' LIMIT 1");
+                $stmtD = $pdo->prepare("SELECT id, nim, nama_lengkap, no_hp, no_hp AS whatsapp FROM users WHERE id = ? AND role = 'dosen' LIMIT 1");
                 $stmtD->execute([$dosenId]);
                 $dosen = $stmtD->fetch(PDO::FETCH_ASSOC);
                 if ($dosen) {
                     $dosenNama = $dosen['nama_lengkap'];
                     $dosenNim = $dosen['nim'];
-                    $dosenWa = $dosen['whatsapp'];
+                    $dosenWa = $dosen['no_hp'] ?? ($dosen['whatsapp'] ?? null);
                 }
             }
 
@@ -81,13 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dosenNim = null;
             $dosenWa = null;
             if ($dosenId > 0) {
-                $stmtD = $pdo->prepare("SELECT id, nim, nama_lengkap, whatsapp FROM users WHERE id = ? AND role = 'dosen' LIMIT 1");
+                $stmtD = $pdo->prepare("SELECT id, nim, nama_lengkap, no_hp, no_hp AS whatsapp FROM users WHERE id = ? AND role = 'dosen' LIMIT 1");
                 $stmtD->execute([$dosenId]);
                 $dosen = $stmtD->fetch(PDO::FETCH_ASSOC);
                 if ($dosen) {
                     $dosenNama = $dosen['nama_lengkap'];
                     $dosenNim = $dosen['nim'];
-                    $dosenWa = $dosen['whatsapp'];
+                    $dosenWa = $dosen['no_hp'] ?? ($dosen['whatsapp'] ?? null);
                 }
             }
 

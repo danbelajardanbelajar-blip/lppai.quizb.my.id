@@ -51,7 +51,7 @@ CREATE TABLE users (
     jenis_program TEXT,
     program_studi TEXT,
     fakultas TEXT,
-    whatsapp TEXT
+    no_hp TEXT
 );
 
 CREATE TABLE master_pretes (

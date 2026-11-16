@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 16:23:00 +0700 — Perbaikan HTTP ERROR 500 Halaman Peserta & Presensi Tutorial RPL: Penyelarasan Kolom `no_hp`
+
+**ID:** FIX-TUTORIAL-RPL-500-USERS-SCHEMA — **Parent Git:** `2daf5e3`.
+**Permintaan pengguna:** 2 halaman (`admin/tutorial-rpl-peserta.php` dan `admin/tutorial-rpl-presensi.php`) mengalami HTTP ERROR 500, yang lain OK.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/tutorial-rpl-helper.php` | 2026-11-16 16:21:06 | 9–435 | Penyelarasan Kolom `no_hp` & Skema Tabel | Mengganti seluruh kueri yang memanggil `u.whatsapp` menjadi `u.no_hp, u.no_hp AS whatsapp` karena kolom nomor telepon pada tabel `users` produksi adalah `no_hp` (bukan `whatsapp`). Menambahkan pengecekan otomatis kolom `jenis_program` melalui `user-helper.php`, pemeriksaan ALTER TABLE untuk seluruh kolom `tutorial_rpl_members`, serta fallback kueri aman dengan try-catch. |
+| `admin/tutorial-rpl-peserta.php` | 2026-11-16 16:19:51 | 112–316 | Penanganan Kueri & Tautan Kontak Mahasiswa | Mengganti tautan WhatsApp agar mengambil `$st['no_hp']` atau `$st['whatsapp']`, menambahkan penanganan try-catch saat pemanggilan `tutorialRplGetStudentsWithPretes`, dan caching daftar peserta untuk metrik ringkasan. |
+| `admin/tutorial-rpl-presensi.php` | 2026-11-16 16:19:26 | 59–97 | Penyelarasan Kolom Kueri Presensi | Mengganti `u.whatsapp` menjadi `u.no_hp, u.no_hp AS whatsapp` pada SELECT presensi dan menambahkan blok try-catch dengan pesan alert informatif agar tidak pernah melempar fatal error HTTP 500. |
+| `admin/tutorial-rpl-kelas.php` | 2026-11-16 16:20:02 | 37–91 | Penyelarasan Kolom Nomor Kontak Dosen Tutor | Mengganti `whatsapp` menjadi `no_hp, no_hp AS whatsapp` pada kueri data dosen pembimbing/tutor RPL. |
+| `dosen/tutorial-rpl.php` | 2026-11-16 16:20:18 | 299–304 | Penyelarasan Nomor Kontak Mahasiswa Bimbingan | Mengambil `$m['no_hp'] ?? ($m['whatsapp'] ?? '')` untuk tautan chat WhatsApp mahasiswa. |
+| `tests/tutorial-rpl-pages-500-fix-test.php` | 2026-11-16 16:22:22 | 1–91 | Pengujian Regresi Bebas Error 500 | Menambahkan integration test khusus yang mensimulasikan skema riil tabel `users` produksi (tanpa kolom `whatsapp`) untuk memastikan seluruh fungsi helper dan kueri presensi/peserta berjalan normal 100%. |
+
+**Verifikasi:**
+1. `php -l includes/tutorial-rpl-helper.php` -> Syntax OK.
+2. `php -l admin/tutorial-rpl-peserta.php` -> Syntax OK.
+3. `php -l admin/tutorial-rpl-presensi.php` -> Syntax OK.
+4. `php -l admin/tutorial-rpl-kelas.php` -> Syntax OK.
+5. `php -l dosen/tutorial-rpl.php` -> Syntax OK.
+6. `php tests/tutorial-rpl-pages-500-fix-test.php` -> PASS (100%).
+7. `php tests/tutorial-rpl-cbt-nilai-test.php` -> PASS (100%).
+8. `php tests/tutorial-rpl-verification-test.php` -> PASS (100%).
+9. `php tests/tutorial-rpl-plotting-test.php` -> PASS (100%).
+10. `php tests/tutorial-rpl-structure-test.php` -> PASS (100%).
+11. `git diff --check ..` -> Bersih tanpa konflik/whitespace issue.
+
+---
+
 ## 2026-11-16 16:10:00 +0700 — Tahap 4 Tutorial RPL Online: Mesin Ujian Tulis CBT, Bank Soal & Rekapitulasi Nilai Akhir Kelulusan
 
 **ID:** TUTORIAL-RPL-ONLINE-PHASE-4 — **Parent Git:** `2379c42`.

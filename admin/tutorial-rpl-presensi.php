@@ -59,7 +59,7 @@ $classes = tutorialRplGetClasses($pdo);
 // Kueri data presensi
 $query = "
     SELECT m.*,
-           u.nama_lengkap, u.nim, u.whatsapp, u.program_studi, u.fakultas,
+           u.nama_lengkap, u.nim, u.no_hp, u.no_hp AS whatsapp, u.program_studi, u.fakultas,
            c.nama_kelompok, c.dosen_nama, c.dosen_wa, c.drive_url
     FROM tutorial_rpl_members m
     JOIN users u ON m.user_id = u.id
@@ -89,9 +89,16 @@ if ($searchTerm !== '') {
 
 $query .= " ORDER BY c.nama_kelompok ASC, u.nama_lengkap ASC";
 
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$rows = [];
+try {
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+    error_log('tutorial-rpl-presensi error: ' . $e->getMessage());
+    $message = 'Gagal memuat data presensi: ' . $e->getMessage();
+    $msgType = 'danger';
+}
 
 // Export CSV jika diminta
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {

@@ -115,12 +115,23 @@ $filterParams = [
     'status_plot' => $statusPlot,
     'search' => $searchTerm
 ];
-$students = tutorialRplGetStudentsWithPretes($pdo, $filterParams);
 
-// Hitung metrik ringkasan
-$totalAllStudents = count(tutorialRplGetStudentsWithPretes($pdo, []));
-$totalPlotted = count(array_filter(tutorialRplGetStudentsWithPretes($pdo, []), fn($s) => !empty($s['class_id'])));
-$totalUnplotted = $totalAllStudents - $totalPlotted;
+$students = [];
+$totalAllStudents = 0;
+$totalPlotted = 0;
+$totalUnplotted = 0;
+
+try {
+    $students = tutorialRplGetStudentsWithPretes($pdo, $filterParams);
+    $allRplStudents = tutorialRplGetStudentsWithPretes($pdo, []);
+    $totalAllStudents = count($allRplStudents);
+    $totalPlotted = count(array_filter($allRplStudents, fn($s) => !empty($s['class_id'])));
+    $totalUnplotted = $totalAllStudents - $totalPlotted;
+} catch (Throwable $e) {
+    error_log('admin/tutorial-rpl-peserta.php: ' . $e->getMessage());
+    $message = 'Gagal memuat data peserta RPL: ' . $e->getMessage();
+    $msgType = 'danger';
+}
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -298,9 +309,10 @@ include __DIR__ . '/../includes/header.php';
                                         <div style="font-weight:700; color:#0f172a;">
                                             <?= sanitize($st['nama_lengkap']) ?>
                                         </div>
-                                        <?php if (!empty($st['whatsapp'])): ?>
-                                            <a href="https://wa.me/<?= preg_replace('/\D/', '', $st['whatsapp']) ?>" target="_blank" rel="noopener noreferrer" style="font-size:11.5px; color:#15803d; text-decoration:none; display:inline-flex; align-items:center; gap:3px; margin-top:2px;">
-                                                <span>💬</span> <?= sanitize($st['whatsapp']) ?>
+                                        <?php $wa = !empty($st['no_hp']) ? $st['no_hp'] : (!empty($st['whatsapp']) ? $st['whatsapp'] : ''); ?>
+                                        <?php if (!empty($wa)): ?>
+                                            <a href="https://wa.me/<?= preg_replace('/\D/', '', $wa) ?>" target="_blank" rel="noopener noreferrer" style="font-size:11.5px; color:#15803d; text-decoration:none; display:inline-flex; align-items:center; gap:3px; margin-top:2px;">
+                                                <span>💬</span> <?= sanitize($wa) ?>
                                             </a>
                                         <?php endif; ?>
                                     </td>

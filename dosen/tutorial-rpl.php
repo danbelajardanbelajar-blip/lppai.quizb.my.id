@@ -296,9 +296,10 @@ include __DIR__ . '/../includes/header.php';
                                             <td style="padding:12px 14px; color:#64748b; vertical-align:middle;"><?= $idx + 1 ?></td>
                                             <td style="padding:12px 14px; vertical-align:middle;">
                                                 <div style="font-weight:700; color:#0f172a;"><?= sanitize($m['nama_lengkap']) ?></div>
-                                                <?php if (!empty($m['whatsapp'])): ?>
-                                                    <a href="https://wa.me/<?= preg_replace('/\D/', '', $m['whatsapp']) ?>" target="_blank" rel="noopener noreferrer" style="font-size:11.5px; color:#15803d; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
-                                                        <span>💬</span> <?= sanitize($m['whatsapp']) ?>
+                                                <?php $wa = !empty($m['no_hp']) ? $m['no_hp'] : (!empty($m['whatsapp']) ? $m['whatsapp'] : ''); ?>
+                                                <?php if (!empty($wa)): ?>
+                                                    <a href="https://wa.me/<?= preg_replace('/\D/', '', $wa) ?>" target="_blank" rel="noopener noreferrer" style="font-size:11.5px; color:#15803d; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+                                                        <span>💬</span> <?= sanitize($wa) ?>
                                                     </a>
                                                 <?php endif; ?>
                                             </td>
