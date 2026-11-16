@@ -5,6 +5,35 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:52:56 +0700 — Penguji pretes diidentifikasi lewat NIM dosen; menu pretes hanya untuk penguji terjadwal
+
+**ID:** PRETES-EXAMINER-NIM · **Parent Git:** `ebf1e56` · **Commit kode:** `4c10a8f`.
+**Catatan commit:** `4c10a8f` juga memuat perubahan sesi lain yang sudah di-*stage* di index Git bersama saat commit dibuat — `admin/tutorial-pendaftaran-kolektif.php`, `tests/tutorial-pendaftaran-kolektif-test.py`, dan entrinya di changelog (ID **TUTORIAL-KOLEKTIF-SINGLE-REG-FIX**, di bawah). Isi berkas tersebut milik entri itu, bukan paket ini; tidak di-revert agar pekerjaan tersebut tidak hilang (sintaks PHP berkas itu dicek: OK).
+**Permintaan:** Dosen tidak boleh melihat menu input pretes bila tidak terjadwal sebagai penguji; identifier penguji = **NIM dosen**, bukan nama.
+**Sebelumnya:** menu "Penilaian & Absensi Pretes" & "Rekapitulasi Nilai Pretes" tampil untuk semua dosen (isi kosong bila bukan penguji); kepemilikan penugasan dicocokkan dengan **nama lengkap persis** (`TRIM(dosen_penguji) = nama`), rawan gagal karena beda penulisan gelar/ejaan.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit `4c10a8f`.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-examiner.php` (baru) | 2026-11-16 11:51:34 | 1–166 | Identitas penguji | `pretesExaminerNormName` (19), `pretesExaminerDirectory` (26, peta dosen nama→NIM, nama ganda ditandai ambigu), `pretesExaminerNimByName` (47, persis lalu ternormalisasi), `pretesExaminerUserNim` (58), `pretesExaminerEnsure` (63, kolom `pretes_registrations.dosen_penguji_nim` + indeks + backfill baris tanpa NIM), `pretesExaminerResync` (101, nama tak terpetakan tidak menghapus NIM), `pretesExaminerOwns` (122), `pretesExaminerPeriodNames` (131), `pretesExaminerIsScheduled` (146, periode aktif: punya peserta via NIM atau tercantum di daftar penguji harian). |
+| `includes/pretes-examiner-gate.php` (baru) | 2026-11-16 11:52:04 | 1–38 | Gerbang halaman dosen | Pesan jelas "Anda Tidak Terjadwal sebagai Penguji Pretes" / "NIM Akun Dosen Belum Diisi" alih-alih tabel kosong; opsi riwayat untuk rekap. |
+| `includes/pretes-helper.php` | 2026-11-16 11:49:45 | 188–195 | `pretesCanAssess()` | Dosen: kepemilikan via NIM (`pretesExaminerOwns`), param `?PDO` opsional; tanpa NIM = ditolak. |
+| `includes/pretes-panel.php` | 2026-11-16 11:50:06 | 18–20, 194–196 | Panel penilaian | `pretesExaminerEnsure`; daftar peserta dosen `AND pr.dosen_penguji_nim = ?` (NIM akun). |
+| `admin/pretes-rekap-nilai.php` | 2026-11-16 11:50:25 | 211–214, 237–238 | Rekap (mode dosen) | Filter dosen via NIM; label tampilan tetap nama. |
+| `dosen/dashboard.php` | 2026-11-16 11:50:06 | 13–14, 18, 21–22 | Ringkasan pretes | Hitung peserta via NIM. |
+| `admin/pretes-jadwal.php` | 2026-11-16 11:50:46 | 337–339, 358–359, 380–384 | Plotting / reset / edit penugasan | Generate → `pretesExaminerResync(periode)`; reset → NIM dikosongkan; edit individual → NIM dari nama penguji terpilih. |
+| `admin/pretes-pengaturan-tutor.php` | 2026-11-16 11:51:35 | 371–375, 591–615 | Sinkron sesi & edit tutor | Sinkron peserta sesi juga menulis NIM; edit tutor: penugasan dipindah dari NIM lama ke NIM baru (ganti nama tidak memengaruhi). |
+| `includes/sidebar.php` | 2026-11-16 11:52:04 | 266–277, 286 | Menu dosen | Menu pretes hanya bila `pretesExaminerIsScheduled()`. |
+| `dosen/pretes.php`, `dosen/pretes-rekap-nilai.php` | 2026-11-16 11:52:13 | 4–6 | Halaman dosen | `pretesExaminerGate()` (rekap mengizinkan riwayat penugasan). |
+| `tests/pretes-examiner-nim-test.php` (baru) | 2026-11-16 11:52:56 | 1–86 | Test | Pemetaan toleran & nama ganda, backfill, kepemilikan, terjadwal, resync/kosongkan/ganti nama, integrasi menu & halaman. |
+| `tests/pretes-helper-test.php` | 2026-11-16 11:52:56 | 28–38 | Assertion izin | Dari nama → NIM (beda penulisan nama tetap boleh, nama sama NIM beda ditolak, tanpa NIM ditolak). |
+
+**Verifikasi:** `php -l` OK (11 file), `git diff --check` OK; `pretes-examiner-nim-test` & `pretes-helper-test` PASS; regresi 20 test terkait (absensi pretes, panel accordion, rekap nilai, jadwal filter, pengaturan tutor, sidebar, tema, pretes exam/tryout, pesan, dll.) PASS, diulang setelah `git pull --rebase`.
+**Keterbatasan:** `tests/user-jenis-program-test.php` gagal karena `admin/dashboard.php` di HEAD (`68fa1e2`, sesi lain) tanpa rujukan `jenis_program` — bukan bagian paket ini. Dosen dengan NIM akun kosong atau nama ganda di daftar penguji perlu dilengkapi admin (ditampilkan pesan jelas). Belum diuji di hosting live.
+
+---
+
 ## 2026-11-16 11:54:10 +0700 — Perbaiki pendaftaran single mahasiswa pada tutorial pendaftaran kolektif
 
 **ID:** TUTORIAL-KOLEKTIF-SINGLE-REG-FIX · **Parent Git:** `ebf1e56`.
