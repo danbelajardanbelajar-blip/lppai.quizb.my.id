@@ -5,6 +5,39 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 11:37:30 +0700 — Sembunyikan panel Kelola Kredensial Tes Tulis Pretes CBT secara default
+
+**ID:** PRETES-PESERTA-HIDE-MANAGE-CRED · **Parent Git:** `6f688b9`.
+**Permintaan:** Sembunyikan panel Kelola Kredensial Tes Tulis Pretes CBT (impor Excel & generate otomatis) dari halaman https://lppai.quizb.my.id/admin/pretes-peserta.php.
+
+**Perubahan dan alasan:**
+- Panel `#card-manage-credentials` (Kelola Kredensial Tes Tulis Pretes CBT yang memuat form Impor Excel/CSV dan Generator Otomatis massal) disembunyikan secara default (`display: none;`) saat halaman pertama kali dimuat sehingga antarmuka daftar peserta pretes lebih bersih, fokus, dan tidak terhalang kotak panel besar.
+- Menambahkan fungsi JavaScript `openCredPanel(tab)` dan `closeCredPanel()`:
+  - Tombol **"📤 Impor Excel"** dan **"⚡ Generate Otomatis"** pada header tabel peserta sekarang membuka/menampilkan panel tersebut secara *on-demand* dengan transisi *smooth scroll*, serta dapat di-toggle tutup jika ditekan kembali.
+  - Menambahkan tombol **"✕ Sembunyikan"** di dalam header panel kredensial agar admin dapat menutup/menyembunyikan kembali panel tersebut kapan saja.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 11:36:10 | `admin/pretes-peserta.php` | 462, 472, 705, 709, 1341 | Sembunyikan `#card-manage-credentials` secara default (`display:none;`), tambahkan tombol '✕ Sembunyikan' pada card header, hubungkan tombol header tabel ke `openCredPanel(tab)`, serta tambahkan implementasi JavaScript `openCredPanel` dan `closeCredPanel`. |
+| 2026-11-16 11:36:37 | `tests/pretes-peserta-hide-manage-cred-test.php` | 1–47 | Test suite otomatis: verifikasi `#card-manage-credentials` tersembunyi secara default, keberadaan tombol sembunyikan, fungsi JavaScript `openCredPanel`/`closeCredPanel`, dan integrasi tombol aksi. |
+| 2026-11-16 11:37:30 | `CHANGELOG-DEV.md` | 8 | Entri PRETES-PESERTA-HIDE-MANAGE-CRED beserta alasan dan bukti verifikasi lengkap. |
+
+**Verifikasi lulus:**
+1. `php -l admin/pretes-peserta.php`: No syntax errors detected.
+2. `php tests/pretes-peserta-hide-manage-cred-test.php`: Seluruh 4 pengujian LULUS 100%.
+3. `php tests/pretes-peserta-columns-test.php`: Validasi persembunyian kolom tabel LULUS 100%.
+4. `php tests/pretes-target-program-test.php`: Validasi target & filter periode LULUS 100%.
+5. `php tests/pretes-peserta-pdf-test.php`: Seluruh 24 pengujian export PDF & data LULUS 100%.
+6. `git diff --check`: Bersih tanpa peringatan whitespace.
+
+**Batas verifikasi:** Pengujian dilakukan pada kode PHP lokal. Push Git tidak membuktikan deployment hosting secara otomatis.
+
+**Pelacakan:** Cari commit dengan ID `PRETES-PESERTA-HIDE-MANAGE-CRED`.
+
+---
+
 ## 2026-11-16 11:26:52 +0700 — Isi kelas lama sesuai kuota dosen dan laporkan peserta menunggu
 
 **ID:** TUTORIAL-GENERATE-FILL-EXISTING · **Parent Git:** `588caf4`.

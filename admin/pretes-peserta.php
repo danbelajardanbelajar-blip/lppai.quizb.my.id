@@ -459,7 +459,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ── Panel Kelola Kredensial: 2 Pilihan (Impor Excel & Generate Otomatis) ────── -->
-<div class="card" id="card-manage-credentials" style="margin-bottom:24px;border:1.5px solid #0284c7;background:#ffffff;box-shadow:0 2px 10px rgba(2,132,199,0.08);border-radius:14px;overflow:hidden;">
+<div class="card" id="card-manage-credentials" style="display:none;margin-bottom:24px;border:1.5px solid #0284c7;background:#ffffff;box-shadow:0 2px 10px rgba(2,132,199,0.08);border-radius:14px;overflow:hidden;">
     <div class="card-header" style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#ffffff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 22px;">
         <div style="display:flex;align-items:center;gap:10px;">
             <span style="font-size:22px;">🔐</span>
@@ -468,15 +468,21 @@ include __DIR__ . '/../includes/header.php';
                 <span style="font-size:11.5px;color:#e0f2fe;">Tersedia 2 metode: Impor File Excel (E-Ujian) atau Generate Otomatis</span>
             </div>
         </div>
-        <!-- Segmented Tab Switcher Buttons -->
-        <div style="display:flex;background:rgba(0,0,0,0.22);border-radius:10px;padding:4px;gap:4px;flex-wrap:wrap;">
-            <button type="button" id="tab-btn-import" onclick="switchCredTab('import')"
-                style="background:#ffffff;color:#0369a1;border:none;padding:7px 16px;border-radius:8px;font-size:12.5px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15);">
-                📤 Pilihan 1: Impor Excel / CSV
-            </button>
-            <button type="button" id="tab-btn-generate" onclick="switchCredTab('generate')"
-                style="background:transparent;color:rgba(255,255,255,0.85);border:none;padding:7px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
-                ⚡ Pilihan 2: Generate Otomatis
+        <!-- Segmented Tab Switcher Buttons & Close Button -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;background:rgba(0,0,0,0.22);border-radius:10px;padding:4px;gap:4px;flex-wrap:wrap;">
+                <button type="button" id="tab-btn-import" onclick="switchCredTab('import')"
+                    style="background:#ffffff;color:#0369a1;border:none;padding:7px 16px;border-radius:8px;font-size:12.5px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                    📤 Pilihan 1: Impor Excel / CSV
+                </button>
+                <button type="button" id="tab-btn-generate" onclick="switchCredTab('generate')"
+                    style="background:transparent;color:rgba(255,255,255,0.85);border:none;padding:7px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s;">
+                    ⚡ Pilihan 2: Generate Otomatis
+                </button>
+            </div>
+            <button type="button" onclick="closeCredPanel()" title="Sembunyikan Panel Kredensial"
+                style="background:rgba(0,0,0,0.25);color:#ffffff;border:1px solid rgba(255,255,255,0.3);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:background 0.2s;">
+                ✕ Sembunyikan
             </button>
         </div>
     </div>
@@ -702,11 +708,11 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>📋 Data Peserta & Credentials Tes Tulis (<?= $totalPeserta ?> peserta)</span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm" onclick="switchCredTab('import'); document.getElementById('card-manage-credentials').scrollIntoView({behavior:'smooth'});"
+            <button type="button" class="btn btn-sm" onclick="openCredPanel('import')"
                style="background:#0284c7;color:#ffffff;border:1px solid #0369a1;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(2,132,199,0.25);">
                 📤 Impor Excel
             </button>
-            <button type="button" class="btn btn-sm" onclick="switchCredTab('generate'); document.getElementById('card-manage-credentials').scrollIntoView({behavior:'smooth'});"
+            <button type="button" class="btn btn-sm" onclick="openCredPanel('generate')"
                style="background:#0f766e;color:#ffffff;border:1px solid #0d9488;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(15,118,110,0.25);">
                 ⚡ Generate Otomatis
             </button>
@@ -1338,7 +1344,28 @@ if (document.readyState === 'loading') {
     initPretesFilters();
 }
 
-// ── Switcher Tab Kredensial (Impor vs Generate) ───────────────────
+// ── Panel Kredensial (Buka / Tutup / Switcher Tab) ────────────────
+function openCredPanel(tab) {
+    var card = document.getElementById('card-manage-credentials');
+    if (!card) return;
+    if (card.style.display !== 'none' && card.dataset.activeTab === tab) {
+        card.style.display = 'none';
+        return;
+    }
+    card.style.display = 'block';
+    card.dataset.activeTab = tab;
+    switchCredTab(tab);
+    card.scrollIntoView({behavior: 'smooth'});
+}
+
+function closeCredPanel() {
+    var card = document.getElementById('card-manage-credentials');
+    if (card) {
+        card.style.display = 'none';
+        card.dataset.activeTab = '';
+    }
+}
+
 function switchCredTab(tab) {
     var tabImport = document.getElementById('tab-content-import');
     var tabGenerate = document.getElementById('tab-content-generate');
