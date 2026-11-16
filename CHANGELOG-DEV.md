@@ -5,6 +5,42 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-16 12:05:30 +0700 — Sembunyikan card pretes di dashboard dosen non-penguji
+
+**ID:** DOSEN-DASHBOARD-PRETES-EXAMINER-GATE · **Parent Git:** `fa6c702`.
+**Permintaan:** Mengapa menu/card Info Absensi Pretes & Info Input Nilai Pretes masih ditampilkan di role dosen yang tidak menguji pretes RPL?
+
+**Penyebab yang ditemukan di kode:**
+Pada `dosen/dashboard.php`, blok kartu `.pretes-dashboard` (yang memuat Info Absensi Pretes, tombol "Kelola Absensi & QR", Info Input Nilai Pretes, dan tombol "Input Nilai Peserta") serta badge "Dosen & Penguji" dirender secara tanpa syarat (unconditional) untuk semua akun dosen. Padahal gerbang akses di sidebar dan halaman penilaian sudah membatasi hanya untuk penguji terjadwal via NIM akun dosen (`pretesExaminerIsScheduled`), sehingga dosen yang hanya mengajar kelas tutorial (bukan penguji pretes) tetap disajikan card pretes dengan data kosong ("0 dari 0 peserta hadir/lengkap").
+
+**Perubahan:**
+1. Menambahkan pemeriksaan status penguji `$isPretesExaminer = pretesExaminerIsScheduled($pdo, $user);` pada `dosen/dashboard.php`.
+2. Pengambilan data periode pretes dan progress absensi/nilai hanya dieksekusi bila dosen memang terjadwal sebagai penguji pretes pada periode aktif.
+3. Membungkus blok kartu `.pretes-dashboard` dengan `<?php if ($isPretesExaminer): ?> ... <?php endif; ?>` sehingga card "Info Absensi Pretes" dan "Info Input Nilai Pretes" otomatis tersembunyi total untuk dosen yang tidak menguji pretes RPL.
+4. Menyesuaikan badge profil selamat datang: menampilkan "Dosen Pengampu" dan peran "Dosen Pengampu Tutorial" jika bukan penguji pretes, atau "Dosen & Penguji" dan "Dosen Pengampu & Penguji Pretes" bila terjadwal sebagai penguji pretes.
+5. Menambahkan test suite rendering terisolasi `tests/dosen-dashboard-examiner-test.php` serta memperbarui `tests/pretes-examiner-nim-test.php`.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan atau seluruh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-16 12:03:19 | `dosen/dashboard.php` | 5, 15, 68, 71, 98, 122 | Penambahan kondisi `$isPretesExaminer`, isolasi query pretes hanya untuk penguji, pengondisian badge/chip peran, dan penyembunyian blok `.pretes-dashboard` bagi non-penguji. |
+| 2026-11-16 12:01:55 | `tests/pretes-examiner-nim-test.php` | 81 | Penambahan asersi statis verifikasi pembungkusan card pretes dashboard dosen. |
+| 2026-11-16 12:03:10 | `tests/dosen-dashboard-examiner-test.php` | 1–127 | Test suite rendering dinamis: membuktikan card pretes, tombol kelola absensi/nilai tersembunyi untuk dosen non-penguji dan tampil untuk dosen penguji. |
+| 2026-11-16 12:05:30 | `CHANGELOG-DEV.md` | 8 | Pencatatan entri DOSEN-DASHBOARD-PRETES-EXAMINER-GATE. |
+
+**Verifikasi lulus:**
+1. `php -l dosen/dashboard.php`: Sintaks valid tanpa error.
+2. `php tests/dosen-dashboard-examiner-test.php`: PASS (Card Info Absensi Pretes, Info Input Nilai Pretes, dan tombol aksi terbukti 100% tersembunyi pada dosen non-penguji, serta tampil lengkap pada dosen penguji terjadwal).
+3. `php tests/pretes-examiner-nim-test.php`: PASS.
+4. `php tests/theme-emerald-royale-test.php`: PASS (Tema Emerald Royale 100% lulus).
+5. `git diff --check`: Bersih tanpa peringatan trailing whitespace.
+
+**Batas verifikasi:** Pengujian otomatis dijalankan pada database lokal SQLite & rendering PHP terisolasi. Push Git ke repositori tidak membuktikan deployment hosting secara otomatis.
+
+**Pelacakan:** Cari commit dengan ID `DOSEN-DASHBOARD-PRETES-EXAMINER-GATE`.
+
+---
 ## 2026-11-16 11:52:56 +0700 — Penguji pretes diidentifikasi lewat NIM dosen; menu pretes hanya untuk penguji terjadwal
 
 **ID:** PRETES-EXAMINER-NIM · **Parent Git:** `ebf1e56` · **Commit kode:** `4c10a8f`.

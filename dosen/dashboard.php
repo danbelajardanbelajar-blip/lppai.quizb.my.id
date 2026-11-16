@@ -2,7 +2,7 @@
 /**
  * LPPAI Corner - Dashboard Dosen
  */
-define('PAGE_TITLE', 'Dashboard Dosen');
+if (!defined('PAGE_TITLE')) define('PAGE_TITLE', 'Dashboard Dosen');
 require_once __DIR__ . '/../includes/auth.php';
 requireDosen();
 
@@ -12,18 +12,26 @@ require_once __DIR__ . '/../includes/pretes-helper.php';
 ensurePretesFeatures($pdo);
 require_once __DIR__ . '/../includes/pretes-examiner.php';
 pretesExaminerEnsure($pdo);
-$pretesPeriod = $pdo->query("SELECT id, periode FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1")->fetch();
+
+$isPretesExaminer = pretesExaminerIsScheduled($pdo, $user);
+$pretesPeriod = null;
 $pretesParticipants = [];
-if ($pretesPeriod) {
-    $stmt = $pdo->prepare('SELECT pr.dosen_penguji, pr.dosen_penguji_nim, pr.status, pa.scores_json FROM pretes_registrations pr
-        JOIN users u ON u.id = pr.user_id
-        LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
-        WHERE pr.periode = ? AND pr.dosen_penguji_nim = ?');
-    $stmt->execute([$pretesPeriod['periode'], pretesExaminerUserNim($user) !== '' ? pretesExaminerUserNim($user) : '__tanpa_nim__']);
-    $pretesParticipants = array_values(array_filter($stmt->fetchAll(), fn($row) => pretesCanAssess($user, $row)));
+$pretesProgress = ['total' => 0, 'hadir' => 0, 'lengkap' => 0, 'sebagian' => 0, 'kosong' => 0];
+$pretesUrl = '';
+
+if ($isPretesExaminer) {
+    $pretesPeriod = $pdo->query("SELECT id, periode FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1")->fetch();
+    if ($pretesPeriod) {
+        $stmt = $pdo->prepare('SELECT pr.dosen_penguji, pr.dosen_penguji_nim, pr.status, pa.scores_json FROM pretes_registrations pr
+            JOIN users u ON u.id = pr.user_id
+            LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
+            WHERE pr.periode = ? AND pr.dosen_penguji_nim = ?');
+        $stmt->execute([$pretesPeriod['periode'], pretesExaminerUserNim($user) !== '' ? pretesExaminerUserNim($user) : '__tanpa_nim__']);
+        $pretesParticipants = array_values(array_filter($stmt->fetchAll(), fn($row) => pretesCanAssess($user, $row)));
+    }
+    $pretesProgress = pretesProgress($pretesParticipants);
+    $pretesUrl = BASE_URL . '/dosen/pretes.php' . ($pretesPeriod ? '?pretes_id=' . (int)$pretesPeriod['id'] : '');
 }
-$pretesProgress = pretesProgress($pretesParticipants);
-$pretesUrl = BASE_URL . '/dosen/pretes.php' . ($pretesPeriod ? '?pretes_id=' . (int)$pretesPeriod['id'] : '');
 
 // Get tutorial classes taught by this dosen
 $stmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_classes WHERE dosen_pengampu = ? AND (semester LIKE '%2026%' OR semester LIKE '%2027%' OR semester LIKE '%2028%' OR semester LIKE '%2029%' OR semester LIKE '%2030%')");
@@ -57,10 +65,10 @@ include __DIR__ . '/../includes/header.php';
         <div style="flex:1;min-width:240px;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
                 <h2 style="font-size:22px;margin:0;font-weight:800;color:var(--primary-dark);letter-spacing:-0.3px;">Assalamu'alaikum, <?= sanitize($user['nama_lengkap']) ?>!</h2>
-                <span class="badge badge-emerald">Dosen & Penguji</span>
+                <span class="badge badge-emerald"><?= $isPretesExaminer ? 'Dosen & Penguji' : 'Dosen Pengampu' ?></span>
             </div>
             <div class="welcome-chips">
-                <span class="welcome-chip">📖 Peran: <strong>Dosen Pengampu & Penguji Pretes</strong></span>
+                <span class="welcome-chip">📖 Peran: <strong><?= $isPretesExaminer ? 'Dosen Pengampu & Penguji Pretes' : 'Dosen Pengampu Tutorial' ?></strong></span>
                 <span class="welcome-chip">🏫 Kelas Aktif: <strong><?= $totalClasses ?> Kelas</strong></span>
                 <span class="welcome-chip">👥 Bimbingan: <strong><?= $totalStudents ?> Mahasiswa</strong></span>
             </div>
@@ -87,6 +95,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<?php if ($isPretesExaminer): ?>
 <style>
     .pretes-dashboard { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px; margin-bottom:24px; }
     .pretes-dashboard .card { margin:0; min-width:0; }
@@ -110,6 +119,7 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= sanitize($pretesUrl) ?>#peserta-pretes" class="btn btn-primary" data-no-spa>Input Nilai Peserta</a>
     </div></div>
 </div>
+<?php endif; ?>
 
 <!-- Recent Classes -->
 <div class="card">

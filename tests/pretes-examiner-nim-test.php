@@ -78,6 +78,7 @@ $check(str_contains(file_get_contents("$root/dosen/pretes-rekap-nilai.php"), 'pr
 $check(str_contains(file_get_contents("$root/includes/pretes-panel.php"), "AND pr.dosen_penguji_nim = ?"), 'Panel penilaian memfilter via NIM');
 $check(str_contains(file_get_contents("$root/admin/pretes-rekap-nilai.php"), 'AND pr.dosen_penguji_nim = ?'), 'Rekap dosen memfilter via NIM');
 $check(str_contains(file_get_contents("$root/dosen/dashboard.php"), 'pr.dosen_penguji_nim = ?'), 'Dashboard dosen memfilter via NIM');
+$check(str_contains(file_get_contents("$root/dosen/dashboard.php"), 'pretesExaminerIsScheduled(') && str_contains(file_get_contents("$root/dosen/dashboard.php"), '<?php if ($isPretesExaminer): ?>'), 'Dashboard dosen menyembunyikan card pretes bagi dosen non-penguji');
 $jadwal = file_get_contents("$root/admin/pretes-jadwal.php");
 $check(str_contains($jadwal, 'pretesExaminerResync($pdo, $active_pretes[\'periode\'])') && str_contains($jadwal, 'SET dosen_penguji_nim = ? WHERE id = ?'), 'Plotting/reset/edit penugasan menyimpan NIM');
 $check(!preg_match("/TRIM\(pr\.dosen_penguji\) = \?'?;\s*\n\s*\\\$params\[\] = trim\(\\\$user\['nama_lengkap'\]\)/", file_get_contents("$root/includes/pretes-panel.php")), 'Panel tidak lagi memfilter dosen berdasarkan nama');
