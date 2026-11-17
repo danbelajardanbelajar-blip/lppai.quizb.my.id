@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 13:12:00 +0700 — Penyiapan Akun Admin Baru: ali (Password: 123)
+
+**ID:** SETUP-ADMIN-ALI · **Parent Git:** `298e706`.
+**Permintaan pengguna:** `buatkan admin baru dengan nama "ali" dan password "123"`
+**Sebelumnya:** Belum ada akun admin bernama "ali" atau penyiapan otomatis akun tersebut di tabel `users`.
+**Rancangan:**
+- Buat fungsi idempotent `ensureAdminUser(PDO $pdo, string $username, string $password, string $nama)` di `includes/user-helper.php` dengan caching static dan session. Fungsi ini memeriksa apakah username sudah ada; jika belum ada, dibuatkan akun baru (`role = 'admin'`, `is_active = 1`, password di-hash `PASSWORD_DEFAULT`). Jika username sudah ada, role diselaraskan menjadi `admin`, akun diaktifkan (`is_active = 1`), dan password diperbarui jika belum cocok.
+- Panggil `ensureAdminUser($pdo, 'ali', '123', 'Ali')` pada siklus inisialisasi sesi `includes/auth.php` dan pada saat percobaan autentikasi `loginUser()` untuk username `ali`, memastikan akun siap digunakan secara instan di hosting live tanpa keharusan akses terminal SSH.
+- Sediakan skrip migrasi mandiri `migration_admin_ali.php` yang dapat dieksekusi melalui CLI (`php migration_admin_ali.php`) maupun diakses via browser (`https://lppai.quizb.my.id/migration_admin_ali.php`).
+- Buat integration test `tests/admin-ali-account-test.php` untuk memvalidasi pembuatan akun, hash password, idempotensi, pembaruan role non-admin menjadi admin, dan simulasi sesi login.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/user-helper.php` | 2026-11-17 13:11:00 | 1065–1146 | Helper `ensureAdminUser` | Menambahkan helper `ensureAdminUser` berkinerja tinggi dengan cache session/memory untuk pembuatan dan pembaruan akun admin secara aman dan idempotent. |
+| `includes/auth.php` | 2026-11-17 13:11:20 | 36–39, 117–120 | Inisialisasi Auth & Login | Memanggil `ensureAdminUser` pada inisialisasi autentikasi dan pengecekan login username `ali`. |
+| `migration_admin_ali.php` (baru) | 2026-11-17 13:11:36 | 1–70 | Skrip Migrasi Admin Ali | Halaman mandiri web & CLI untuk eksekusi dan verifikasi status akun admin `ali` secara visual. |
+| `tests/admin-ali-account-test.php` (baru) | 2026-11-17 13:12:00 | 1–95 | Unit & Integration Test | Pengujian komprehensif pembuatan admin, verifikasi hash password, idempotensi, update role, dan alur login. |
+
+**Verifikasi:**
+- `php -l includes/user-helper.php`, `php -l includes/auth.php`, `php -l migration_admin_ali.php`, `php -l tests/admin-ali-account-test.php`: OK (No syntax errors).
+- `git diff --check`: OK (bersih dari trailing whitespace).
+- `php tests/admin-ali-account-test.php`: PASS (100%).
+- `php tests/tambah-admin-test.php`: PASS (100%).
+- `php tests/log-aktivitas-program-badge-test.php`: PASS (100%).
+- `python tests/activity-log-visibility-test.py`: PASS (100%).
+- `php tests/admin-tables-jenis-program-test.php`: PASS (100%).
+
+---
+
+
 ## 2026-11-17 10:34:24 +0700 — Optimasi Performa Ekstrem Halaman Log Aktivitas: Batch User Enrichment & Non-Blocking Queries
 
 **ID:** OPT-LOG-AKTIVITAS-PERF · **Parent Git:** `156561e`.

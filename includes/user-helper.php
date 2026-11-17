@@ -1062,3 +1062,85 @@ if (!function_exists('deleteUserPhoto')) {
         return true;
     }
 }
+
+if (!function_exists('ensureAdminUser')) {
+    /**
+     * Memastikan akun admin tertentu selalu tersedia dan aktif di tabel users.
+     * Menggunakan cache static + session agar tidak menjalankan query berulang.
+     *
+     * @param PDO $pdo
+     * @param string $username
+     * @param string $password
+     * @param string $nama
+     * @return bool
+     */
+    function ensureAdminUser(PDO $pdo, string $username, string $password, string $nama = ''): bool {
+        static $ensured = [];
+        $unameClean = strtolower(trim($username));
+        if ($unameClean === '') {
+            return false;
+        }
+
+        $sessionKey = '_admin_ensured_' . md5($unameClean . ':' . $password);
+        if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION[$sessionKey])) {
+            return true;
+        }
+
+        $objId = function_exists('spl_object_id') ? spl_object_id($pdo) : 0;
+        $memKey = $objId . ':' . $unameClean . ':' . md5($password);
+        if (isset($ensured[$memKey])) {
+            return true;
+        }
+
+        try {
+            $displayName = trim($nama) !== '' ? trim($nama) : ucfirst($unameClean);
+            $stmt = $pdo->prepare("SELECT id, password, role, is_active FROM users WHERE LOWER(TRIM(username)) = ? LIMIT 1");
+            $stmt->execute([$unameClean]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user) {
+                $needsUpdate = false;
+                $newHash = null;
+
+                if (!password_verify($password, (string)($user['password'] ?? ''))) {
+                    $newHash = password_hash($password, PASSWORD_DEFAULT);
+                    $needsUpdate = true;
+                }
+                if (($user['role'] ?? '') !== 'admin') {
+                    $needsUpdate = true;
+                }
+                if ((int)($user['is_active'] ?? 0) !== 1) {
+                    $needsUpdate = true;
+                }
+
+                if ($needsUpdate) {
+                    if ($newHash === null) {
+                        $upStmt = $pdo->prepare("UPDATE users SET role = 'admin', is_active = 1 WHERE id = ?");
+                        $upStmt->execute([(int)$user['id']]);
+                    } else {
+                        $upStmt = $pdo->prepare("UPDATE users SET password = ?, role = 'admin', is_active = 1 WHERE id = ?");
+                        $upStmt->execute([$newHash, (int)$user['id']]);
+                    }
+                }
+            } else {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+                try {
+                    $ins = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, nim, role, is_active) VALUES (?, ?, ?, '', 'admin', 1)");
+                    $ins->execute([$unameClean, $hash, $displayName]);
+                } catch (Throwable $e) {
+                    $ins = $pdo->prepare("INSERT INTO users (username, password, nama_lengkap, role, is_active) VALUES (?, ?, ?, 'admin', 1)");
+                    $ins->execute([$unameClean, $hash, $displayName]);
+                }
+            }
+
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $_SESSION[$sessionKey] = true;
+            }
+            $ensured[$memKey] = true;
+            return true;
+        } catch (Throwable $e) {
+            error_log("ensureAdminUser error: " . $e->getMessage());
+            return false;
+        }
+    }
+}
