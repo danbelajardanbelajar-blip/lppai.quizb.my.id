@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 13:29:17 +0700 — Tabel Dosen Mobile Friendly: Dashboard, Daftar Kelas, Penilaian, Absensi & Rekap
+
+**ID:** DOSEN-TABEL-MOBILE · **Parent Git:** `ce6bd13`.
+**Permintaan:** Perbaiki tabel pada role dosen (dashboard dosen dan halaman Kelola Kelas, khususnya tabel ABSENSI dan PENILAIAN) agar mobile friendly dan modern tanpa mengubah logika penyimpanan, nama field form, atau id elemen.
+**Sebelumnya:** Pada lebar ~375px tabel kelas dan tabel penilaian (10 kolom) hanya bisa digeser horizontal, tab kelas membungkus berantakan, modal Nilai Rinci memakai input 6px padding dan tombol cepat kecil, serta tabel absensi desktop dan matriks rekap ikut diinisialisasi DataTables global sehingga hanya 10 baris pertama ada di DOM (baris halaman 2+ tidak ikut terkirim saat simpan absensi dan tidak ikut tercetak pada rekap).
+**Rancangan:**
+- Tabel kelas (dashboard & daftar kelas) dan tabel Penilaian memakai pola *stacked rows* di bawah 768px: tiap baris menjadi kartu dengan label kolom dari `data-label`; nilai komponen Penilaian tampil sebagai grid 3 kolom, rata-rata disorot, tombol aksi selebar kartu (≥44px).
+- Tab Penilaian/Absensi/Rekap digulir horizontal di mobile (tanpa membungkus), target sentuh 44px.
+- Absensi: tombol status (desktop label & kartu mobile) minimal 44px, grid 5 kolom tanpa teks terbungkus di mobile; input tanggal & tombol batch 44px (font 16px mencegah zoom iOS). Tabel absensi desktop diberi `no-datatable` agar semua baris radio tetap di DOM dan ikut tersubmit.
+- Rekap kehadiran: tetap tabel matriks dengan scroll di dalam wrapper, kolom Nama Mahasiswa *sticky*; diberi `no-datatable` (sudah punya pencarian sendiri `filterRekapTable`, dan cetak harus memuat semua baris).
+- Modal Nilai Rinci: layar penuh di mobile, input 44px `inputmode="decimal"`, tombol 60–100 grid 5 kolom, tombol Batal/Simpan sama lebar.
+- Nama field (`status_hadir[...]`, `detail[...]`, `tanggal`, dll.), id elemen (`input_*`, `modal_reg_id`, `countHadir`, `rekapAttendanceTable`, dll.), serta logika PHP/JS penyimpanan tidak diubah; perubahan hanya kelas CSS, atribut `data-label`, `type="button"` pada tombol Input Rinci, `aria-label` tombol tutup, dan `inputmode`.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `assets/css/style.css` | 2026-11-17 13:29:17 | 2391–2713 | Seksi baru "DOSEN: TABEL KELAS, PENILAIAN & ABSENSI" | Gaya wrapper tabel, aksi, sticky kolom nama rekap, target sentuh 44px, serta media query ≤767.98px untuk stacked rows, grid nilai, tab scroll, toolbar absensi, dan modal nilai layar penuh. |
+| `dosen/dashboard.php` | 2026-11-17 13:24:39 | 126, 138–167 | Card "Kelas Anda (Terbaru)" | Header card bisa membungkus; tabel diberi `no-datatable dosen-stack-table dosen-class-table`, `data-label` per sel, grup aksi berkelas. |
+| `dosen/kelas.php` | 2026-11-17 13:24:50 | 29–58 | Tabel "Daftar Kelas Anda" | Kelas `dosen-stack-table dosen-class-table` + `data-label` per sel (DataTables tetap aktif untuk pencarian). |
+| `dosen/detail-kelas.php` | 2026-11-17 13:25:41 | 307, 323–368, 380–431, 587–600, 633–634, 907–938 | Tab nav; tab Penilaian (tabel + modal Nilai Rinci); tab Absensi (toolbar & tabel desktop); tab Rekap (matriks) | Kelas CSS/`data-label` untuk tampilan kartu; `no-datatable` pada tabel absensi & rekap; kelas modal + `inputmode="decimal"`; kolom nama rekap sticky. |
+
+**Verifikasi:**
+- `php -l` ketiga file PHP: OK. `git diff --check`: bersih.
+- `php tests/dosen-dashboard-examiner-test.php`, `tests/theme-emerald-royale-test.php`, `tests/tutorial-attendance-mobile-test.php`, `tests/tutorial-rekap-absensi-test.php`, `tests/pretes-examiner-nim-test.php`, `tests/dosen-wa-link-test.php`: PASS. `tests/user-jenis-program-test.php` tetap gagal seperti di HEAD bersih (`admin/dashboard.php` tidak mereferensikan jenis_program; tidak terkait).
+- Browser lokal (`php -S` + halaman dosen dirender dengan fixture SQLite, header/footer tiruan yang memuat `style.css`, jQuery, DataTables, `app.js`): pada 375px `scrollWidth` = 375 (tanpa scroll horizontal) untuk dashboard, daftar kelas, Penilaian, Absensi, Rekap; tombol aksi/status/input 44px (tombol cepat nilai 40px); kolom nama rekap tetap menempel saat digulir. Pada 1366px tabel tampil normal tanpa overflow. FormData form absensi memuat 12/12 `status_hadir[...]` setelah "Hadir Semua"; tidak ada error konsol.
+- Keterbatasan: tidak diuji dengan sesi login dosen & database asli; tidak diuji di perangkat iOS/Android fisik; `:has()` hanya dipakai untuk menghapus border wrapper (fallback tetap rapi).
+
+---
+
 ## 2026-11-17 13:12:00 +0700 — Penyiapan Akun Admin Baru: ali (Password: 123)
 
 **ID:** SETUP-ADMIN-ALI · **Parent Git:** `298e706`.

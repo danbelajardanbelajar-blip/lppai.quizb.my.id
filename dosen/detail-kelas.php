@@ -304,7 +304,7 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Tabs -->
-<div class="tabs no-print" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
+<div class="tabs no-print dosen-kelas-tabs" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
     <a href="?id=<?= $class_id ?>&tab=nilai" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='nilai' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='nilai' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='nilai' ? 'bold' : 'normal' ?>;">📝 Penilaian</a>
     <a href="?id=<?= $class_id ?>&tab=absensi" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='absensi' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='absensi' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='absensi' ? 'bold' : 'normal' ?>;">📱 Input Absensi & QR</a>
     <a href="?id=<?= $class_id ?>&tab=rekap_absensi" style="padding:10px 20px; text-decoration:none; color:<?= $activeTab==='rekap_absensi' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='rekap_absensi' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='rekap_absensi' ? 'bold' : 'normal' ?>;">📊 Rekap Kehadiran</a>
@@ -320,8 +320,8 @@ include __DIR__ . '/../includes/header.php';
                     <p>Belum ada mahasiswa yang terdaftar di kelas ini.</p>
                 </div>
             <?php else: ?>
-                <div class="table-responsive">
-                    <table>
+                <div class="table-responsive dosen-table-wrap">
+                    <table class="dosen-stack-table dosen-nilai-table">
                         <thead>
                             <tr>
                                 <th width="40">No</th>
@@ -339,18 +339,18 @@ include __DIR__ . '/../includes/header.php';
                         <tbody>
                             <?php $no=1; foreach($students as $s): ?>
                             <tr>
-                                <td align="center"><?= $no++ ?></td>
-                                <td>
+                                <td align="center" class="dosen-cell-no" data-label="No"><?= $no++ ?></td>
+                                <td class="dosen-cell-title" data-label="Mahasiswa">
                                     <strong><?= adminUserProfileLink($s['nama_lengkap'], $s['user_id'] ?? null) ?></strong><br>
                                     <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?> <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></small>
                                 </td>
-                                <td align="center"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
-                                <td align="center"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>
-                                <td align="center"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
-                                <td align="center"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
-                                <td align="center"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
-                                <td align="center"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
-                                <td align="center">
+                                <td align="center" class="dosen-cell-score" data-label="Thaharah"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Shalat"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Srt Pdk"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Amaliyah"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Jenazah"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="UT"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-average" data-label="Rata-Rata">
                                     <strong>
                                         <?php
                                         $sum = 0; $count = 0;
@@ -364,8 +364,8 @@ include __DIR__ . '/../includes/header.php';
                                         ?>
                                     </strong>
                                 </td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="openNilaiModal(<?= $s['reg_id'] ?>, '<?= htmlspecialchars(addslashes($s['nama_lengkap'])) ?>', '<?= htmlspecialchars(addslashes($s['nilai_detail'] ?? '{}')) ?>')">✏️ Input Rinci</button>
+                                <td class="dosen-cell-actions" data-label="Aksi">
+                                    <button type="button" class="btn btn-sm btn-primary" onclick="openNilaiModal(<?= $s['reg_id'] ?>, '<?= htmlspecialchars(addslashes($s['nama_lengkap'])) ?>', '<?= htmlspecialchars(addslashes($s['nilai_detail'] ?? '{}')) ?>')">✏️ Input Rinci</button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -377,19 +377,19 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <!-- Modal Nilai Rinci -->
-    <div id="nilaiModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
-        <div style="background:#fff; width:90%; max-width:800px; margin:40px auto; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+    <div id="nilaiModal" class="nilai-modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; overflow-y:auto;">
+        <div class="nilai-modal-dialog" style="background:#fff; width:90%; max-width:800px; margin:40px auto; border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
             <form method="POST" id="formNilaiRinci">
                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                 <input type="hidden" name="action" value="save_nilai_detail">
                 <input type="hidden" name="reg_id" id="modal_reg_id" value="">
 
-                <div style="padding:20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:#fff; z-index:10; border-radius:8px 8px 0 0;">
+                <div class="nilai-modal-head" style="padding:20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:12px; position:sticky; top:0; background:#fff; z-index:10; border-radius:8px 8px 0 0;">
                     <h3 style="margin:0;">Input Nilai Rinci: <span id="modal_student_name"></span></h3>
-                    <button type="button" onclick="closeNilaiModal()" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
+                    <button type="button" onclick="closeNilaiModal()" aria-label="Tutup" class="nilai-modal-close" style="background:none; border:none; font-size:24px; cursor:pointer;">&times;</button>
                 </div>
 
-                <div style="padding:20px;">
+                <div class="nilai-modal-body" style="padding:20px;">
                     <?php
                     $categories = [
                         'thaharah' => 'Ketuntasan Hafalan Thaharah',
@@ -403,16 +403,16 @@ include __DIR__ . '/../includes/header.php';
                     ?>
                     <div style="margin-bottom:30px;">
                         <h4 style="background:#f1f5f9; padding:10px; border-radius:4px; margin-bottom:10px;"><?= $cat_name ?></h4>
-                        <table style="width:100%; border-collapse:collapse;">
+                        <table class="nilai-rinci-table" style="width:100%; border-collapse:collapse;">
                             <tbody>
                                 <?php foreach($materi_list[$cat_key] as $key => $materi): ?>
                                 <tr style="border-bottom:1px solid #e2e8f0;">
-                                    <td style="padding:10px 5px; width:40%;"><?= sanitize($materi) ?></td>
-                                    <td style="padding:10px 5px; width:15%;">
-                                        <input type="number" step="0.01" min="0" max="100" name="detail[<?= $key ?>]" id="input_<?= $key ?>" style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px;" placeholder="0-100">
+                                    <td class="nilai-rinci-materi" style="padding:10px 5px; width:40%;"><?= sanitize($materi) ?></td>
+                                    <td class="nilai-rinci-input" style="padding:10px 5px; width:15%;">
+                                        <input type="number" step="0.01" min="0" max="100" name="detail[<?= $key ?>]" id="input_<?= $key ?>" inputmode="decimal" style="width:100%; padding:6px; border:1px solid #cbd5e1; border-radius:4px;" placeholder="0-100">
                                     </td>
-                                    <td style="padding:10px 5px;">
-                                        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                    <td class="nilai-rinci-quick" style="padding:10px 5px;">
+                                        <div class="nilai-quick-group" style="display:flex; gap:5px; flex-wrap:wrap;">
                                             <button type="button" class="btn btn-sm btn-outline" style="padding:4px 8px;" onclick="setVal('<?= $key ?>', 60)">60</button>
                                             <button type="button" class="btn btn-sm btn-outline" style="padding:4px 8px;" onclick="setVal('<?= $key ?>', 70)">70</button>
                                             <button type="button" class="btn btn-sm btn-outline" style="padding:4px 8px;" onclick="setVal('<?= $key ?>', 80)">80</button>
@@ -428,7 +428,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </div>
 
-                <div style="padding:20px; border-top:1px solid #e2e8f0; text-align:right; position:sticky; bottom:0; background:#fff; border-radius:0 0 8px 8px;">
+                <div class="nilai-modal-foot" style="padding:20px; border-top:1px solid #e2e8f0; text-align:right; position:sticky; bottom:0; background:#fff; border-radius:0 0 8px 8px;">
                     <button type="button" class="btn btn-outline" onclick="closeNilaiModal()" style="margin-right:10px;">Batal</button>
                     <button type="submit" class="btn btn-primary">💾 Simpan Nilai</button>
                 </div>
@@ -584,12 +584,12 @@ include __DIR__ . '/../includes/header.php';
                     <input type="hidden" name="pertemuan_ke" value="<?= $pertemuanSelected ?>">
 
                     <!-- Baris Pengaturan Tanggal & Tombol Batch Aksi Cepat -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
+                    <div class="attendance-toolbar" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0;">
                         <div>
                             <label style="display: block; margin-bottom: 6px; font-weight: 700; font-size: 13px; color: #334155;">
                                 Tanggal Pertemuan *
                             </label>
-                            <div style="display: flex; gap: 8px; align-items: center;">
+                            <div class="attendance-date-row" style="display: flex; gap: 8px; align-items: center;">
                                 <input type="date" name="tanggal" id="inputTanggalAbsensi" value="<?= sanitize($tanggalSelected) ?>" required style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
                                 <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('inputTanggalAbsensi').value = '<?= date('Y-m-d') ?>'" style="padding: 7px 12px; font-size: 12px; font-weight: 600;">
                                     Hari Ini
@@ -597,7 +597,7 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <div class="attendance-batch-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button type="button" class="btn btn-sm" onclick="markAllHadir()" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 600; padding: 7px 14px;">
                                 ✨ Hadir Semua
                             </button>
@@ -630,8 +630,8 @@ include __DIR__ . '/../includes/header.php';
                     </div>
 
                     <!-- Desktop Table View (>= 768px) -->
-                    <div class="desktop-attendance-table table-responsive">
-                        <table>
+                    <div class="desktop-attendance-table table-responsive dosen-table-wrap">
+                        <table class="no-datatable dosen-attendance-table">
                             <thead>
                                 <tr>
                                     <th width="40" style="text-align: center;">No</th>
@@ -904,13 +904,13 @@ include __DIR__ . '/../includes/header.php';
                     <p style="color:#64748b;">Belum ada mahasiswa yang terdaftar di kelas tutorial ini.</p>
                 </div>
             <?php else: ?>
-                <div class="table-responsive">
-                    <table id="rekapAttendanceTable">
+                <div class="table-responsive dosen-table-wrap dosen-rekap-wrap">
+                    <table id="rekapAttendanceTable" class="no-datatable dosen-rekap-table">
                         <thead>
                             <tr style="background: #f1f5f9;">
                                 <th width="35" style="text-align: center;">No</th>
                                 <th width="110">NIM</th>
-                                <th>Nama Mahasiswa</th>
+                                <th class="dosen-sticky-name">Nama Mahasiswa</th>
                                 <th width="35" style="text-align: center;">P1</th>
                                 <th width="35" style="text-align: center;">P2</th>
                                 <th width="35" style="text-align: center;">P3</th>
@@ -935,7 +935,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr class="rekap-student-row" data-name="<?= htmlspecialchars(strtolower($st['nama_lengkap'])) ?>" data-nim="<?= htmlspecialchars(strtolower($st['nim'])) ?>">
                                 <td align="center" style="color: #64748b;"><?= $no++ ?></td>
                                 <td><span style="font-family: monospace; font-size: 13px; font-weight: 600; color: #334155;"><?= sanitize($st['nim']) ?></span></td>
-                                <td>
+                                <td class="dosen-sticky-name">
                                     <strong><?= adminUserProfileLink($st['nama_lengkap'], $uid) ?></strong><br>
                                     <small style="color: #64748b;"><?= sanitize($st['program_studi']) ?> <?= renderJenisProgramBadge($st['jenis_program'] ?? 'Reguler', true) ?></small>
                                 </td>

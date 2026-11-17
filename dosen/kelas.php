@@ -26,8 +26,8 @@ include __DIR__ . '/../includes/header.php';
                 <p style="color:#64748b;">Anda belum dijadwalkan untuk mengajar kelas apapun.</p>
             </div>
         <?php else: ?>
-            <div class="table-responsive">
-                <table>
+            <div class="table-responsive dosen-table-wrap">
+                <table class="dosen-stack-table dosen-class-table">
                     <thead>
                         <tr>
                             <th>Nama Kelas</th>
@@ -41,17 +41,17 @@ include __DIR__ . '/../includes/header.php';
                     <tbody>
                         <?php foreach ($kelasData as $kelas): ?>
                         <tr>
-                            <td><strong><?= sanitize($kelas['nama_kelas']) ?></strong></td>
-                            <td>
+                            <td data-label="Nama Kelas" class="dosen-cell-title"><strong><?= sanitize($kelas['nama_kelas']) ?></strong></td>
+                            <td data-label="Jadwal">
                                 <span class="badge" style="background:#e0f2fe;color:#0284c7;">
                                     <?= sanitize($kelas['hari']) ?>, <?= sanitize($kelas['jam']) ?>
                                 </span>
                             </td>
-                            <td><?= sanitize($kelas['ruangan']) ?></td>
-                            <td><?= sanitize($kelas['semester']) ?></td>
-                            <td><span class="badge"><?= sanitize($kelas['gelombang']) ?></span></td>
-                            <td>
-                                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <td data-label="Ruangan"><?= sanitize($kelas['ruangan']) ?></td>
+                            <td data-label="Semester"><?= sanitize($kelas['semester']) ?></td>
+                            <td data-label="Gelombang"><span class="badge"><?= sanitize($kelas['gelombang']) ?></span></td>
+                            <td data-label="Aksi" class="dosen-cell-actions">
+                                <div class="dosen-action-group">
                                     <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>" class="btn btn-sm btn-primary">Lihat & Kelola</a>
                                     <a href="<?= BASE_URL ?>/dosen/detail-kelas.php?id=<?= $kelas['id'] ?>&tab=rekap_absensi" class="btn btn-sm btn-outline" style="border-color:#10b981; color:#047857;" title="Rekap Kehadiran">📊 Rekap</a>
                                 </div>

@@ -2388,3 +2388,326 @@ table tbody tr.removing {
         color: #047857;
     }
 }
+
+/* =================== DOSEN: TABEL KELAS, PENILAIAN & ABSENSI =================== */
+.dosen-table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #ffffff;
+    max-width: 100%;
+}
+.dosen-action-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.dosen-action-group .btn,
+.dosen-cell-actions .btn {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+.dosen-nilai-table td.dosen-cell-score,
+.dosen-nilai-table td.dosen-cell-average {
+    font-variant-numeric: tabular-nums;
+}
+.dosen-nilai-table td.dosen-cell-average strong {
+    display: inline-block;
+    min-width: 52px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: #ecfdf5;
+    color: #065f46;
+}
+.dosen-attendance-table .status-pill-btn,
+.mobile-attendance-card-list .status-pill-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.dosen-attendance-table .status-pill-btn {
+    position: relative;
+}
+/* Kolom nama tetap terlihat saat matriks rekap digulir horizontal */
+.dosen-rekap-table th.dosen-sticky-name,
+.dosen-rekap-table td.dosen-sticky-name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #ffffff;
+    min-width: 170px;
+    box-shadow: 1px 0 0 var(--border);
+}
+.dosen-rekap-table thead th.dosen-sticky-name {
+    z-index: 3;
+    background: #f8fafc;
+}
+.dosen-rekap-table tbody tr:hover td.dosen-sticky-name {
+    background: #f8fafc;
+}
+#nilaiModal .nilai-rinci-input input {
+    min-height: 44px;
+    font-size: 16px;
+}
+#nilaiModal .nilai-quick-group .btn {
+    min-height: 40px;
+    min-width: 44px;
+}
+.nilai-modal-close {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 50%;
+}
+
+@media (max-width: 767.98px) {
+    .dosen-kelas-tabs {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 4px !important;
+    }
+    .dosen-kelas-tabs::-webkit-scrollbar { display: none; }
+    .dosen-kelas-tabs a {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 12px 14px !important;
+        min-height: 44px;
+    }
+
+    /* Tabel bertumpuk: tiap baris menjadi kartu */
+    .dosen-table-wrap.dosen-stack-wrap,
+    .dosen-table-wrap:has(> .dosen-stack-table),
+    .dosen-table-wrap:has(.dataTables_wrapper .dosen-stack-table) {
+        border: none;
+        background: transparent;
+    }
+    .dosen-stack-table,
+    .dosen-stack-table tbody,
+    .dosen-stack-table tr,
+    .dosen-stack-table td {
+        display: block;
+        width: 100% !important;
+    }
+    .dosen-stack-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+    }
+    .dosen-stack-table tbody tr {
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+        box-sizing: border-box;
+    }
+    .dosen-stack-table tbody tr:hover { background: #ffffff; }
+    .dosen-stack-table tbody td,
+    .dosen-stack-table tbody tr:last-child td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px dashed #e2e8f0;
+        text-align: right;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        box-sizing: border-box;
+    }
+    .dosen-stack-table tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+        text-align: left;
+    }
+    .dosen-stack-table tbody td:last-child { border-bottom: none; }
+    .dosen-stack-table tbody td.dosen-cell-title {
+        display: block;
+        text-align: left;
+        padding-top: 0;
+        font-size: 15px;
+    }
+    .dosen-stack-table tbody td.dosen-cell-title::before { display: none; }
+    .dosen-stack-table tbody td.dosen-cell-actions {
+        display: block;
+        padding-top: 12px;
+    }
+    .dosen-stack-table tbody td.dosen-cell-actions::before { display: none; }
+    .dosen-stack-table .dosen-cell-actions .btn,
+    .dosen-stack-table .dosen-action-group .btn {
+        flex: 1 1 0;
+        width: 100%;
+        min-height: 44px;
+    }
+    .dosen-stack-table .dosen-action-group { flex-wrap: nowrap; }
+    .dosen-stack-table td.dataTables_empty,
+    .dosen-stack-table td[colspan] { text-align: center; justify-content: center; }
+    .dosen-stack-table td.dataTables_empty::before,
+    .dosen-stack-table td[colspan]::before { display: none; }
+
+    /* Penilaian: nomor jadi badge, nilai komponen jadi grid 3 kolom */
+    .dosen-nilai-table tbody tr {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        position: relative;
+    }
+    .dosen-nilai-table tbody td { width: auto !important; }
+    .dosen-nilai-table tbody td.dosen-cell-no,
+    .dosen-nilai-table tbody tr:last-child td.dosen-cell-no {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        display: inline-block;
+        padding: 2px 8px;
+        border: none;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 700;
+    }
+    .dosen-nilai-table tbody td.dosen-cell-no::before { display: none; }
+    .dosen-nilai-table tbody td.dosen-cell-title {
+        grid-column: 1 / -1;
+        padding-right: 44px;
+        border-bottom: none;
+    }
+    .dosen-nilai-table tbody td.dosen-cell-score,
+    .dosen-nilai-table tbody tr:last-child td.dosen-cell-score {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        padding: 8px 4px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #f8fafc;
+        text-align: center;
+        font-weight: 700;
+        font-size: 15px;
+        color: #0f172a;
+    }
+    .dosen-nilai-table tbody td.dosen-cell-score::before {
+        font-size: 10.5px;
+        letter-spacing: 0.02em;
+        text-align: center;
+    }
+    .dosen-nilai-table tbody td.dosen-cell-average,
+    .dosen-nilai-table tbody tr:last-child td.dosen-cell-average {
+        grid-column: 1 / -1;
+        border-bottom: none;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #ecfdf5;
+    }
+    .dosen-nilai-table tbody td.dosen-cell-average::before { color: #065f46; }
+    .dosen-nilai-table tbody td.dosen-cell-average strong { background: transparent; padding: 0; font-size: 16px; text-align: right; }
+    .dosen-nilai-table tbody td.dosen-cell-actions {
+        grid-column: 1 / -1;
+        padding-top: 4px;
+    }
+
+    /* Absensi */
+    .attendance-toolbar { align-items: stretch !important; }
+    .attendance-toolbar > div { width: 100%; }
+    .attendance-date-row input[type="date"] {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 44px;
+        font-size: 16px !important;
+    }
+    .attendance-date-row .btn,
+    .attendance-batch-actions .btn {
+        min-height: 44px;
+    }
+    .attendance-batch-actions .btn { flex: 1 1 auto; }
+    .mobile-attendance-card-list .status-pill-group {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+    }
+    .mobile-attendance-card-list .status-pill-btn {
+        min-width: 0;
+        padding: 6px 1px;
+        font-size: 11px;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+    }
+    .floating-attendance-bar { flex-wrap: wrap; }
+    .floating-save-btn { min-height: 44px; }
+
+    /* Rekap: matriks tetap tabel, digulir di dalam wrapper */
+    .dosen-rekap-table th.dosen-sticky-name,
+    .dosen-rekap-table td.dosen-sticky-name {
+        min-width: 132px;
+        max-width: 150px;
+    }
+
+    /* Modal nilai rinci layar penuh */
+    #nilaiModal .nilai-modal-dialog {
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 100%;
+        margin: 0 !important;
+        border-radius: 0 !important;
+    }
+    #nilaiModal .nilai-modal-head,
+    #nilaiModal .nilai-modal-foot {
+        padding: 12px 16px !important;
+        border-radius: 0 !important;
+    }
+    #nilaiModal .nilai-modal-head h3 { font-size: 16px; }
+    #nilaiModal .nilai-modal-body { padding: 12px 16px !important; }
+    #nilaiModal .nilai-modal-foot {
+        display: flex;
+        gap: 8px;
+    }
+    #nilaiModal .nilai-modal-foot .btn {
+        flex: 1 1 0;
+        min-height: 44px;
+        margin: 0 !important;
+    }
+    #nilaiModal .nilai-rinci-table,
+    #nilaiModal .nilai-rinci-table tbody { display: block; }
+    #nilaiModal .nilai-rinci-table tr {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 8px;
+        padding: 10px 0;
+    }
+    #nilaiModal .nilai-rinci-table td {
+        display: block;
+        width: auto !important;
+        padding: 0 !important;
+        border: none;
+    }
+    #nilaiModal .nilai-rinci-table td.nilai-rinci-materi {
+        grid-column: 1 / -1;
+        font-weight: 600;
+        color: #0f172a;
+    }
+    #nilaiModal .nilai-quick-group {
+        display: grid !important;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px !important;
+    }
+    #nilaiModal .nilai-quick-group .btn {
+        min-width: 0;
+        padding: 4px 0 !important;
+        font-size: 13px;
+    }
+}
