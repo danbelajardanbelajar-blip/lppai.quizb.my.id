@@ -125,6 +125,25 @@ function isUserLulusPretes($pdo, $userId) {
         }
     } catch (Exception $e) {}
 
+    // 3. RPL mode "cukup CBT": CBT resmi (registration_id > 0) yang sudah dikumpulkan dengan nilai ≥ 80
+    //    (cadangan bila nilai CBT belum tersalin ke komponen Ujian tulis).
+    if ($program === 'rpl' && function_exists('pretesRplCbtOnly') && pretesRplCbtOnly()) {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT a.score
+                FROM pretes_cbt_attempts a
+                JOIN pretes_registrations pr ON pr.id = a.registration_id
+                WHERE a.user_id = ? AND a.registration_id > 0 AND a.submitted_at IS NOT NULL AND a.score IS NOT NULL
+                ORDER BY pr.id DESC, a.id DESC LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            $cbtScore = $stmt->fetchColumn();
+            if ($cbtScore !== false && $cbtScore !== null && (float)$cbtScore >= 80) {
+                return true;
+            }
+        } catch (Throwable $e) {}
+    }
+
     return false;
 }
 

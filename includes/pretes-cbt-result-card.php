@@ -43,8 +43,12 @@ function pretesCbtResultPassed(?array $result): bool {
     return $result && $result['status'] === 'submitted' && $result['score'] !== null && $result['score'] >= PRETES_CBT_MIN_SCORE;
 }
 
-/** Cetak kartu hasil. $linkUjian = URL halaman ujian; $tutorialUrl = halaman Pendaftaran Tutorial RPL. */
-function renderPretesCbtResultCard(array $result, string $linkUjian, string $tutorialUrl): void {
+/**
+ * Cetak kartu hasil. $linkUjian = URL halaman ujian; $tutorialUrl = halaman Pendaftaran Tutorial RPL.
+ * $user (opsional): bila mahasiswa RPL & mode kelulusan "cukup CBT" aktif, nilai ≥ 80 ditampilkan
+ * sebagai LULUS PRETES + info pengambilan sertifikat (bukan tugas online).
+ */
+function renderPretesCbtResultCard(array $result, string $linkUjian, string $tutorialUrl, ?array $user = null): void {
     $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     if ($result['status'] === 'in_progress'): ?>
         <div id="pretes-cbt-result" data-state="in_progress" style="background:#fffbeb;border:2px solid #fcd34d;border-radius:14px;padding:22px 18px;text-align:center;">
@@ -58,6 +62,15 @@ function renderPretesCbtResultCard(array $result, string $linkUjian, string $tut
     $score = $result['score'] ?? 0.0;
     $scoreText = rtrim(rtrim(number_format((float)$score, 2, ',', ''), '0'), ',');
     $passed = pretesCbtResultPassed($result);
+    $rplCbtOnly = false;
+    $certAnnouncement = null;
+    if ($passed && $user) {
+        require_once __DIR__ . '/pretes-certificate.php';
+        $rplCbtOnly = pretesIsRplCbtOnlyUser($user);
+        if ($rplCbtOnly && ($certPdo = pretesComponentsPdo())) {
+            $certAnnouncement = pretesCertificateAnnouncement($certPdo, $user);
+        }
+    }
     // Zona waktu eksplisit (aplikasi tidak menyetel date_default_timezone, label harus benar-benar WIB)
     $when = $result['submitted_at']
         ? (new DateTimeImmutable('@' . (int)$result['submitted_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') . ' WIB'
@@ -88,6 +101,8 @@ function renderPretesCbtResultCard(array $result, string $linkUjian, string $tut
             <a href="<?= $e($tutorialUrl) ?>" id="btn-daftar-tutorial-rpl" class="btn btn-danger" style="display:inline-flex;align-items:center;gap:8px;padding:11px 22px;font-size:14px;font-weight:800;border-radius:10px;text-decoration:none;">
                 📝 Pendaftaran Tutorial RPL Gelombang 1
             </a>
+        <?php elseif ($rplCbtOnly): ?>
+            <?php renderPretesRplPassedNotice($scoreText, $certAnnouncement, true); ?>
         <?php else: ?>
             <p style="margin:0 0 12px;color:#14532d;font-size:14px;line-height:1.65;font-weight:700;">
                 🎉 Selamat, Saudara diperkenankan melanjutkan ke tahap pretes secara online. Berikut adalah tugas pretes RPL (online):
@@ -101,7 +116,7 @@ function renderPretesCbtResultCard(array $result, string $linkUjian, string $tut
             </ol>
         <?php endif; ?>
         <div style="margin-top:14px;padding-top:12px;border-top:1px dashed <?= $passed ? '#bbf7d0' : '#fecaca' ?>;font-size:13px;">
-            <a href="<?= BASE_URL ?>/pretes-hasil.php" id="link-pretes-hasil-status" style="color:#1d4ed8;font-weight:700;text-decoration:none;">📊 Lihat status lengkap &amp; penilaian tutor di halaman Hasil Pretes →</a>
+            <a href="<?= BASE_URL ?>/pretes-hasil.php" id="link-pretes-hasil-status" style="color:#1d4ed8;font-weight:700;text-decoration:none;"><?= $rplCbtOnly ? '📊 Lihat hasil kelulusan pretes Anda →' : '📊 Lihat status lengkap &amp; penilaian tutor di halaman Hasil Pretes →' ?></a>
         </div>
     </div>
     <?php

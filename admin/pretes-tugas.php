@@ -49,6 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 pretesComponentDelete($pdo, $program, $id);
                 $msg = 'Komponen dihapus permanen.';
                 break;
+            case 'set_rpl_mode':
+                $mode = (string)($_POST['rpl_pass_mode'] ?? '');
+                if (!isset(PRETES_RPL_PASS_MODES[$mode])) throw new InvalidArgumentException('Mode kelulusan RPL tidak dikenal.');
+                pretesSettingSet($pdo, 'rpl_pass_mode', $mode);
+                $msg = 'Mode kelulusan RPL disimpan: ' . PRETES_RPL_PASS_MODES[$mode] . '.';
+                break;
             default:
                 throw new InvalidArgumentException('Aksi tidak dikenal.');
         }
@@ -77,6 +83,8 @@ $form = $formInput ?? ($editing ?? ['label' => '', 'bentuk' => 'Lisan / Praktik'
     'video_url' => '', 'video_title' => '', 'reading_title' => '', 'reading_text' => '']);
 $isEdit = $editId > 0 && ($editing || $formInput);
 $programLabel = PRETES_COMPONENT_PROGRAMS[$program];
+$rplPassMode = pretesRplPassMode();
+$rplCbtOnlyActive = $program === 'rpl' && $rplPassMode === 'cbt_only';
 $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
 include __DIR__ . '/../includes/header.php';
@@ -101,6 +109,10 @@ include __DIR__ . '/../includes/header.php';
 .ptg-form textarea{min-height:120px;resize:vertical}
 .ptg-hint{font-size:12px;color:#64748b;margin-top:3px}
 .ptg-table-wrap{overflow-x:auto}
+.ptg-mode-options{display:grid;gap:8px}
+.ptg-mode-option{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;font-size:13.5px;background:#fff}
+.ptg-mode-option.checked{border-color:#16a34a;background:#f0fdf4}
+.ptg-mode-option input{margin-top:3px;width:18px;height:18px;flex-shrink:0}
 </style>
 
 <div class="card" style="margin-bottom:18px;">
@@ -126,11 +138,49 @@ include __DIR__ . '/../includes/header.php';
     <div class="alert alert-<?= $e($flash['type']) ?>" id="ptg-flash"><?= $e($flash['text']) ?></div>
 <?php endif; ?>
 
+<?php if ($program === 'rpl'): ?>
+<div class="card" id="ptg-rpl-mode" style="margin-bottom:18px;border-left:4px solid <?= $rplCbtOnlyActive ? '#16a34a' : '#2563eb' ?>;">
+    <div class="card-body">
+        <form method="post" action="<?= $e($selfUrl) ?>" class="ptg-mode-form" data-no-spa>
+            <input type="hidden" name="csrf_token" value="<?= $e(csrfToken()) ?>">
+            <input type="hidden" name="action" value="set_rpl_mode">
+            <input type="hidden" name="program" value="rpl">
+            <div style="font-weight:800;font-size:15px;margin-bottom:4px;">⚖️ Mode Kelulusan Pretes RPL</div>
+            <p class="ptg-hint" style="margin:0 0 10px;">Menentukan syarat lulus pretes bagi mahasiswa RPL. Perubahan langsung berlaku pada dashboard, Hasil Pretes, rekap nilai, dan menu mahasiswa.</p>
+            <div class="ptg-mode-options">
+                <?php foreach (PRETES_RPL_PASS_MODES as $mk => $ml): ?>
+                    <label class="ptg-mode-option <?= $rplPassMode === $mk ? 'checked' : '' ?>">
+                        <input type="radio" name="rpl_pass_mode" value="<?= $e($mk) ?>" <?= $rplPassMode === $mk ? 'checked' : '' ?>>
+                        <span>
+                            <strong><?= $e($ml) ?></strong>
+                            <span class="ptg-hint" style="display:block;">
+                                <?= $mk === 'cbt_only'
+                                    ? 'CBT resmi ≥ 80 langsung LULUS dan berhak sertifikat (bayar Rp 50.000 di Bank Jatim, bawa nota & pasfoto 3×4) setelah ada pengumuman bertipe “Pengambilan Sertifikat Pretes”. Daftar komponen di bawah tidak dipakai untuk RPL.'
+                                    : 'CBT resmi ≥ 80 lanjut tugas video online; lulus bila seluruh komponen aktif di bawah bernilai minimal 80.' ?>
+                            </span>
+                        </span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <button type="submit" class="btn btn-primary" id="ptg-rpl-mode-save" style="margin-top:10px;">💾 Simpan Mode Kelulusan</button>
+            <a href="<?= BASE_URL ?>/admin/pengumuman.php" class="btn btn-secondary" style="margin-top:10px;text-decoration:none;">📢 Buat Pengumuman Sertifikat</a>
+        </form>
+    </div>
+</div>
+<?php if ($rplCbtOnlyActive): ?>
+    <div class="alert alert-info" id="ptg-rpl-cbt-only-note">ℹ️ Mode <strong>cukup CBT</strong> aktif: komponen RPL di bawah ini <strong>tidak dipakai</strong> untuk kelulusan, materi wajib, maupun input nilai dosen. Daftar tetap tersimpan bila suatu saat mode dikembalikan ke “CBT + tugas online”.</div>
+<?php endif; ?>
+<?php endif; ?>
+
 <div class="ptg-grid">
     <div class="card" id="daftar-tugas">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="font-weight:700;">Daftar Komponen — Program <?= $e($programLabel) ?></span>
-            <span class="ptg-chip" style="background:#dcfce7;color:#166534;">Aktif: <?= $activeCount ?> + Ujian tulis = <?= $activeCount + 1 ?> komponen wajib</span>
+            <?php if ($rplCbtOnlyActive): ?>
+                <span class="ptg-chip" style="background:#e0f2fe;color:#075985;">Mode cukup CBT: hanya Ujian tulis yang wajib</span>
+            <?php else: ?>
+                <span class="ptg-chip" style="background:#dcfce7;color:#166534;">Aktif: <?= $activeCount ?> + Ujian tulis = <?= $activeCount + 1 ?> komponen wajib</span>
+            <?php endif; ?>
         </div>
         <div class="card-body ptg-table-wrap">
             <table class="ptg-table">

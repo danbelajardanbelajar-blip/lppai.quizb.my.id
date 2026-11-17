@@ -5,6 +5,73 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 14:31:57 +0700 — RPL Lulus Pretes Cukup CBT ≥ 80 + Pengambilan Sertifikat Setelah Pengumuman
+
+**ID:** PRETES-RPL-LULUS-CBT · **Parent Git:** `bcd376c`.
+
+**Permintaan:** Mahasiswa RPL yang lulus CBT resmi pretes langsung dinyatakan lulus dan layak sertifikat. Syarat sertifikat: bayar Rp 50.000 di Bank Jatim, lalu membawa nota dan foto 3×4 ke Kantor LPPAI setelah pengumuman pengambilan sertifikat diumumkan.
+
+**Keputusan pengguna:**
+- Aturan bisa diatur lewat saklar di Kelola Tugas Pretes.
+- Pengumuman memakai tipe baru di Admin › Pengumuman.
+- Langkah RPL hanya bayar, nota, dan foto 3×4, tanpa Al Khidmah.
+
+**Rancangan:**
+- **Pengaturan:**
+  - Tabel baru `pretes_settings` (key-value), dibuat otomatis di MySQL dan SQLite.
+  - Kunci `rpl_pass_mode` bernilai `cbt_only` (bawaan, langsung berlaku) atau `cbt_tasks` (alur lama: CBT + tugas video online + penilaian tutor).
+- **Mode `cbt_only`:**
+  - `pretesComponentsFor('rpl')` hanya berisi `ujian_tulis`, dan `pretesComponentCategoriesFor('rpl')` hanya "Ujian CBT".
+  - Akibatnya `getPretesStatusLulus`, `isUserLulusPretes`, `pretesRplStage`, Hasil Pretes, rekap nilai, form nilai dosen, dan menu ikut otomatis: CBT ≥ 80 → `final_passed`/LULUS, CBT < 80 → `cbt_failed`.
+  - Daftar komponen praktik RPL tetap tersimpan dan dipakai lagi bila mode dikembalikan.
+- **Cadangan `isUserLulusPretes`:** untuk RPL mode `cbt_only`, nilai CBT resmi yang sudah dikumpulkan (≥ 80) dibaca dari `pretes_cbt_attempts` bila belum tersalin ke asesmen.
+- **Sertifikat** (`includes/pretes-certificate.php`, baru):
+  - Pengumuman aktif bertipe `pengambilan_sertifikat_pretes` yang lolos filter program/sasaran (`isUserEligibleForAnnouncement`) membuka instruksi: (1) bayar Rp 50.000,- di Bank Jatim dan simpan nota, (2) bawa nota + pasfoto 3×4 ke Kantor LPPAI. Isi pengumuman (jadwal) ikut ditampilkan.
+  - Tanpa pengumuman, ditampilkan "Menunggu Pengumuman Pengambilan Sertifikat — belum perlu membayar".
+- **Tampilan mahasiswa RPL (`cbt_only`):**
+  - Kartu Hasil CBT di dashboard dan halaman Peserta: "LULUS PRETES" + blok sertifikat, menggantikan tugas online/Drive.
+  - Hasil Pretes: kotak "Selamat, Anda Dinyatakan LULUS Pretes! · Bebas Tutorial RPL" + blok sertifikat, tanpa langkah Al Khidmah. Tombol "Ambil Sertifikat" hanya muncul setelah ada pengumuman.
+  - Kartu tanpa data user (pemanggil lama) dan mahasiswa Reguler tidak berubah.
+- **Sidebar:** menu "Daftar Pretes" disembunyikan bagi yang sudah lulus pretes. Menu "Scan Pengambilan Sertifikat" tampil di grup Pretes untuk yang lulus (RPL mode `cbt_only`: hanya setelah ada pengumuman).
+- **Admin:**
+  - Kartu "⚖️ Mode Kelulusan Pretes RPL" di tab RPL Kelola Tugas Pretes (aksi POST `set_rpl_mode`, CSRF), dengan catatan bahwa komponen RPL tidak dipakai saat mode cukup CBT.
+  - Tipe pengumuman baru "Pengambilan Sertifikat Pretes".
+
+**Dampak:** begitu di-deploy, mahasiswa RPL dengan CBT resmi ≥ 80 — termasuk yang sedang di tahap tugas online atau sudah dinilai tutor — langsung berstatus LULUS. Admin dapat mengembalikan alur lama lewat saklar.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-components.php` | 2026-11-17 14:23:11 | 133–213, 229–231, 262–263 | Pengaturan & mode RPL; `pretesComponentsFor`; `pretesComponentCategoriesFor` | Konstanta mode; `ensurePretesSettingsTable`, `pretesSettingsCache`, `pretesSettingGet`, `pretesSettingSet`, `pretesRplPassMode`, `pretesRplCbtOnly`; RPL hanya Ujian tulis pada mode `cbt_only`. |
+| `includes/pretes-helper.php` | 2026-11-17 14:23:21 | 128–145 | `isUserLulusPretes` | Cadangan kelulusan dari CBT resmi untuk RPL mode `cbt_only`. |
+| `includes/pretes-certificate.php` | 2026-11-17 14:31:54 | 1–116 (baru) | Kelulusan & sertifikat | `pretesIsRplCbtOnlyUser`, `pretesCertificateAnnouncement`, `renderPretesCertificateSteps`, `renderPretesRplPassedNotice`. |
+| `includes/pretes-cbt-result-card.php` | 2026-11-17 14:24:01 | 46–75, 104–105, 119 | `renderPretesCbtResultCard` | Parameter `?array $user`; cabang LULUS + sertifikat untuk RPL `cbt_only`; teks tautan Hasil Pretes. |
+| `includes/pretes-participant-view.php` | 2026-11-17 14:24:13 | 91, 279 | Kartu hasil CBT halaman Peserta | Meneruskan `$user`. |
+| `pages/dashboard.php` | 2026-11-17 14:24:13 | 590 | Kartu "Hasil CBT Pretes Saya" | Meneruskan `$user`. |
+| `pages/pretes-hasil.php` | 2026-11-17 14:31:57 | 109–113, 579–594, 898–902 | Data tahap; panel pengumuman; tombol navigasi | `$rplCbtOnlyUser`, `$certAnnouncement`; kotak LULUS RPL + sertifikat; tombol Ambil Sertifikat hanya setelah pengumuman, tanpa Al Khidmah. |
+| `admin/pengumuman.php` | 2026-11-17 14:24:57 | 53 | `$tipeOptions` | Tipe `pengambilan_sertifikat_pretes`. |
+| `admin/pretes-tugas.php` | 2026-11-17 14:25:31 | 52–57, 86–87, 112–115, 141–175, 179–183 | POST `set_rpl_mode`; kartu Mode Kelulusan RPL; chip daftar | Saklar mode + catatan mode cukup CBT. |
+| `includes/sidebar.php` | 2026-11-17 14:25:51 | 397–406, 438–443 | Menu mahasiswa grup Pretes | Sembunyikan Daftar Pretes bila lulus; menu Scan Pengambilan Sertifikat. |
+| `tests/pretes-rpl-flow-test.php` | 2026-11-17 14:27:21 | 19–22, 155–194 | Bagian 7 baru | Alur lama memakai `cbt_tasks`; 30+ asersi mode `cbt_only` (komponen, status, tahap, cadangan CBT, halaman sebelum/sesudah pengumuman, filter program pengumuman, kartu CBT, kembali ke `cbt_tasks`). |
+| `tests/pretes-components-test.php` | 2026-11-17 14:27:35 | 24–29 | Pengaturan | Mode bawaan, simpan, dan simpan ulang tidak dobel; test komponen memakai `cbt_tasks`. |
+| `tests/dashboard-cbt-submitted-test.php` | 2026-11-17 14:28:20 | 27, 326–330 | Daftar file; Test 3 | Salin `pretes-certificate.php`; ekspektasi RPL CBT 84 → "✅ Lulus" + LULUS PRETES, tanpa tugas online. |
+| `tests/pretes-hasil-preparation-test.py` | 2026-11-17 14:28:36 | 17 | Daftar file harness | Tambah `pretes-certificate.php` dan `announcement-helper.php`. |
+
+**Verifikasi:**
+- `php -l` semua file PHP yang berubah atau baru: OK. `git diff --check`: bersih.
+- Seluruh `tests/*.php` dijalankan; yang gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait). `tests/pretes-hasil-preparation-test.py`: PASS.
+- Browser lokal (`php -S`, salinan aplikasi dengan auth tiruan; mahasiswa RPL dengan CBT resmi 88):
+  - Saklar di Kelola Tugas Pretes: berpindah ke "CBT + tugas" menampilkan flash, chip "11 + Ujian tulis = 12", dan halaman mahasiswa kembali ke "TAHAP 2 — TUGAS PRETES ONLINE". Kembali ke "cukup CBT" membuat halaman mahasiswa menjadi "Status Akhir: LULUS" + "menunggu pengumuman".
+  - Pengumuman dibuat lewat form Admin › Pengumuman (tipe baru, target RPL, lulus_pretes) → Hasil Pretes menampilkan isi pengumuman, Rp 50.000, Bank Jatim, nota, pasfoto 3×4, Kantor LPPAI, dan tombol Ambil Sertifikat, tanpa Al Khidmah. Tidak ada overflow horizontal di tampilan sempit.
+  - Sidebar mahasiswa: tanpa "Daftar Pretes". "Scan Pengambilan Sertifikat" hanya muncul saat pengumuman aktif.
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi dan akun asli. Tabel `pretes_settings` dibuat saat pertama dipakai.
+  - Halaman `ambil-sertifikat.php` tidak diubah.
+  - Teks biaya, bank, dan lokasi kantor berupa konstanta di `includes/pretes-certificate.php`.
+
+---
+
 ## 2026-11-17 14:09:19 +0700 — Ekspor .xlsx Hasil CBT Mengikuti Filter Hari, Lulus/Tidak Lulus & Pencarian
 
 **ID:** CBT-HASIL-EKSPOR-FILTER · **Parent Git:** `8a1f6c1`.

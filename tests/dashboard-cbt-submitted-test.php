@@ -25,6 +25,7 @@ $copyFiles = [
     'includes/pretes-cbt.php',
     'includes/pretes-cbt-interruption.php',
     'includes/pretes-cbt-result-card.php',
+    'includes/pretes-certificate.php',
     'includes/pretes-exam-access.php',
     'includes/pretes-tryout.php',
     'includes/pretes-examiner.php',
@@ -322,10 +323,11 @@ pretesCbtChange($pdoFixture, 103, 3, 'submit', ['revision' => 0], $now + 120);
 $html3 = $renderDashboard($user3);
 $check(!str_contains($html3, 'Jadwal & Status Pretes Anda'), 'Test 3: Kartu jadwal pretes disembunyikan');
 $check(!str_contains($html3, 'Wajib Mengikuti Tryout Pretes'), 'Test 3: Banner tryout disembunyikan');
-$check(str_contains($html3, '✅ Lolos CBT (84)'), 'Test 3: Stat card menunjukkan ✅ Lolos CBT (84)');
+// Mode bawaan kelulusan RPL "cukup CBT": CBT ≥ 80 langsung LULUS (PRETES-RPL-LULUS-CBT)
+$check(str_contains($html3, '✅ Lulus'), 'Test 3: Stat card menunjukkan ✅ Lulus (RPL cukup CBT)');
 $check(str_contains($html3, 'Hasil CBT Pretes Saya'), 'Test 3: Menampilkan kartu Hasil CBT Pretes Saya');
-$check(str_contains($html3, 'Selamat, Saudara diperkenankan melanjutkan ke tahap pretes secara online'), 'Test 3: Menampilkan instruksi tugas pretes online RPL');
-$check(str_contains($html3, PRETES_RPL_DRIVE_URL), 'Test 3: Menampilkan folder Google Drive tugas RPL');
+$check(str_contains($html3, 'LULUS PRETES') && str_contains($html3, 'data-cert-state="waiting"'), 'Test 3: Kartu menyatakan LULUS PRETES + menunggu pengumuman sertifikat');
+$check(!str_contains($html3, PRETES_RPL_DRIVE_URL) && !str_contains($html3, 'pretes-rpl-online-tasks'), 'Test 3: Tidak lagi menampilkan tugas online / Google Drive');
 $check(!str_contains($html3, 'Mohon maaf, nilai CBT Pretes Anda tidak mencapai nilai minimal'), 'Test 3: Tidak menampilkan pesan maaf');
 
 // Bersihkan direktori sementara

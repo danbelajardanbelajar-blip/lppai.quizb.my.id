@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory(prefix='lppai-pretes-preparation-') as temp:
     for name in ['pages/pretes-hasil.php', 'pages/pretes-peserta.php', 'includes/pretes-helper.php', 'includes/pretes-components.php', 'includes/user-helper.php', 'includes/pretes-face-engine.php',
                  'includes/pretes-active-page.php', 'includes/pretes-participant-view.php', 'includes/sync_eujian.php',
                  'includes/pretes-preparation-view.php', 'includes/pretes-learning-reading-view.php',
-                 'includes/pretes-rpl-flow.php', 'includes/pretes-cbt-result-card.php', 'includes/pretes-cbt.php', 'includes/pretes-cbt-interruption.php', 'data/pretes-cbt-bank.php', 'includes/pretes-exam-access.php',
+                 'includes/pretes-rpl-flow.php', 'includes/pretes-cbt-result-card.php', 'includes/pretes-certificate.php', 'includes/announcement-helper.php', 'includes/pretes-cbt.php', 'includes/pretes-cbt-interruption.php', 'data/pretes-cbt-bank.php', 'includes/pretes-exam-access.php',
                  'data/pretes-istighasah.php', 'data/pretes-learning-readings.json', 'data/pretes-learning-videos.php']:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)

@@ -88,7 +88,7 @@
         </p>
     </div>
     <div id="pretes-cbt-finished" style="margin-bottom:22px;">
-        <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php')); ?>
+        <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php'), $user ?? null); ?>
     </div>
 
 <?php elseif ($myReg): ?>
@@ -276,7 +276,7 @@
 
                 <?php if (!empty($cbtResult) && function_exists('renderPretesCbtResultCard')): ?>
                     <!-- KONDISI 0: CBT SUDAH DIKERJAKAN / MASIH BERJALAN → kartu hasil (includes/pretes-cbt-result-card.php) -->
-                    <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php')); ?>
+                    <?php renderPretesCbtResultCard($cbtResult, $linkSoalPretes ?? (BASE_URL . '/pretes-ujian.php'), $tutorialRplUrl ?? (BASE_URL . '/tutorial-rpl.php'), $user ?? null); ?>
                 <?php elseif ($isUjianDibuka): ?>
                     <!-- KONDISI A: PENGERJAAN DIBUKA ADMIN (sesuai jadwal sesi) / PRIVILEGE TESTER 12345 -->
                     <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:14px;padding:22px 18px;text-align:center;box-shadow:0 4px 14px rgba(22,163,74,0.1);">

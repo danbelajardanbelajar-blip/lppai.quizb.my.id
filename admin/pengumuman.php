@@ -50,6 +50,7 @@ $msgType = '';
 $tipeOptions = [
     'pendaftaran_pretes'     => 'Pendaftaran Pretes',
     'hasil_pretes'           => 'Pengumuman Hasil Pretes',
+    'pengambilan_sertifikat_pretes' => 'Pengambilan Sertifikat Pretes (buka instruksi bayar & ambil sertifikat)',
     'pendaftaran_gel1'       => 'Pendaftaran Tutorial Gel. 1 (Ganjil)',
     'pembagian_kelas_gel1'   => 'Pembagian Kelas Gel. 1 (Ganjil)',
     'kelulusan_gel1'         => 'Kelulusan Gel. 1 (Ganjil)',

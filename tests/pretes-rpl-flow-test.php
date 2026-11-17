@@ -17,6 +17,9 @@ $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 ensurePretesCbtTables($pdo);
 ensurePretesFeatures($pdo);
+pretesComponentsPdo($pdo);
+// Bagian 1–6 menguji alur lama "CBT + tugas online"; mode "cukup CBT" diuji di bagian 7.
+pretesSettingSet($pdo, 'rpl_pass_mode', 'cbt_tasks');
 
 $failures = [];
 $check = function ($cond, $msg) use (&$failures) { if (!$cond) $failures[] = $msg; };
@@ -148,6 +151,49 @@ $check(str_contains($p2b, 'Status Akhir: LULUS') && !str_contains($p2b, 'id="pre
 $p9 = $renderPage(9);
 $check(!str_contains($p9, 'id="pretes-rpl-stage"') && str_contains($p9, 'MENUNGGU PENILAIAN'), 'Halaman: belum CBT → tampilan menunggu lama');
 foreach (['p1' => $p1, 'p2' => $p2, 'p3' => $p3, 'p9' => $p9] as $k => $html) $check(!str_contains($html, 'EXC:') && !str_contains($html, 'Warning'), "Halaman $k tanpa error: " . substr(strstr($html, 'EXC:') ?: '', 0, 160));
+
+// 7) Mode "cukup CBT" (bawaan): RPL CBT ≥ 80 langsung LULUS; sertifikat menunggu pengumuman
+pretesSettingSet($pdo, 'rpl_pass_mode', 'cbt_only');
+$check(pretesRplCbtOnly() && array_keys(pretesComponents('rpl')) === ['ujian_tulis'] && count(pretesComponents('reguler')) === 12, 'Mode cukup CBT: komponen wajib RPL hanya Ujian tulis, Reguler tetap 12');
+$check(array_keys(pretesComponentCategoriesFor('rpl')) === ['Ujian CBT'], 'Mode cukup CBT: form nilai dosen RPL hanya Ujian CBT');
+$check(getPretesStatusLulus(['ujian_tulis' => 80], 'rpl') === 'lulus' && getPretesStatusLulus(['ujian_tulis' => 79.9], 'rpl') === 'tidak_lulus'
+    && getPretesStatusLulus([], 'rpl') === 'menunggu', 'Mode cukup CBT: status lulus RPL dari Ujian tulis (80 lulus, 79.9 tidak)');
+$check(pretesRplStage($pdo, 3, $reg(30), $scoresOf(30), null, 'rpl')['stage'] === 'final_passed', 'Mode cukup CBT: CBT 80 → final_passed');
+$check(pretesRplStage($pdo, 1, $reg(10), $scoresOf(10), null, 'rpl')['stage'] === 'cbt_failed', 'Mode cukup CBT: CBT 76 → tetap cbt_failed');
+$pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, jenis_program TEXT)");
+$pdo->exec("INSERT OR REPLACE INTO users (id, jenis_program) VALUES (1,'RPL'),(3,'RPL'),(4,'Reguler')");
+$check(isUserLulusPretes($pdo, 3) === true && isUserLulusPretes($pdo, 1) === false, 'isUserLulusPretes: RPL CBT 80 lulus, CBT 76 tidak');
+// Cadangan: nilai CBT belum tersalin ke asesmen
+$pdo->exec("DELETE FROM pretes_assessments WHERE registration_id = 30");
+$check(isUserLulusPretes($pdo, 3) === true, 'isUserLulusPretes: cadangan dari pretes_cbt_attempts bila asesmen kosong');
+$pdo->prepare('INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by) VALUES (30, ?, 0)')->execute([json_encode(['ujian_tulis' => 80])]);
+
+$pdo->exec("CREATE TABLE IF NOT EXISTS announcements (id INTEGER PRIMARY KEY AUTOINCREMENT, judul TEXT, konten TEXT, tipe TEXT, link_tujuan TEXT, target_program TEXT DEFAULT 'Semua', target_peserta TEXT DEFAULT 'semua', is_active INT DEFAULT 1, created_by INT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)");
+$p3c = $renderPage(3);
+$check(str_contains($p3c, 'Status Akhir: LULUS') && str_contains($p3c, 'id="pretes-rpl-lulus-box"') && str_contains($p3c, 'data-cert-state="waiting"')
+    && !str_contains($p3c, 'Majlis Dzikir Al Khidmah') && !str_contains($p3c, '/absensi-alkhidmah.php') && !str_contains($p3c, PRETES_RPL_DRIVE_URL)
+    && !str_contains($p3c, '/ambil-sertifikat.php') && !str_contains($p3c, 'id="pretes-rpl-stage"'), 'Halaman cukup CBT: LULUS + menunggu pengumuman, tanpa Al Khidmah/Drive/tombol sertifikat');
+$pdo->exec("INSERT INTO announcements (judul, konten, tipe, target_program, target_peserta, is_active) VALUES ('Sertifikat Reguler', 'x', 'pengambilan_sertifikat_pretes', 'Reguler', 'semua', 1)");
+$check(str_contains($renderPage(3), 'data-cert-state="waiting"'), 'Pengumuman khusus Reguler tidak membuka sertifikat RPL');
+$pdo->exec("INSERT INTO announcements (judul, konten, tipe, target_program, target_peserta, is_active) VALUES ('Pengambilan Sertifikat Pretes RPL', 'Mulai 1 Desember 2026 pukul 08.00-15.00 WIB', 'pengambilan_sertifikat_pretes', 'RPL', 'lulus_pretes', 1)");
+$p3d = $renderPage(3);
+foreach (['data-cert-state="announced"', 'Pengambilan Sertifikat Pretes RPL', 'Mulai 1 Desember 2026', 'Rp 50.000', 'Bank Jatim', 'pasfoto 3×4', 'Kantor LPPAI', '/ambil-sertifikat.php'] as $n) {
+    $check(str_contains($p3d, $n), "Halaman cukup CBT setelah pengumuman memuat: $n");
+}
+$p1c = $renderPage(1);
+$check(str_contains($p1c, 'TIDAK LULUS TAHAP CBT') && !str_contains($p1c, 'pretes-cert-steps'), 'CBT <80 tetap tidak lulus, tanpa info sertifikat');
+foreach (['p3c' => $p3c, 'p3d' => $p3d, 'p1c' => $p1c] as $k => $html) $check(!str_contains($html, 'EXC:') && !str_contains($html, 'Warning'), "Halaman $k tanpa error: " . substr(strstr($html, 'EXC:') ?: (strstr($html, 'Warning') ?: ''), 0, 200));
+
+// Kartu hasil CBT (dashboard/peserta) untuk RPL cukup CBT
+$cbt3 = pretesCbtResultFor($pdo, 3, 30);
+ob_start(); renderPretesCbtResultCard($cbt3, '/pretes-ujian.php', '/tutorial-rpl.php', ['id' => 3, 'jenis_program' => 'RPL', 'role' => 'mahasiswa']); $c3 = ob_get_clean();
+$check(str_contains($c3, 'LULUS PRETES') && str_contains($c3, 'data-cert-state="announced"') && !str_contains($c3, 'pretes-rpl-online-tasks'), 'Kartu CBT RPL ≥80: LULUS + info sertifikat, tanpa tugas online');
+ob_start(); renderPretesCbtResultCard($cbt3, '/pretes-ujian.php', '/tutorial-rpl.php'); $c3old = ob_get_clean();
+$check(str_contains($c3old, 'pretes-rpl-online-tasks'), 'Kartu tanpa data user tetap memakai tampilan lama');
+pretesSettingSet($pdo, 'rpl_pass_mode', 'cbt_tasks');
+ob_start(); renderPretesCbtResultCard($cbt3, '/pretes-ujian.php', '/tutorial-rpl.php', ['id' => 3, 'jenis_program' => 'RPL']); $c3tasks = ob_get_clean();
+$check(str_contains($c3tasks, 'pretes-rpl-online-tasks') && !str_contains($c3tasks, 'LULUS PRETES'), 'Mode CBT + tugas: kartu kembali menampilkan tugas online');
+$check(count(pretesComponents('rpl')) === 12, 'Mode CBT + tugas: komponen RPL kembali 12');
 @unlink($stub); @unlink($page);
 
 // 6) Kartu peserta menautkan Hasil Pretes

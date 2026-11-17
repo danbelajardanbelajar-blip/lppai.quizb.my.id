@@ -394,6 +394,17 @@ if (!function_exists('isNavGroupActive')) {
                 ? isUserLulusPretes($db, (int)($currentUser['id'] ?? 0))
                 : false;
             $showTutorialMenus = !$isMahasiswaPretesAktif && ($hasTutorialReg || ($hasPretesReg && !$isLulusPretes));
+            // Sudah lulus pretes: tidak perlu mendaftar pretes lagi
+            if ($isLulusPretes) $showDaftarPretesMenu = false;
+            // Menu sertifikat bagi yang lulus pretes (bila menu tutorial yang memuatnya tidak tampil).
+            // RPL mode "cukup CBT": baru tampil setelah ada pengumuman Pengambilan Sertifikat Pretes.
+            $showPretesSertifikatMenu = false;
+            if ($isLulusPretes && !$showTutorialMenus && !$hidePretesMenus && $db) {
+                require_once __DIR__ . '/pretes-certificate.php';
+                $showPretesSertifikatMenu = pretesIsRplCbtOnlyUser($currentUser ?? null)
+                    ? (pretesCertificateAnnouncement($db, $currentUser) !== null)
+                    : true;
+            }
 
             // Item dan label Absensi: tampil hanya bila ada item yang relevan dan tidak dalam pretes aktif
             $showAbsensiPretes    = !$hidePretesMenus;
@@ -424,6 +435,12 @@ if (!function_exists('isNavGroupActive')) {
                 <span class="icon">📊</span>
                 <span class="nav-text">Hasil Pretes</span>
             </a>
+            <?php if ($showPretesSertifikatMenu): ?>
+            <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="page-nav <?= menuActive('ambil-sertifikat.php') ?>">
+                <span class="icon">📷</span>
+                <span class="nav-text">Scan Pengambilan Sertifikat</span>
+            </a>
+            <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($showTutorialMenus): ?>

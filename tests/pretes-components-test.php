@@ -21,6 +21,12 @@ $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 ensurePretesFeatures($pdo);
 pretesComponentsPdo($pdo);
 pretesComponentsCache(null, null, true);
+// Mode kelulusan RPL: bawaan "cukup CBT"; test komponen di bawah memakai mode "CBT + tugas online".
+$check(pretesRplPassMode() === 'cbt_only' && pretesRplCbtOnly(), 'Mode kelulusan RPL bawaan: cukup CBT');
+pretesSettingSet($pdo, 'rpl_pass_mode', 'cbt_tasks');
+$check(pretesRplPassMode() === 'cbt_tasks' && pretesSettingGet('rpl_pass_mode') === 'cbt_tasks', 'Pengaturan mode tersimpan di pretes_settings');
+pretesSettingSet($pdo, 'rpl_pass_mode', 'cbt_tasks'); // simpan ulang (update) tidak dobel
+$check((int)$pdo->query("SELECT COUNT(*) FROM pretes_settings WHERE setting_key = 'rpl_pass_mode'")->fetchColumn() === 1, 'Simpan ulang pengaturan tidak dobel');
 
 // Seed
 $reg = pretesComponentRows($pdo, 'reguler', true);

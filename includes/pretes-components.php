@@ -131,6 +131,87 @@ function ensurePretesComponentTable(PDO $pdo): void {
     $ready[$id] = true;
 }
 
+/* ------------------------------------------------------------------
+ * Pengaturan pretes (key-value) & mode kelulusan RPL
+ * ------------------------------------------------------------------ */
+const PRETES_RPL_PASS_MODES = [
+    'cbt_only' => 'Cukup CBT resmi ≥ 80 (langsung lulus)',
+    'cbt_tasks' => 'CBT resmi ≥ 80 + tugas online & penilaian tutor',
+];
+const PRETES_RPL_PASS_MODE_DEFAULT = 'cbt_only';
+
+function ensurePretesSettingsTable(PDO $pdo): void {
+    static $ready = [];
+    $id = spl_object_id($pdo);
+    if (isset($ready[$id])) return;
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_settings (
+            setting_key VARCHAR(60) PRIMARY KEY,
+            setting_value TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } else {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_settings (
+            setting_key VARCHAR(60) NOT NULL PRIMARY KEY,
+            setting_value TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    }
+    $ready[$id] = true;
+}
+
+/** Cache pengaturan per request; $reset untuk test/setelah simpan. */
+function pretesSettingsCache(?string $key = null, ?string $value = null, bool $reset = false) {
+    static $cache = [];
+    if ($reset) { $cache = []; return null; }
+    if ($key === null) return null;
+    if ($value !== null) { $cache[$key] = $value; return $value; }
+    return $cache[$key] ?? null;
+}
+
+function pretesSettingGet(string $key, string $default = ''): string {
+    $cached = pretesSettingsCache($key);
+    if ($cached !== null) return $cached;
+    $pdo = pretesComponentsPdo();
+    if (!$pdo) return $default; // tanpa DB: nilai bawaan, tidak di-cache
+    try {
+        ensurePretesSettingsTable($pdo);
+        $stmt = $pdo->prepare('SELECT setting_value FROM pretes_settings WHERE setting_key = ?');
+        $stmt->execute([$key]);
+        $val = $stmt->fetchColumn();
+        $val = ($val === false || $val === null) ? $default : (string)$val;
+    } catch (Throwable $e) {
+        error_log('pretesSettingGet: ' . $e->getMessage());
+        return $default;
+    }
+    return pretesSettingsCache($key, $val);
+}
+
+function pretesSettingSet(PDO $pdo, string $key, string $value): void {
+    ensurePretesSettingsTable($pdo);
+    $upd = $pdo->prepare('UPDATE pretes_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?');
+    $upd->execute([$value, $key]);
+    if ($upd->rowCount() === 0) {
+        $chk = $pdo->prepare('SELECT COUNT(*) FROM pretes_settings WHERE setting_key = ?');
+        $chk->execute([$key]);
+        if ((int)$chk->fetchColumn() === 0) {
+            $pdo->prepare('INSERT INTO pretes_settings (setting_key, setting_value) VALUES (?, ?)')->execute([$key, $value]);
+        }
+    }
+    pretesSettingsCache(null, null, true);
+    pretesComponentsCache(null, null, true);
+}
+
+function pretesRplPassMode(): string {
+    $mode = pretesSettingGet('rpl_pass_mode', PRETES_RPL_PASS_MODE_DEFAULT);
+    return isset(PRETES_RPL_PASS_MODES[$mode]) ? $mode : PRETES_RPL_PASS_MODE_DEFAULT;
+}
+
+/** true = mahasiswa RPL lulus pretes cukup dengan CBT resmi ≥ 80 (tanpa tugas online/penilaian tutor). */
+function pretesRplCbtOnly(): bool {
+    return pretesRplPassMode() === 'cbt_only';
+}
+
 /** Baris komponen sebuah program, terurut. */
 function pretesComponentRows(PDO $pdo, string $program, bool $includeInactive = false): array {
     ensurePretesComponentTable($pdo);
@@ -146,6 +227,8 @@ function pretesComponentRows(PDO $pdo, string $program, bool $includeInactive = 
  */
 function pretesComponentsFor(?string $program = null): array {
     $base = ['ujian_tulis' => 'Ujian tulis'];
+    // Mode "cukup CBT": komponen wajib RPL hanya Ujian tulis (CBT). Daftar praktik RPL tetap tersimpan.
+    if ($program === 'rpl' && pretesRplCbtOnly()) return $base;
     $cacheKey = $program ?? '*';
     $cached = pretesComponentsCache($cacheKey);
     if ($cached !== null) return $cached;
@@ -177,6 +260,7 @@ function pretesComponentsFor(?string $program = null): array {
 /** Kelompok tampilan panel penilaian: ['Ujian CBT' => [...], kategori => [kunci => label], ...]. */
 function pretesComponentCategoriesFor(?string $program): array {
     $groups = ['Ujian CBT' => ['ujian_tulis' => 'Ujian tulis (CBT)']];
+    if ($program === 'rpl' && pretesRplCbtOnly()) return $groups;
     $pdo = pretesComponentsPdo();
     $rows = [];
     if ($pdo) {

@@ -587,7 +587,7 @@ include __DIR__ . '/../includes/header.php';
         $linkSoalPretes = BASE_URL . '/pretes-ujian.php';
         $isRplStudent = (isset($user['jenis_program']) && strtoupper(trim($user['jenis_program'])) === 'RPL');
         $tutorialTargetUrl = $isRplStudent ? (BASE_URL . '/tutorial-rpl.php') : (BASE_URL . '/tutorial-pendaftaran.php');
-        renderPretesCbtResultCard($cbtResult, $linkSoalPretes, $tutorialTargetUrl);
+        renderPretesCbtResultCard($cbtResult, $linkSoalPretes, $tutorialTargetUrl, $user);
         ?>
     </div>
 </div>

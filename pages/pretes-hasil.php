@@ -107,6 +107,11 @@ $showRplPanel = in_array($rpl['stage'], $rplPanelStages, true);
 $tutorialCtaUrl = $rpl['stage'] !== 'none' ? BASE_URL . '/tutorial-rpl.php' : BASE_URL . '/tutorial-pendaftaran.php';
 $tutorialCtaLabel = $rpl['stage'] !== 'none' ? PRETES_RPL_TUTORIAL_LABEL : 'Daftar Program Tutorial Gelombang 1';
 
+// RPL mode "cukup CBT": CBT resmi ≥ 80 = LULUS; info sertifikat menunggu pengumuman admin
+require_once __DIR__ . '/../includes/pretes-certificate.php';
+$rplCbtOnlyUser = pretesIsRplCbtOnlyUser($user);
+$certAnnouncement = $rplCbtOnlyUser ? pretesCertificateAnnouncement($pdo, $user) : null;
+
 $components = pretesComponents($pretesProgram);
 $componentDetails = [];
 $sum = 0;
@@ -571,6 +576,22 @@ include __DIR__ . '/../includes/header.php';
             <!-- ================================================================ -->
             <?php if ($showRplPanel): ?>
                 <?php renderPretesRplStagePanel($rpl, $tutorialCtaUrl, '<strong>' . renderDosenWithWa($pdo, $myReg['dosen_penguji'] ?? null, $user, 'Laporan upload tugas pretes RPL (online)', 'Tutor belum ditetapkan — hubungi admin LPPAI') . '</strong>'); ?>
+            <?php elseif ($statusLulus === 'lulus' && $rplCbtOnlyUser): ?>
+                <div class="pretes-ann-box lulus" id="pretes-rpl-lulus-box">
+                    <div class="pretes-ann-header">
+                        <span class="pretes-ann-icon-bubble" style="background:#dcfce7; color:#15803d;">🎉</span>
+                        <div style="flex:1;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                                <h3 class="pretes-ann-title" style="color:#065f46;">Selamat, Anda Dinyatakan LULUS Pretes!</h3>
+                                <span class="badge badge-success" style="font-size:11.5px; padding:4px 10px;">Bebas Tutorial RPL</span>
+                            </div>
+                        </div>
+                    </div>
+                    <?php
+                        $rplScoreText = !empty($rpl['cbt']) ? rtrim(rtrim(number_format((float)$rpl['cbt']['score'], 2, ',', ''), '0'), ',') : number_format($avgScore, 2, ',', '');
+                        renderPretesRplPassedNotice($rplScoreText, $certAnnouncement, false, false);
+                    ?>
+                </div>
             <?php elseif ($statusLulus === 'lulus'): ?>
                 <div class="pretes-ann-box lulus">
                     <div class="pretes-ann-header">
@@ -874,7 +895,11 @@ include __DIR__ . '/../includes/header.php';
             <!-- Tombol Navigasi -->
             <div style="margin-top:24px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                 <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary" style="text-decoration:none;">🏠 Kembali ke Dashboard</a>
-                <?php if ($statusLulus === 'lulus'): ?>
+                <?php if ($statusLulus === 'lulus' && $rplCbtOnlyUser): ?>
+                    <?php if ($certAnnouncement): ?>
+                        <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="text-decoration:none;">📷 Ambil Sertifikat</a>
+                    <?php endif; ?>
+                <?php elseif ($statusLulus === 'lulus'): ?>
                     <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-outline-success" style="text-decoration:none;">🕌 Presensi Al Khidmah</a>
                     <a href="<?= BASE_URL ?>/ambil-sertifikat.php" class="btn btn-success" style="text-decoration:none;">📷 Ambil Sertifikat</a>
                 <?php elseif ($rpl['stage'] === 'online_task'): ?>
