@@ -227,14 +227,33 @@ function cbtBankExportRows(PDO $pdo): Generator {
     }
 }
 
-function cbtResultsExportRows(PDO $pdo, string $filter = 'all'): Generator {
+/**
+ * @param array $extra Filter tambahan dari tab Hasil Ujian: day (Y-m-d WIB),
+ *                     pass_filter (lulus|tidak_lulus), q (kata kunci). Kosong = semua.
+ */
+function cbtResultsExportRows(PDO $pdo, string $filter = 'all', array $extra = []): Generator {
     yield ['NIM', 'Nama Peserta', 'Jenis Ujian', 'Sesi Ujian', 'Mulai (WIB)', 'Selesai (WIB)', 'Status', 'Jawaban Benar', 'Jumlah Soal', 'Nilai'];
 
     $whereConds = [];
+    $params = [];
     if ($filter === 'resmi') {
         $whereConds[] = 'a.registration_id > 0';
     } elseif ($filter === 'tryout') {
         $whereConds[] = 'a.registration_id < 0';
+    }
+    if ($extra && function_exists('pretesCbtResultFilters') && function_exists('pretesCbtResultWhere')) {
+        $f = pretesCbtResultFilters([
+            'day' => $extra['day'] ?? '',
+            'pass_filter' => $extra['pass_filter'] ?? 'all',
+            'q' => $extra['q'] ?? '',
+        ]);
+        $f['status_filter'] = 'all';
+        $f['result_filter'] = 'all'; // tipe sudah ditangani $filter di atas
+        [$extraWhere, $extraParams] = pretesCbtResultWhere($f, time());
+        if ($extraWhere !== '') {
+            $whereConds[] = '(' . substr($extraWhere, strlen('WHERE ')) . ')';
+            $params = $extraParams;
+        }
     }
     $hasUsername = true;
     try {
@@ -260,7 +279,9 @@ function cbtResultsExportRows(PDO $pdo, string $filter = 'all'): Generator {
             LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
             $where
             ORDER BY a.started_at DESC";
-    $stmt = $pdo->query($sql);
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $k => $v) $stmt->bindValue($k, $v);
+    $stmt->execute();
     $tryoutLabelCache = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $isTryout = ((int)$row['registration_id'] < 0);

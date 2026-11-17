@@ -5,6 +5,45 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 14:09:19 +0700 — Ekspor .xlsx Hasil CBT Mengikuti Filter Hari, Lulus/Tidak Lulus & Pencarian
+
+**ID:** CBT-HASIL-EKSPOR-FILTER · **Parent Git:** `8a1f6c1`.
+**Permintaan:** Lanjutan dari CBT-HASIL-FILTER-HARI-LULUS ("Ya, ikutkan"): ekspor .xlsx juga mengikuti filter hari dan lulus/tidak lulus.
+**Sebelumnya:** Tombol Ekspor Resmi/Tryout/Semua hanya membawa `filter=resmi|tryout|all`, sehingga isi berkas tetap seluruh sesi untuk tipe tersebut walaupun tabel sedang difilter.
+**Rancangan:**
+- `cbtResultsExportRows($pdo, $filter, $extra = [])` menerima `day`, `pass_filter`, dan `q`. Kondisi dibangun dengan `pretesCbtResultWhere` (status selalu `all`, tipe tetap dari `$filter`), memakai prepared statement dengan placeholder unik.
+- Pemanggilan lama tanpa `$extra` berperilaku sama seperti sebelumnya. Pengecualian akun uji `12345` tetap berlaku.
+- Handler `download=results` membaca filter lewat `pretesCbtResultFilters($_GET)`. Nama berkas mencerminkan filter, misalnya `hasil-cbt-resmi-2026-11-17-lulus-YYYYMMDD.xlsx`; ada akhiran `cari-` bila pencarian aktif.
+- Ketiga tombol ekspor meneruskan `day`, `pass_filter`, dan `q` yang aktif. Bila ada filter, tombol diberi keterangan "⚙️ Ekspor mengikuti filter aktif" beserta title.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt-xlsx.php` | 2026-11-17 14:08:29 | 230–259, 282–284 | `cbtResultsExportRows` | Parameter `$extra` + WHERE dari helper filter; `query()` diganti `prepare()/bindValue()/execute()`. |
+| `admin/pretes-bank-soal.php` | 2026-11-17 14:08:36 | 208–215 | Handler `download=results` | Meneruskan filter aktif ke ekspor; nama berkas memuat hari, kelulusan, dan penanda pencarian. |
+| `includes/pretes-cbt-admin-view.php` | 2026-11-17 14:09:02 | 453–469 | Tombol ekspor di header panel Hasil Ujian | Query filter aktif ditambahkan ke ketiga tombol; `data-export-scope`; keterangan `#cbtExportFilterNote`. |
+| `assets/css/pretes-cbt-admin.css` | 2026-11-17 14:09:02 | 483 | `.cbt-export-note` | Gaya badge keterangan ekspor. |
+| `tests/pretes-cbt-result-filters-test.php` | 2026-11-17 14:09:19 | 19, 23–25, 107–118, 127–128 | Test ekspor | Fixture tabel sesi/item; 8 asersi baru untuk ekspor (tanpa filter, Resmi+Lulus, Tidak Lulus, hari, cari, kombinasi) serta markup tombol dan handler. |
+
+**Verifikasi:**
+- `php -l` file PHP yang berubah: OK. `git diff --check`: bersih.
+- `tests/pretes-cbt-result-filters-test.php`: 35/35 PASS. Seluruh `tests/pretes-*.php` PASS, termasuk `pretes-cbt-export-scope-test.php` dan `pretes-cbt-xlsx-test.php`.
+- HTTP lokal (`php -S`, salinan aplikasi dengan auth tiruan, 8 sesi), berkas .xlsx diunduh dan baris sheet dihitung:
+
+  | Filter | Baris data | Nama berkas |
+  |---|---|---|
+  | Semua | 8 | `hasil-cbt-20261117.xlsx` |
+  | Resmi + Lulus | 3 | `hasil-cbt-resmi-lulus-…` |
+  | Resmi + Tidak Lulus | 3 | – |
+  | `q=siti` | 1 | `hasil-cbt-cari-…` |
+  | Resmi + Lulus + hari ini | 1 | `hasil-cbt-resmi-2026-11-17-lulus-…` |
+
+  Link tombol membawa `pass_filter` dan `q`, dan keterangan filter tampil.
+- Keterbatasan: belum diuji pada MySQL produksi; kolom berkas .xlsx tidak diubah (tidak ada kolom keterangan lulus tambahan).
+
+---
+
 ## 2026-11-17 13:55:24 +0700 — Hasil Ujian CBT: Filter Hari, Filter Lulus/Tidak Lulus & Perbaikan Pencarian
 
 **ID:** CBT-HASIL-FILTER-HARI-LULUS · **Parent Git:** `438e3b8`.

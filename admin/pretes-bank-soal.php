@@ -205,7 +205,14 @@ if (isset($_GET['download'])) {
             $prefix = 'hasil-cbt-';
             if ($filter === 'resmi') $prefix = 'hasil-cbt-resmi-';
             elseif ($filter === 'tryout') $prefix = 'hasil-cbt-tryout-';
-            cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo, $filter), 'Hasil CBT', [16,28,16,26,20,20,16,16,14,12]), $prefix . date('Ymd') . '.xlsx', true);
+            // Ekspor mengikuti filter aktif tab Hasil Ujian (hari, lulus/tidak lulus, pencarian).
+            $exportFilters = pretesCbtResultFilters($_GET);
+            $exportExtra = ['day' => $exportFilters['day'], 'pass_filter' => $exportFilters['pass_filter'], 'q' => $exportFilters['q']];
+            if ($exportFilters['day'] !== '') $prefix .= $exportFilters['day'] . '-';
+            if ($exportFilters['pass_filter'] === 'lulus') $prefix .= 'lulus-';
+            elseif ($exportFilters['pass_filter'] === 'tidak_lulus') $prefix .= 'tidak-lulus-';
+            if ($exportFilters['q'] !== '') $prefix .= 'cari-';
+            cbtSendXlsx(cbtWriteXlsx(cbtResultsExportRows($pdo, $filter, $exportExtra), 'Hasil CBT', [16,28,16,26,20,20,16,16,14,12]), $prefix . date('Ymd') . '.xlsx', true);
         }
         elseif ($_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
         elseif ($_GET['download'] === 'pretes177') cbtSendXlsx(__DIR__ . '/../downloads/bank-soal-pretes-177-soal.xlsx', 'bank-soal-pretes-177-soal.xlsx');

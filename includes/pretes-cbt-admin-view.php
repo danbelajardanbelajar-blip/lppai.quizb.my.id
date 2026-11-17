@@ -450,9 +450,22 @@
                         <button type="submit" class="bank-button danger" title="Hapus Semua Hasil CBT peserta sesuai filter">🗑️ Hapus Semua Hasil (<?= $resultFilter === 'tryout' ? 'Tryout' : ($resultFilter === 'resmi' ? 'Resmi' : 'Semua') ?>)</button>
                     </form>
                 <?php endif; ?>
-                <a data-no-spa class="bank-button primary" href="<?= $bankUrl ?>&amp;download=results&amp;filter=resmi" title="Ekspor data nilai ujian resmi pretes">🎓 Ekspor Resmi (.xlsx)</a>
-                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=results&amp;filter=tryout" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe" title="Ekspor data riwayat latihan tryout">📝 Ekspor Tryout (.xlsx)</a>
-                <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=results&amp;filter=all" title="Ekspor gabungan semua sesi">↓ Ekspor Semua (.xlsx)</a>
+                <?php
+                    // Ekspor mengikuti filter aktif: hari, lulus/tidak lulus, dan pencarian.
+                    $exportQs = http_build_query(array_filter([
+                        'day' => $dayFilter ?? '',
+                        'pass_filter' => ($passFilter ?? 'all') !== 'all' ? $passFilter : '',
+                        'q' => $searchQuery ?? '',
+                    ], fn($v) => $v !== ''));
+                    $exportSuffix = $exportQs !== '' ? '&amp;' . htmlspecialchars($exportQs, ENT_QUOTES, 'UTF-8') : '';
+                    $exportNote = $exportQs !== '' ? ' (mengikuti filter aktif: hari/kelulusan/pencarian)' : '';
+                ?>
+                <a data-no-spa class="bank-button primary" data-export-scope="resmi" href="<?= $bankUrl ?>&amp;download=results&amp;filter=resmi<?= $exportSuffix ?>" title="Ekspor data nilai ujian resmi pretes<?= $exportNote ?>">🎓 Ekspor Resmi (.xlsx)</a>
+                <a data-no-spa class="bank-button" data-export-scope="tryout" href="<?= $bankUrl ?>&amp;download=results&amp;filter=tryout<?= $exportSuffix ?>" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe" title="Ekspor data riwayat latihan tryout<?= $exportNote ?>">📝 Ekspor Tryout (.xlsx)</a>
+                <a data-no-spa class="bank-button" data-export-scope="all" href="<?= $bankUrl ?>&amp;download=results&amp;filter=all<?= $exportSuffix ?>" title="Ekspor gabungan semua sesi<?= $exportNote ?>">↓ Ekspor Semua (.xlsx)</a>
+                <?php if ($exportQs !== ''): ?>
+                    <span class="cbt-export-note" id="cbtExportFilterNote">⚙️ Ekspor mengikuti filter aktif</span>
+                <?php endif; ?>
             </div>
         </div>
 

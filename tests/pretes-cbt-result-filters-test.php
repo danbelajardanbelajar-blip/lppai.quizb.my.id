@@ -16,10 +16,13 @@ function t(bool $ok, string $msg): void {
 }
 
 require_once __DIR__ . '/../includes/pretes-cbt.php';
+require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $pdo->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT, nama_lengkap TEXT, nim TEXT, program_studi TEXT, jenis_program TEXT)');
-$pdo->exec('CREATE TABLE pretes_cbt_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, registration_id INTEGER, started_at INTEGER, deadline_at INTEGER, submitted_at INTEGER NULL, score REAL NULL)');
+$pdo->exec('CREATE TABLE pretes_cbt_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, registration_id INTEGER, session_id INTEGER DEFAULT 1, started_at INTEGER, deadline_at INTEGER, submitted_at INTEGER NULL, correct_count INTEGER NULL, score REAL NULL)');
+$pdo->exec('CREATE TABLE pretes_cbt_items (id INTEGER PRIMARY KEY, attempt_id INTEGER)');
+$pdo->exec('CREATE TABLE pretes_cbt_sessions (id INTEGER PRIMARY KEY, title TEXT)');
 
 $tz = new DateTimeZone('Asia/Jakarta');
 $d1 = (new DateTimeImmutable('2026-11-16 08:00:00', $tz))->getTimestamp();
@@ -101,12 +104,28 @@ t(strpos($url, 'day=2026-11-16') !== false && strpos($url, 'pass_filter=lulus') 
 $url = buildCbtResultUrl(['day' => '', 'pass_filter' => 'all']);
 t(strpos($url, 'day=') === false && strpos($url, 'pass_filter') === false, 'buildCbtResultUrl dapat menghapus day dan pass_filter');
 
+// Ekspor .xlsx mengikuti filter
+$exp = function (string $type, array $extra) use ($pdo): array {
+    $rows = iterator_to_array(cbtResultsExportRows($pdo, $type, $extra), false);
+    array_shift($rows);
+    return array_map(fn($r) => (string)$r[0], $rows);
+};
+t($exp('all', []) === ['2026002', '2026003', '2026004', '2026002', '2026001'], 'Ekspor tanpa filter tambahan tetap memuat semua sesi');
+t($exp('resmi', ['pass_filter' => 'lulus']) === ['2026003', '2026001'], 'Ekspor Resmi + Lulus');
+t($exp('all', ['pass_filter' => 'tidak_lulus']) === ['2026004', '2026002'], 'Ekspor Tidak Lulus (sesi live tidak ikut)');
+t($exp('resmi', ['day' => '2026-11-16']) === ['2026002', '2026001'], 'Ekspor mengikuti filter hari WIB');
+t($exp('all', ['q' => 'budi']) === ['2026001'], 'Ekspor mengikuti pencarian');
+t($exp('tryout', ['day' => '2026-11-17', 'pass_filter' => 'tidak_lulus']) === ['2026004'], 'Ekspor Tryout + hari + tidak lulus');
+
 // Markup
 $view = file_get_contents(__DIR__ . '/../includes/pretes-cbt-admin-view.php');
 t(strpos($view, 'id="cbtDayFilter"') !== false && strpos($view, 'data-pass-filter="tidak_lulus"') !== false, 'View memuat filter hari dan kelulusan');
 t(strpos($view, 'id="cbtResultSearchForm" data-no-spa') !== false, 'Form pencarian memakai navigasi penuh (data-no-spa)');
 $ctrl = file_get_contents(__DIR__ . '/../admin/pretes-bank-soal.php');
 t(strpos($ctrl, ':search_kw') === false, 'Controller tidak lagi memakai placeholder :search_kw ganda');
+
+t(strpos($view, 'data-export-scope="resmi"') !== false && strpos($view, '$exportSuffix') !== false, 'Tombol ekspor meneruskan filter aktif');
+t(strpos($ctrl, 'cbtResultsExportRows($pdo, $filter, $exportExtra)') !== false, 'Handler unduhan meneruskan filter ke ekspor');
 
 if ($fail) { echo "\n$fail test gagal\n"; exit(1); }
 echo "\nSemua test filter hasil CBT lulus.\n";
