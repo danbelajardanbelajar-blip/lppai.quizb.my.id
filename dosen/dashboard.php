@@ -93,6 +93,14 @@ include __DIR__ . '/../includes/header.php';
             <p>Total Mahasiswa</p>
         </div>
     </div>
+
+    <a href="<?= BASE_URL ?>/dosen/diktat.php" class="stat-card" style="text-decoration:none; color:inherit; transition:transform 0.2s, box-shadow 0.2s;" title="Buka Diktat LPPAI 2026">
+        <div class="stat-icon green" style="background:#dcfce7; color:#15803d;">📖</div>
+        <div class="stat-info">
+            <h3 style="color:#15803d; font-size:18px; margin:2px 0 0 0;">Diktat LPPAI</h3>
+            <p>Pegangan Materi Tutorial</p>
+        </div>
+    </a>
 </div>
 
 <?php if ($isPretesExaminer): ?>
@@ -120,6 +128,65 @@ include __DIR__ . '/../includes/header.php';
     </div></div>
 </div>
 <?php endif; ?>
+
+<style>
+/* Diktat Educational Prompt Banner */
+.ti-diktat-prompt { background: linear-gradient(135deg, #064e3b 0%, #065f46 60%, #047857 100%); color: #ffffff; border-radius: 16px; padding: 24px 26px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; gap: 24px; box-shadow: 0 10px 25px rgba(6, 78, 59, 0.22); }
+.ti-diktat-prompt-left { flex: 1; min-width: 0; }
+.ti-diktat-badge { display: inline-block; background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.28); color: #fef08a; font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px; letter-spacing: 0.05em; margin-bottom: 10px; }
+.ti-diktat-prompt h3 { margin: 0 0 8px; font-size: 18.5px; font-weight: 800; color: #ffffff; line-height: 1.35; }
+.ti-diktat-prompt p { margin: 0 0 14px; font-size: 13.5px; line-height: 1.6; color: #e2e8f0; }
+.ti-diktat-topics { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.ti-topic-tag { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600; color: #f0fdf4; }
+.ti-diktat-action { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn-diktat-cta { background: #facc15; color: #713f12; border: none; padding: 11px 22px; border-radius: 12px; font-weight: 800; font-size: 14px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 14px rgba(250, 204, 21, 0.35); display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.btn-diktat-cta:hover { background: #fde047; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(250, 204, 21, 0.45); color: #422006; }
+.ti-diktat-subnote { font-size: 12px; opacity: 0.85; color: #d1fae5; }
+.ti-diktat-prompt-visual { display: flex; align-items: center; justify-content: center; flex: 0 0 140px; }
+.ti-diktat-book-card { width: 125px; height: 170px; background: #ffffff; border-radius: 10px; padding: 14px 12px; box-shadow: -6px 8px 24px rgba(0, 0, 0, 0.35); border-left: 7px solid #facc15; display: flex; flex-direction: column; justify-content: space-between; text-align: center; color: #064e3b; transform: rotate(-3deg); transition: transform 0.25s ease; user-select: none; }
+.ti-diktat-book-card:hover { transform: rotate(0deg) scale(1.06); }
+.ti-diktat-book-title { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: #064e3b; margin-top: 4px; }
+.ti-diktat-book-sub { font-size: 13px; font-weight: 900; color: #047857; margin-top: 2px; }
+.ti-diktat-book-logo { font-size: 28px; margin: 8px 0; }
+.ti-diktat-book-label { font-size: 10px; font-weight: 700; color: #64748b; background: #f1f5f9; padding: 3px 6px; border-radius: 6px; }
+
+@media (max-width: 768px) {
+    .ti-diktat-prompt { flex-direction: column; align-items: flex-start; padding: 20px; }
+    .ti-diktat-prompt-visual { display: none; }
+}
+</style>
+
+<!-- Banner Edukasi & Pegangan Diktat Tutorial -->
+<div class="ti-diktat-prompt" id="dosen-diktat-card">
+    <div class="ti-diktat-prompt-left">
+        <div class="ti-diktat-badge">📖 BUKU PEGANGAN DOSEN &amp; TUTOR</div>
+        <h3>Diktat Resmi LPPAI 2026 (Pedoman Tutorial Ubudiyah &amp; PAI)</h3>
+        <p>Buku materi resmi sebagai pedoman pembelajaran tatap muka di kelas tutorial bersama mahasiswa bimbingan Anda. Mencakup seluruh standar kompetensi praktikum ibadah, thaharah, shalat, wirid, serta bacaan tartil Al-Qur'an.</p>
+
+        <!-- Poin Pokok Materi Diktat -->
+        <div class="ti-diktat-topics">
+            <div class="ti-topic-tag">🕌 Thaharah &amp; Wudhu Sempurna</div>
+            <div class="ti-topic-tag">🤲 Praktik Shalat Fardhu &amp; Jenazah</div>
+            <div class="ti-topic-tag">📿 Dzikir &amp; Wirid Sesudah Shalat</div>
+            <div class="ti-topic-tag">📖 Kaidah Tajwid &amp; Tartil Al-Qur'an</div>
+        </div>
+
+        <div class="ti-diktat-action">
+            <a href="<?= BASE_URL ?>/dosen/diktat.php" class="btn-diktat-cta" id="btn-buka-diktat-dosen">
+                📖 Buka &amp; Pelajari Diktat Tutorial →
+            </a>
+            <span class="ti-diktat-subnote">Dapat dibaca langsung di peramban secara daring tanpa perlu mengunduh file.</span>
+        </div>
+    </div>
+    <div class="ti-diktat-prompt-visual">
+        <div class="ti-diktat-book-card">
+            <div class="ti-diktat-book-title">DIKTAT TUTORIAL</div>
+            <div class="ti-diktat-book-sub">LPPAI 2026</div>
+            <div class="ti-diktat-book-logo">📗</div>
+            <div class="ti-diktat-book-label">Reader Daring Aktif</div>
+        </div>
+    </div>
+</div>
 
 <!-- Recent Classes -->
 <div class="card">

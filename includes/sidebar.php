@@ -333,6 +333,10 @@ if (!function_exists('isNavGroupActive')) {
                 <span class="icon">🏫</span>
                 <span class="nav-text">Kelas Anda</span>
             </a>
+            <a href="<?= BASE_URL ?>/dosen/diktat.php" class="page-nav <?= menuActive('diktat.php') ?>">
+                <span class="icon">📖</span>
+                <span class="nav-text">Diktat Tutorial</span>
+            </a>
             <a href="<?= BASE_URL ?>/rekap-nilai.php" class="page-nav <?= menuActive('rekap-nilai.php') ?>">
                 <span class="icon">🎓</span>
                 <span class="nav-text">Rekapitulasi Nilai</span>

@@ -5,6 +5,47 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 14:48:14 +0700 — Penambahan Menu & Kartu Diktat Tutorial LPPAI 2026 pada Role Dosen
+
+**ID:** DOSEN-DIKTAT-MENU · **Parent Git:** `42d7d6f`.
+
+**Permintaan:** Pada dashboard role dosen apakah bisa ditambahkan menu diktat seperti yang ditampilkan pada role mahasiswa peserta tutorial?
+
+**Solusi & Implementasi:**
+1. **Sidebar Dosen (`includes/sidebar.php`):** Menambahkan menu navigasi resmi "Diktat Tutorial" (`dosen/diktat.php`) dengan ikon 📖 pada bagian Akademik dosen. Menu ini terintegrasi penuh dengan penanda aktif `menuActive('diktat.php')` dan fitur pencarian menu sidebar.
+2. **Dashboard Dosen (`dosen/dashboard.php`):**
+   - Menambahkan stat card interaktif ke-3 pada grid statistik beranda dosen: "Diktat LPPAI - Pegangan Materi Tutorial" yang langsung mengarahkan ke reader diktat.
+   - Menambahkan banner edukatif & pegangan dosen `.ti-diktat-prompt` di beranda dosen (seragam dengan tampilan ikonik mahasiswa di `tutorial-info.php`), lengkap dengan visual 3D buku "DIKTAT TUTORIAL LPPAI 2026", badge "BUKU PEGANGAN DOSEN & TUTOR", 4 topik pokok kompetensi (Thaharah, Shalat Fardhu/Jenazah, Dzikir/Wirid, Tajwid/Tartil), serta tombol CTA "📖 Buka & Pelajari Diktat Tutorial →".
+3. **Halaman Reader Diktat Dosen (`dosen/diktat.php`):**
+   - Halaman baru khusus role Dosen dengan proteksi otentikasi `requireDosen()`.
+   - Mengintegrasikan pembaca PDF.js interaktif dengan continuous scroll, lazy rendering via `IntersectionObserver`, navigasi lompat halaman, zoom in/out, fit width, dan layar penuh (fullscreen).
+   - Menggunakan mekanisme streaming terenkripsi XOR yang sama via `diktat-stream.php` menggunakan kunci sesi acak `$_SESSION['diktat_key']`.
+   - Dilengkapi proteksi keamanan: watermark dinamis nama dosen ("Nama Lengkap · Dosen / Tutor LPPAI"), pemblokiran klik kanan, drag-drop, dan pintasan keyboard (Ctrl+S, Ctrl+P, Ctrl+U).
+4. **Unit Test Suite (`tests/dosen-diktat-menu-test.php`):**
+   - 20 asersi pengujian menyeluruh memvalidasi sintaks PHP, keberadaan menu sidebar dosen, elemen kartu/banner/tombol CTA dashboard dosen, dan proteksi otentikasi/reader halaman `dosen/diktat.php`.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `dosen/diktat.php` | 2026-11-17 14:45:57 | 1–252 (baru) | Reader Diktat Dosen | Halaman baru reader Diktat LPPAI 2026 dengan otentikasi dosen, PDF.js, watermark nama dosen, dan kontrol zoom/fullscreen. |
+| `includes/sidebar.php` | 2026-11-17 14:46:37 | 336–339 | Sidebar Dosen (Akademik) | Menambahkan tautan menu `dosen/diktat.php` ("Diktat Tutorial") di bawah "Kelas Anda". |
+| `dosen/dashboard.php` | 2026-11-17 14:48:14 | 97–104, 132–190 | Dashboard Beranda Dosen | Menambahkan stat card Diktat di stat-grid dan banner promosi edukasi Diktat Tutorial dengan visual buku 3D dan CTA. |
+| `tests/dosen-diktat-menu-test.php` | 2026-11-17 14:47:54 | 1–70 (baru) | Test Suite | Pengujian 20 asersi validasi sidebar, dashboard card, dan halaman reader dosen. |
+
+**Verifikasi:**
+- Pemeriksaan sintaks: `php -l dosen/diktat.php`, `php -l dosen/dashboard.php`, `php -l includes/sidebar.php`, `php -l tests/dosen-diktat-menu-test.php`: No syntax errors detected (PASS).
+- `git diff --check`: Bersih tanpa trailing whitespace atau konflik spasi baris.
+- Pengujian unit test:
+  1. `tests/dosen-diktat-menu-test.php`: 20 asersi PASS 100%.
+  2. `tests/dosen-dashboard-examiner-test.php`: Pengujian isolasi dosen penguji vs non-penguji PASS.
+  3. `tests/sidebar-accordion-compact-test.php`: PASS 100%.
+  4. `tests/tutorial-info-test.php`: PASS 100%.
+  5. `tests/tutorial-waiting-test.php`: PASS 100%.
+  6. `tests/dosen-wa-link-test.php`: PASS 100%.
+- Keterbatasan verifikasi: Pengujian lingkungan browser sebenarnya (interaksi mouse/layar sentuh langsung dan pembacaan stream PDF visual live) memerlukan sesi browser pengguna pada hosting aktif.
+
+---
 ## 2026-11-17 14:39:21 +0700 — Sembunyikan Materi Persiapan Praktik untuk RPL yang Lulus Lewat CBT
 
 **ID:** PRETES-RPL-LULUS-HIDE-MATERI · **Parent Git:** `a47a68e`.
