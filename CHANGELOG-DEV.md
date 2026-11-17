@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 22:33:28 +0700 — Tampilkan Jurusan (Kecil) di Kolom Nama pada Tab Hasil Ujian CBT
+
+**ID:** CBT-RESULT-PRODI-COLUMN · **Parent Git:** `310ef54`.
+
+**Permintaan:** https://lppai.quizb.my.id/pretes-ujian.php?cbt_bank=1&tab=results&pass_filter=lulus — tampilkan jurusan (kecil) di kolom nama di bawah nama.
+
+**Solusi & Implementasi:**
+1. **View Tabel Hasil CBT (`includes/pretes-cbt-admin-view.php`):**
+   - Menambahkan elemen container teks kecil `<div class="cbt-user-prodi" style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.25;"><?= sanitize($attempt['program_studi']) ?></div>` tepat di bawah nama peserta pada kolom pertama tabel hasil ujian.
+   - Pengecekan aman: jurusan hanya dirender jika string `program_studi` tidak kosong setelah di-trim, sehingga tidak meninggalkan ruang kosong atau teks aneh jika profil belum memiliki data jurusan.
+   - Memperbarui placeholder dan label pencarian menjadi `"Nama, NIM, jurusan, atau username…"` untuk menginformasikan kemampuan pencarian prodi.
+2. **JavaScript Live Monitoring (`assets/js/pretes-cbt-admin.js`):**
+   - Pada fungsi `renderRowHtml(att)` yang merender baris saat live polling/auto-refresh berjalan, menambahkan ekstraksi `att.program_studi` (sudah disediakan oleh endpoint AJAX `live_results`), di-escape via `escapeHtml()`, dan dirender sebagai elemen `.cbt-user-prodi` di bawah tautan profil nama mahasiswa.
+3. **Stylesheet Admin CBT (`assets/css/pretes-cbt-admin.css`):**
+   - Menambahkan aturan kelas `.cbt-user-prodi` dengan ukuran font 11px, warna `#64748b`, line-height 1.25, font-weight 500, dan `word-break: break-word` agar nama prodi yang panjang tetap rapi dan tidak merusak layout tabel.
+4. **Helper Query Pencarian (`includes/pretes-cbt.php`):**
+   - Pada fungsi `pretesCbtResultWhere()`, memperluas kondisi pencarian teks bebas `q` agar juga mencocokkan `u.program_studi LIKE :kw_prodi ESCAPE '!'` dengan named parameter yang unik dan aman untuk native prepare MySQL (PDO emulate prepares false).
+5. **Unit Test Suite (`tests/pretes-cbt-result-prodi-column-test.php`):**
+   - 19 asersi pengujian menyeluruh memvalidasi sintaks PHP seluruh file terkait, pengecekan template view, integrasi JavaScript live monitor, definisi CSS, pengujian simulasi render baris (prodi terisi vs kosong vs null), dan pengujian query SQLite pencarian jurusan.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt-admin-view.php` | 2026-11-17 22:31:09 | 571, 628–635 | Tabel Hasil CBT & Form Filter | Menampilkan teks jurusan / prodi dengan styling kecil di bawah nama peserta dan memperbarui placeholder pencarian. |
+| `assets/js/pretes-cbt-admin.js` | 2026-11-17 22:31:37 | 917–919, 934–936 | Live Monitor Row Renderer | Menyertakan container teks kecil `.cbt-user-prodi` saat rendering live auto-refresh hasil ujian. |
+| `assets/css/pretes-cbt-admin.css` | 2026-11-17 22:32:03 | 484 | Styling Hasil Ujian | Menambahkan styling `.cbt-user-prodi` (font-size 11px, warna muted slate #64748b). |
+| `includes/pretes-cbt.php` | 2026-11-17 22:32:26 | 1196–1200 | Helper Query `pretesCbtResultWhere` | Menambahkan pencarian fleksibel berdasarkan nama jurusan/prodi via parameter `:kw_prodi`. |
+| `tests/pretes-cbt-result-prodi-column-test.php` | 2026-11-17 22:33:28 | 1–193 (baru) | Test Suite Validasi | 19 asersi validasi sintaks PHP, HTML view, JS renderer, CSS style, dan query search prodi. |
+
+**Verifikasi:**
+- Pemeriksaan sintaks: `php -l includes/pretes-cbt-admin-view.php`, `php -l includes/pretes-cbt.php`, `php -l admin/pretes-bank-soal.php`, `php -l pages/pretes-ujian.php`, `php -l tests/pretes-cbt-result-prodi-column-test.php`: No syntax errors detected (PASS).
+- `git diff --check`: Bersih tanpa trailing whitespace atau konflik spasi baris.
+- Pengujian unit test:
+  1. `tests/pretes-cbt-result-prodi-column-test.php`: 19 asersi PASS 100%.
+  2. `tests/pretes-cbt-result-filters-test.php`: 34 asersi PASS 100%.
+  3. `tests/pretes-cbt-live-monitoring-test.php`: 35 asersi PASS 100%.
+  4. `tests/pretes-cbt-pagination-tabs-test.php`: 33 asersi PASS 100%.
+  5. `tests/pretes-cbt-review-test.php`: 22 asersi PASS 100%.
+  6. `tests/pretes-cbt-admin-buttons-test.php`: PASS 100%.
+- Keterbatasan verifikasi: Pengujian tampilan visual live di peramban sebenarnya memerlukan sesi pengguna admin aktif pada lingkungan hosting live.
+
+---
+
 ## 2026-11-17 14:48:14 +0700 — Penambahan Menu & Kartu Diktat Tutorial LPPAI 2026 pada Role Dosen
 
 **ID:** DOSEN-DIKTAT-MENU · **Parent Git:** `42d7d6f`.

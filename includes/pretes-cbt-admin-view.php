@@ -568,7 +568,7 @@
                         <span class="cbt-filter-label">Cari</span>
                         <span class="cbt-search-box">
                             <span class="cbt-search-icon" aria-hidden="true">🔍</span>
-                            <input type="search" name="q" id="cbtResultSearchInput" value="<?= sanitize($searchQuery) ?>" placeholder="Nama, NIM, atau username…" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="Cari peserta berdasarkan nama, NIM, atau username">
+                            <input type="search" name="q" id="cbtResultSearchInput" value="<?= sanitize($searchQuery) ?>" placeholder="Nama, NIM, jurusan, atau username…" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="Cari peserta berdasarkan nama, NIM, jurusan, atau username">
                         </span>
                     </label>
                     <div class="cbt-filter-actions">
@@ -626,7 +626,12 @@
                     $unansCount = max(0, $totItems - $ansCount);
                 ?>
                     <tr id="attemptRow_<?= (int)$attempt['id'] ?>" data-attempt-id="<?= (int)$attempt['id'] ?>">
-                        <td><strong><?= adminUserProfileLink($attempt['nama_lengkap'], $attempt['user_id']) ?></strong></td>
+                        <td>
+                            <div><strong><?= adminUserProfileLink($attempt['nama_lengkap'], $attempt['user_id']) ?></strong></div>
+                            <?php if (!empty(trim((string)($attempt['program_studi'] ?? '')))): ?>
+                                <div class="cbt-user-prodi" style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.25;"><?= sanitize($attempt['program_studi']) ?></div>
+                            <?php endif; ?>
+                        </td>
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
                         <td><?= renderJenisProgramBadge($attempt['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>

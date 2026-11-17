@@ -1193,10 +1193,11 @@ if (!function_exists('pretesCbtResultWhere')) {
         if ($f['q'] !== '') {
             // Escape wildcard LIKE dengan '!' (perilaku sama di MySQL & SQLite).
             $kw = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $f['q']) . '%';
-            $conds[] = "(u.nama_lengkap LIKE :kw_nama ESCAPE '!' OR u.nim LIKE :kw_nim ESCAPE '!' OR u.username LIKE :kw_user ESCAPE '!')";
+            $conds[] = "(u.nama_lengkap LIKE :kw_nama ESCAPE '!' OR u.nim LIKE :kw_nim ESCAPE '!' OR u.username LIKE :kw_user ESCAPE '!' OR u.program_studi LIKE :kw_prodi ESCAPE '!')";
             $params[':kw_nama'] = $kw;
             $params[':kw_nim'] = $kw;
             $params[':kw_user'] = $kw;
+            $params[':kw_prodi'] = $kw;
         }
         return [$conds ? ('WHERE ' . implode(' AND ', $conds)) : '', $params];
     }
