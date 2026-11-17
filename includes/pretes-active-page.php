@@ -80,9 +80,11 @@ function renderActivePretesParticipantPage(PDO $pdo, array $user): bool {
     }
     $tutorialRplUrl = BASE_URL . '/tutorial-rpl.php';
     // Setelah CBT dikumpulkan: jadwal & tata tertib ujian disembunyikan (di view); materi persiapan hanya
-    // untuk nilai ≥ 80 (dibutuhkan untuk tugas video hafalan 11 kompetensi). Nilai < 80 → kartu hasil saja.
+    // untuk nilai ≥ 80 pada alur "CBT + tugas online" (dibutuhkan untuk tugas video hafalan). Nilai < 80 →
+    // kartu hasil saja. RPL mode "cukup CBT" dengan nilai ≥ 80 sudah LULUS → materi praktik disembunyikan.
     $cbtSubmitted = $cbtResult && ($cbtResult['status'] ?? '') === 'submitted';
-    $showPreparation = !$cbtSubmitted || pretesCbtResultPassed($cbtResult);
+    require_once __DIR__ . '/pretes-certificate.php';
+    $showPreparation = pretesShouldShowPreparation($cbtResult, $user);
 
     define('PAGE_TITLE', 'Peserta, Jadwal & Persiapan Pretes');
     include __DIR__ . '/header.php';

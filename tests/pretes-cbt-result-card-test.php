@@ -106,8 +106,19 @@ $vRun = $renderView($run);
 $check(str_contains($vRun, 'Jadwal Pelaksanaan Pretes Anda') && str_contains($vRun, 'data-state="in_progress"'), 'View berjalan: jadwal tetap + kartu Lanjutkan Ujian');
 $vNone = $renderView(null);
 $check(str_contains($vNone, 'Jadwal Pelaksanaan Pretes Anda') && str_contains($vNone, 'id="btn-kerjakan-pretes"'), 'View belum mulai: tampilan biasa');
-// Materi persiapan: hanya bila belum dikumpulkan atau nilai ≥ 80
-$check(str_contains($active, '$showPreparation = !$cbtSubmitted || pretesCbtResultPassed($cbtResult);') && str_contains($active, 'if ($showPreparation) {'), 'Materi persiapan disembunyikan untuk nilai < 80, tetap untuk ≥ 80');
+// Materi persiapan: belum dikumpulkan → tampil; < 80 → tidak; ≥ 80 → tampil kecuali RPL mode "cukup CBT" (sudah LULUS)
+require_once __DIR__ . '/../includes/pretes-certificate.php';
+$check(str_contains($active, '$showPreparation = pretesShouldShowPreparation($cbtResult, $user);') && str_contains($active, 'if ($showPreparation) {'), 'Halaman aktif memakai pretesShouldShowPreparation');
+$rplUser = ['id' => 1, 'jenis_program' => 'RPL', 'role' => 'mahasiswa'];
+$regUser = ['id' => 2, 'jenis_program' => 'Reguler', 'role' => 'mahasiswa'];
+pretesSettingsCache(null, null, true);
+$check(pretesShouldShowPreparation(null, $rplUser) && pretesShouldShowPreparation($run, $rplUser), 'Materi: belum/sedang CBT → tampil');
+$check(!pretesShouldShowPreparation($r76, $rplUser) && !pretesShouldShowPreparation($r76, $regUser), 'Materi: CBT < 80 → disembunyikan');
+$check(pretesRplCbtOnly() && !pretesShouldShowPreparation($r100, $rplUser), 'Materi: RPL CBT ≥ 80 mode cukup CBT (LULUS) → disembunyikan');
+$check(pretesShouldShowPreparation($r100, $regUser), 'Materi: Reguler CBT ≥ 80 → tetap tampil');
+pretesSettingsCache('rpl_pass_mode', 'cbt_tasks');
+$check(pretesShouldShowPreparation($r100, $rplUser), 'Materi: RPL CBT ≥ 80 mode CBT + tugas online → tampil (untuk video hafalan)');
+pretesSettingsCache(null, null, true);
 
 if ($failures) { echo "FAIL:\n - " . implode("\n - ", $failures) . "\n"; exit(1); }
 echo "PASS: kartu hasil CBT pretes (berjalan, ≥80 tugas online, tepat 80, <80 link Tutorial RPL, 0) + halaman tutorial RPL.\n";

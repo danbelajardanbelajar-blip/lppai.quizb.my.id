@@ -5,6 +5,48 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 14:39:21 +0700 — Sembunyikan Materi Persiapan Praktik untuk RPL yang Lulus Lewat CBT
+
+**ID:** PRETES-RPL-LULUS-HIDE-MATERI · **Parent Git:** `a47a68e`.
+
+**Permintaan:** Pada `/pretes-peserta.php`, mahasiswa RPL yang sudah lulus pretes (CBT resmi ≥ 80, mode "cukup CBT") tidak perlu lagi melihat materi persiapan praktik ("Ya, sembunyikan").
+
+**Sebelumnya:**
+- `includes/pretes-active-page.php` menampilkan bagian `#pretes-active-preparation` untuk semua peserta dengan CBT ≥ 80, karena materi dulu dipakai untuk tugas video hafalan.
+- `pretes-preparation-view.php` membaca komponen RPL langsung dari database tanpa melihat mode, sehingga video dan bacaan 11 kompetensi tetap tampil di bawah kartu "LULUS PRETES".
+
+**Rancangan:** fungsi baru `pretesShouldShowPreparation($cbtResult, $user)` menentukan apakah materi tampil:
+
+| Kondisi peserta | Materi praktik |
+|---|---|
+| Belum mengumpulkan CBT, atau CBT masih berjalan | Tampil |
+| CBT < 80 | Disembunyikan (seperti sebelumnya) |
+| CBT ≥ 80, RPL mode "cukup CBT" | Disembunyikan (sudah LULUS) |
+| CBT ≥ 80, Reguler, atau RPL mode "CBT + tugas online" | Tampil |
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-certificate.php` | 2026-11-17 14:39:04 | 23–36 | `pretesShouldShowPreparation` (baru) | Aturan tampil materi persiapan per hasil CBT dan mode RPL. |
+| `includes/pretes-active-page.php` | 2026-11-17 14:39:05 | 82–87 | `renderActivePretesParticipantPage` | `$showPreparation` memakai helper baru; komentar diperbarui. |
+| `tests/pretes-cbt-result-card-test.php` | 2026-11-17 14:39:21 | 109–121 | Materi persiapan | Asersi string lama diganti dengan uji perilaku untuk lima kondisi (belum/berjalan, < 80, RPL cukup CBT, Reguler, RPL CBT + tugas). |
+
+**Verifikasi:**
+- `php -l` file yang berubah: OK. `git diff --check`: bersih.
+- `tests/pretes-cbt-result-card-test.php`, semua `tests/pretes-*.php`, `tests/dashboard-cbt-submitted-test.php`, dan `tests/pretes-hasil-preparation-test.py`: PASS.
+- Render `pages/pretes-peserta.php` asli (salinan aplikasi, auth tiruan, mahasiswa RPL dengan CBT resmi 88, periode aktif, pengumuman sertifikat aktif):
+
+  | Mode | `#pretes-active-preparation` | Yang tampil |
+  |---|---|---|
+  | `cbt_only` | 0 | "LULUS PRETES" + sertifikat `announced`, tanpa tugas online |
+  | `cbt_tasks` | ada | Kartu tugas online |
+
+  Tidak ada fatal error.
+- **Keterbatasan:** belum dicek di situs live dengan akun asli.
+
+---
+
 ## 2026-11-17 14:31:57 +0700 — RPL Lulus Pretes Cukup CBT ≥ 80 + Pengambilan Sertifikat Setelah Pengumuman
 
 **ID:** PRETES-RPL-LULUS-CBT · **Parent Git:** `bcd376c`.

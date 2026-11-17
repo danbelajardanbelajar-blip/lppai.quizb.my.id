@@ -21,6 +21,20 @@ function pretesIsRplCbtOnlyUser(?array $user): bool {
 }
 
 /**
+ * Tampilkan bagian "Persiapan materi pretes" (praktik) di halaman peserta aktif?
+ * - Belum mengumpulkan CBT → ya (persiapan ujian).
+ * - CBT < 80 → tidak (cukup kartu hasil + Tutorial RPL).
+ * - CBT ≥ 80 → ya untuk alur "CBT + tugas online" (materi dipakai untuk video hafalan),
+ *   tidak untuk RPL mode "cukup CBT" karena sudah LULUS dan praktik tidak lagi wajib.
+ */
+function pretesShouldShowPreparation(?array $cbtResult, ?array $user): bool {
+    $submitted = $cbtResult && ($cbtResult['status'] ?? '') === 'submitted';
+    if (!$submitted) return true;
+    if (!function_exists('pretesCbtResultPassed') || !pretesCbtResultPassed($cbtResult)) return false;
+    return !pretesIsRplCbtOnlyUser($user);
+}
+
+/**
  * Pengumuman pengambilan sertifikat pretes yang aktif & berlaku untuk user (terbaru), atau null.
  * Menghormati target program (Semua/RPL/Reguler) dan sasaran peserta pengumuman.
  */
