@@ -60,6 +60,9 @@ function renderElementTypeBadge($type) {
 function renderLogJenisProgramBadge($role, $jenisProgram) {
     $roleClean = strtolower(trim((string)$role));
     $jenisClean = strtoupper(trim((string)$jenisProgram));
+    if ($roleClean === 'admin' || $roleClean === 'dosen' || $roleClean === 'tamu') {
+        return '';
+    }
     if ($roleClean === 'mahasiswa' || $jenisClean === 'RPL' || ($roleClean === '' && !empty($jenisProgram))) {
         if (function_exists('renderJenisProgramBadge')) {
             return renderJenisProgramBadge($jenisProgram ?: 'Reguler', true);
@@ -151,7 +154,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th style="width:50px;">No</th>
                         <th>Waktu</th>
-                        <th>Pengguna</th>
+                        <th>Nama Pengguna</th>
                         <th>Role</th>
                         <th>Username / NIM</th>
                         <th>No. HP</th>
@@ -177,7 +180,7 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td>
                             <div style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($nama, $log['user_id'] ?? null) ?></strong>
+                                <strong style="color:var(--primary-dark);"><?= function_exists('adminUserProfileLink') ? adminUserProfileLink($nama, $log['user_id'] ?? null) : sanitize($nama) ?></strong>
                                 <?= renderLogJenisProgramBadge($log['role'] ?? '', $log['jenis_program'] ?? '') ?>
                             </div>
                         </td>
@@ -252,7 +255,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th style="width:50px;">No</th>
                         <th>Waktu</th>
-                        <th>Pengguna</th>
+                        <th>Nama Pengguna</th>
                         <th>Role</th>
                         <th>Elemen / Teks Diklik</th>
                         <th>Tipe</th>
@@ -277,7 +280,7 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td>
                             <div style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                                <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($namaUser, $c['user_id'] ?? null) ?></strong>
+                                <strong style="color:var(--primary-dark);"><?= function_exists('adminUserProfileLink') ? adminUserProfileLink($namaUser, $c['user_id'] ?? null) : sanitize($namaUser) ?></strong>
                                 <?= renderLogJenisProgramBadge($c['role'] ?? '', $c['jenis_program'] ?? '') ?>
                             </div>
                             <?php if (!empty($c['username']) && $c['username'] !== $namaUser): ?>

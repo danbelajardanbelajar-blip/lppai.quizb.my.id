@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 10:26:37 +0700 — Label Jenis Program (RPL / Reguler) pada Kolom Nama Halaman Log Aktivitas
+
+**ID:** LOG-AKTIVITAS-JENIS-PROGRAM · **Parent Git:** `18117d5`.
+**Permintaan pengguna:** tambahkan label di sebelah nama pada kolom nama agar diketahui apakah rpl atau reguler pada halaman ini https://lppai.quizb.my.id/admin/log-aktivitas.php.
+**Sebelumnya:** Halaman log aktivitas menampilkan nama pengguna tanpa label RPL / Reguler yang konsisten, header tabel tertulis "Pengguna", query log belum resilien terhadap skema database tanpa kolom `jenis_program`, serta kueri JOIN berpotensi melewatkan data mahasiswa jika `user_id` tidak terisi atau bernilai 0.
+
+**Rancangan:**
+- Tambahkan pendeteksian skema kolom dinamis `activityLogUserHasColumn` (MySQL & SQLite) untuk kolom `jenis_program`, `role`, dan `nama_lengkap`.
+- Kueri `getRecentLoginLogs` dan `getRecentClickLogs` mengaitkan tabel `users` dengan kondisi JOIN resilien `(u.id = user_id OR u.username = username)`, menyertakan fallback data nama, role, dan `jenis_program` (default 'Reguler' untuk mahasiswa).
+- Filter visual badge `renderLogJenisProgramBadge`: secara eksplisit hanya menampilkan badge jenis program (`RPL` warna kuning-emas atau `Reguler` warna biru muda) untuk mahasiswa/peserta; tidak menampilkan badge program mahasiswa untuk akun `admin`, `dosen`, dan `tamu`.
+- Header tabel diperjelas menjadi `<th>Nama Pengguna</th>` (kolom nama) pada Tabel Riwayat Login dan Tabel Riwayat Klik.
+- Panggilan tautan profil pengguna `adminUserProfileLink` diberi pengaman `function_exists` dengan fallback `sanitize($nama)` agar aman di semua lingkungan pengujian isolasi.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/log-aktivitas.php` | 2026-11-17 10:25:01 | 60–77, 154, 180–183, 258, 280–283 | Helper badge, header tabel, render nama | Penajaman `renderLogJenisProgramBadge` (mengecualikan role staf/tamu dan memvalidasi RPL/Reguler mahasiswa), penyesuaian header tabel menjadi `<th>Nama Pengguna</th>`, penambahan pengaman `function_exists('adminUserProfileLink')`, dan penempatan badge di sebelah nama dengan layout inline-flex. |
+| `includes/activity-logger.php` | 2026-11-17 10:26:37 | 256–364 | Skema dinamis & kueri log | Penambahan fungsi `activityLogUserHasColumn` dengan caching per-koneksi; penyelarasan kueri `getRecentLoginLogs` dan `getRecentClickLogs` dengan JOIN ganda (ID atau username), pemilihan kolom nama, role, serta `jenis_program` yang tahan terhadap variasi skema basis data. |
+| `tests/log-aktivitas-program-badge-test.php` (baru) | 2026-11-17 10:25:56 | 1–175 | Pengujian unit & integrasi | Verifikasi render badge (mahasiswa RPL, Reguler, admin/dosen/tamu tanpa badge), verifikasi kueri database SQLite mock, deteksi kolom, serta validasi struktur tabel admin. |
+
+**Verifikasi:**
+- `php -l admin/log-aktivitas.php`, `php -l includes/activity-logger.php`, `php -l tests/log-aktivitas-program-badge-test.php`: OK (No syntax errors).
+- `git diff --check`: OK (bersih dari trailing whitespace).
+- `php tests/log-aktivitas-program-badge-test.php`: PASS (3 pengujian lulus 100%).
+- `python tests/activity-log-visibility-test.py`: PASS (verifikasi penuh riwayat login/klik, filter username, dan isolasi sqlite).
+- `php tests/admin-tables-jenis-program-test.php`: PASS (38 verifikasi pattern pada 17 file lulus 100%).
+
+---
+
+
 ## 2026-11-17 00:22:30 +0700 — Kelola Tugas Pretes (komponen selain CBT) per program RPL / Reguler
 
 **ID:** PRETES-TUGAS-KELOLA · **Parent Git:** `bf012f9`.

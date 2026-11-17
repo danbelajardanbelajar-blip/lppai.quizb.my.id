@@ -253,6 +253,42 @@ function activityLogUsernameFilter(string $alias, ?string $excludedUsername): ar
     ];
 }
 
+/**
+ * Periksa ketersediaan kolom pada tabel users secara aman (kompatibel MySQL dan SQLite).
+ */
+function activityLogUserHasColumn(PDO $pdo, string $columnName): bool {
+    static $cache = [];
+    $objId = function_exists('spl_object_id') ? spl_object_id($pdo) : 0;
+    $cacheKey = $objId . ':' . strtolower($columnName);
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
+    }
+    try {
+        $driver = '';
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        } catch (Throwable $e) {
+            $driver = 'mysql';
+        }
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query("PRAGMA table_info(users)");
+            $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($cols as $col) {
+                if (strcasecmp((string)($col['name'] ?? ''), $columnName) === 0) {
+                    return $cache[$cacheKey] = true;
+                }
+            }
+            return $cache[$cacheKey] = false;
+        } else {
+            $quoted = $pdo->quote($columnName);
+            $stmt = $pdo->query("SHOW COLUMNS FROM users LIKE $quoted");
+            return $cache[$cacheKey] = ($stmt && $stmt->rowCount() > 0);
+        }
+    } catch (Throwable $e) {
+        return $cache[$cacheKey] = false;
+    }
+}
+
 /** Ambil data log login terbaru, dengan filter tampilan opsional. */
 function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
     try {
@@ -261,13 +297,26 @@ function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 50;
         $filter = activityLogUsernameFilter('l', $excludedUsername);
+
+        $hasJenis = activityLogUserHasColumn($pdo, 'jenis_program');
+        $hasRole = activityLogUserHasColumn($pdo, 'role');
+        $hasNama = activityLogUserHasColumn($pdo, 'nama_lengkap');
+
+        $jenisSelect = $hasJenis ? "COALESCE(NULLIF(u.jenis_program, ''), 'Reguler')" : "'Reguler'";
+        $roleSelect = $hasRole ? "COALESCE(NULLIF(l.role, ''), u.role)" : "l.role";
+        $namaSelect = $hasNama ? "COALESCE(NULLIF(l.nama_lengkap, ''), u.nama_lengkap)" : "l.nama_lengkap";
+
         $stmt = $pdo->prepare("
-            SELECT l.*, COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp,
-                   COALESCE(u.jenis_program, 'Reguler') AS jenis_program
+            SELECT l.*,
+                   COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp,
+                   {$namaSelect} AS nama_lengkap,
+                   {$roleSelect} AS role,
+                   {$jenisSelect} AS jenis_program
             FROM user_login_logs l
-            LEFT JOIN users u ON (l.user_id = u.id OR (l.user_id IS NULL AND l.username = u.username))
+            LEFT JOIN users u ON ((l.user_id IS NOT NULL AND l.user_id > 0 AND l.user_id = u.id)
+                               OR ((l.user_id IS NULL OR l.user_id = 0) AND l.username IS NOT NULL AND l.username <> '' AND l.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
-            ORDER BY l.created_at DESC 
+            ORDER BY l.created_at DESC
             LIMIT $lim
         ");
         $stmt->execute($filter['params']);
@@ -288,10 +337,23 @@ function getRecentClickLogs($limit = 100, ?string $excludedUsername = null) {
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 100;
         $filter = activityLogUsernameFilter('c', $excludedUsername);
+
+        $hasJenis = activityLogUserHasColumn($pdo, 'jenis_program');
+        $hasRole = activityLogUserHasColumn($pdo, 'role');
+        $hasNama = activityLogUserHasColumn($pdo, 'nama_lengkap');
+
+        $jenisSelect = $hasJenis ? "COALESCE(NULLIF(u.jenis_program, ''), 'Reguler')" : "'Reguler'";
+        $roleSelect = $hasRole ? "COALESCE(NULLIF(c.role, ''), u.role)" : "c.role";
+        $namaSelect = $hasNama ? "COALESCE(NULLIF(c.nama_lengkap, ''), u.nama_lengkap)" : "c.nama_lengkap";
+
         $stmt = $pdo->prepare("
-            SELECT c.*, COALESCE(u.jenis_program, 'Reguler') AS jenis_program
+            SELECT c.*,
+                   {$namaSelect} AS nama_lengkap,
+                   {$roleSelect} AS role,
+                   {$jenisSelect} AS jenis_program
             FROM user_click_logs c
-            LEFT JOIN users u ON (c.user_id = u.id OR (c.user_id IS NULL AND c.username = u.username))
+            LEFT JOIN users u ON ((c.user_id IS NOT NULL AND c.user_id > 0 AND c.user_id = u.id)
+                               OR ((c.user_id IS NULL OR c.user_id = 0) AND c.username IS NOT NULL AND c.username <> '' AND c.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
             ORDER BY c.created_at DESC
             LIMIT $lim
