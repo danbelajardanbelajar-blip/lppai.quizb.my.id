@@ -11,6 +11,10 @@ require_once __DIR__ . '/../config/database.php';
 function ensureActivityLogTablesExist($pdo = null) {
     static $ensured = false;
     if ($ensured) return;
+    if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['_activity_log_tables_ensured'])) {
+        $ensured = true;
+        return;
+    }
 
     if ($pdo === null) {
         $pdo = getDBConnection();
@@ -71,6 +75,9 @@ function ensureActivityLogTablesExist($pdo = null) {
             }
         } catch (Exception $colEx) {}
 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['_activity_log_tables_ensured'] = true;
+        }
         $ensured = true;
     } catch (Exception $e) {
         error_log("Gagal membuat tabel activity logs: " . $e->getMessage());
@@ -242,9 +249,34 @@ function recordClickLog(array $data) {
 /**
  * Filter pembacaan log berdasarkan username tersimpan atau akun pemilik; tidak mengubah pencatatan.
  */
-function activityLogUsernameFilter(string $alias, ?string $excludedUsername): array {
+function activityLogUsernameFilter(string $alias, ?string $excludedUsername, ?PDO $pdo = null): array {
     $username = strtolower(trim((string)$excludedUsername));
     if ($username === '') return ['sql' => '', 'params' => []];
+
+    // Coba resolve user_id yang dikecualikan dari users agar kueri tidak menjalankan correlated subquery per baris
+    $excludedId = null;
+    if ($pdo !== null) {
+        try {
+            $st = $pdo->prepare("SELECT id FROM users WHERE LOWER(TRIM(username)) = ? LIMIT 1");
+            $st->execute([$username]);
+            $foundId = $st->fetchColumn();
+            if ($foundId !== false && $foundId !== null) {
+                $excludedId = (int)$foundId;
+            }
+        } catch (Throwable $e) {}
+    }
+
+    if ($excludedId !== null && $excludedId > 0) {
+        return [
+            'sql' => " AND LOWER(TRIM(COALESCE($alias.username, ''))) <> :excluded_log_username
+                AND ($alias.user_id IS NULL OR $alias.user_id <> :excluded_user_id)",
+            'params' => [
+                'excluded_log_username' => $username,
+                'excluded_user_id' => $excludedId
+            ],
+        ];
+    }
+
     return [
         'sql' => " AND LOWER(TRIM(COALESCE($alias.username, ''))) <> :excluded_log_username
             AND NOT EXISTS (SELECT 1 FROM users hidden_user WHERE hidden_user.id = $alias.user_id
@@ -289,6 +321,117 @@ function activityLogUserHasColumn(PDO $pdo, string $columnName): bool {
     }
 }
 
+/**
+ * Lengkapi baris log (login atau klik) dengan profil pengguna (nama_lengkap, role, jenis_program, no_hp)
+ * menggunakan batch query terindeks pada ID dan Username, tanpa JOIN berat pada seluruh tabel log.
+ */
+function attachActivityLogUserData(PDO $pdo, array $logs): array {
+    if (empty($logs)) {
+        return [];
+    }
+
+    $userIds = [];
+    $usernames = [];
+    foreach ($logs as $row) {
+        if (!empty($row['user_id']) && (int)$row['user_id'] > 0) {
+            $userIds[(int)$row['user_id']] = (int)$row['user_id'];
+        }
+        if (!empty($row['username'])) {
+            $u = strtolower(trim((string)$row['username']));
+            if ($u !== '') {
+                $usernames[$u] = $u;
+            }
+        }
+    }
+
+    $userById = [];
+    $userByName = [];
+
+    if (!empty($userIds) || !empty($usernames)) {
+        try {
+            $hasJenis = activityLogUserHasColumn($pdo, 'jenis_program');
+            $hasRole = activityLogUserHasColumn($pdo, 'role');
+            $hasNama = activityLogUserHasColumn($pdo, 'nama_lengkap');
+            $hasNoHp = activityLogUserHasColumn($pdo, 'no_hp');
+
+            $cols = ['id', 'username'];
+            if ($hasNama) $cols[] = 'nama_lengkap';
+            if ($hasRole) $cols[] = 'role';
+            if ($hasNoHp) $cols[] = 'no_hp';
+            if ($hasJenis) $cols[] = 'jenis_program';
+
+            $clauses = [];
+            $params = [];
+            if (!empty($userIds)) {
+                $inIds = implode(',', array_map('intval', array_values($userIds)));
+                $clauses[] = "id IN ($inIds)";
+            }
+            if (!empty($usernames)) {
+                $placeholders = [];
+                $idx = 0;
+                foreach ($usernames as $u) {
+                    $pKey = ":uname_$idx";
+                    $placeholders[] = $pKey;
+                    $params[$pKey] = $u;
+                    $idx++;
+                }
+                $clauses[] = "LOWER(TRIM(username)) IN (" . implode(',', $placeholders) . ")";
+            }
+
+            $sql = "SELECT " . implode(', ', $cols) . " FROM users WHERE " . implode(' OR ', $clauses);
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($users as $u) {
+                if (!empty($u['id'])) {
+                    $userById[(int)$u['id']] = $u;
+                }
+                if (!empty($u['username'])) {
+                    $cleanName = strtolower(trim((string)$u['username']));
+                    if ($cleanName !== '') {
+                        $userByName[$cleanName] = $u;
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            error_log("attachActivityLogUserData error: " . $e->getMessage());
+        }
+    }
+
+    foreach ($logs as &$log) {
+        $u = null;
+        if (!empty($log['user_id']) && isset($userById[(int)$log['user_id']])) {
+            $u = $userById[(int)$log['user_id']];
+        } elseif (!empty($log['username'])) {
+            $cleanName = strtolower(trim((string)$log['username']));
+            if (isset($userByName[$cleanName])) {
+                $u = $userByName[$cleanName];
+            }
+        }
+
+        if ($u !== null) {
+            if (empty($log['nama_lengkap']) && !empty($u['nama_lengkap'])) {
+                $log['nama_lengkap'] = $u['nama_lengkap'];
+            }
+            if (empty($log['role']) && !empty($u['role'])) {
+                $log['role'] = $u['role'];
+            }
+            if (empty($log['no_hp']) && !empty($u['no_hp'])) {
+                $log['no_hp'] = $u['no_hp'];
+            }
+            $log['jenis_program'] = !empty($u['jenis_program']) ? $u['jenis_program'] : 'Reguler';
+        } else {
+            if (!isset($log['jenis_program'])) {
+                $log['jenis_program'] = 'Reguler';
+            }
+        }
+    }
+    unset($log);
+
+    return $logs;
+}
+
 /** Ambil data log login terbaru, dengan filter tampilan opsional. */
 function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
     try {
@@ -296,31 +439,18 @@ function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
         ensureActivityLogTablesExist($pdo);
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 50;
-        $filter = activityLogUsernameFilter('l', $excludedUsername);
-
-        $hasJenis = activityLogUserHasColumn($pdo, 'jenis_program');
-        $hasRole = activityLogUserHasColumn($pdo, 'role');
-        $hasNama = activityLogUserHasColumn($pdo, 'nama_lengkap');
-
-        $jenisSelect = $hasJenis ? "COALESCE(NULLIF(u.jenis_program, ''), 'Reguler')" : "'Reguler'";
-        $roleSelect = $hasRole ? "COALESCE(NULLIF(l.role, ''), u.role)" : "l.role";
-        $namaSelect = $hasNama ? "COALESCE(NULLIF(l.nama_lengkap, ''), u.nama_lengkap)" : "l.nama_lengkap";
+        $filter = activityLogUsernameFilter('l', $excludedUsername, $pdo);
 
         $stmt = $pdo->prepare("
-            SELECT l.*,
-                   COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp,
-                   {$namaSelect} AS nama_lengkap,
-                   {$roleSelect} AS role,
-                   {$jenisSelect} AS jenis_program
+            SELECT l.*
             FROM user_login_logs l
-            LEFT JOIN users u ON ((l.user_id IS NOT NULL AND l.user_id > 0 AND l.user_id = u.id)
-                               OR ((l.user_id IS NULL OR l.user_id = 0) AND l.username IS NOT NULL AND l.username <> '' AND l.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
             ORDER BY l.created_at DESC
             LIMIT $lim
         ");
         $stmt->execute($filter['params']);
-        return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        return attachActivityLogUserData($pdo, $rows);
     } catch (Exception $e) {
         error_log("Error getRecentLoginLogs: " . $e->getMessage());
         return [];
@@ -336,30 +466,18 @@ function getRecentClickLogs($limit = 100, ?string $excludedUsername = null) {
         ensureActivityLogTablesExist($pdo);
         $lim = (int)$limit;
         if ($lim <= 0) $lim = 100;
-        $filter = activityLogUsernameFilter('c', $excludedUsername);
-
-        $hasJenis = activityLogUserHasColumn($pdo, 'jenis_program');
-        $hasRole = activityLogUserHasColumn($pdo, 'role');
-        $hasNama = activityLogUserHasColumn($pdo, 'nama_lengkap');
-
-        $jenisSelect = $hasJenis ? "COALESCE(NULLIF(u.jenis_program, ''), 'Reguler')" : "'Reguler'";
-        $roleSelect = $hasRole ? "COALESCE(NULLIF(c.role, ''), u.role)" : "c.role";
-        $namaSelect = $hasNama ? "COALESCE(NULLIF(c.nama_lengkap, ''), u.nama_lengkap)" : "c.nama_lengkap";
+        $filter = activityLogUsernameFilter('c', $excludedUsername, $pdo);
 
         $stmt = $pdo->prepare("
-            SELECT c.*,
-                   {$namaSelect} AS nama_lengkap,
-                   {$roleSelect} AS role,
-                   {$jenisSelect} AS jenis_program
+            SELECT c.*
             FROM user_click_logs c
-            LEFT JOIN users u ON ((c.user_id IS NOT NULL AND c.user_id > 0 AND c.user_id = u.id)
-                               OR ((c.user_id IS NULL OR c.user_id = 0) AND c.username IS NOT NULL AND c.username <> '' AND c.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
             ORDER BY c.created_at DESC
             LIMIT $lim
         ");
         $stmt->execute($filter['params']);
-        return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        return attachActivityLogUserData($pdo, $rows);
     } catch (Exception $e) {
         error_log("Error getRecentClickLogs: " . $e->getMessage());
         return [];
@@ -374,14 +492,16 @@ function getActivityLogStats(?string $excludedUsername = null) {
         $pdo = getDBConnection();
         ensureActivityLogTablesExist($pdo);
         $today = date('Y-m-d');
-        $filter = activityLogUsernameFilter('l', $excludedUsername);
+        $todayStart = $today . ' 00:00:00';
+        $todayEnd = $today . ' 23:59:59';
+        $filter = activityLogUsernameFilter('l', $excludedUsername, $pdo);
 
-        $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs l WHERE DATE(l.created_at) = :today {$filter['sql']}");
-        $stmt1->execute(['today' => $today] + $filter['params']);
+        $stmt1 = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs l WHERE l.created_at >= :today_start AND l.created_at <= :today_end {$filter['sql']}");
+        $stmt1->execute(['today_start' => $todayStart, 'today_end' => $todayEnd] + $filter['params']);
         $loginToday = (int)$stmt1->fetchColumn();
 
-        $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM user_click_logs l WHERE DATE(l.created_at) = :today {$filter['sql']}");
-        $stmt2->execute(['today' => $today] + $filter['params']);
+        $stmt2 = $pdo->prepare("SELECT COUNT(*) FROM user_click_logs l WHERE l.created_at >= :today_start AND l.created_at <= :today_end {$filter['sql']}");
+        $stmt2->execute(['today_start' => $todayStart, 'today_end' => $todayEnd] + $filter['params']);
         $clickToday = (int)$stmt2->fetchColumn();
 
         $stmtTotalLogin = $pdo->prepare("SELECT COUNT(*) FROM user_login_logs l WHERE 1 = 1 {$filter['sql']}");

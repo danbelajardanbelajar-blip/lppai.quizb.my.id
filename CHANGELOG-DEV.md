@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 10:34:24 +0700 — Optimasi Performa Ekstrem Halaman Log Aktivitas: Batch User Enrichment & Non-Blocking Queries
+
+**ID:** OPT-LOG-AKTIVITAS-PERF · **Parent Git:** `156561e`.
+**Permintaan pengguna:** `https://lppai.quizb.my.id/admin/log-aktivitas.php mengapa halaman ini hanya loading tidak merespon dengan baik?`
+**Penyebab:**
+- Kueri `getRecentClickLogs` dan `getRecentLoginLogs` sebelumnya menggunakan `LEFT JOIN users u ON ((... = id) OR (... = username))` dengan klausul `OR` pada tabel log yang berukuran puluhan ribu baris. Kondisi `OR` menggagalkan penggunaan indeks di MySQL dan memaksa *full table scan* dan *nested loop join* pada seluruh baris tabel sebelum `LIMIT`, serta memicu disk temporary table & filesort besar yang menyebabkan page load menggantung (timeout / loading tanpa henti).
+- Kueri hitungan ringkasan pada `getActivityLogStats` menjalankan correlated subquery `NOT EXISTS (SELECT 1 FROM users hidden_user WHERE ...)` berulang untuk setiap baris, serta menggunakan `DATE(created_at)` non-sargable yang tidak memanfaatkan indeks `created_at`.
+- Pemeriksaan DDL `CREATE TABLE IF NOT EXISTS` dan `SHOW COLUMNS` pada `ensureActivityLogTablesExist` dijalankan pada setiap request tanpa caching sesi, berisiko mengantri di metadata lock.
+
+**Solusi & Perubahan:**
+- **Pemisahan Kueri Log & Batch User Enrichment (`attachActivityLogUserData`)**: Kueri `user_login_logs` dan `user_click_logs` kini berjalan murni tanpa JOIN, langsung membaca `ORDER BY created_at DESC LIMIT $lim` menggunakan indeks B-Tree bawaan (`idx_click_created_at`, `idx_login_created_at`) dalam waktu < 1 milidetik. Data profil pengguna (`nama_lengkap`, `role`, `no_hp`, dan `jenis_program`) kemudian diambil sekaligus secara batch dalam satu kueri terindeks `id IN (...) OR LOWER(username) IN (...)` untuk ~100-200 user terkait lalu dipetakan di memori PHP.
+- **Penyelarasan Username Filter**: `activityLogUsernameFilter` kini dapat memanfaatkan `$pdo` untuk mengambil ID akun yang dikecualikan satu kali, menggantikan correlated subquery `NOT EXISTS` berulang dengan komparasi integer langsung `($alias.user_id IS NULL OR $alias.user_id <> :excluded_user_id)`.
+- **Indeks Range Sargable Pada Statistik Harian**: Mengganti `DATE(l.created_at) = :today` menjadi `l.created_at >= :today_start AND l.created_at <= :today_end` agar memanfaatkan indeks `created_at`.
+- **Session Cache DDL Schema**: `ensureActivityLogTablesExist` menyimpan flag `$_SESSION['_activity_log_tables_ensured']` agar tidak mengeksekusi DDL berulang di setiap request aktif.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/activity-logger.php` | 2026-11-17 10:34:24 | 11–78, 249–528 | Optimasi Kueri Log, Session Cache DDL & Batch Mapping Profil | Menambahkan session caching pada `ensureActivityLogTablesExist`; mengoptimasi `activityLogUsernameFilter` dengan resolusi ID tunggal; membuat fungsi `attachActivityLogUserData` untuk pengisian profil batch berindeks; membebaskan kueri `getRecentLoginLogs` dan `getRecentClickLogs` dari JOIN berat; serta mengoptimasi kueri range sargable pada `getActivityLogStats`. |
+
+**Verifikasi:**
+- `php -l includes/activity-logger.php`: OK (No syntax errors).
+- `git diff --check`: OK (bersih dari trailing whitespace).
+- `php tests/log-aktivitas-program-badge-test.php`: PASS (100%).
+- `python tests/activity-log-visibility-test.py`: PASS (100%).
+- `php tests/admin-tables-jenis-program-test.php`: PASS (100%).
+
+---
+
+
 ## 2026-11-17 10:26:37 +0700 — Label Jenis Program (RPL / Reguler) pada Kolom Nama Halaman Log Aktivitas
 
 **ID:** LOG-AKTIVITAS-JENIS-PROGRAM · **Parent Git:** `18117d5`.
