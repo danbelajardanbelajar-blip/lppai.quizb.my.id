@@ -57,6 +57,22 @@ function renderElementTypeBadge($type) {
     }
 }
 
+function renderLogJenisProgramBadge($role, $jenisProgram) {
+    $roleClean = strtolower(trim((string)$role));
+    $jenisClean = strtoupper(trim((string)$jenisProgram));
+    if ($roleClean === 'mahasiswa' || $jenisClean === 'RPL' || ($roleClean === '' && !empty($jenisProgram))) {
+        if (function_exists('renderJenisProgramBadge')) {
+            return renderJenisProgramBadge($jenisProgram ?: 'Reguler', true);
+        }
+        $isRpl = ($jenisClean === 'RPL');
+        $bg = $isRpl ? '#fef3c7' : '#e0f2fe';
+        $color = $isRpl ? '#92400e' : '#0369a1';
+        $border = $isRpl ? '#fde68a' : '#bae6fd';
+        return '<span class="badge-jenis-program badge-jenis-' . strtolower($jenisClean ?: 'reguler') . '" style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:0.2px;line-height:1.2;background:' . $bg . ';color:' . $color . ';border:1px solid ' . $border . ';white-space:nowrap;">' . htmlspecialchars($isRpl ? 'RPL' : 'Reguler') . '</span>';
+    }
+    return '';
+}
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -160,7 +176,10 @@ include __DIR__ . '/../includes/header.php';
                             <strong><?= $timeStr ?></strong>
                         </td>
                         <td>
-                            <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($nama, $log['user_id'] ?? null) ?></strong>
+                            <div style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($nama, $log['user_id'] ?? null) ?></strong>
+                                <?= renderLogJenisProgramBadge($log['role'] ?? '', $log['jenis_program'] ?? '') ?>
+                            </div>
                         </td>
                         <td><?= renderRoleBadge($log['role']) ?></td>
                         <td><code><?= sanitize($log['username']) ?></code></td>
@@ -257,7 +276,10 @@ include __DIR__ . '/../includes/header.php';
                             <strong><?= $timeStr ?></strong>
                         </td>
                         <td>
-                            <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($namaUser, $c['user_id'] ?? null) ?></strong>
+                            <div style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                <strong style="color:var(--primary-dark);"><?= adminUserProfileLink($namaUser, $c['user_id'] ?? null) ?></strong>
+                                <?= renderLogJenisProgramBadge($c['role'] ?? '', $c['jenis_program'] ?? '') ?>
+                            </div>
                             <?php if (!empty($c['username']) && $c['username'] !== $namaUser): ?>
                                 <div style="font-size:11px;color:#6b7280;"><code><?= sanitize($c['username']) ?></code></div>
                             <?php endif; ?>

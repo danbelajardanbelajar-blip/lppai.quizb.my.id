@@ -262,7 +262,8 @@ function getRecentLoginLogs($limit = 50, ?string $excludedUsername = null) {
         if ($lim <= 0) $lim = 50;
         $filter = activityLogUsernameFilter('l', $excludedUsername);
         $stmt = $pdo->prepare("
-            SELECT l.*, COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp
+            SELECT l.*, COALESCE(NULLIF(l.no_hp, ''), u.no_hp) AS no_hp,
+                   COALESCE(u.jenis_program, 'Reguler') AS jenis_program
             FROM user_login_logs l
             LEFT JOIN users u ON (l.user_id = u.id OR (l.user_id IS NULL AND l.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
@@ -288,7 +289,9 @@ function getRecentClickLogs($limit = 100, ?string $excludedUsername = null) {
         if ($lim <= 0) $lim = 100;
         $filter = activityLogUsernameFilter('c', $excludedUsername);
         $stmt = $pdo->prepare("
-            SELECT c.* FROM user_click_logs c
+            SELECT c.*, COALESCE(u.jenis_program, 'Reguler') AS jenis_program
+            FROM user_click_logs c
+            LEFT JOIN users u ON (c.user_id = u.id OR (c.user_id IS NULL AND c.username = u.username))
             WHERE 1 = 1 {$filter['sql']}
             ORDER BY c.created_at DESC
             LIMIT $lim
