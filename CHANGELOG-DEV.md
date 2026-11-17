@@ -5,6 +5,59 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-17 13:55:24 +0700 — Hasil Ujian CBT: Filter Hari, Filter Lulus/Tidak Lulus & Perbaikan Pencarian
+
+**ID:** CBT-HASIL-FILTER-HARI-LULUS · **Parent Git:** `438e3b8`.
+**Permintaan:** Pada `/pretes-ujian.php?cbt_bank=1&tab=results` tambahkan filter hari dan lulus/tidak lulus, serta perbaiki menu pencarian.
+**Akar masalah pencarian:** kueri halaman dan AJAX `live_results` memakai placeholder `:search_kw` dua kali (`nama LIKE :search_kw OR nim LIKE :search_kw`). Koneksi produksi memakai `PDO::ATTR_EMULATE_PREPARES => false` (`config/database.php`), dan prepare native MySQL menolak placeholder bernama yang dipakai ulang (SQLSTATE HY093). Akibatnya pencarian gagal di server. Di test SQLite masalah ini tidak terlihat.
+**Rancangan:**
+- Helper bersama di `includes/pretes-cbt.php` dipakai halaman dan AJAX:
+  - `pretesCbtResultFilters` menormalkan filter.
+  - `pretesCbtResultWhere` membangun WHERE dengan placeholder unik per kondisi.
+  - `pretesCbtResultPassCounts` menghitung jumlah lulus dan tidak lulus.
+  - `pretesCbtResultDayOptions` menyusun daftar hari (WIB) beserta jumlah sesi.
+  - `pretesCbtPassMinScore` memakai `PRETES_CBT_MIN_SCORE` bila ada, jika tidak 80.
+- Filter **Hari** (`day=Y-m-d`): dropdown berisi hari yang memiliki sesi (mis. "Senin, 16 Nov 2026 (2 sesi)"), dengan batas 00:00–24:00 WIB. Memilih hari langsung memuat ulang halaman. Di tab Live, status dialihkan ke Semua Sesi karena sesi live hanya ada saat ini.
+- Filter **Hasil** (`pass_filter=lulus|tidak_lulus`) berupa chip dengan jumlah. Lulus = sesi selesai dengan nilai ≥ 80; Tidak Lulus = sesi selesai dengan nilai < 80 atau kosong. Di tab Live, status dialihkan ke Riwayat Selesai, dan jumlah pada chip selalu dihitung dari sesi selesai.
+- Kolom Nilai menampilkan label Lulus/Tidak lulus untuk sesi selesai, baik pada render server maupun live refresh.
+- **Pencarian:**
+  - Placeholder unik, ditambah pencarian username.
+  - Wildcard `%`/`_` di-escape dengan `ESCAPE '!'` (sama di MySQL dan SQLite).
+  - Spasi dirapikan dan panjang dibatasi 100 karakter.
+  - Form memakai `data-no-spa` (navigasi penuh, sehingga variabel live monitor tidak basi).
+  - Tombol ✕ bawaan input search mengosongkan pencarian.
+  - Tombol Reset menghapus semua filter tambahan, ditambah tag "Filter aktif" yang bisa dihapus satu per satu.
+- AJAX `live_results` meneruskan `day` dan `pass_filter`, serta mengembalikan `pass_counts`.
+- `buildCbtResultUrl` mempertahankan `day` dan `pass_filter`. Duplikat fungsi yang tidak pernah terpakai di `admin/pretes-bank-soal.php` dihapus; versi di `includes/pretes-cbt.php` selalu terdefinisi lebih dulu.
+- Tampilan modern dan responsif: di ≤640px chip, dropdown, kotak cari, dan tombol (42px) tersusun penuh lebar.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt.php` | 2026-11-17 13:55:22 | 1113–1299 | Helper filter hasil CBT + `buildCbtResultUrl` | Fungsi baru `pretesCbtResultFilters`, `pretesCbtPassMinScore`, `pretesCbtResultWhere`, `pretesCbtResultPassCounts`, `pretesCbtResultDayOptions`; `buildCbtResultUrl` mendukung `day` & `pass_filter`. |
+| `admin/pretes-bank-soal.php` | 2026-11-17 13:49:51 | 57–68, 186–189, 548–565, 619 | AJAX `live_results`; kueri halaman tab Hasil; bekas duplikat `buildCbtResultUrl` | Memakai helper (menghapus `:search_kw` ganda); payload AJAX ditambah `day`, `pass_filter`, `pass_counts`; variabel `$dayFilter`, `$passFilter`, `$passCounts`, `$dayOptions`, `$passMinScore`. |
+| `includes/pretes-cbt-admin-view.php` | 2026-11-17 13:50:38 | 462, 506–581, 688–689, 723–729, 1156–1158 | Tab Live; panel filter baru; sel Nilai; empty state; variabel JS | Panel filter Tipe/Hasil/Hari/Cari + tag filter aktif; link tab Live mereset `pass_filter`; label Lulus/Tidak lulus; empty state untuk semua filter; `CBT_DAY_FILTER`, `CBT_PASS_FILTER`, `CBT_PASS_MIN_SCORE`. |
+| `assets/js/pretes-cbt-admin.js` | 2026-11-17 13:51:18 | 782–801, 896–899, 951–955, 1013–1021, 1049–1054 | `initCbtLiveMonitor` | Membaca filter baru, mengatur perilaku form cari (✕ kosongkan, trim, status tombol), label lulus pada baris live, pesan kosong, parameter AJAX `day`/`pass_filter`, pembaruan jumlah chip. |
+| `assets/css/pretes-cbt-admin.css` | 2026-11-17 13:50:59 | 441–482 | Seksi baru "CBT-RESULT-FILTERS" | Gaya chip, form filter, kotak cari berikon, tag filter aktif, label lulus, media query ≤640px. |
+| `tests/pretes-cbt-result-filters-test.php` | 2026-11-17 13:55:24 | 1–112 (baru) | Test filter | Menguji normalisasi, keunikan placeholder, batas hari WIB, lulus/tidak lulus (80 termasuk lulus), pencarian nama/NIM/username/`%`, jumlah lulus, opsi hari, URL builder, dan markup. |
+| `tests/pretes-cbt-pagination-tabs-test.php` | 2026-11-17 13:51:28 | 166–168 | Pemeriksaan controller | Asersi string disesuaikan dengan struktur helper baru. |
+
+**Verifikasi:**
+- `php -l` untuk semua file PHP yang berubah: OK. `node --check assets/js/pretes-cbt-admin.js`: OK. `git diff --check`: bersih.
+- `tests/pretes-cbt-result-filters-test.php`: 27/27 PASS. Seluruh `tests/pretes-*.php`: PASS.
+- Browser lokal (`php -S`, salinan aplikasi dengan auth tiruan, SQLite berisi 8 sesi di 3 hari):
+  - Tipe Resmi + Lulus = 4 baris; Tidak Lulus + Resmi = 3; hari 16 Nov = 2 (dengan label Lulus/Tidak lulus).
+  - Kombinasi hari + Tidak Lulus = 1; mengetik "  siti  " lalu Enter = 1 baris (spasi di-trim); `q=%` = 0 baris.
+  - Live refresh 5 detik mempertahankan filter dan tidak ada error konsol.
+  - Pada 375px `scrollWidth` = 375 dan kontrol tersusun penuh lebar; pada 1024px dropdown hari, kotak cari, dan tombol berada dalam satu baris.
+- Keterbatasan:
+  - Belum diuji terhadap MySQL produksi. Perbaikan HY093 berdasarkan perilaku native prepare yang terdokumentasi, dan test memastikan setiap placeholder unik.
+  - Ekspor .xlsx belum mengikuti filter hari/lulus.
+  - Screenshot pane browser gagal render, sehingga verifikasi tata letak dilakukan lewat pengukuran DOM.
+
+---
+
 ## 2026-11-17 13:29:17 +0700 — Tabel Dosen Mobile Friendly: Dashboard, Daftar Kelas, Penilaian, Absensi & Rekap
 
 **ID:** DOSEN-TABEL-MOBILE · **Parent Git:** `ce6bd13`.

@@ -163,8 +163,9 @@ assertCbt(strpos($url, 'per_page=50') !== false, "buildCbtResultUrl mempertahank
 
 // ── 6. Test Controller, View Markup & CSS Assets ───────────────────────────
 $controllerContent = file_get_contents(__DIR__ . '/../admin/pretes-bank-soal.php');
-assertCbt(strpos($controllerContent, "\$statusFilter = isset(\$_GET['status_filter'])") !== false, "Controller menangani status_filter.");
-assertCbt(strpos($controllerContent, "\$searchQuery = isset(\$_GET['q'])") !== false, "Controller menangani search query q.");
+$helperContent = file_get_contents(__DIR__ . '/../includes/pretes-cbt.php');
+assertCbt(strpos($controllerContent, "pretesCbtResultFilters(\$_GET)") !== false && strpos($helperContent, "\$src['status_filter']") !== false, "Controller menangani status_filter.");
+assertCbt(strpos($controllerContent, "\$searchQuery = \$cbtFilters['q']") !== false && strpos($helperContent, "\$src['q']") !== false, "Controller menangani search query q.");
 assertCbt(strpos($controllerContent, "\$perPage =") !== false && strpos($controllerContent, "LIMIT \$perPage OFFSET \$offset") !== false, "Controller melakukan paginasi LIMIT & OFFSET dinamis.");
 assertCbt(strpos($controllerContent, "'finished_count' => \$finishedCount") !== false, "Controller mengirimkan finished_count pada AJAX payload.");
 $viewContent = file_get_contents(__DIR__ . '/../includes/pretes-cbt-admin-view.php');

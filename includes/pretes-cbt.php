@@ -1110,9 +1110,155 @@ function pretesCbtDeleteAllAttempts(PDO $pdo, ?array $attemptIds = null, string 
     }
 }
 
+/**
+ * Filter tab "Hasil Ujian" CBT (dipakai halaman dan AJAX live_results).
+ * Menormalkan status, tipe, kata kunci, hari (Y-m-d WIB), lulus/tidak lulus,
+ * page, dan per_page dari $_GET.
+ */
+if (!function_exists('pretesCbtResultFilters')) {
+    function pretesCbtResultFilters(array $src): array {
+        $status = trim((string)($src['status_filter'] ?? 'all'));
+        if (!in_array($status, ['all', 'live', 'finished'], true)) $status = 'all';
+        $result = trim((string)($src['result_filter'] ?? 'all'));
+        if (!in_array($result, ['all', 'resmi', 'tryout'], true)) $result = 'all';
+        $q = preg_replace('/\s+/u', ' ', trim((string)($src['q'] ?? ''))) ?? '';
+        if (function_exists('mb_substr')) $q = mb_substr($q, 0, 100); else $q = substr($q, 0, 100);
+        $day = trim((string)($src['day'] ?? ''));
+        if ($day !== '') {
+            $d = DateTimeImmutable::createFromFormat('!Y-m-d', $day, new DateTimeZone('Asia/Jakarta'));
+            if (!$d || $d->format('Y-m-d') !== $day) $day = '';
+        }
+        $pass = trim((string)($src['pass_filter'] ?? 'all'));
+        if (!in_array($pass, ['all', 'lulus', 'tidak_lulus'], true)) $pass = 'all';
+        // Lulus/tidak lulus hanya bermakna untuk sesi yang sudah selesai.
+        if ($pass !== 'all' && $status === 'live') $status = 'finished';
+        // Filter hari ditujukan ke riwayat; di tab Live tampilkan semua sesi hari itu.
+        elseif ($day !== '' && $status === 'live') $status = 'all';
+        $perPage = (int)($src['per_page'] ?? 25);
+        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+        return [
+            'status_filter' => $status,
+            'result_filter' => $result,
+            'q' => $q,
+            'day' => $day,
+            'pass_filter' => $pass,
+            'page' => max(1, (int)($src['page'] ?? 1)),
+            'per_page' => $perPage,
+        ];
+    }
+}
+
+if (!function_exists('pretesCbtPassMinScore')) {
+    function pretesCbtPassMinScore(): float {
+        return defined('PRETES_CBT_MIN_SCORE') ? (float)PRETES_CBT_MIN_SCORE : 80.0;
+    }
+}
+
+/**
+ * Bangun WHERE untuk daftar hasil CBT (alias a = attempts, u = users).
+ * Setiap placeholder bernama hanya dipakai sekali agar aman untuk
+ * PDO::ATTR_EMULATE_PREPARES => false (MySQL native prepare).
+ */
+if (!function_exists('pretesCbtResultWhere')) {
+    function pretesCbtResultWhere(array $f, int $now, bool $withPass = true): array {
+        $conds = [];
+        $params = [];
+        if ($f['status_filter'] === 'live') {
+            $conds[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
+            $params[':now_ts'] = $now;
+        } elseif ($f['status_filter'] === 'finished') {
+            $conds[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
+            $params[':now_ts'] = $now;
+        }
+        if ($f['result_filter'] === 'resmi') {
+            $conds[] = 'a.registration_id > 0';
+        } elseif ($f['result_filter'] === 'tryout') {
+            $conds[] = 'a.registration_id < 0';
+        }
+        if ($f['day'] !== '') {
+            $start = DateTimeImmutable::createFromFormat('!Y-m-d', $f['day'], new DateTimeZone('Asia/Jakarta'));
+            if ($start) {
+                $conds[] = '(a.started_at >= :day_start AND a.started_at < :day_end)';
+                $params[':day_start'] = $start->getTimestamp();
+                $params[':day_end'] = $start->modify('+1 day')->getTimestamp();
+            }
+        }
+        if ($withPass && $f['pass_filter'] === 'lulus') {
+            $conds[] = '(a.submitted_at IS NOT NULL AND a.score >= :pass_min)';
+            $params[':pass_min'] = pretesCbtPassMinScore();
+        } elseif ($withPass && $f['pass_filter'] === 'tidak_lulus') {
+            $conds[] = '(a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pass_min))';
+            $params[':pass_min'] = pretesCbtPassMinScore();
+        }
+        if ($f['q'] !== '') {
+            // Escape wildcard LIKE dengan '!' (perilaku sama di MySQL & SQLite).
+            $kw = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $f['q']) . '%';
+            $conds[] = "(u.nama_lengkap LIKE :kw_nama ESCAPE '!' OR u.nim LIKE :kw_nim ESCAPE '!' OR u.username LIKE :kw_user ESCAPE '!')";
+            $params[':kw_nama'] = $kw;
+            $params[':kw_nim'] = $kw;
+            $params[':kw_user'] = $kw;
+        }
+        return [$conds ? ('WHERE ' . implode(' AND ', $conds)) : '', $params];
+    }
+}
+
+/** Jumlah sesi selesai lulus / tidak lulus untuk filter aktif (tanpa filter lulus). */
+if (!function_exists('pretesCbtResultPassCounts')) {
+    function pretesCbtResultPassCounts(PDO $pdo, array $f, int $now): array {
+        // Klik chip lulus/tidak lulus selalu menuju sesi selesai, jadi hitungannya juga dari sesi selesai.
+        if (($f['status_filter'] ?? 'all') === 'live') $f['status_filter'] = 'finished';
+        [$where, $params] = pretesCbtResultWhere($f, $now, false);
+        $params[':pc_min1'] = pretesCbtPassMinScore();
+        $params[':pc_min2'] = pretesCbtPassMinScore();
+        $sql = "SELECT
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pc_min1 THEN 1 ELSE 0 END) AS lulus,
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pc_min2) THEN 1 ELSE 0 END) AS tidak_lulus
+            FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $where";
+        try {
+            $st = $pdo->prepare($sql);
+            foreach ($params as $k => $v) $st->bindValue($k, $v);
+            $st->execute();
+            $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            $row = [];
+        }
+        return ['lulus' => (int)($row['lulus'] ?? 0), 'tidak_lulus' => (int)($row['tidak_lulus'] ?? 0)];
+    }
+}
+
+/** Daftar hari (WIB) yang memiliki sesi CBT, terbaru dulu: [['date'=>'Y-m-d','label'=>..,'count'=>n], ...]. */
+if (!function_exists('pretesCbtResultDayOptions')) {
+    function pretesCbtResultDayOptions(PDO $pdo, string $resultFilter = 'all', int $limit = 90): array {
+        $where = '';
+        if ($resultFilter === 'resmi') $where = 'WHERE registration_id > 0';
+        elseif ($resultFilter === 'tryout') $where = 'WHERE registration_id < 0';
+        $counts = [];
+        try {
+            $tz = new DateTimeZone('Asia/Jakarta');
+            foreach ($pdo->query("SELECT started_at FROM pretes_cbt_attempts $where") as $row) {
+                $key = (new DateTimeImmutable('@' . (int)$row['started_at']))->setTimezone($tz)->format('Y-m-d');
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        } catch (Throwable $e) {
+            return [];
+        }
+        krsort($counts);
+        $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        $months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        $out = [];
+        foreach (array_slice($counts, 0, $limit, true) as $date => $n) {
+            $d = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$date, new DateTimeZone('Asia/Jakarta'));
+            if (!$d) continue;
+            $label = $days[(int)$d->format('w')] . ', ' . $d->format('j') . ' ' . $months[(int)$d->format('n')] . ' ' . $d->format('Y');
+            $out[] = ['date' => (string)$date, 'label' => $label, 'count' => (int)$n];
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('buildCbtResultUrl')) {
     function buildCbtResultUrl(array $overrides = []): string {
-        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page;
+        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page, $dayFilter, $passFilter;
         $params = [
             'cbt_bank' => 1,
             'tab' => 'results'
@@ -1124,6 +1270,14 @@ if (!function_exists('buildCbtResultUrl')) {
         $mergedResult = $overrides['result_filter'] ?? ($resultFilter ?? 'all');
         if ($mergedResult !== 'all') {
             $params['result_filter'] = $mergedResult;
+        }
+        $mergedDay = array_key_exists('day', $overrides) ? (string)$overrides['day'] : (string)($dayFilter ?? '');
+        if ($mergedDay !== '') {
+            $params['day'] = $mergedDay;
+        }
+        $mergedPass = array_key_exists('pass_filter', $overrides) ? (string)$overrides['pass_filter'] : (string)($passFilter ?? 'all');
+        if ($mergedPass !== '' && $mergedPass !== 'all') {
+            $params['pass_filter'] = $mergedPass;
         }
         $mergedQ = array_key_exists('q', $overrides) ? $overrides['q'] : ($searchQuery ?? '');
         if ($mergedQ !== '') {

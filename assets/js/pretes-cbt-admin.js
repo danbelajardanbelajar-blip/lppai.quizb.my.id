@@ -780,6 +780,24 @@
         const currentFilter = window.CBT_RESULT_FILTER || 'all';
         const currentStatus = window.CBT_STATUS_FILTER || 'all';
         const currentSearch = window.CBT_SEARCH_QUERY || '';
+        const currentDay = window.CBT_DAY_FILTER || '';
+        const currentPass = window.CBT_PASS_FILTER || 'all';
+        const passMinScore = Number(window.CBT_PASS_MIN_SCORE || 80);
+        const hasExtraFilter = !!(currentSearch || currentDay || currentPass !== 'all');
+
+        // Pencarian: ikon ✕ bawaan input[type=search] mengosongkan kata kunci -> muat ulang tanpa q.
+        const searchForm = get('cbtResultSearchForm');
+        const searchInput = get('cbtResultSearchInput');
+        if (searchForm && searchInput) {
+            searchInput.addEventListener('search', function () {
+                if (searchInput.value.trim() === '' && currentSearch !== '') searchForm.submit();
+            });
+            searchForm.addEventListener('submit', function () {
+                searchInput.value = searchInput.value.trim();
+                const btn = searchForm.querySelector('button[type=submit]');
+                if (btn) { btn.disabled = true; btn.textContent = 'Mencari…'; }
+            });
+        }
         const currentPage = window.CBT_PAGE || 1;
         const currentPerPage = window.CBT_PER_PAGE || 25;
         const bankUrl = window.CBT_BANK_URL || (window.location.pathname + '?cbt_bank=1');
@@ -876,7 +894,9 @@
 
             let scoreCellHtml = '';
             if (isSubmitted) {
-                scoreCellHtml = '<span class="bank-key" title="Nilai Akhir Ujian">' + (att.score !== null ? att.score : '—') + '</span>';
+                const isPass = att.score !== null && Number(att.score) >= passMinScore;
+                scoreCellHtml = '<span class="bank-key" title="Nilai Akhir Ujian">' + (att.score !== null ? att.score : '—') + '</span>' +
+                    '<span class="cbt-pass-label ' + (isPass ? 'is-pass' : 'is-fail') + '">' + (isPass ? 'Lulus' : 'Tidak lulus') + '</span>';
             } else {
                 scoreCellHtml =
                     '<span class="bank-key" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;width:auto;padding:0 7px" title="Estimasi nilai sementara saat ini">' +
@@ -928,8 +948,11 @@
             if (!data.length) {
                 if (currentStatus === 'live') {
                     tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:32px 16px"><div style="font-size:24px;margin-bottom:6px">⚡</div><div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">Tidak ada peserta yang sedang mengerjakan ujian saat ini.</div><div style="font-size:12px;color:#64748b">Seluruh peserta telah menyelesaikan ujian atau belum ada sesi baru yang dimulai.</div></td></tr>';
-                } else if (currentSearch) {
-                    tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:28px 16px"><div style="font-size:22px;margin-bottom:6px">🔍</div><div style="font-weight:700;color:#0f172a;margin-bottom:4px">Tidak ditemukan sesi dengan kata kunci &ldquo;' + escapeHtml(currentSearch) + '&rdquo;.</div></td></tr>';
+                } else if (hasExtraFilter) {
+                    const msg = currentSearch
+                        ? 'Tidak ditemukan sesi dengan kata kunci &ldquo;' + escapeHtml(currentSearch) + '&rdquo; pada filter ini.'
+                        : 'Tidak ada sesi yang cocok dengan filter ini.';
+                    tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:28px 16px"><div style="font-size:22px;margin-bottom:6px">🔍</div><div style="font-weight:700;color:#0f172a;margin-bottom:4px">' + msg + '</div></td></tr>';
                 } else {
                     tbody.innerHTML = '<tr><td colspan="10" class="bank-empty">Belum ada peserta yang memulai CBT.</td></tr>';
                 }
@@ -990,6 +1013,12 @@
             if (currentSearch) {
                 url += '&q=' + encodeURIComponent(currentSearch);
             }
+            if (currentDay) {
+                url += '&day=' + encodeURIComponent(currentDay);
+            }
+            if (currentPass && currentPass !== 'all') {
+                url += '&pass_filter=' + encodeURIComponent(currentPass);
+            }
 
             fetch(url, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -1016,6 +1045,12 @@
                 const allBadge = get('cbtAllTabBadge');
                 if (allBadge && res.total_all !== undefined) {
                     allBadge.textContent = res.total_all;
+                }
+                if (res.pass_counts) {
+                    const lulusEl = get('cbtPassCountLulus');
+                    const tidakEl = get('cbtPassCountTidak');
+                    if (lulusEl) lulusEl.textContent = res.pass_counts.lulus;
+                    if (tidakEl) tidakEl.textContent = res.pass_counts.tidak_lulus;
                 }
                 if (lastUpdatedEl && res.timestamp_wib) {
                     lastUpdatedEl.textContent = 'Pembaruan: ' + res.timestamp_wib;

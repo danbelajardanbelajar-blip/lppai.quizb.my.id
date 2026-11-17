@@ -459,7 +459,7 @@
         <div style="padding:14px 24px 0;">
             <!-- Status Sub-Tabs: Live Monitoring vs Selesai vs Semua -->
             <div class="cbt-status-tabs" style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid #e2e8f0;padding-bottom:12px;flex-wrap:wrap">
-                <a href="<?= buildCbtResultUrl(['status_filter' => 'live', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'live' ? 'active' : '' ?>">
+                <a href="<?= buildCbtResultUrl(['status_filter' => 'live', 'pass_filter' => 'all', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'live' ? 'active' : '' ?>">
                     <span>⚡ Sedang Berlangsung (Live)</span>
                     <span id="cbtLiveTabBadge" class="cbt-tab-count <?= $ongoingCount > 0 ? 'live' : '' ?>"><?= $ongoingCount ?></span>
                 </a>
@@ -503,27 +503,78 @@
                 </div>
             </div>
 
-            <!-- Filter Tipe & Pencarian -->
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:0 0 14px;flex-wrap:wrap;gap:12px">
-                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                    <span style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em">Tipe:</span>
-                    <a href="<?= buildCbtResultUrl(['result_filter' => 'all', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'all' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">Semua (<?= $totalAttemptCount ?>)</a>
-                    <a href="<?= buildCbtResultUrl(['result_filter' => 'resmi', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'resmi' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">🎓 Ujian Resmi (<?= (int)$stats['total'] ?>)</a>
-                    <a href="<?= buildCbtResultUrl(['result_filter' => 'tryout', 'page' => 1]) ?>" class="bank-button <?= $resultFilter === 'tryout' ? 'primary' : '' ?>" style="min-height:28px;padding:3px 10px;font-size:11.5px">📝 Tryout (<?= (int)$tryoutStats['total'] ?>)</a>
+            <!-- Filter Tipe, Hari, Kelulusan & Pencarian -->
+            <?php
+                $dayFilter = $dayFilter ?? '';
+                $passFilter = $passFilter ?? 'all';
+                $passCounts = $passCounts ?? ['lulus' => 0, 'tidak_lulus' => 0];
+                $dayOptions = $dayOptions ?? [];
+                $passMinScore = $passMinScore ?? 80.0;
+                $dayInOptions = false;
+                foreach ($dayOptions as $dOpt) { if ($dOpt['date'] === $dayFilter) { $dayInOptions = true; break; } }
+                $hasExtraFilter = ($searchQuery !== '' || $dayFilter !== '' || $passFilter !== 'all');
+            ?>
+            <div class="cbt-result-filters" id="cbtResultFilters">
+                <div class="cbt-filter-row">
+                    <span class="cbt-filter-label">Tipe</span>
+                    <div class="cbt-filter-chips">
+                        <a href="<?= buildCbtResultUrl(['result_filter' => 'all', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === 'all' ? 'active' : '' ?>">Semua <span><?= $totalAttemptCount ?></span></a>
+                        <a href="<?= buildCbtResultUrl(['result_filter' => 'resmi', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === 'resmi' ? 'active' : '' ?>">🎓 Ujian Resmi <span><?= (int)$stats['total'] ?></span></a>
+                        <a href="<?= buildCbtResultUrl(['result_filter' => 'tryout', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === 'tryout' ? 'active' : '' ?>">📝 Tryout <span><?= (int)$tryoutStats['total'] ?></span></a>
+                    </div>
+                </div>
+                <div class="cbt-filter-row">
+                    <span class="cbt-filter-label">Hasil</span>
+                    <div class="cbt-filter-chips" id="cbtPassFilterChips">
+                        <a href="<?= buildCbtResultUrl(['pass_filter' => 'all', 'page' => 1]) ?>" class="cbt-chip <?= $passFilter === 'all' ? 'active' : '' ?>" data-pass-filter="all">Semua</a>
+                        <a href="<?= buildCbtResultUrl(['pass_filter' => 'lulus', 'page' => 1]) ?>" class="cbt-chip cbt-chip-pass <?= $passFilter === 'lulus' ? 'active' : '' ?>" data-pass-filter="lulus" title="Sesi selesai dengan nilai &ge; <?= (int)$passMinScore ?>">✓ Lulus <span id="cbtPassCountLulus"><?= (int)$passCounts['lulus'] ?></span></a>
+                        <a href="<?= buildCbtResultUrl(['pass_filter' => 'tidak_lulus', 'page' => 1]) ?>" class="cbt-chip cbt-chip-fail <?= $passFilter === 'tidak_lulus' ? 'active' : '' ?>" data-pass-filter="tidak_lulus" title="Sesi selesai dengan nilai &lt; <?= (int)$passMinScore ?>">✕ Tidak Lulus <span id="cbtPassCountTidak"><?= (int)$passCounts['tidak_lulus'] ?></span></a>
+                    </div>
                 </div>
 
-                <form method="get" action="<?= BASE_URL ?>/pretes-ujian.php" style="margin:0;display:inline-flex;align-items:center;gap:6px">
+                <form method="get" action="<?= BASE_URL ?>/pretes-ujian.php" class="cbt-filter-form" id="cbtResultSearchForm" data-no-spa role="search">
                     <input type="hidden" name="cbt_bank" value="1">
                     <input type="hidden" name="tab" value="results">
                     <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status_filter" value="<?= sanitize($statusFilter) ?>"><?php endif; ?>
                     <?php if ($resultFilter !== 'all'): ?><input type="hidden" name="result_filter" value="<?= sanitize($resultFilter) ?>"><?php endif; ?>
+                    <?php if ($passFilter !== 'all'): ?><input type="hidden" name="pass_filter" value="<?= sanitize($passFilter) ?>"><?php endif; ?>
                     <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= (int)$perPage ?>"><?php endif; ?>
-                    <input type="search" name="q" value="<?= sanitize($searchQuery) ?>" placeholder="Cari nama atau NIM..." class="bank-input" style="min-height:30px;padding:3px 10px;font-size:12px;width:180px">
-                    <button type="submit" class="bank-button" style="min-height:30px;padding:3px 10px;font-size:11.5px">🔍 Cari</button>
-                    <?php if ($searchQuery !== ''): ?>
-                        <a href="<?= buildCbtResultUrl(['q' => '', 'page' => 1]) ?>" class="bank-button" style="min-height:30px;padding:3px 8px;font-size:11.5px;background:#f1f5f9;color:#475569;border-color:#cbd5e1" title="Hapus pencarian">✕ Reset</a>
-                    <?php endif; ?>
+                    <label class="cbt-filter-field cbt-filter-day">
+                        <span class="cbt-filter-label">Hari</span>
+                        <select name="day" id="cbtDayFilter" class="bank-input" onchange="this.form.submit()">
+                            <option value="">Semua hari</option>
+                            <?php if ($dayFilter !== '' && !$dayInOptions): ?>
+                                <option value="<?= sanitize($dayFilter) ?>" selected><?= sanitize($dayFilter) ?> (0 sesi)</option>
+                            <?php endif; ?>
+                            <?php foreach ($dayOptions as $dOpt): ?>
+                                <option value="<?= sanitize($dOpt['date']) ?>" <?= $dOpt['date'] === $dayFilter ? 'selected' : '' ?>><?= sanitize($dOpt['label']) ?> (<?= (int)$dOpt['count'] ?> sesi)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <label class="cbt-filter-field cbt-filter-search">
+                        <span class="cbt-filter-label">Cari</span>
+                        <span class="cbt-search-box">
+                            <span class="cbt-search-icon" aria-hidden="true">🔍</span>
+                            <input type="search" name="q" id="cbtResultSearchInput" value="<?= sanitize($searchQuery) ?>" placeholder="Nama, NIM, atau username…" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="Cari peserta berdasarkan nama, NIM, atau username">
+                        </span>
+                    </label>
+                    <div class="cbt-filter-actions">
+                        <button type="submit" class="bank-button primary">Cari</button>
+                        <?php if ($hasExtraFilter): ?>
+                            <a href="<?= buildCbtResultUrl(['q' => '', 'day' => '', 'pass_filter' => 'all', 'page' => 1]) ?>" class="bank-button" id="cbtResultResetFilters" title="Hapus pencarian, filter hari, dan filter kelulusan">✕ Reset</a>
+                        <?php endif; ?>
+                    </div>
                 </form>
+                <?php if ($hasExtraFilter): ?>
+                    <div class="cbt-active-filters">
+                        Filter aktif:
+                        <?php if ($dayFilter !== ''): ?><span class="cbt-active-tag">📅 <?php
+                            $dLabel = $dayFilter; foreach ($dayOptions as $dOpt) { if ($dOpt['date'] === $dayFilter) { $dLabel = $dOpt['label']; break; } }
+                            echo sanitize($dLabel); ?> <a href="<?= buildCbtResultUrl(['day' => '', 'page' => 1]) ?>" aria-label="Hapus filter hari">✕</a></span><?php endif; ?>
+                        <?php if ($passFilter !== 'all'): ?><span class="cbt-active-tag"><?= $passFilter === 'lulus' ? '✓ Lulus' : '✕ Tidak Lulus' ?> <a href="<?= buildCbtResultUrl(['pass_filter' => 'all', 'page' => 1]) ?>" aria-label="Hapus filter kelulusan">✕</a></span><?php endif; ?>
+                        <?php if ($searchQuery !== ''): ?><span class="cbt-active-tag">🔍 &ldquo;<?= sanitize($searchQuery) ?>&rdquo; <a href="<?= buildCbtResultUrl(['q' => '', 'page' => 1]) ?>" aria-label="Hapus pencarian">✕</a></span><?php endif; ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -634,6 +685,8 @@
                         <td>
                             <?php if ($isSubmitted): ?>
                                 <span class="bank-key" title="Nilai Akhir Ujian"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 1) : '—' ?></span>
+                                <?php $isPass = $attempt['score'] !== null && (float)$attempt['score'] >= ($passMinScore ?? 80.0); ?>
+                                <span class="cbt-pass-label <?= $isPass ? 'is-pass' : 'is-fail' ?>"><?= $isPass ? 'Lulus' : 'Tidak lulus' ?></span>
                             <?php else: ?>
                                 <?php 
                                     $liveScore = $totItems > 0 ? round(($corCount / $totItems) * 100, 1) : 0.0;
@@ -667,12 +720,12 @@
                                 <a href="<?= buildCbtResultUrl(['status_filter' => 'finished', 'page' => 1]) ?>" class="bank-button primary" style="font-size:12px;min-height:30px;padding:4px 14px">Lihat Riwayat Selesai (<?= $finishedCount ?>)</a>
                             </td>
                         </tr>
-                    <?php elseif ($searchQuery !== ''): ?>
+                    <?php elseif ($hasExtraFilter): ?>
                         <tr>
                             <td colspan="10" class="bank-empty" style="padding:28px 16px">
                                 <div style="font-size:22px;margin-bottom:6px">🔍</div>
-                                <div style="font-weight:700;color:#0f172a;margin-bottom:4px">Tidak ditemukan sesi dengan kata kunci &ldquo;<?= sanitize($searchQuery) ?>&rdquo;.</div>
-                                <a href="<?= buildCbtResultUrl(['q' => '', 'page' => 1]) ?>" class="bank-button" style="font-size:11.5px;min-height:28px;margin-top:8px">Reset Pencarian</a>
+                                <div style="font-weight:700;color:#0f172a;margin-bottom:4px"><?= $searchQuery !== '' ? 'Tidak ditemukan sesi dengan kata kunci &ldquo;' . sanitize($searchQuery) . '&rdquo; pada filter ini.' : 'Tidak ada sesi yang cocok dengan filter ini.' ?></div>
+                                <a href="<?= buildCbtResultUrl(['q' => '', 'day' => '', 'pass_filter' => 'all', 'page' => 1]) ?>" class="bank-button" style="font-size:11.5px;min-height:28px;margin-top:8px">Reset Filter</a>
                             </td>
                         </tr>
                     <?php else: ?>
@@ -1100,6 +1153,9 @@ window.CBT_BANK_URL = <?= json_encode($bankUrl) ?>;
 window.CBT_RESULT_FILTER = <?= json_encode($resultFilter) ?>;
 window.CBT_STATUS_FILTER = <?= json_encode($statusFilter ?? 'all') ?>;
 window.CBT_SEARCH_QUERY = <?= json_encode($searchQuery ?? '') ?>;
+window.CBT_DAY_FILTER = <?= json_encode($dayFilter ?? '') ?>;
+window.CBT_PASS_FILTER = <?= json_encode($passFilter ?? 'all') ?>;
+window.CBT_PASS_MIN_SCORE = <?= json_encode((float)($passMinScore ?? 80.0)) ?>;
 window.CBT_PAGE = <?= (int)($page ?? 1) ?>;
 window.CBT_PER_PAGE = <?= (int)($perPage ?? 25) ?>;
 </script>

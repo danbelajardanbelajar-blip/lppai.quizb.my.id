@@ -55,42 +55,17 @@ if (isset($_GET['ajax'])) {
         exit;
     }
     if ($_GET['ajax'] === 'live_results') {
-        $statusFilter = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : 'all';
-        if (!in_array($statusFilter, ['all', 'live', 'finished'], true)) $statusFilter = 'all';
-
-        $filter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
-        if (!in_array($filter, ['all', 'resmi', 'tryout'], true)) $filter = 'all';
-
-        $searchQuery = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-        $page = max(1, (int)($_GET['page'] ?? 1));
-        $perPage = (int)($_GET['per_page'] ?? 25);
-        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+        $cbtFilters = pretesCbtResultFilters($_GET);
+        $statusFilter = $cbtFilters['status_filter'];
+        $filter = $cbtFilters['result_filter'];
+        $searchQuery = $cbtFilters['q'];
+        $page = $cbtFilters['page'];
+        $perPage = $cbtFilters['per_page'];
 
         $now = time();
 
-        $whereConditions = [];
-        $params = [];
-
-        if ($statusFilter === 'live') {
-            $whereConditions[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
-            $params[':now_ts'] = $now;
-        } elseif ($statusFilter === 'finished') {
-            $whereConditions[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
-            $params[':now_ts'] = $now;
-        }
-
-        if ($filter === 'resmi') {
-            $whereConditions[] = 'a.registration_id > 0';
-        } elseif ($filter === 'tryout') {
-            $whereConditions[] = 'a.registration_id < 0';
-        }
-
-        if ($searchQuery !== '') {
-            $whereConditions[] = '(u.nama_lengkap LIKE :search_kw OR u.nim LIKE :search_kw)';
-            $params[':search_kw'] = '%' . $searchQuery . '%';
-        }
-
-        $whereSql = !empty($whereConditions) ? ('WHERE ' . implode(' AND ', $whereConditions)) : '';
+        // Placeholder unik per kondisi (aman untuk native prepare MySQL).
+        [$whereSql, $params] = pretesCbtResultWhere($cbtFilters, $now);
 
         // Total filtered count
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereSql");
@@ -209,6 +184,9 @@ if (isset($_GET['ajax'])) {
             'total_pages' => $totalPages,
             'status_filter' => $statusFilter,
             'result_filter' => $filter,
+            'day' => $cbtFilters['day'],
+            'pass_filter' => $cbtFilters['pass_filter'],
+            'pass_counts' => pretesCbtResultPassCounts($pdo, $cbtFilters, $now),
             'data' => $data
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -567,50 +545,24 @@ $tryoutStats['average_score'] = $tryoutStats['average_score'] !== null ? (float)
 $allStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC) ?: [];
 $totalAttemptCount = (int)($allStats['total'] ?? 0);
 
-$statusFilter = isset($_GET['status_filter']) ? trim((string)$_GET['status_filter']) : 'all';
-if (!in_array($statusFilter, ['all', 'live', 'finished'], true)) {
-    $statusFilter = 'all';
-}
-
-$resultFilter = isset($_GET['result_filter']) ? trim((string)$_GET['result_filter']) : 'all';
-if (!in_array($resultFilter, ['all', 'resmi', 'tryout'], true)) {
-    $resultFilter = 'all';
-}
-
-$searchQuery = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-$page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = (int)($_GET['per_page'] ?? 25);
-if (!in_array($perPage, [10, 25, 50, 100], true)) {
-    $perPage = 25;
-}
+$cbtFilters = pretesCbtResultFilters($_GET);
+$statusFilter = $cbtFilters['status_filter'];
+$resultFilter = $cbtFilters['result_filter'];
+$searchQuery = $cbtFilters['q'];
+$dayFilter = $cbtFilters['day'];
+$passFilter = $cbtFilters['pass_filter'];
+$page = $cbtFilters['page'];
+$perPage = $cbtFilters['per_page'];
 
 $now = time();
 $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
 $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
 
-$whereConditions = [];
-$params = [];
-
-if ($statusFilter === 'live') {
-    $whereConditions[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
-    $params[':now_ts'] = $now;
-} elseif ($statusFilter === 'finished') {
-    $whereConditions[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
-    $params[':now_ts'] = $now;
-}
-
-if ($resultFilter === 'resmi') {
-    $whereConditions[] = 'a.registration_id > 0';
-} elseif ($resultFilter === 'tryout') {
-    $whereConditions[] = 'a.registration_id < 0';
-}
-
-if ($searchQuery !== '') {
-    $whereConditions[] = '(u.nama_lengkap LIKE :search_kw OR u.nim LIKE :search_kw)';
-    $params[':search_kw'] = '%' . $searchQuery . '%';
-}
-
-$whereClause = !empty($whereConditions) ? ('WHERE ' . implode(' AND ', $whereConditions)) : '';
+// Placeholder unik per kondisi (aman untuk native prepare MySQL).
+[$whereClause, $params] = pretesCbtResultWhere($cbtFilters, $now);
+$passCounts = pretesCbtResultPassCounts($pdo, $cbtFilters, $now);
+$dayOptions = pretesCbtResultDayOptions($pdo, $resultFilter);
+$passMinScore = pretesCbtPassMinScore();
 
 $countStmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause");
 foreach ($params as $k => $v) {
@@ -664,36 +616,7 @@ foreach ($attempts as &$att) {
 }
 unset($att);
 
-if (!function_exists('buildCbtResultUrl')) {
-    function buildCbtResultUrl(array $overrides = []): string {
-        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page;
-        $params = [
-            'cbt_bank' => 1,
-            'tab' => 'results'
-        ];
-        $mergedStatus = $overrides['status_filter'] ?? $statusFilter;
-        if ($mergedStatus !== 'all') {
-            $params['status_filter'] = $mergedStatus;
-        }
-        $mergedResult = $overrides['result_filter'] ?? $resultFilter;
-        if ($mergedResult !== 'all') {
-            $params['result_filter'] = $mergedResult;
-        }
-        $mergedQ = array_key_exists('q', $overrides) ? $overrides['q'] : $searchQuery;
-        if ($mergedQ !== '') {
-            $params['q'] = $mergedQ;
-        }
-        $mergedPerPage = array_key_exists('per_page', $overrides) ? (int)$overrides['per_page'] : (int)$perPage;
-        if ($mergedPerPage !== 25) {
-            $params['per_page'] = $mergedPerPage;
-        }
-        $mergedPage = array_key_exists('page', $overrides) ? (int)$overrides['page'] : (int)$page;
-        if ($mergedPage > 1) {
-            $params['page'] = $mergedPage;
-        }
-        return BASE_URL . '/pretes-ujian.php?' . http_build_query($params);
-    }
-}
+// buildCbtResultUrl() didefinisikan di includes/pretes-cbt.php.
 if (!defined('EXTRA_HEAD')) {
     define('EXTRA_HEAD', '<link rel="stylesheet" href="' . BASE_URL . '/pretes-ujian.php?cbt_style=bank&amp;v=' . (file_exists(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ? filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') : time()) . '">');
 }

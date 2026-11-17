@@ -437,3 +437,46 @@
     font-size: 13px;
     color: #94a3b8;
 }
+
+/* === Filter Hasil Ujian: tipe, kelulusan, hari & pencarian (CBT-RESULT-FILTERS) === */
+.cbt-result-filters{display:flex;flex-direction:column;gap:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.cbt-filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cbt-filter-label{font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em;min-width:44px}
+.cbt-filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+.cbt-chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 12px;border:1px solid #cbd5e1;border-radius:999px;background:#f8fafc;color:#334155;font-size:12px;font-weight:700;text-decoration:none;line-height:1.2;transition:background .15s,border-color .15s,color .15s}
+.cbt-chip:hover{background:#f1f5f9;border-color:#94a3b8;color:#0f172a}
+.cbt-chip span{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;padding:0 6px;border-radius:999px;background:#e2e8f0;color:#475569;font-size:10.5px;font-weight:800}
+.cbt-chip.active{background:#126147;border-color:#126147;color:#fff}
+.cbt-chip.active span{background:rgba(255,255,255,.22);color:#fff}
+.cbt-chip-pass:not(.active){border-color:#a7f3d0;background:#ecfdf5;color:#065f46}
+.cbt-chip-pass:not(.active) span{background:#d1fae5;color:#065f46}
+.cbt-chip-fail:not(.active){border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.cbt-chip-fail:not(.active) span{background:#fee2e2;color:#991b1b}
+.cbt-chip-fail.active{background:#dc2626;border-color:#dc2626}
+.cbt-filter-form{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;margin:0;padding-top:10px;border-top:1px dashed #e2e8f0}
+.cbt-filter-field{display:flex;flex-direction:column;gap:4px;margin:0}
+.cbt-filter-day{flex:0 1 240px;min-width:0}
+.cbt-filter-day select{width:100%;min-height:38px;margin:0;font-size:13px;padding:6px 10px}
+.cbt-filter-search{flex:1 1 240px;min-width:0}
+.cbt-search-box{position:relative;display:flex;align-items:center}
+.cbt-search-icon{position:absolute;left:11px;font-size:13px;opacity:.6;pointer-events:none}
+.cbt-search-box input{width:100%;min-height:38px;margin:0;padding:7px 12px 7px 34px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:13px;color:#0f172a;outline:none;transition:border-color .15s,box-shadow .15s}
+.cbt-search-box input:focus{border-color:#126147;box-shadow:0 0 0 3px rgba(18,97,71,.15)}
+.cbt-filter-actions{display:flex;gap:6px;align-items:center}
+.cbt-filter-actions .bank-button{min-height:38px;padding:6px 14px;font-size:12.5px;white-space:nowrap}
+.cbt-active-filters{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:#64748b;font-weight:600}
+.cbt-active-tag{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-weight:700}
+.cbt-active-tag a{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;color:#1e3a8a;text-decoration:none;font-size:11px}
+.cbt-active-tag a:hover{background:#dbeafe}
+.cbt-pass-label{display:block;margin-top:4px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.cbt-pass-label.is-pass{color:#047857}
+.cbt-pass-label.is-fail{color:#dc2626}
+@media (max-width:640px){
+  .cbt-result-filters{padding:12px}
+  .cbt-filter-row{align-items:flex-start;flex-direction:column;gap:6px}
+  .cbt-filter-chips{width:100%}
+  .cbt-chip{flex:1 1 auto;justify-content:center;min-height:38px}
+  .cbt-filter-form{flex-direction:column;align-items:stretch}
+  .cbt-filter-day,.cbt-filter-search{flex:1 1 auto;width:100%}
+  .cbt-filter-actions .bank-button{flex:1 1 0;justify-content:center;min-height:42px}
+}
