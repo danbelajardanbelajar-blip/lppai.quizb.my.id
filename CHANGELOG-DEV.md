@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 21:39:52 +0700 — Pesan: Pengguna Melihat Nama Admin yang Membalas
+
+**ID:** MSG-NAMA-ADMIN-USER · **Parent Git:** `680d003`.
+**Permintaan:** Pada fitur pesan, ketika pengguna (mahasiswa/dosen) membaca pesan dari admin, tampilkan nama user admin yang membalas di sisi pengguna.
+**Sebelumnya:** `msgFormat()` sengaja menyamarkan semua balasan admin menjadi "Admin LPPAI" untuk non-admin. Judul notifikasi widget juga selalu "Admin LPPAI".
+
+**Rancangan:**
+- **Server (`msgFormat`):** untuk penonton non-admin, `sender_name` balasan admin menjadi "{nama admin} · Admin LPPAI", mis. "Ali Mustofa · Admin LPPAI". Bila nama kosong atau akun terhapus (JOIN kosong), tetap "Admin LPPAI".
+  - Tampilan admin tidak berubah ("Admin · nama" untuk admin lain, "Anda" untuk pesan sendiri).
+  - Berlaku untuk riwayat percakapan, pesan baru, poll/notifikasi, dan respons kirim.
+- **Widget (`messages-widget.js`):** judul notifikasi pesan baru memakai `sender_name` dari server, sehingga pengguna melihat nama admin pembalas. Judul percakapan tetap "Admin LPPAI" (layanan).
+- Teks ditampilkan via `textContent`, sehingga nama aman dari HTML.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/messaging.php` | 2026-11-18 21:39:37 | 175–181 | `msgFormat()` | Nama admin pembalas untuk penonton non-admin + cadangan "Admin LPPAI". |
+| `assets/js/messages-widget.js` | 2026-11-18 21:39:37 | 403–404 | `notifyIncoming` (judul notifikasi) | Memakai `sender_name` (nama admin) untuk pengguna. |
+| `tests/messaging-test.php` | 2026-11-18 21:39:52 | 56–62 | Asersi balasan admin | Ekspektasi lama "Admin LPPAI" diganti "Admin Satu · Admin LPPAI"; tambah asersi percakapan & nama kosong. |
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l includes/messaging.php`: OK. `node --check assets/js/messages-widget.js`: OK. `git diff --check`: bersih.
+- `tests/messaging-test.php`: PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait).
+- **Browser lokal** (`php -S` + SQLite, widget asli + `/pesan-api.php`; mahasiswa "Rina RPL", admin "Ali Mustofa"):
+  - Membuka widget sebagai mahasiswa: di atas balasan admin tampil "Ali Mustofa · Admin LPPAI" (dicek lewat screenshot/zoom).
+  - Balasan admin baru muncul otomatis dengan nama yang sama. Respons `poll` (sumber judul notifikasi) berisi `sender_name` "Ali Mustofa · Admin LPPAI". Tidak ada error konsol.
+- **Keterbatasan:** belum diuji di produksi. Notifikasi sistem (Notification API) memerlukan izin browser, sehingga hanya data judulnya yang diverifikasi.
+
+---
+
 ## 2026-11-18 21:21:56 +0700 — Peserta Pretes: Hapus Filter "Nama Mahasiswa" & "NIM" (Pakai Kotak Cari Tabel)
 
 **ID:** PRETES-PESERTA-HAPUS-FILTER-NAMA-NIM · **Parent Git:** `07c57f4`.

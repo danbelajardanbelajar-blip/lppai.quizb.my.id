@@ -172,8 +172,12 @@ function msgSend(PDO $pdo, array $user, ?int $threadId, string $body, ?string $c
 function msgFormat(array $row, array $viewer): array {
     $isMine = (int)$row['sender_id'] === (int)$viewer['id'];
     $fromAdmin = $row['sender_role'] === 'admin';
+    // Pengguna melihat nama admin yang membalas, mis. "Ali · Admin LPPAI" (nama kosong → "Admin LPPAI")
+    $adminName = trim((string)($row['sender_name'] ?? ''));
     $name = $fromAdmin
-        ? (msgIsAdmin($viewer) ? ('Admin · ' . ($row['sender_name'] ?? 'LPPAI')) : 'Admin LPPAI')
+        ? (msgIsAdmin($viewer)
+            ? ('Admin · ' . ($adminName !== '' ? $adminName : 'LPPAI'))
+            : ($adminName !== '' ? $adminName . ' · Admin LPPAI' : 'Admin LPPAI'))
         : (string)($row['sender_name'] ?? 'Pengguna');
     return [
         'id' => (int)$row['id'],

@@ -400,7 +400,8 @@
         const last = fresh[fresh.length - 1];
         const viewingThis = state.open && state.view === 'chat' && !document.hidden && (!IS_ADMIN || state.threadId === last.thread_id);
         if (viewingThis) return;
-        const title = (IS_ADMIN ? last.sender_name : 'Admin LPPAI') + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ' pesan)' : '');
+        // Pengguna: nama admin yang membalas ("Ali · Admin LPPAI"), sesuai sender_name dari server
+        const title = (last.sender_name || 'Admin LPPAI') + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ' pesan)' : '');
         const body = last.body.length > 140 ? last.body.slice(0, 137) + '…' : last.body;
         chime();
         fab.classList.remove('is-ping'); void fab.offsetWidth; fab.classList.add('is-ping');

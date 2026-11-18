@@ -53,10 +53,13 @@ $view = msgFetchThread($pdo, $admin, (int)$th['id']);
 $check(count($view['messages']) === 1 && !$view['messages'][0]['mine'] && $view['thread']['unread'] === 0, 'Admin membaca → unread 0');
 $r1 = msgSend($pdo, $admin, (int)$th['id'], 'Wa’alaikumsalam. Jadwal sesuai hari pilihan pukul 13.00.', 'a1', $t + 10);
 $pu = msgPoll($pdo, $siti, $m1['id']);
-$check($pu['unread'] === 1 && count($pu['incoming']) === 1 && $pu['incoming'][0]['sender_name'] === 'Admin LPPAI' && $pu['incoming'][0]['from_admin'], 'Mahasiswa: unread 1 + incoming dari Admin LPPAI');
+// MSG-NAMA-ADMIN-USER: pengguna melihat nama admin yang membalas
+$check($pu['unread'] === 1 && count($pu['incoming']) === 1 && $pu['incoming'][0]['sender_name'] === 'Admin Satu · Admin LPPAI' && $pu['incoming'][0]['from_admin'], 'Mahasiswa: unread 1 + incoming dari Admin Satu · Admin LPPAI');
 $check(msgPoll($pdo, $admin, $m1['id'])['incoming'] === [], 'Balasan admin tidak jadi notifikasi bagi admin');
 $sv = msgFetchThread($pdo, $siti, null);
 $check(count($sv['messages']) === 2 && $sv['thread']['title'] === 'Admin LPPAI' && msgPoll($pdo, $siti)['unread'] === 0, 'Mahasiswa membaca → unread 0');
+$check($sv['messages'][1]['sender_name'] === 'Admin Satu · Admin LPPAI' && $sv['messages'][0]['sender_name'] === 'Anda', 'Mahasiswa melihat nama admin pembalas pada percakapan');
+$check(msgFormat(['id' => 1, 'thread_id' => 1, 'sender_id' => 777, 'sender_role' => 'admin', 'body' => 'x', 'created_at' => 1, 'sender_name' => null], $siti)['sender_name'] === 'Admin LPPAI', 'Nama admin kosong/terhapus → Admin LPPAI');
 $check(count(msgFetchThread($pdo, $siti, null, $m1['id'])['messages']) === 1, 'after_id hanya pesan baru');
 
 // Admin lain melihat pesan admin pertama sebagai "Admin · nama"
