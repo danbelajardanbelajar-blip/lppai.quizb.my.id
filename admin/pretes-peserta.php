@@ -777,28 +777,7 @@ include __DIR__ . '/../includes/header.php';
 
             <!-- Grid Input Filter Sesuai Nama Kolom -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;">
-                <!-- Kolom 1: Nama -->
-                <div>
-                    <label for="filter-nama" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
-                        👤 Nama Mahasiswa
-                    </label>
-                    <input type="text" id="filter-nama" placeholder="Cari nama..."
-                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
-                        onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
-                        onblur="this.style.borderColor='#cbd5e1';if(!this.value)this.style.background='#f8fafc'">
-                </div>
-
-                <!-- Kolom 2: NIM -->
-                <div>
-                    <label for="filter-nim" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
-                        🔢 NIM
-                    </label>
-                    <input type="text" id="filter-nim" placeholder="Cari NIM..."
-                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;outline:none;box-sizing:border-box;transition:border-color 0.2s;"
-                        onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'"
-                        onblur="this.style.borderColor='#cbd5e1';if(!this.value)this.style.background='#f8fafc'">
-                </div>
-
+                <!-- Filter Nama & NIM dihapus: gunakan kotak pencarian bawaan tabel (DataTables) -->
                 <!-- Kolom 3: Prodi -->
                 <div>
                     <label for="filter-prodi" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
@@ -1216,19 +1195,15 @@ function applyPretesFilters() {
     var dt = getPretesTable();
     if (!dt) return;
 
-    var namaVal   = ($('#filter-nama').val() || '').trim();
-    var nimVal    = ($('#filter-nim').val() || '').trim();
     var prodiVal  = $('#filter-prodi').val() || '';
     var jenisVal  = $('#filter-jenis-program').val() || '';
     var hariList  = setSelectedHari(getSelectedHari());
     var hariVal   = hariList.join(',');
     var pretesVal = $('#filter-pretes').val() || '';
 
-    // Kolom 1: Nama
-    dt.column(1).search(namaVal);
-
-    // Kolom 2: NIM
-    dt.column(2).search(nimVal);
+    // Kolom 1 (Nama) & 2 (NIM): dicari lewat kotak pencarian bawaan tabel; bersihkan sisa filter kolom lama
+    dt.column(1).search('');
+    dt.column(2).search('');
 
     // Kolom 3: Prodi & Kolom 4: Jenis Program disaring lewat custom DataTables ext.search agar akurat terhadap badge
     dt.column(3).search('');
@@ -1249,8 +1224,6 @@ function applyPretesFilters() {
 
     // Update indikator filter aktif
     var activeCount = 0;
-    if (namaVal) activeCount++;
-    if (nimVal) activeCount++;
     if (prodiVal) activeCount++;
     if (jenisVal) activeCount++;
     if (hariVal) activeCount++;
@@ -1268,8 +1241,6 @@ function applyPretesFilters() {
 
     try {
         sessionStorage.setItem('pretes_peserta_filter', JSON.stringify({
-            nama: namaVal,
-            nim: nimVal,
             prodi: prodiVal,
             jenis_program: jenisVal,
             hari: hariVal,
@@ -1317,23 +1288,11 @@ function setupPretesFilters() {
     // Pulihkan filter dari sessionStorage bila ada
     try {
         var saved = JSON.parse(sessionStorage.getItem('pretes_peserta_filter') || '{}');
-        if (saved.nama)          $('#filter-nama').val(saved.nama);
-        if (saved.nim)           $('#filter-nim').val(saved.nim);
         if (saved.prodi)         $('#filter-prodi').val(saved.prodi);
         if (saved.jenis_program) $('#filter-jenis-program').val(saved.jenis_program);
         if (saved.hari)          setSelectedHari(String(saved.hari).split(','));
         if (saved.pretes)        $('#filter-pretes').val(saved.pretes);
     } catch(e) {}
-
-    // Event input debounced untuk Nama dan NIM
-    var debounceTimer;
-    function debouncedApply() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(applyPretesFilters, 200);
-    }
-
-    $('#filter-nama').on('input', debouncedApply);
-    $('#filter-nim').on('input', debouncedApply);
 
     // Event change untuk dropdown filter
     $('#filter-prodi, #filter-jenis-program, #filter-pretes').on('change', applyPretesFilters);
@@ -1368,8 +1327,8 @@ function setupPretesFilters() {
     var resetBtn = document.getElementById('btn-reset-filters');
     if (resetBtn) {
         resetBtn.addEventListener('click', function() {
-            $('#filter-nama').val('');
-            $('#filter-nim').val('');
+            var dtReset = getPretesTable();
+            if (dtReset) { dtReset.search(''); $(dtReset.table().container()).find('.dataTables_filter input').val(''); }
             $('#filter-prodi').val('');
             $('#filter-jenis-program').val('');
             setSelectedHari([]);
@@ -1711,15 +1670,14 @@ function openExportModal() {
         var prodiVal  = ($('#filter-prodi').val() || '').trim();
         var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
         var pretesVal = ($('#filter-pretes').val() || '').trim();
-        var namaVal   = ($('#filter-nama').val() || '').trim();
-        var nimVal    = ($('#filter-nim').val() || '').trim();
+        var dtDesc    = getPretesTable();
+        var searchVal = dtDesc ? String(dtDesc.search() || '').trim() : '';
 
         if (hariVal) activeDesc.push('Hari: ' + hariVal.split(',').join(' + '));
         if (prodiVal) activeDesc.push('Prodi: ' + prodiVal);
         if (jenisVal) activeDesc.push('Program: ' + jenisVal);
         if (pretesVal) activeDesc.push(pretesVal === 'sudah' ? 'Sudah Pretes Resmi' : 'Belum Pretes Resmi');
-        if (namaVal) activeDesc.push('Nama: ' + namaVal);
-        if (nimVal) activeDesc.push('NIM: ' + nimVal);
+        if (searchVal) activeDesc.push('Pencarian: ' + searchVal);
 
         var descEl = document.getElementById('modal-export-filter-desc');
         var descPdfEl = document.getElementById('modal-export-pdf-desc');
@@ -1749,15 +1707,15 @@ function exportCurrentFiltered(format) {
         params.set('periode', SELECTED_PRETES_PERIODE);
     }
 
-    var namaVal   = ($('#filter-nama').val() || '').trim();
-    var nimVal    = ($('#filter-nim').val() || '').trim();
+    // Kata kunci kotak pencarian tabel (nama / NIM) ikut ke ekspor sebagai q
+    var dtExp     = getPretesTable();
+    var searchVal = dtExp ? String(dtExp.search() || '').trim() : '';
     var prodiVal  = ($('#filter-prodi').val() || '').trim();
     var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
     var hariVal   = ($('#filter-hari').val() || '').trim();
     var pretesVal = ($('#filter-pretes').val() || '').trim();
 
-    if (namaVal) params.set('nama', namaVal);
-    if (nimVal) params.set('nim', nimVal);
+    if (searchVal) params.set('q', searchVal);
     if (prodiVal) params.set('prodi', prodiVal);
     if (jenisVal) params.set('jenis_program', jenisVal);
     if (hariVal) params.set('hari', hariVal);

@@ -5,6 +5,37 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 21:21:56 +0700 — Peserta Pretes: Hapus Filter "Nama Mahasiswa" & "NIM" (Pakai Kotak Cari Tabel)
+
+**ID:** PRETES-PESERTA-HAPUS-FILTER-NAMA-NIM · **Parent Git:** `07c57f4`.
+**Permintaan:** Hilangkan filter Nama Mahasiswa dan NIM di `/admin/pretes-peserta.php`, karena pencarian sudah tersedia di tabel.
+
+**Rancangan:**
+- **Panel filter:** input `#filter-nama` dan `#filter-nim` dihapus. Pencarian memakai kotak "Cari:" bawaan DataTables yang mencari nama, NIM, dan kolom lain.
+- **`applyPretesFilters`:** pencarian kolom 1/2 dikosongkan, sehingga sisa filter lama dari sessionStorage tidak ikut menyaring. Penghitung "Filter Aktif" dan penyimpanan status tidak lagi memuat nama/NIM. Event input debounce dihapus.
+- **Reset:** juga mengosongkan pencarian DataTables beserta teks di kotaknya.
+- **Ekspor:** kata kunci kotak cari tabel dikirim sebagai `q` ke ekspor PDF/Excel. Parameter ini sudah didukung dan mencari nama, NIM, atau username tes. Deskripsi modal ekspor menampilkan "Pencarian: …".
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/pretes-peserta.php` | 2026-11-18 21:21:55 | 780, 1204–1206, 1330–1331, 1673–1680, 1711–1718 | Panel filter; `applyPretesFilters`; Reset; `openExportModal`; `exportCurrentFiltered` | Hapus filter Nama/NIM; ekspor & reset memakai kotak cari tabel. |
+| `tests/pretes-peserta-pdf-nilai-hari-test.php` | 2026-11-18 21:21:56 | 77–80 | Bagian 6 | 3 asersi: tidak ada sisa referensi, `q` dari kotak cari tabel, Reset mengosongkan kotak cari. |
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l`: OK. `git diff --check`: bersih.
+- Test terkait: 31 PASS. `pretes-peserta-columns-test.php`: PASS.
+- Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait).
+- **Browser lokal** (jQuery 3.7.1 + DataTables 1.13.8):
+  - Kedua filter tidak ada lagi; kotak "Cari:" tabel tersedia.
+  - Mengetik NIM "20260002" atau "Budi" lewat keyboard → 1 baris.
+  - URL ekspor PDF `...&q=20260002`; deskripsi modal "Pencarian: 20260002"; PDF hanya memuat NIM tersebut.
+  - Reset → 4 baris dan kotak cari kosong (awalnya teks masih tersisa di kotak; diperbaiki sebelum commit). Tidak ada error konsol.
+- **Keterbatasan:** belum diuji pada MySQL produksi.
+
+---
+
 ## 2026-11-18 21:17:53 +0700 — Peserta Pretes: Filter "Status Hadir" & "Status Credentials" Diganti Satu Filter "Status Pretes Resmi"
 
 **ID:** PRETES-PESERTA-FILTER-STATUS-PRETES · **Parent Git:** `7674781`.

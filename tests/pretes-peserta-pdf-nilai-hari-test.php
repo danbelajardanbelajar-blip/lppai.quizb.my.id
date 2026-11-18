@@ -74,5 +74,10 @@ foreach (['pdf' => $pdf, 'xlsx' => $xlsx] as $k => $src) {
 $pdf2 = file_get_contents($root . '/admin/pretes-peserta-pdf.php');
 $t(strpos($pdf2, 'if ($filterPretes !== \'\')') < strpos($pdf2, '$totalPeserta = count($rows);'), 'PDF menghitung total setelah filter pretes');
 
+// 6) Filter Nama & NIM dihapus (pencarian lewat kotak cari tabel), kata kunci tabel ikut ke ekspor
+$t(!str_contains($admin, 'filter-nama') && !str_contains($admin, 'filter-nim') && !str_contains($admin, 'namaVal') && !str_contains($admin, 'nimVal'), 'Filter Nama & NIM dihapus tanpa sisa referensi JS');
+$t(str_contains($admin, "if (searchVal) params.set('q', searchVal);") && str_contains($admin, "String(dtExp.search() || '').trim()"), 'Ekspor sesuai filter mengirim kata kunci kotak cari tabel (q)');
+$t(str_contains($admin, "if (dtReset) { dtReset.search(''); $(dtReset.table().container()).find('.dataTables_filter input').val(''); }"), 'Reset juga mengosongkan kotak cari tabel');
+
 if ($fail) { echo "\n$fail test gagal\n"; exit(1); }
 echo "\nSemua test kolom nilai PDF & filter hari multi-pilih lulus.\n";
