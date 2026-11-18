@@ -5,6 +5,68 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 22:15:40 +0700 — Profil Pengguna (Admin): 15 Bagian Data Tambahan (Tanpa Password Tes)
+
+**ID:** ADMIN-PROFIL-DATA-LENGKAP · **Parent Git:** `7afb1b7`.
+**Permintaan:** Tampilkan 15 data yang sebelumnya belum muncul di `/admin/profil-pengguna.php`. Khusus password tes tidak ditampilkan.
+
+**Rancangan:**
+- **Data (`includes/admin-profile-extra.php`, baru):** `adminProfileExtraData($pdo, $user, $registrations)`.
+  - Setiap bagian dijalankan terisolasi: tabel belum ada atau query gagal → bagian kosong, halaman tetap tampil. Query memakai prepared statement dan dibatasi jumlah barisnya.
+  - **Kolom `password_tes` tidak pernah dikeluarkan.** Yang dikembalikan hanya boolean `password_set`.
+- **Tampilan (`includes/admin-profile-extra-view.php`, baru):** kartu bernomor 1–15 berbentuk grid 2 kolom (1 kolom di layar ≤ 900px). Tabel memakai `no-datatable`; semua keluaran di-escape.
+  - Bagian 1–12 hanya untuk mahasiswa; bagian 13–15 untuk semua peran.
+  - Isi tiap bagian:
+    1. **CBT pretes resmi:** periode, mulai/selesai (WIB), durasi, status, benar/salah dari jumlah soal (`pretes_cbt_items`), nilai + Lulus/Tidak lulus.
+    2. **Tryout:** daftar sesi + nilai tertinggi/rata-rata/terakhir.
+    3. **Gangguan CBT:** waktu, alasan, posisi soal, waktu dilanjutkan.
+    4. **Pengawas AI:** jumlah per status, tantangan wajah lulus/terbit, 15 log terakhir.
+    5. **Presensi pretes:** scan QR beserta sesi, ditambah status "hadir" yang ditandai manual.
+    6. **Kredensial tes:** username tes; password hanya "Tersimpan (disembunyikan)" / "Belum ada".
+    7. **Status kelulusan per periode:** nilai resmi + Lulus/Tidak lulus/Menunggu + dasar kelulusan (RPL cukup CBT / semua komponen).
+    8. **Presensi tutorial:** rekap hadir/izin/sakit/alfa + per pertemuan.
+    9. **Tutorial RPL Online:** kelompok, tutor, tugas Drive, nilai tulis/praktik/akhir, status, CBT tutorial RPL.
+    10. **Al Khidmah:** tanggal, jam hadir/pulang, tautan swafoto.
+    11. **Pengambilan sertifikat:** nomor, status, tanggal, metode, penerima.
+    12. **Jaminan:** jaminan atas, jenis, tanggal, sudah/belum diambil.
+    13. **Login:** login berhasil terakhir, jumlah gagal, 10 login terakhir (perangkat/browser/IP).
+    14. **Aktivitas:** total + 15 klik terakhir, tautan ke Log Aktivitas.
+    15. **Pesan:** jumlah pesan dari pengguna/admin, belum dibaca admin, pesan terakhir.
+  - Tombol **"Buka percakapan dengan pengguna ini"** membuka widget Pesan. Bila belum ada percakapan, tombol membuatnya lewat aksi `start` pada `/pesan-api.php` (CSRF widget).
+- **Halaman:** `admin/profil-pengguna.php` memasang tampilan setelah bagian akademik/kelas diampu.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/admin-profile-extra.php` | 2026-11-18 22:15:17 | 1–305 (baru) | `adminProfileExtraWib`, `adminProfileExtraDuration`, `adminProfileExtraData` | Pengambil data 15 bagian. |
+| `includes/admin-profile-extra-view.php` | 2026-11-18 22:15:36 | 1–216 (baru) | Tampilan 15 kartu + skrip tombol pesan | Render terisolasi per bagian. |
+| `admin/profil-pengguna.php` | 2026-11-18 22:13:33 | 141 | Setelah bagian akademik/kelas diampu | `include` tampilan data tambahan. |
+| `tests/admin-profile-extra-test.php` | 2026-11-18 22:15:40 | 1–120 (baru) | Test | 38 asersi. |
+
+**Cakupan test baru (38 asersi):**
+- Fixture SQLite seluruh 15 sumber data, termasuk jumlah soal dari `pretes_cbt_items`.
+- Password tes rahasia tidak ada di data maupun HTML.
+- Tabel tidak ada → bagian kosong tanpa error.
+- View mahasiswa memuat bagian 1–15; view dosen hanya 13–15.
+- Tabel `no-datatable`, tombol pesan memakai `thread_id` yang ada.
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l` 3 file PHP + test: OK. `git diff --check` + cek spasi di file baru: bersih.
+- Test baru PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait).
+- **Browser lokal** (`php -S` + SQLite, halaman profil asli, mahasiswa dengan CBT resmi 23/25):
+  - 15 kartu tampil, nilai "92 Lulus", Al Khidmah, login, aktivitas.
+  - Password `SANGAT-RAHASIA-77` tidak muncul di HTML (0 kemunculan); tampil "Tersimpan (disembunyikan)".
+  - Ditemukan dan diperbaiki sebelum commit: skema produksi `pretes_cbt_attempts` tidak punya `total_questions`, sehingga sempat tampil "23 / dari 0". Kini jumlah soal dihitung dari `pretes_cbt_items` → "23 / 2 dari 25".
+  - Tombol "Buka percakapan" diklik: percakapan baru dibuat dan widget terbuka dengan judul nama mahasiswa; tidak ada error konsol.
+  - Pada 375px: satu kolom, `scrollWidth` = 375.
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi; kolom yang berbeda di produksi membuat bagian terkait kosong, bukan error.
+  - Swafoto Al Khidmah ditampilkan sebagai tautan, bukan pratinjau.
+  - Snapshot pengawas AI tidak ditampilkan (hanya log teks).
+
+---
+
 ## 2026-11-18 21:39:52 +0700 — Pesan: Pengguna Melihat Nama Admin yang Membalas
 
 **ID:** MSG-NAMA-ADMIN-USER · **Parent Git:** `680d003`.

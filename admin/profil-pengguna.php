@@ -138,6 +138,7 @@ document.getElementById('admin-profile-back').addEventListener('click', function
 <?php foreach ($profileHistory['teaching'] as $row): ?><tr><td><?= sanitize($row['nama_kelas']) ?></td><td><?= sanitize($row['semester'] . ' / ' . $row['gelombang']) ?></td><td><?= sanitize($row['hari'] ?: '-') ?></td><td><?= sanitize($row['jam'] ?: '-') ?></td><td><?= sanitize($row['ruangan'] ?: '-') ?></td></tr><?php endforeach; ?>
 </tbody></table></div><?php endif; ?></div></section>
 <?php endif; ?>
+<?php include __DIR__ . '/../includes/admin-profile-extra-view.php'; // 15 bagian data tambahan (tanpa password tes) ?>
 <?php endif; ?>
 <div id="admin-photo-zoom-modal" class="photo-zoom-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Perbesar Foto">
     <div class="photo-zoom-backdrop" onclick="closePhotoZoom()"></div>
