@@ -5,6 +5,43 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 21:17:53 +0700 — Peserta Pretes: Filter "Status Hadir" & "Status Credentials" Diganti Satu Filter "Status Pretes Resmi"
+
+**ID:** PRETES-PESERTA-FILTER-STATUS-PRETES · **Parent Git:** `7674781`.
+**Permintaan:** Di `/admin/pretes-peserta.php`, ganti dua filter (Status Hadir & Status Credentials) dengan satu filter saja: *sudah pretes resmi* dan *belum pretes resmi*.
+
+**Rancangan:**
+- **Filter baru `#filter-pretes`** dengan opsi Semua Peserta (n) / Sudah Pretes Resmi (n) / Belum Pretes Resmi (n). "Sudah" = punya nilai resmi menurut `pretesOfficialScoresByRegistration()` (CBT resmi terkumpul atau cadangan ujian_tulis), sama dengan kolom Nilai Pretes. Selain itu "Belum", termasuk CBT yang masih berlangsung.
+- **Tabel:** setiap `<tr>` diberi `data-pretes="sudah|belum"`. DataTables `ext.search` menyaring `wantPretes`; pengecekan `wantStatus`/`wantCred` dihapus. Atribut `data-status`/`data-cred` tetap ada (dipakai modal Edit/test lama).
+- **JS:** penghitung "Filter Aktif", penyimpanan sessionStorage (`pretes`), pemulihan, tombol Reset, deskripsi modal ekspor, dan parameter ekspor kini memakai `pretes`. Tidak ada sisa referensi `#filter-status` / `#filter-cred`.
+- **Ekspor PDF & Excel/CSV:** menerima `pretes=sudah|belum` (nilai lain diabaikan) dan menyaring baris setelah query memakai helper nilai resmi. PDF menghitung total, rekap RPL/Non-RPL, dan rekap nilai setelah filter. Keterangan filter tercetak ("Sudah Pretes Resmi" / "Belum Pretes Resmi"). Parameter lama `status`/`cred` tetap didukung server untuk tautan lama.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/pretes-peserta.php` | 2026-11-18 21:14:12 | 357, 856–867, 904, 1225, 1257, 1276, 1303–1312, 1325, 1339, 1376, 1713–1720, 1757–1764 | Hitung sudah pretes; filter UI; atribut baris; JS filter/simpan/pulihkan/reset/ekspor | Filter tunggal Status Pretes Resmi menggantikan Status Hadir & Credentials. |
+| `admin/pretes-peserta-pdf.php` | 2026-11-18 21:14:45 | 31, 99–106, 592–599 | Parameter; filter baris; keterangan filter | `pretes=sudah\|belum`. |
+| `admin/pretes-peserta-export.php` | 2026-11-18 21:14:45 | 55, 148–152, 234 | Parameter; filter baris; info sub-judul | `pretes=sudah\|belum`. |
+| `tests/pretes-peserta-pdf-nilai-hari-test.php` | 2026-11-18 21:15:17 | 66–75 | Bagian 5 | 7 asersi filter Status Pretes Resmi (UI, penghapusan filter lama, data-pretes, ekspor PDF/Excel, urutan total PDF). |
+| `tests/pretes-peserta-columns-test.php` | 2026-11-18 21:17:53 | 85–92 | Asersi ext.search | Diperbarui: kini mengharuskan `wantPretes`/`data-pretes` dan tidak ada `wantStatus`/`wantCred`. Asersi lama memeriksa filter yang memang diminta dihapus. |
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l` file yang berubah: OK. `git diff --check`: bersih.
+- `pretes-peserta-pdf-nilai-hari-test.php`: 28 PASS. `pretes-peserta-columns-test.php`: PASS setelah asersi diperbarui (sebelumnya gagal karena memeriksa filter lama).
+- Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait).
+- **Browser lokal** (`php -S` + SQLite, jQuery 3.7.1 + DataTables 1.13.8, 4 peserta: 3 bernilai, 1 belum):
+  - Opsi "Semua Peserta (4) / Sudah Pretes Resmi (3) / Belum Pretes Resmi (1)"; dua filter lama tidak ada.
+  - Pilih Belum → 1 baris, badge "1 Filter Aktif", URL PDF `...&pretes=belum`.
+  - Pilih Sudah → 3 baris. Reset → 4 baris dan pilihan kosong. Tidak ada error konsol.
+- **Ekspor:**
+  - PDF `pretes=belum` → 1 baris "-". PDF `pretes=sudah` → 92 / 60 / 81,5. PDF `pretes=sudah&hari=Senin` → 2 baris, keterangan "Hari Senin • Sudah Pretes Resmi".
+  - Excel/CSV `pretes=belum` → 1 baris; `pretes=sudah` → 3 baris.
+- **Keterangan:** status kehadiran tetap dapat diubah lewat modal Edit; hanya filternya yang dihapus dari panel.
+- **Keterbatasan:** belum diuji pada MySQL produksi.
+
+---
+
 ## 2026-11-18 20:54:53 +0700 — Peserta Pretes: Kolom Nilai di Ekspor PDF + Filter Hari Multi-Pilih
 
 **ID:** PRETES-PESERTA-PDF-NILAI-HARI · **Parent Git:** `2f91150`.

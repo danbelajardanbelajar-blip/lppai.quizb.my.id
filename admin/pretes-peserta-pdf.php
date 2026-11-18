@@ -28,6 +28,7 @@ $filterJenis  = trim($_GET['jenis_program'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
 $filterCred   = trim($_GET['cred'] ?? '');
 $filterSearch = trim($_GET['q'] ?? ($_GET['nama'] ?? ($_GET['nim'] ?? '')));
+$filterPretes = in_array($_GET['pretes'] ?? '', ['sudah', 'belum'], true) ? $_GET['pretes'] : ''; // status pretes resmi
 
 // Kueri filter data dinamis
 $whereConditions = ["1=1"];
@@ -95,9 +96,13 @@ $stmt = $pdo->prepare($querySql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$totalPeserta = count($rows);
 // Nilai hasil pretes resmi (CBT resmi / cadangan ujian_tulis); belum pretes -> "-"
 $officialScores = pretesOfficialScoresByRegistration($pdo, array_column($rows, 'reg_id'));
+// Filter "Sudah / Belum Pretes Resmi"
+if ($filterPretes !== '') {
+    $rows = array_values(array_filter($rows, static fn($r) => isset($officialScores[(int)$r['reg_id']]) === ($filterPretes === 'sudah')));
+}
+$totalPeserta = count($rows);
 $scoredCount = 0;
 $passCount = 0;
 foreach ($rows as $r) {
@@ -584,13 +589,14 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
                 <span class="meta-label">Filter Program:</span>
                 <span class="meta-value"><?= htmlspecialchars($filterJenis ?: 'Semua Program (RPL & Non RPL)', ENT_QUOTES, 'UTF-8') ?></span>
             </div>
-            <?php if ($filterHari !== '' || $filterStatus !== '' || $filterSearch !== ''): ?>
+            <?php if ($filterHari !== '' || $filterStatus !== '' || $filterSearch !== '' || $filterPretes !== ''): ?>
                 <div class="meta-item">
                     <span class="meta-label">Filter Lainnya:</span>
                     <span class="meta-value">
                         <?= htmlspecialchars(implode(' • ', array_filter([
                             $filterHari ? "Hari $filterHari" : '',
                             $filterStatus ? "Status " . ucfirst($filterStatus) : '',
+                            $filterPretes ? ($filterPretes === 'sudah' ? 'Sudah Pretes Resmi' : 'Belum Pretes Resmi') : '',
                             $filterSearch ? "Cari '$filterSearch'" : ''
                         ])), ENT_QUOTES, 'UTF-8') ?>
                     </span>

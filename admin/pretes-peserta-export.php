@@ -52,6 +52,7 @@ $filterJenis  = trim($_GET['jenis_program'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
 $filterCred   = trim($_GET['cred'] ?? '');
 $filterSearch = trim($_GET['q'] ?? ($_GET['nama'] ?? ($_GET['nim'] ?? '')));
+$filterPretes = in_array($_GET['pretes'] ?? '', ['sudah', 'belum'], true) ? $_GET['pretes'] : ''; // status pretes resmi
 $format       = strtolower(trim($_GET['format'] ?? 'xlsx'));
 if ($format === 'pdf') {
     require __DIR__ . '/pretes-peserta-pdf.php';
@@ -144,6 +145,11 @@ $querySql = "
 $stmt = $pdo->prepare($querySql);
 $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Filter "Sudah / Belum Pretes Resmi" (nilai CBT resmi / cadangan ujian_tulis)
+if ($filterPretes !== '') {
+    $pretesScoresForFilter = pretesOfficialScoresByRegistration($pdo, array_column($rows, 'reg_id'));
+    $rows = array_values(array_filter($rows, static fn($r) => isset($pretesScoresForFilter[(int)$r['reg_id']]) === ($filterPretes === 'sudah')));
+}
 
 // ── Mode Download (Excel .xlsx / CSV) ──────────────────────────────────────────
 $isDownload = (isset($_GET['download']) && $_GET['download'] === '1') || (isset($_GET['action']) && $_GET['action'] === 'export');
@@ -225,6 +231,7 @@ if ($isDownload) {
         if ($filterJenis) $subInfo[] = "Jenis Program: " . normalizeJenisProgram($filterJenis);
         if ($filterStatus) $subInfo[] = "Status: " . ucfirst(str_replace('_', ' ', $filterStatus));
         if ($filterCred) $subInfo[] = "Credentials: " . ($filterCred === 'has_cred' ? 'Sudah Ada' : 'Belum Ada');
+        if ($filterPretes) $subInfo[] = "Status Pretes: " . ($filterPretes === 'sudah' ? 'Sudah Pretes Resmi' : 'Belum Pretes Resmi');
         if ($filterSearch) $subInfo[] = "Pencarian: \"{$filterSearch}\"";
         $subInfo[] = "Total Data: " . count($rows) . " Mahasiswa";
         $subInfo[] = "Diunduh: " . date('d/m/Y H:i:s') . " WIB";

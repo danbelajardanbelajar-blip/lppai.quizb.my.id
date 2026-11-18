@@ -83,9 +83,11 @@ checkAssert(
 );
 
 checkAssert(
-    strpos($pesertaSrc, 'wantStatus') !== false && strpos($pesertaSrc, 'wantCred') !== false,
-    'Filter Status & Credentials diintegrasikan dengan mulus ke DataTables ext.search',
-    'DataTables ext.search tidak menyaring wantStatus atau wantCred',
+    // PRETES-PESERTA-FILTER-STATUS-PRETES: filter Status Hadir & Credentials diganti satu filter Status Pretes Resmi
+    strpos($pesertaSrc, 'wantPretes') !== false && strpos($pesertaSrc, "getAttribute('data-pretes')") !== false
+        && strpos($pesertaSrc, 'wantStatus') === false && strpos($pesertaSrc, 'wantCred') === false,
+    'Filter Status Pretes Resmi (sudah/belum) diintegrasikan ke DataTables ext.search',
+    'DataTables ext.search tidak menyaring wantPretes (data-pretes) atau masih memakai filter lama',
     $errors
 );
 

@@ -63,5 +63,16 @@ $t(str_contains($pdf, 'Belum Pretes:'), 'Rekap PDF memuat jumlah sudah/belum pre
 $xlsx = file_get_contents($root . '/admin/pretes-peserta-export.php');
 $t(str_contains($xlsx, 'pretesParseHariFilter($_GET[\'hari\'] ?? \'\')') && str_contains($xlsx, "implode('-', \$filterHariList)"), 'Ekspor Excel juga mendukung beberapa hari');
 
+// 5) Filter tunggal "Status Pretes Resmi" menggantikan Status Hadir & Status Credentials
+$t(str_contains($admin, '<select id="filter-pretes"') && str_contains($admin, '<option value="sudah">Sudah Pretes Resmi') && str_contains($admin, '<option value="belum">Belum Pretes Resmi'), 'Filter Status Pretes Resmi (sudah/belum) tersedia');
+$t(!str_contains($admin, 'id="filter-status"') && !str_contains($admin, 'id="filter-cred"') && !str_contains($admin, "#filter-status") && !str_contains($admin, "#filter-cred"), 'Filter Status Hadir & Status Credentials dihapus (tanpa sisa referensi JS)');
+$t(str_contains($admin, 'data-pretes="<?= isset($officialScores[(int)$p[\'reg_id\']]) ? \'sudah\' : \'belum\' ?>"') && str_contains($admin, 'rowNode.getAttribute(\'data-pretes\')'), 'Baris tabel ber-atribut data-pretes dan disaring DataTables');
+$t(str_contains($admin, 'if (pretesVal) params.set(\'pretes\', pretesVal);'), 'Ekspor sesuai filter mengirim parameter pretes');
+foreach (['pdf' => $pdf, 'xlsx' => $xlsx] as $k => $src) {
+    $t(str_contains($src, 'in_array($_GET[\'pretes\'] ?? \'\', [\'sudah\', \'belum\'], true)') && str_contains($src, '($filterPretes === \'sudah\')'), "Ekspor $k memfilter sudah/belum pretes resmi");
+}
+$pdf2 = file_get_contents($root . '/admin/pretes-peserta-pdf.php');
+$t(strpos($pdf2, 'if ($filterPretes !== \'\')') < strpos($pdf2, '$totalPeserta = count($rows);'), 'PDF menghitung total setelah filter pretes');
+
 if ($fail) { echo "\n$fail test gagal\n"; exit(1); }
 echo "\nSemua test kolom nilai PDF & filter hari multi-pilih lulus.\n";

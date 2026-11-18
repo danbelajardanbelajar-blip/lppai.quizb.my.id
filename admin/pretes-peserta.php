@@ -354,6 +354,7 @@ if ($selectedPeriode !== '' && $selectedPeriode !== '__all__') {
 
 // Nilai hasil pretes resmi per pendaftaran (CBT resmi / cadangan ujian_tulis); belum pretes -> "-"
 $officialScores = pretesOfficialScoresByRegistration($pdo, array_column($participants, 'reg_id'));
+$sudahPretesCount = count(array_filter($participants, static fn($p) => isset($officialScores[(int)$p['reg_id']])));
 
 $totalPeserta    = count($participants);
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
@@ -852,30 +853,16 @@ include __DIR__ . '/../includes/header.php';
                     </style>
                 </div>
 
-                <!-- Kolom 5: Status Hadir -->
+                <!-- Kolom 5: Status Pretes Resmi (menggantikan filter Status Hadir & Status Credentials) -->
                 <div>
-                    <label for="filter-status" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
-                        📋 Status Hadir
+                    <label for="filter-pretes" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        📝 Status Pretes Resmi
                     </label>
-                    <select id="filter-status"
+                    <select id="filter-pretes"
                         style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
-                        <option value="">Semua Status Kehadiran</option>
-                        <option value="terdaftar">Terdaftar (<?= $statusCounts['terdaftar'] ?? 0 ?>)</option>
-                        <option value="hadir">Hadir (<?= $statusCounts['hadir'] ?? 0 ?>)</option>
-                        <option value="tidak_hadir">Tidak Hadir (<?= $statusCounts['tidak_hadir'] ?? 0 ?>)</option>
-                    </select>
-                </div>
-
-                <!-- Kolom 6: Username Tes / Credentials -->
-                <div>
-                    <label for="filter-cred" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
-                        🔑 Status Credentials
-                    </label>
-                    <select id="filter-cred"
-                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
-                        <option value="">Semua Status Credentials</option>
-                        <option value="has_cred">Sudah Ada (<?= $totalBerCredentials ?>)</option>
-                        <option value="no_cred">Belum Ada (<?= $totalPeserta - $totalBerCredentials ?>)</option>
+                        <option value="">Semua Peserta (<?= $totalPeserta ?>)</option>
+                        <option value="sudah">Sudah Pretes Resmi (<?= $sudahPretesCount ?>)</option>
+                        <option value="belum">Belum Pretes Resmi (<?= $totalPeserta - $sudahPretesCount ?>)</option>
                     </select>
                 </div>
             </div>
@@ -914,7 +901,7 @@ include __DIR__ . '/../includes/header.php';
                 <tbody>
                     <?php foreach ($participants as $i => $p): ?>
                     <?php $rowJenis = normalizeJenisProgram($p['jenis_program'] ?? 'Reguler'); ?>
-                    <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>" data-status="<?= sanitize($p['status'] ?? 'terdaftar') ?>" data-cred="<?= !empty($p['username_tes']) ? 'has_cred' : 'no_cred' ?>">
+                    <tr id="row-<?= $p['reg_id'] ?>" data-prodi="<?= sanitize($p['program_studi'] ?? '') ?>" data-jenis="<?= sanitize($rowJenis) ?>" data-status="<?= sanitize($p['status'] ?? 'terdaftar') ?>" data-cred="<?= !empty($p['username_tes']) ? 'has_cred' : 'no_cred' ?>" data-pretes="<?= isset($officialScores[(int)$p['reg_id']]) ? 'sudah' : 'belum' ?>">
                         <td><?= $i + 1 ?></td>
                         <td data-search="<?= sanitize($p['nama_lengkap']) ?>">
                             <div style="display:flex; align-items:center; gap:10px;">
@@ -1235,8 +1222,7 @@ function applyPretesFilters() {
     var jenisVal  = $('#filter-jenis-program').val() || '';
     var hariList  = setSelectedHari(getSelectedHari());
     var hariVal   = hariList.join(',');
-    var statusVal = $('#filter-status').val() || '';
-    var credVal   = $('#filter-cred').val() || '';
+    var pretesVal = $('#filter-pretes').val() || '';
 
     // Kolom 1: Nama
     dt.column(1).search(namaVal);
@@ -1268,8 +1254,7 @@ function applyPretesFilters() {
     if (prodiVal) activeCount++;
     if (jenisVal) activeCount++;
     if (hariVal) activeCount++;
-    if (statusVal) activeCount++;
-    if (credVal) activeCount++;
+    if (pretesVal) activeCount++;
 
     var badge = document.getElementById('filter-active-badge');
     if (badge) {
@@ -1288,8 +1273,7 @@ function applyPretesFilters() {
             prodi: prodiVal,
             jenis_program: jenisVal,
             hari: hariVal,
-            status: statusVal,
-            cred: credVal
+            pretes: pretesVal
         }));
     } catch(e) {}
 }
@@ -1316,18 +1300,14 @@ function setupPretesFilters() {
             if (!rowNode) return true;
             var wantProdi  = ($('#filter-prodi').val() || '').trim();
             var wantJenis  = ($('#filter-jenis-program').val() || '').trim();
-            var wantStatus = ($('#filter-status').val() || '').trim();
-            var wantCred   = ($('#filter-cred').val() || '').trim();
+            var wantPretes = ($('#filter-pretes').val() || '').trim();
             if (wantProdi && (rowNode.getAttribute('data-prodi') || '') !== wantProdi) {
                 return false;
             }
             if (wantJenis && (rowNode.getAttribute('data-jenis') || '') !== wantJenis) {
                 return false;
             }
-            if (wantStatus && (rowNode.getAttribute('data-status') || '') !== wantStatus) {
-                return false;
-            }
-            if (wantCred && (rowNode.getAttribute('data-cred') || '') !== wantCred) {
+            if (wantPretes && (rowNode.getAttribute('data-pretes') || '') !== wantPretes) {
                 return false;
             }
             return true;
@@ -1342,8 +1322,7 @@ function setupPretesFilters() {
         if (saved.prodi)         $('#filter-prodi').val(saved.prodi);
         if (saved.jenis_program) $('#filter-jenis-program').val(saved.jenis_program);
         if (saved.hari)          setSelectedHari(String(saved.hari).split(','));
-        if (saved.status)        $('#filter-status').val(saved.status);
-        if (saved.cred)          $('#filter-cred').val(saved.cred);
+        if (saved.pretes)        $('#filter-pretes').val(saved.pretes);
     } catch(e) {}
 
     // Event input debounced untuk Nama dan NIM
@@ -1357,7 +1336,7 @@ function setupPretesFilters() {
     $('#filter-nim').on('input', debouncedApply);
 
     // Event change untuk dropdown filter
-    $('#filter-prodi, #filter-jenis-program, #filter-status, #filter-cred').on('change', applyPretesFilters);
+    $('#filter-prodi, #filter-jenis-program, #filter-pretes').on('change', applyPretesFilters);
 
     // Checkbox hari (multi-pilih)
     document.querySelectorAll('.filter-hari-cb').forEach(function(cb) {
@@ -1394,8 +1373,7 @@ function setupPretesFilters() {
             $('#filter-prodi').val('');
             $('#filter-jenis-program').val('');
             setSelectedHari([]);
-            $('#filter-status').val('');
-            $('#filter-cred').val('');
+            $('#filter-pretes').val('');
             try { sessionStorage.removeItem('pretes_peserta_filter'); } catch(e) {}
             applyPretesFilters();
         });
@@ -1732,16 +1710,14 @@ function openExportModal() {
         var hariVal   = ($('#filter-hari').val() || '').trim();
         var prodiVal  = ($('#filter-prodi').val() || '').trim();
         var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
-        var statusVal = ($('#filter-status').val() || '').trim();
-        var credVal   = ($('#filter-cred').val() || '').trim();
+        var pretesVal = ($('#filter-pretes').val() || '').trim();
         var namaVal   = ($('#filter-nama').val() || '').trim();
         var nimVal    = ($('#filter-nim').val() || '').trim();
 
         if (hariVal) activeDesc.push('Hari: ' + hariVal.split(',').join(' + '));
         if (prodiVal) activeDesc.push('Prodi: ' + prodiVal);
         if (jenisVal) activeDesc.push('Program: ' + jenisVal);
-        if (statusVal) activeDesc.push('Status: ' + statusVal);
-        if (credVal) activeDesc.push('Cred: ' + (credVal === 'has_cred' ? 'Sudah Ada' : 'Belum Ada'));
+        if (pretesVal) activeDesc.push(pretesVal === 'sudah' ? 'Sudah Pretes Resmi' : 'Belum Pretes Resmi');
         if (namaVal) activeDesc.push('Nama: ' + namaVal);
         if (nimVal) activeDesc.push('NIM: ' + nimVal);
 
@@ -1778,16 +1754,14 @@ function exportCurrentFiltered(format) {
     var prodiVal  = ($('#filter-prodi').val() || '').trim();
     var jenisVal  = ($('#filter-jenis-program').val() || '').trim();
     var hariVal   = ($('#filter-hari').val() || '').trim();
-    var statusVal = ($('#filter-status').val() || '').trim();
-    var credVal   = ($('#filter-cred').val() || '').trim();
+    var pretesVal = ($('#filter-pretes').val() || '').trim();
 
     if (namaVal) params.set('nama', namaVal);
     if (nimVal) params.set('nim', nimVal);
     if (prodiVal) params.set('prodi', prodiVal);
     if (jenisVal) params.set('jenis_program', jenisVal);
     if (hariVal) params.set('hari', hariVal);
-    if (statusVal) params.set('status', statusVal);
-    if (credVal) params.set('cred', credVal);
+    if (pretesVal) params.set('pretes', pretesVal);
 
     closeExportModal();
     if (format === 'pdf') {
