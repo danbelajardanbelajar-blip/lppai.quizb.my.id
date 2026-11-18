@@ -5,6 +5,46 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 16:13:53 +0700 — Admin Peserta Pretes: Kolom Nilai Hasil Pretes Resmi
+
+**ID:** PRETES-PESERTA-NILAI-RESMI · **Parent Git:** `aca84aa`.
+**Permintaan:** Di `/admin/pretes-peserta.php`, tampilkan kolom nilai hasil pretes resmi bila peserta sudah pretes; bila belum, kosongkan (-).
+**Rancangan:**
+- **Sumber nilai** — diambil dalam satu batch per 500 pendaftaran:
+  - CBT pretes resmi yang sudah dikumpulkan (`pretes_cbt_attempts.registration_id = reg_id`, `submitted_at` & `score` terisi). Bila ada beberapa, dipakai yang terakhir dikumpulkan.
+  - Cadangan bila belum ada CBT: nilai `ujian_tulis` di `pretes_assessments` (mis. hasil impor E-Ujian).
+- **Tampilan:**
+  - Sudah pretes: nilai dengan format desimal Indonesia (mis. 81,5) + label Lulus (≥ 80, hijau) / Tidak lulus (merah). Title sel menyebut sumber nilai.
+  - Belum pretes, termasuk CBT yang masih berlangsung: "-" abu-abu.
+  - `data-order` numerik (belum = -1) agar kolom bisa diurutkan, dan `data-search` Lulus/Tidak lulus/Belum.
+- **Penempatan:** kolom "Nilai Pretes" disisipkan sebelum "Aksi", sehingga indeks kolom filter DataTables yang ada (1–5) tidak berubah.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/pretes-peserta.php` | 2026-11-18 16:13:53 | 355–385, 926, 981–991 | Pengambilan data peserta; header tabel; sel baris | Query batch `$officialScores`; kolom `<th>Nilai Pretes</th>`; sel nilai/label atau "-". |
+
+**Verifikasi:**
+- **Lingkungan:** PHP di `C:\xampp\php` sudah tidak ada di komputer ini. Atas persetujuan pengguna, PHP 8.3.36 NTS x64 resmi diunduh dari windows.php.net (SHA-256 cocok dengan `releases.json`) ke folder scratchpad sesi; PATH sistem tidak diubah.
+- `php -l admin/pretes-peserta.php`: OK. `git diff --check`: bersih.
+- Seluruh `tests/*.php` dijalankan; yang gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait). Termasuk `admin-tables-jenis-program-test.php`, `pretes-foto-verifikasi-test.php`, `pretes-peserta-aktif-test.php`, `admin-dashboard-active-period-test.php`: PASS.
+- Render lokal (`php -S` + SQLite, 4 peserta RPL):
+
+  | Kondisi peserta | Tampilan |
+  |---|---|
+  | CBT 23/25 | 92 Lulus |
+  | CBT 15/25 | 60 Tidak lulus |
+  | CBT masih berlangsung | - |
+  | Impor ujian tulis 81,5 | 81,5 Lulus |
+
+  Header 8 kolom, setiap baris 8 sel.
+- **Keterbatasan:**
+  - Header tiruan tidak memuat jQuery/DataTables, sehingga pengurutan dan filter DataTables tidak diuji di browser (indeks kolom filter tidak berubah).
+  - Belum diuji pada MySQL produksi.
+
+---
+
 ## 2026-11-17 22:33:28 +0700 — Tampilkan Jurusan (Kecil) di Kolom Nama pada Tab Hasil Ujian CBT
 
 **ID:** CBT-RESULT-PRODI-COLUMN · **Parent Git:** `310ef54`.

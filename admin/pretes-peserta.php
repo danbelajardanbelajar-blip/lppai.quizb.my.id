@@ -352,6 +352,38 @@ if ($selectedPeriode !== '' && $selectedPeriode !== '__all__') {
     $participants = $pdo->query($baseSelect . " ORDER BY u.nama_lengkap ASC")->fetchAll();
 }
 
+// Nilai hasil pretes resmi per pendaftaran: CBT resmi yang sudah dikumpulkan (registration_id = reg_id),
+// cadangan nilai Ujian tulis di pretes_assessments (mis. impor E-Ujian). Belum ada → "-".
+$officialScores = [];
+$regIds = array_values(array_unique(array_map(static fn($p) => (int)$p['reg_id'], $participants)));
+if ($regIds) {
+    foreach (array_chunk($regIds, 500) as $chunk) {
+        $ph = implode(',', array_fill(0, count($chunk), '?'));
+        try {
+            $stmtSc = $pdo->prepare("SELECT registration_id, score FROM pretes_cbt_attempts
+                WHERE registration_id IN ($ph) AND submitted_at IS NOT NULL AND score IS NOT NULL
+                ORDER BY submitted_at ASC, id ASC");
+            $stmtSc->execute($chunk);
+            foreach ($stmtSc->fetchAll(PDO::FETCH_ASSOC) as $sc) {
+                $officialScores[(int)$sc['registration_id']] = ['score' => (float)$sc['score'], 'source' => 'CBT'];
+            }
+        } catch (Throwable $e) {}
+        try {
+            $stmtAs = $pdo->prepare("SELECT registration_id, scores_json FROM pretes_assessments WHERE registration_id IN ($ph)");
+            $stmtAs->execute($chunk);
+            foreach ($stmtAs->fetchAll(PDO::FETCH_ASSOC) as $as) {
+                $rid = (int)$as['registration_id'];
+                if (isset($officialScores[$rid])) continue;
+                $sj = json_decode((string)$as['scores_json'], true);
+                $ut = is_array($sj) ? ($sj['ujian_tulis'] ?? null) : null;
+                if ($ut !== null && $ut !== '' && is_numeric($ut)) {
+                    $officialScores[$rid] = ['score' => (float)$ut, 'source' => 'Ujian tulis'];
+                }
+            }
+        } catch (Throwable $e) {}
+    }
+}
+
 $totalPeserta    = count($participants);
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
 
@@ -891,6 +923,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Prodi</th>
                         <th>Program</th>
                         <th>Hari / Periode</th>
+                        <th title="Nilai CBT pretes resmi (minimal lulus 80). Tanda - berarti belum mengerjakan pretes resmi.">Nilai Pretes</th>
                         <th style="min-width:160px;">Aksi</th>
                     </tr>
                 </thead>
@@ -944,6 +977,18 @@ include __DIR__ . '/../includes/header.php';
                                 <div style="font-size:11px;color:#475569;margin-top:3px;"><?= sanitize($p['periode']) ?></div>
                             <?php endif; ?>
                         </td>
+
+                        <!-- Nilai hasil pretes resmi -->
+                        <?php $os = $officialScores[(int)$p['reg_id']] ?? null; ?>
+                        <?php if ($os): ?>
+                            <?php $osPass = $os['score'] >= 80; $osText = rtrim(rtrim(number_format($os['score'], 2, ',', ''), '0'), ','); ?>
+                            <td class="pretes-official-score" data-order="<?= number_format($os['score'], 2, '.', '') ?>" data-search="<?= $osPass ? 'Lulus' : 'Tidak lulus' ?>" style="white-space:nowrap;" title="Sumber: <?= sanitize($os['source']) ?>">
+                                <strong style="font-size:14px;color:<?= $osPass ? '#15803d' : '#b91c1c' ?>;"><?= sanitize($osText) ?></strong>
+                                <div style="font-size:10.5px;font-weight:700;color:<?= $osPass ? '#15803d' : '#b91c1c' ?>;"><?= $osPass ? 'Lulus' : 'Tidak lulus' ?></div>
+                            </td>
+                        <?php else: ?>
+                            <td class="pretes-official-score" data-order="-1" data-search="Belum" style="color:#94a3b8;text-align:center;" title="Belum mengerjakan pretes resmi">-</td>
+                        <?php endif; ?>
 
                         <!-- Aksi -->
                         <td style="white-space:nowrap;">
