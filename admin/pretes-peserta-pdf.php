@@ -2,7 +2,8 @@
 /**
  * LPPAI Corner - Admin: Export Dokumen PDF Data Peserta Pretes
  * Format Resmi Cetak / Simpan PDF (A4 Portrait)
- * Berisi kolom: No, NIM, Nama Mahasiswa, Program (RPL / Non RPL), Jurusan (Program Studi)
+ * Berisi kolom: No, NIM, Nama Mahasiswa, Program (RPL / Non RPL), Jurusan (Program Studi), Nilai Pretes
+ * Filter hari bisa lebih dari satu: hari=Senin,Rabu
  */
 
 define('PAGE_TITLE', 'Export Data Peserta Pretes ke PDF');
@@ -19,7 +20,9 @@ $activeExportPretes = getActivePretesPeriod($pdo);
 $rawFilterPeriode = trim($_GET['periode'] ?? ($activeExportPretes['periode'] ?? ''));
 $filterPeriode = ($rawFilterPeriode === '__all__' || strtolower($rawFilterPeriode) === 'all') ? '' : $rawFilterPeriode;
 
-$filterHari   = trim($_GET['hari'] ?? '');
+// Hari multi-pilih ("Senin,Rabu" atau hari[]=...); hanya Senin-Jumat yang diterima
+$filterHariList = pretesParseHariFilter($_GET['hari'] ?? '');
+$filterHari   = implode(', ', $filterHariList);
 $filterProdi  = trim($_GET['prodi'] ?? '');
 $filterJenis  = trim($_GET['jenis_program'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
@@ -39,9 +42,9 @@ if ($filterPeriode !== '') {
     $params[] = $filterPeriode;
 }
 
-if ($filterHari !== '') {
-    $whereConditions[] = "LOWER(TRIM(pr.hari_pilihan)) = LOWER(?)";
-    $params[] = $filterHari;
+if ($filterHariList) {
+    $whereConditions[] = "LOWER(TRIM(pr.hari_pilihan)) IN (" . implode(',', array_fill(0, count($filterHariList), 'LOWER(?)')) . ")";
+    foreach ($filterHariList as $hariItem) $params[] = $hariItem;
 }
 
 if ($filterProdi !== '') {
@@ -93,6 +96,14 @@ $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $totalPeserta = count($rows);
+// Nilai hasil pretes resmi (CBT resmi / cadangan ujian_tulis); belum pretes -> "-"
+$officialScores = pretesOfficialScoresByRegistration($pdo, array_column($rows, 'reg_id'));
+$scoredCount = 0;
+$passCount = 0;
+foreach ($rows as $r) {
+    $os = $officialScores[(int)$r['reg_id']] ?? null;
+    if ($os) { $scoredCount++; if ($os['score'] >= 80) $passCount++; }
+}
 $rplCount = 0;
 $nonRplCount = 0;
 $prodiStats = [];
@@ -337,12 +348,12 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
             background: #fafbfc;
         }
         .col-no {
-            width: 5.5%;
+            width: 5%;
             text-align: center;
             font-weight: 600;
         }
         .col-nim {
-            width: 18%;
+            width: 15%;
             text-align: center;
             font-family: Consolas, "Courier New", monospace;
             font-size: 9.5pt;
@@ -350,20 +361,38 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
             color: #0f172a;
         }
         .col-nama {
-            width: 36%;
+            width: 31%;
             text-align: left;
             font-weight: 600;
             color: #0f172a;
         }
         .col-program {
-            width: 18.5%;
+            width: 15%;
             text-align: center;
         }
         .col-jurusan {
-            width: 22%;
+            width: 21%;
             text-align: left;
             color: #1e293b;
         }
+        .col-nilai {
+            width: 13%;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .nilai-angka {
+            display: block;
+            font-size: 10.5pt;
+            font-weight: 800;
+        }
+        .nilai-ket {
+            display: block;
+            font-size: 7.5pt;
+            font-weight: 700;
+        }
+        .nilai-lulus { color: #15803d; }
+        .nilai-gagal { color: #b91c1c; }
+        .nilai-kosong { color: #94a3b8; font-weight: 700; }
 
         /* ── Badge Program RPL / Non RPL ── */
         .badge-program {
@@ -573,7 +602,7 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
             </div>
         </div>
 
-        <!-- Tabel 5 Kolom: No, NIM, Nama Mahasiswa, Program (RPL / Non RPL), Jurusan -->
+        <!-- Tabel 6 Kolom: No, NIM, Nama Mahasiswa, Program (RPL / Non RPL), Jurusan, Nilai Pretes -->
         <table class="peserta-table">
             <thead>
                 <tr>
@@ -582,12 +611,13 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
                     <th class="col-nama">Nama Mahasiswa</th>
                     <th class="col-program">Program</th>
                     <th class="col-jurusan">Jurusan / Program Studi</th>
+                    <th class="col-nilai">Nilai Pretes</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($rows)): ?>
                     <tr>
-                        <td colspan="5" style="text-align:center; padding:35px 20px; color:#64748b;">
+                        <td colspan="6" style="text-align:center; padding:35px 20px; color:#64748b;">
                             <em>Tidak ada data peserta pretes yang sesuai dengan kriteria / filter yang dipilih.</em>
                         </td>
                     </tr>
@@ -610,6 +640,16 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
                                 <?php endif; ?>
                             </td>
                             <td class="col-jurusan"><?= htmlspecialchars($row['program_studi'] ?: '-', ENT_QUOTES, 'UTF-8') ?></td>
+                            <?php $os = $officialScores[(int)$row['reg_id']] ?? null; ?>
+                            <td class="col-nilai">
+                                <?php if ($os): ?>
+                                    <?php $osPass = $os['score'] >= 80; ?>
+                                    <span class="nilai-angka <?= $osPass ? 'nilai-lulus' : 'nilai-gagal' ?>"><?= htmlspecialchars(pretesFormatScore($os['score']), ENT_QUOTES, 'UTF-8') ?></span>
+                                    <span class="nilai-ket <?= $osPass ? 'nilai-lulus' : 'nilai-gagal' ?>"><?= $osPass ? 'Lulus' : 'Tidak lulus' ?></span>
+                                <?php else: ?>
+                                    <span class="nilai-kosong">-</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -623,6 +663,8 @@ $backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urle
                 • Total Peserta: <strong><?= $totalPeserta ?></strong> orang<br>
                 • Program RPL: <strong><?= $rplCount ?></strong> orang<br>
                 • Program Non RPL (Reguler): <strong><?= $nonRplCount ?></strong> orang<br>
+                • Sudah Pretes (bernilai): <strong><?= $scoredCount ?></strong> orang (Lulus ≥ 80: <strong><?= $passCount ?></strong>, Tidak lulus: <strong><?= $scoredCount - $passCount ?></strong>)<br>
+                • Belum Pretes: <strong><?= $totalPeserta - $scoredCount ?></strong> orang<br>
                 <span style="font-size:8pt;color:#64748b;">Dicetak secara resmi melalui Sistem Informasi LPPAI Corner UNISDA.</span>
             </div>
 

@@ -44,7 +44,9 @@ $availableColumns = [
 // ── Tangkap Parameter Filter ───────────────────────────────────────────────────
 $rawFilterPeriode = trim($_GET['periode'] ?? ($activeExportPretes['periode'] ?? ''));
 $filterPeriode = ($rawFilterPeriode === '__all__' || strtolower($rawFilterPeriode) === 'all') ? '' : $rawFilterPeriode;
-$filterHari   = trim($_GET['hari'] ?? '');
+// Hari multi-pilih ("Senin,Rabu" atau hari[]=...); hanya Senin-Jumat yang diterima
+$filterHariList = pretesParseHariFilter($_GET['hari'] ?? '');
+$filterHari   = implode(', ', $filterHariList);
 $filterProdi  = trim($_GET['prodi'] ?? '');
 $filterJenis  = trim($_GET['jenis_program'] ?? '');
 $filterStatus = trim($_GET['status'] ?? '');
@@ -84,9 +86,9 @@ if ($filterPeriode !== '') {
     $params[] = $filterPeriode;
 }
 
-if ($filterHari !== '') {
-    $whereConditions[] = "LOWER(TRIM(pr.hari_pilihan)) = LOWER(?)";
-    $params[] = $filterHari;
+if ($filterHariList) {
+    $whereConditions[] = "LOWER(TRIM(pr.hari_pilihan)) IN (" . implode(',', array_fill(0, count($filterHariList), 'LOWER(?)')) . ")";
+    foreach ($filterHariList as $hariItem) $params[] = $hariItem;
 }
 
 if ($filterProdi !== '') {
@@ -154,7 +156,7 @@ if ($isDownload) {
     }
 
     $safePeriode = $filterPeriode ? '_' . preg_replace('/[^a-zA-Z0-9_-]/', '-', $filterPeriode) : '_SemuaPeriode';
-    $safeHari = $filterHari ? preg_replace('/[^a-zA-Z0-9]/', '', ucfirst(strtolower($filterHari))) : 'SemuaHari';
+    $safeHari = $filterHariList ? implode('-', $filterHariList) : 'SemuaHari';
     $timestamp = date('Ymd_His');
     $filenameBase = "Data_Peserta_Pretes_LPPAI{$safePeriode}_{$safeHari}_{$timestamp}";
 

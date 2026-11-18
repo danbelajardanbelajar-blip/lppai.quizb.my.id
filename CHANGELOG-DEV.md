@@ -5,6 +5,54 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-18 20:54:53 +0700 — Peserta Pretes: Kolom Nilai di Ekspor PDF + Filter Hari Multi-Pilih
+
+**ID:** PRETES-PESERTA-PDF-NILAI-HARI · **Parent Git:** `2f91150`.
+**Permintaan:** (1) Semua hasil ekspor PDF di `/admin/pretes-peserta.php` diberi kolom nilai. (2) Filter hari bisa dipilih lebih dari satu sekaligus ("double filter").
+**Rancangan:**
+- **Helper bersama** di `includes/pretes-helper.php`:
+  - `pretesOfficialScoresByRegistration()` — nilai resmi: CBT resmi terakhir yang dikumpulkan, cadangan `ujian_tulis` di asesmen; kosong = "-". Dipindah dari blok inline PRETES-PESERTA-NILAI-RESMI.
+  - `pretesFormatScore()` — format 81,5 / 92.
+  - `pretesParseHariFilter()` — menerima "Senin,Rabu" atau `hari[]=`; hanya Senin–Jumat, urut, tanpa duplikat. Satu hari (format lama) tetap didukung.
+- **PDF** (`pretes-peserta-pdf.php`): dipakai oleh tombol "Export ke PDF" (semua/periode) maupun "Export Sesuai Filter (.pdf)".
+  - Kolom baru **Nilai Pretes**: angka + Lulus (≥ 80, hijau) / Tidak lulus (merah), atau "-". Lebar kolom disesuaikan agar total tetap 100% A4.
+  - Rekap ditambah "Sudah Pretes (Lulus/Tidak lulus)" dan "Belum Pretes".
+  - Filter hari memakai `IN (...)`.
+- **Halaman admin:**
+  - Dropdown hari tunggal diganti chip checkbox multi-pilih. Nilainya disimpan di `#filter-hari` sebagai "Senin,Rabu".
+  - Pill "Distribusi Hari" kini toggle (klik lagi = batal; "Semua" = kosongkan) dan tersinkron dengan chip, ditandai `aria-pressed`.
+  - DataTables kolom 5 memakai regex `^(Senin|Rabu)$`.
+  - Status filter tersimpan di sessionStorage dan dipulihkan.
+  - Reset mengosongkan pilihan hari. Deskripsi modal ekspor menampilkan "Hari: Rabu + Kamis".
+- **Ekspor Excel/CSV** (`pretes-peserta-export.php`): menerima parameter hari yang sama (beberapa hari, `IN`); nama berkas memuat "Rabu-Kamis". Tanpa ini, ekspor sesuai filter dengan dua hari akan kosong.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-helper.php` | 2026-11-18 20:52:28 | 1124–1188 | Helper baru | `pretesOfficialScoresByRegistration`, `pretesFormatScore`, `pretesParseHariFilter`. |
+| `admin/pretes-peserta.php` | 2026-11-18 20:53:34 | 355–356, 828–852, 886, 968, 1186–1225, 1236–1262, 1344, 1360–1384, 1396, 1740 | Data nilai; filter hari (UI chip); pill distribusi; JS filter/sinkronisasi/reset; deskripsi modal ekspor | Helper nilai; filter hari multi-pilih. |
+| `admin/pretes-peserta-pdf.php` | 2026-11-18 20:54:08 | 5–6, 23–25, 45–48, 99–107, 339–395, 614–620, 644–654, 666–667 | Header doc; filter hari; data nilai; CSS kolom; tabel; rekap | Kolom Nilai Pretes + rekap sudah/belum pretes; filter beberapa hari. |
+| `admin/pretes-peserta-export.php` | 2026-11-18 20:54:25 | 47–49, 89–92, 159 | Filter hari; nama berkas | Beberapa hari (`IN`), nama berkas "Senin-Rabu". |
+| `tests/pretes-peserta-pdf-nilai-hari-test.php` | 2026-11-18 20:54:53 | 1–67 (baru) | Test | 21 asersi: parser hari, format nilai, sumber nilai resmi (CBT terakhir, berlangsung, tryout, cadangan ujian_tulis), markup halaman/PDF/Excel. |
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad; lihat entri sebelumnya):
+- `php -l` 4 file PHP + test: OK. `git diff --check`: bersih.
+- Test baru PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya, tidak terkait).
+- Browser lokal (`php -S` + SQLite, jQuery 3.7.1 + DataTables 1.13.8 seperti `footer.php`, `app.js` asli; 4 peserta Senin/Rabu/Kamis/Senin):
+  - Klik chip Rabu → 1 baris. Klik pill Kamis → 2 baris (Rabu + Kamis); chip dan pill tersinkron; badge "1 Filter Aktif".
+  - URL ekspor PDF `...&hari=Rabu%2CKamis`; deskripsi modal "Hari: Rabu + Kamis".
+  - Setelah muat ulang, pilihan dipulihkan. Pada 375px chip membungkus tanpa overflow. Tidak ada error konsol.
+- PDF `hari=Rabu,Kamis`: 6 kolom; baris "60 Tidak lulus" dan "-"; "Filter Lainnya: Hari Rabu, Kamis".
+- PDF tanpa filter: nilai 92 Lulus / 60 Tidak lulus / - / 81,5 Lulus; rekap "Sudah Pretes 3 (Lulus 2, Tidak lulus 1), Belum Pretes 1".
+- Ekspor Excel/CSV `hari=Rabu,Kamis`: 2 baris data; nama berkas `..._Rabu-Kamis_...`.
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi.
+  - Kolom nilai belum ditambahkan ke ekspor Excel (tidak diminta).
+  - Halaman ekspor Excel bawaan masih memakai pilihan hari tunggal pada form-nya sendiri.
+
+---
+
 ## 2026-11-18 16:13:53 +0700 — Admin Peserta Pretes: Kolom Nilai Hasil Pretes Resmi
 
 **ID:** PRETES-PESERTA-NILAI-RESMI · **Parent Git:** `aca84aa`.

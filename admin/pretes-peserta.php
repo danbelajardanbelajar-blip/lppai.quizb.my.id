@@ -352,37 +352,8 @@ if ($selectedPeriode !== '' && $selectedPeriode !== '__all__') {
     $participants = $pdo->query($baseSelect . " ORDER BY u.nama_lengkap ASC")->fetchAll();
 }
 
-// Nilai hasil pretes resmi per pendaftaran: CBT resmi yang sudah dikumpulkan (registration_id = reg_id),
-// cadangan nilai Ujian tulis di pretes_assessments (mis. impor E-Ujian). Belum ada → "-".
-$officialScores = [];
-$regIds = array_values(array_unique(array_map(static fn($p) => (int)$p['reg_id'], $participants)));
-if ($regIds) {
-    foreach (array_chunk($regIds, 500) as $chunk) {
-        $ph = implode(',', array_fill(0, count($chunk), '?'));
-        try {
-            $stmtSc = $pdo->prepare("SELECT registration_id, score FROM pretes_cbt_attempts
-                WHERE registration_id IN ($ph) AND submitted_at IS NOT NULL AND score IS NOT NULL
-                ORDER BY submitted_at ASC, id ASC");
-            $stmtSc->execute($chunk);
-            foreach ($stmtSc->fetchAll(PDO::FETCH_ASSOC) as $sc) {
-                $officialScores[(int)$sc['registration_id']] = ['score' => (float)$sc['score'], 'source' => 'CBT'];
-            }
-        } catch (Throwable $e) {}
-        try {
-            $stmtAs = $pdo->prepare("SELECT registration_id, scores_json FROM pretes_assessments WHERE registration_id IN ($ph)");
-            $stmtAs->execute($chunk);
-            foreach ($stmtAs->fetchAll(PDO::FETCH_ASSOC) as $as) {
-                $rid = (int)$as['registration_id'];
-                if (isset($officialScores[$rid])) continue;
-                $sj = json_decode((string)$as['scores_json'], true);
-                $ut = is_array($sj) ? ($sj['ujian_tulis'] ?? null) : null;
-                if ($ut !== null && $ut !== '' && is_numeric($ut)) {
-                    $officialScores[$rid] = ['score' => (float)$ut, 'source' => 'Ujian tulis'];
-                }
-            }
-        } catch (Throwable $e) {}
-    }
-}
+// Nilai hasil pretes resmi per pendaftaran (CBT resmi / cadangan ujian_tulis); belum pretes -> "-"
+$officialScores = pretesOfficialScoresByRegistration($pdo, array_column($participants, 'reg_id'));
 
 $totalPeserta    = count($participants);
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
@@ -856,16 +827,29 @@ include __DIR__ . '/../includes/header.php';
 
                 <!-- Kolom 4: Hari / Periode -->
                 <div>
-                    <label for="filter-hari" style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
-                        📅 Hari Pelaksanaan
-                    </label>
-                    <select id="filter-hari"
-                        style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#f8fafc;color:#1e293b;outline:none;box-sizing:border-box;cursor:pointer;transition:border-color 0.2s;">
-                        <option value="">Semua Hari (<?= $totalPeserta ?>)</option>
+                    <span style="display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;">
+                        📅 Hari Pelaksanaan <small style="font-weight:500;color:#94a3b8;">(bisa pilih lebih dari satu)</small>
+                    </span>
+                    <!-- Nilai filter: daftar hari dipisah koma, mis. "Senin,Rabu" (kosong = semua hari) -->
+                    <input type="hidden" id="filter-hari" value="">
+                    <div id="filter-hari-group" role="group" aria-label="Filter hari pelaksanaan (multi-pilih)" style="display:flex;flex-wrap:wrap;gap:6px;">
                         <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
-                            <option value="<?= $day ?>"><?= $day ?> (<?= $dayCounts[$day] ?? 0 ?>)</option>
+                            <label class="hari-chip" data-day="<?= $day ?>">
+                                <input type="checkbox" class="filter-hari-cb" value="<?= $day ?>">
+                                <span><?= $day ?> <b><?= $dayCounts[$day] ?? 0 ?></b></span>
+                            </label>
                         <?php endforeach; ?>
-                    </select>
+                    </div>
+                    <style>
+                        .hari-chip{position:relative;display:inline-flex;align-items:center;cursor:pointer;margin:0}
+                        .hari-chip input{position:absolute;opacity:0;width:1px;height:1px}
+                        .hari-chip span{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:5px 11px;border:1.5px solid #cbd5e1;border-radius:999px;background:#f8fafc;color:#1e293b;font-size:12.5px;font-weight:600;transition:all .15s}
+                        .hari-chip span b{color:#2563eb;font-weight:800}
+                        .hari-chip input:checked + span{background:#2563eb;border-color:#2563eb;color:#fff}
+                        .hari-chip input:checked + span b{color:#fff}
+                        .hari-chip input:checked + span::before{content:'\2713'}
+                        .hari-chip input:focus-visible + span{outline:2px solid #93c5fd;outline-offset:1px}
+                    </style>
                 </div>
 
                 <!-- Kolom 5: Status Hadir -->
@@ -899,7 +883,7 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Filter & Sebaran Hari Peserta Pretes (Shortcut Badges) -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;background:#f8fafc;padding:10px 14px;border-radius:10px;border:1px solid #e2e8f0;">
-            <span style="font-size:13px;font-weight:600;color:#475569;">📅 Distribusi Hari:</span>
+            <span style="font-size:13px;font-weight:600;color:#475569;">📅 Distribusi Hari <small style="font-weight:500;color:#94a3b8;">(klik untuk pilih / batal; bisa beberapa hari)</small>:</span>
             <button type="button" class="btn-filter-day" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#e2e8f0;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
                 Semua (<?= $totalPeserta ?>)
             </button>
@@ -981,7 +965,7 @@ include __DIR__ . '/../includes/header.php';
                         <!-- Nilai hasil pretes resmi -->
                         <?php $os = $officialScores[(int)$p['reg_id']] ?? null; ?>
                         <?php if ($os): ?>
-                            <?php $osPass = $os['score'] >= 80; $osText = rtrim(rtrim(number_format($os['score'], 2, ',', ''), '0'), ','); ?>
+                            <?php $osPass = $os['score'] >= 80; $osText = pretesFormatScore($os['score']); ?>
                             <td class="pretes-official-score" data-order="<?= number_format($os['score'], 2, '.', '') ?>" data-search="<?= $osPass ? 'Lulus' : 'Tidak lulus' ?>" style="white-space:nowrap;" title="Sumber: <?= sanitize($os['source']) ?>">
                                 <strong style="font-size:14px;color:<?= $osPass ? '#15803d' : '#b91c1c' ?>;"><?= sanitize($osText) ?></strong>
                                 <div style="font-size:10.5px;font-weight:700;color:<?= $osPass ? '#15803d' : '#b91c1c' ?>;"><?= $osPass ? 'Lulus' : 'Tidak lulus' ?></div>
@@ -1200,10 +1184,30 @@ function getPretesTable() {
     return null;
 }
 
-function updateDayBadges(activeDay) {
+// Filter hari multi-pilih: nilai #filter-hari = "Senin,Rabu" (kosong = semua hari)
+var PRETES_HARI_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+function getSelectedHari() {
+    var raw = ($('#filter-hari').val() || '').split(',');
+    var set = {};
+    raw.forEach(function(d) { d = (d || '').trim(); if (d) set[d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()] = true; });
+    return PRETES_HARI_ORDER.filter(function(d) { return set[d]; });
+}
+function setSelectedHari(days) {
+    var set = {};
+    (days || []).forEach(function(d) { set[d] = true; });
+    var ordered = PRETES_HARI_ORDER.filter(function(d) { return set[d]; });
+    $('#filter-hari').val(ordered.join(','));
+    document.querySelectorAll('.filter-hari-cb').forEach(function(cb) { cb.checked = !!set[cb.value]; });
+    return ordered;
+}
+
+function updateDayBadges(activeDays) {
+    var list = Array.isArray(activeDays) ? activeDays : (activeDays ? String(activeDays).split(',') : []);
     document.querySelectorAll('.btn-filter-day').forEach(function(b) {
         var day = b.dataset.day || '';
-        if (day === activeDay) {
+        var isActive = day === '' ? list.length === 0 : list.indexOf(day) !== -1;
+        b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        if (isActive) {
             b.style.background = '#2563eb';
             b.style.color = '#ffffff';
             b.style.borderColor = '#2563eb';
@@ -1229,7 +1233,8 @@ function applyPretesFilters() {
     var nimVal    = ($('#filter-nim').val() || '').trim();
     var prodiVal  = $('#filter-prodi').val() || '';
     var jenisVal  = $('#filter-jenis-program').val() || '';
-    var hariVal   = $('#filter-hari').val() || '';
+    var hariList  = setSelectedHari(getSelectedHari());
+    var hariVal   = hariList.join(',');
     var statusVal = $('#filter-status').val() || '';
     var credVal   = $('#filter-cred').val() || '';
 
@@ -1243,9 +1248,9 @@ function applyPretesFilters() {
     dt.column(3).search('');
     dt.column(4).search('');
 
-    // Kolom 5: Hari (Exact match jika dipilih)
-    if (hariVal) {
-        dt.column(5).search('^' + $.fn.dataTable.util.escapeRegex(hariVal) + '$', true, false);
+    // Kolom 5: Hari (exact match; beberapa hari sekaligus -> regex alternatif)
+    if (hariList.length) {
+        dt.column(5).search('^(' + hariList.map(function(d) { return $.fn.dataTable.util.escapeRegex(d); }).join('|') + ')$', true, false);
     } else {
         dt.column(5).search('');
     }
@@ -1254,7 +1259,7 @@ function applyPretesFilters() {
     dt.draw();
 
     // Sinkronkan badge shortcut distribusi hari
-    updateDayBadges(hariVal);
+    updateDayBadges(hariList);
 
     // Update indikator filter aktif
     var activeCount = 0;
@@ -1336,7 +1341,7 @@ function setupPretesFilters() {
         if (saved.nim)           $('#filter-nim').val(saved.nim);
         if (saved.prodi)         $('#filter-prodi').val(saved.prodi);
         if (saved.jenis_program) $('#filter-jenis-program').val(saved.jenis_program);
-        if (saved.hari)          $('#filter-hari').val(saved.hari);
+        if (saved.hari)          setSelectedHari(String(saved.hari).split(','));
         if (saved.status)        $('#filter-status').val(saved.status);
         if (saved.cred)          $('#filter-cred').val(saved.cred);
     } catch(e) {}
@@ -1352,13 +1357,30 @@ function setupPretesFilters() {
     $('#filter-nim').on('input', debouncedApply);
 
     // Event change untuk dropdown filter
-    $('#filter-prodi, #filter-jenis-program, #filter-hari, #filter-status, #filter-cred').on('change', applyPretesFilters);
+    $('#filter-prodi, #filter-jenis-program, #filter-status, #filter-cred').on('change', applyPretesFilters);
 
-    // Tombol pill shortcut Distribusi Hari
+    // Checkbox hari (multi-pilih)
+    document.querySelectorAll('.filter-hari-cb').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var checked = [];
+            document.querySelectorAll('.filter-hari-cb').forEach(function(c) { if (c.checked) checked.push(c.value); });
+            setSelectedHari(checked);
+            applyPretesFilters();
+        });
+    });
+
+    // Tombol pill shortcut Distribusi Hari: toggle hari (bisa beberapa); "Semua" = kosongkan
     document.querySelectorAll('.btn-filter-day').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var day = this.dataset.day || '';
-            $('#filter-hari').val(day);
+            if (!day) {
+                setSelectedHari([]);
+            } else {
+                var cur = getSelectedHari();
+                var i = cur.indexOf(day);
+                if (i === -1) cur.push(day); else cur.splice(i, 1);
+                setSelectedHari(cur);
+            }
             applyPretesFilters();
         });
     });
@@ -1371,7 +1393,7 @@ function setupPretesFilters() {
             $('#filter-nim').val('');
             $('#filter-prodi').val('');
             $('#filter-jenis-program').val('');
-            $('#filter-hari').val('');
+            setSelectedHari([]);
             $('#filter-status').val('');
             $('#filter-cred').val('');
             try { sessionStorage.removeItem('pretes_peserta_filter'); } catch(e) {}
@@ -1715,7 +1737,7 @@ function openExportModal() {
         var namaVal   = ($('#filter-nama').val() || '').trim();
         var nimVal    = ($('#filter-nim').val() || '').trim();
 
-        if (hariVal) activeDesc.push('Hari: ' + hariVal);
+        if (hariVal) activeDesc.push('Hari: ' + hariVal.split(',').join(' + '));
         if (prodiVal) activeDesc.push('Prodi: ' + prodiVal);
         if (jenisVal) activeDesc.push('Program: ' + jenisVal);
         if (statusVal) activeDesc.push('Status: ' + statusVal);

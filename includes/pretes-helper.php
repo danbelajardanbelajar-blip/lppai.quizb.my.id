@@ -1121,3 +1121,68 @@ if (!function_exists('getStudentProctoringLogs')) {
         }
     }
 }
+
+if (!function_exists('pretesOfficialScoresByRegistration')) {
+    /**
+     * Nilai hasil pretes resmi per pendaftaran: CBT resmi yang sudah dikumpulkan
+     * (pretes_cbt_attempts.registration_id = id pendaftaran; dipakai yang terakhir dikumpulkan),
+     * cadangan nilai ujian_tulis di pretes_assessments (mis. impor E-Ujian).
+     * Belum pretes → tidak ada kunci (tampilkan "-").
+     * @return array<int, array{score: float, source: string}>
+     */
+    function pretesOfficialScoresByRegistration(PDO $pdo, array $regIds): array {
+        $out = [];
+        $regIds = array_values(array_unique(array_filter(array_map('intval', $regIds), static fn($v) => $v > 0)));
+        foreach (array_chunk($regIds, 500) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            try {
+                $st = $pdo->prepare("SELECT registration_id, score FROM pretes_cbt_attempts
+                    WHERE registration_id IN ($ph) AND submitted_at IS NOT NULL AND score IS NOT NULL
+                    ORDER BY submitted_at ASC, id ASC");
+                $st->execute($chunk);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $out[(int)$r['registration_id']] = ['score' => (float)$r['score'], 'source' => 'CBT'];
+                }
+            } catch (Throwable $e) {}
+            try {
+                $st = $pdo->prepare("SELECT registration_id, scores_json FROM pretes_assessments WHERE registration_id IN ($ph)");
+                $st->execute($chunk);
+                foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $rid = (int)$r['registration_id'];
+                    if (isset($out[$rid])) continue;
+                    $sj = json_decode((string)$r['scores_json'], true);
+                    $ut = is_array($sj) ? ($sj['ujian_tulis'] ?? null) : null;
+                    if ($ut !== null && $ut !== '' && is_numeric($ut)) {
+                        $out[$rid] = ['score' => (float)$ut, 'source' => 'Ujian tulis'];
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('pretesFormatScore')) {
+    /** 81.5 → "81,5"; 92.0 → "92". */
+    function pretesFormatScore(float $score): string {
+        return rtrim(rtrim(number_format($score, 2, ',', ''), '0'), ',');
+    }
+}
+
+if (!function_exists('pretesParseHariFilter')) {
+    /**
+     * Filter hari multi-pilih dari parameter GET ("Senin,Rabu" atau hari[]=Senin&hari[]=Rabu).
+     * Hanya Senin–Jumat yang diterima; urutan mengikuti urutan hari.
+     * @return string[]
+     */
+    function pretesParseHariFilter($raw): array {
+        $valid = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+        $parts = is_array($raw) ? $raw : explode(',', (string)$raw);
+        $want = [];
+        foreach ($parts as $p) {
+            $d = ucfirst(strtolower(trim((string)$p)));
+            if (in_array($d, $valid, true)) $want[$d] = true;
+        }
+        return array_values(array_filter($valid, static fn($d) => isset($want[$d])));
+    }
+}
