@@ -9,6 +9,10 @@ requireAdmin();
 $pdo = getDBConnection();
 $fillExistingResult = $_SESSION['tutorial_fill_existing_result'] ?? null;
 unset($_SESSION['tutorial_fill_existing_result']);
+// Jadwal Majlis Dzikir Al Khidmah (peserta tutorial aktif, 3 sesi Jumat awal Des/Jan/Feb, kuota & kelompok se-prodi)
+require_once __DIR__ . '/../includes/alkhidmah-schedule.php';
+$alkhidmahResult = $_SESSION['alkhidmah_generate_result'] ?? null;
+unset($_SESSION['alkhidmah_generate_result']);
 
 // Sinkronkan nama dosen_pengampu pada tutorial_classes dengan nama lengkap beserta gelar di tabel users (role = dosen)
 try {
@@ -335,6 +339,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'danger';
             }
         /* ---- UPDATE TUTORS & KUOTA ---- */
+        } elseif ($action === 'generate_alkhidmah') {
+            /* ---- GENERATE JADWAL MAJLIS DZIKIR AL KHIDMAH ---- */
+            $alkMode = ($_POST['alkhidmah_mode'] ?? 'rebuild') === 'add' ? 'add' : 'rebuild';
+            try {
+                $res = alkhidmahGenerate($pdo, $alkMode,
+                    [$_POST['alkhidmah_tanggal_1'] ?? '', $_POST['alkhidmah_tanggal_2'] ?? '', $_POST['alkhidmah_tanggal_3'] ?? ''],
+                    max(0, (int)($_POST['alkhidmah_kuota'] ?? 0)), (string)($_POST['alkhidmah_waktu'] ?? ''));
+                $_SESSION['alkhidmah_generate_result'] = [
+                    'mode' => $res['mode'], 'total' => $res['total'], 'scheduled' => $res['scheduled'], 'quota' => $res['quota'],
+                    'unassigned' => array_map(static fn($u) => ['nama' => $u['nama_lengkap'], 'nim' => $u['nim'] ?? '', 'prodi' => $u['_prodi'] ?? ''], $res['unassigned']),
+                ];
+                header('Location: ' . BASE_URL . '/admin/tutorial-pengaturan-generate.php#alkhidmah-jadwal');
+                exit;
+            } catch (InvalidArgumentException $e) {
+                $message = $e->getMessage();
+                $msgType = 'danger';
+            } catch (Throwable $e) {
+                error_log('generate_alkhidmah: ' . $e->getMessage());
+                $message = 'Gagal menyusun jadwal Majlis Al Khidmah. Silakan coba lagi.';
+                $msgType = 'danger';
+            }
         } elseif ($action === 'update_tutors_kuota') {
             $active_gel_id = (int)($_POST['gel_id'] ?? 0);
             if ($active_gel_id > 0) {
@@ -805,6 +830,134 @@ function addQETutorRow(day) {
 </div>
 
 
+
+<!-- ===================================================
+     CARD: GENERATE JADWAL MAJLIS DZIKIR AL KHIDMAH
+     =================================================== -->
+<?php
+    $alkSessions = [];
+    $alkActiveCount = 0;
+    try {
+        $alkSessions = alkhidmahCurrentSchedule($pdo, true);
+        $alkActiveCount = count(tutorialActiveParticipants($pdo));
+    } catch (Throwable $e) {
+        error_log('alkhidmah card: ' . $e->getMessage());
+    }
+    $alkDefaults = $alkSessions && count($alkSessions) === 3 ? array_column($alkSessions, 'tanggal') : alkhidmahDefaultDates();
+    $alkDefaultQuota = $alkSessions ? (int)max(array_column($alkSessions, 'kuota')) : (int)ceil($alkActiveCount / 3);
+    $alkWaktu = $alkSessions ? (string)($alkSessions[0]['waktu'] ?? '') : '';
+    $alkScheduledCount = array_sum(array_column($alkSessions, 'jumlah'));
+?>
+<div class="card" id="alkhidmah-jadwal" style="margin-top:24px;border:2px dashed #16a34a;background:#f0fdf4;">
+    <div class="card-header" style="background:transparent;color:#166534;">🕌 Generate Jadwal Kegiatan <?= sanitize(ALKHIDMAH_KEGIATAN) ?> — <?= sanitize(ALKHIDMAH_LOKASI) ?></div>
+    <div class="card-body">
+        <p style="color:#14532d;font-size:14px;margin:0 0 14px;line-height:1.6;">
+            Seluruh <strong>peserta tutorial aktif</strong> (saat ini <strong id="alk-active-count"><?= (int)$alkActiveCount ?></strong> mahasiswa) dibagi ke <strong>3 kegiatan</strong> pada Jumat awal bulan Desember, Januari, dan Februari.
+            Setiap mahasiswa <strong>wajib mengikuti sekali</strong> sesuai jadwalnya. Pembagian memakai kuota per kegiatan (bawaan: total ÷ 3) dan mengelompokkan mahasiswa bersama teman <strong>se-prodi</strong>.
+        </p>
+
+        <?php if ($alkhidmahResult): ?>
+            <div class="alert keep-alert alert-<?= empty($alkhidmahResult['unassigned']) ? 'success' : 'warning' ?>" id="alk-result" style="margin-bottom:14px;">
+                <strong><?= $alkhidmahResult['mode'] === 'add' ? 'Peserta baru ditambahkan ke jadwal.' : 'Jadwal Majlis berhasil disusun.' ?></strong>
+                <?= (int)$alkhidmahResult['scheduled'] ?> mahasiswa dijadwalkan<?= $alkhidmahResult['mode'] === 'add' ? ' (baru)' : '' ?> dari <?= (int)$alkhidmahResult['total'] ?> peserta tutorial aktif · kuota <?= (int)$alkhidmahResult['quota'] ?> per kegiatan.
+                <?php if (!empty($alkhidmahResult['unassigned'])): ?>
+                    <div style="margin-top:6px;"><strong><?= count($alkhidmahResult['unassigned']) ?> mahasiswa belum kebagian kuota</strong> — naikkan kuota lalu jalankan "Tambahkan peserta yang belum terjadwal":</div>
+                    <ul style="margin:6px 0 0;padding-left:20px;max-height:160px;overflow:auto;">
+                        <?php foreach ($alkhidmahResult['unassigned'] as $u): ?><li><?= sanitize($u['nama']) ?> (<?= sanitize($u['nim'] ?: '-') ?>) — <?= sanitize($u['prodi']) ?></li><?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <form method="POST" data-no-spa id="alk-form" style="background:#fff;padding:16px;border-radius:8px;border:1px solid #bbf7d0;"
+              onsubmit="return this.alkhidmah_mode.value === 'add' || !<?= $alkSessions ? 'true' : 'false' ?> || confirm('Susun ulang akan MENGHAPUS jadwal Majlis yang sudah ada dan membagi ulang seluruh peserta. Lanjutkan?');">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="action" value="generate_alkhidmah">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+                <?php foreach ([1 => 'Desember', 2 => 'Januari', 3 => 'Februari'] as $i => $bulan): $tgl = $alkDefaults[$i - 1] ?? ''; ?>
+                    <label style="display:block;font-size:13px;font-weight:600;color:#14532d;">Kegiatan <?= $i ?> (<?= $bulan ?>)
+                        <input type="date" name="alkhidmah_tanggal_<?= $i ?>" id="alk-tanggal-<?= $i ?>" value="<?= sanitize($tgl) ?>" class="alk-date" required
+                               style="display:block;width:100%;margin-top:4px;padding:8px;border:1.5px solid #cbd5e1;border-radius:8px;box-sizing:border-box;">
+                        <small class="alk-date-label" style="display:block;font-weight:500;color:#475569;margin-top:3px;"><?= $tgl ? sanitize(alkhidmahFormatDate($tgl)) : '' ?></small>
+                        <?php if (substr($tgl, 5) === '01-01'): ?><small class="alk-holiday" style="display:block;color:#b45309;font-weight:600;">⚠️ Bertepatan dengan Tahun Baru — periksa kembali.</small><?php endif; ?>
+                    </label>
+                <?php endforeach; ?>
+                <label style="display:block;font-size:13px;font-weight:600;color:#14532d;">Kuota per kegiatan
+                    <input type="number" name="alkhidmah_kuota" id="alk-kuota" min="1" max="100000" value="<?= max(1, $alkDefaultQuota) ?>"
+                           style="display:block;width:100%;margin-top:4px;padding:8px;border:1.5px solid #cbd5e1;border-radius:8px;box-sizing:border-box;">
+                    <small style="display:block;font-weight:500;color:#475569;margin-top:3px;">Bawaan: <?= (int)$alkActiveCount ?> ÷ 3 = <?= (int)ceil($alkActiveCount / 3) ?></small>
+                </label>
+                <label style="display:block;font-size:13px;font-weight:600;color:#14532d;">Waktu (opsional)
+                    <input type="text" name="alkhidmah_waktu" id="alk-waktu" maxlength="60" value="<?= sanitize($alkWaktu) ?>" placeholder="mis. Ba'da Isya, 19.30 WIB"
+                           style="display:block;width:100%;margin-top:4px;padding:8px;border:1.5px solid #cbd5e1;border-radius:8px;box-sizing:border-box;">
+                </label>
+            </div>
+            <div style="margin-top:14px;display:grid;gap:8px;">
+                <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;color:#14532d;">
+                    <input type="radio" name="alkhidmah_mode" value="rebuild" <?= $alkSessions ? '' : 'checked' ?> style="margin-top:4px;">
+                    <span><strong>Susun ulang seluruh jadwal</strong><small style="display:block;color:#475569;">Hapus jadwal lama, bagi ulang semua peserta tutorial aktif ke 3 tanggal di atas.</small></span>
+                </label>
+                <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;color:#14532d;<?= $alkSessions ? '' : 'opacity:.5;' ?>">
+                    <input type="radio" name="alkhidmah_mode" value="add" <?= $alkSessions ? 'checked' : 'disabled' ?> style="margin-top:4px;">
+                    <span><strong>Tambahkan peserta yang belum terjadwal</strong><small style="display:block;color:#475569;">Jadwal & tanggal lama dipertahankan; peserta baru dimasukkan sesuai sisa kuota, mengutamakan kegiatan yang sudah berisi prodi yang sama.</small></span>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-success" id="alk-submit" style="margin-top:14px;width:auto;background:#16a34a;border-color:#16a34a;">🕌 Generate Jadwal Majlis Al Khidmah</button>
+        </form>
+
+        <?php if ($alkSessions): ?>
+            <div style="margin-top:18px;">
+                <div style="font-weight:700;color:#14532d;margin-bottom:8px;">📋 Jadwal tersusun — <?= (int)$alkScheduledCount ?> mahasiswa
+                    <?php if ($alkActiveCount > $alkScheduledCount): ?><span style="color:#b45309;font-weight:600;font-size:13px;">· <?= (int)($alkActiveCount - $alkScheduledCount) ?> peserta aktif belum terjadwal</span><?php endif; ?>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;" id="alk-sessions">
+                    <?php foreach ($alkSessions as $s): ?>
+                        <div class="alk-session" data-tanggal="<?= sanitize($s['tanggal']) ?>" style="background:#fff;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;">
+                            <div style="font-weight:800;color:#166534;"><?= sanitize(alkhidmahFormatDate($s['tanggal'])) ?></div>
+                            <div style="font-size:12px;color:#475569;margin-bottom:6px;"><?= sanitize($s['lokasi']) ?><?= !empty($s['waktu']) ? ' · ' . sanitize($s['waktu']) : '' ?></div>
+                            <div style="font-size:13px;margin-bottom:6px;"><strong class="alk-jumlah"><?= (int)$s['jumlah'] ?></strong> / <?= (int)$s['kuota'] ?> mahasiswa</div>
+                            <div style="background:#dcfce7;border-radius:999px;height:6px;overflow:hidden;margin-bottom:8px;"><div style="height:100%;width:<?= $s['kuota'] > 0 ? min(100, round($s['jumlah'] / $s['kuota'] * 100)) : 0 ?>%;background:#16a34a;"></div></div>
+                            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+                                <?php foreach ($s['prodi_counts'] as $prodi => $n): ?><span class="alk-prodi" style="font-size:11px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:2px 8px;"><?= sanitize($prodi) ?>: <strong><?= (int)$n ?></strong></span><?php endforeach; ?>
+                            </div>
+                            <details><summary style="cursor:pointer;color:#166534;font-size:13px;font-weight:600;">Daftar mahasiswa</summary>
+                                <ol style="margin:6px 0 0;padding-left:20px;font-size:12.5px;max-height:240px;overflow:auto;">
+                                    <?php foreach ($s['members'] ?? [] as $m): ?><li><?= sanitize($m['nama_lengkap']) ?> <span style="color:#64748b;">(<?= sanitize($m['nim'] ?: '-') ?> · <?= sanitize($m['program_studi'] ?: '-') ?>)</span></li><?php endforeach; ?>
+                                </ol>
+                            </details>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+        <script>
+            (function () {
+                var form = document.getElementById('alk-form');
+                if (!form) return;
+                var days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                form.querySelectorAll('.alk-date').forEach(function (inp) {
+                    inp.addEventListener('change', function () {
+                        var lbl = inp.parentNode.querySelector('.alk-date-label');
+                        var hol = inp.parentNode.querySelector('.alk-holiday');
+                        var p = (inp.value || '').split('-');
+                        if (lbl && p.length === 3) {
+                            var d = new Date(+p[0], +p[1] - 1, +p[2]);
+                            lbl.textContent = days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + (d.getDay() !== 5 ? ' (bukan hari Jumat)' : '');
+                        }
+                        if (hol) hol.style.display = inp.value.slice(5) === '01-01' ? 'block' : 'none';
+                    });
+                });
+                function syncMode() {
+                    var add = form.alkhidmah_mode.value === 'add';
+                    form.querySelectorAll('.alk-date').forEach(function (inp) { inp.disabled = add; });
+                }
+                form.querySelectorAll('input[name="alkhidmah_mode"]').forEach(function (r) { r.addEventListener('change', syncMode); });
+                syncMode();
+            })();
+        </script>
+    </div>
+</div>
 
 </div> <!-- End of tab-pengaturan -->
 

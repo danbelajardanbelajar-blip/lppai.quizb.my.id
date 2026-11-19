@@ -347,6 +347,45 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Jadwal Majlis Dzikir Al Khidmah (peserta tutorial aktif; wajib sekali sesuai jadwal) -->
+<?php
+require_once __DIR__ . '/../includes/alkhidmah-schedule.php';
+$alkJadwal = (($user['role'] ?? '') === 'mahasiswa') ? alkhidmahScheduleForUser($pdo, (int)$user['id']) : null;
+if ($alkJadwal):
+    $alkToday = (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d');
+    $alkHadir = false;
+    try {
+        $stAlk = $pdo->prepare('SELECT 1 FROM absensi_alkhidmah WHERE nim = ? AND tanggal = ? LIMIT 1');
+        $stAlk->execute([(string)($user['nim'] ?? ''), $alkJadwal['tanggal']]);
+        $alkHadir = (bool)$stAlk->fetchColumn();
+    } catch (Throwable $e) {}
+    $alkState = $alkHadir ? 'hadir' : ($alkJadwal['tanggal'] === $alkToday ? 'hari_ini' : ($alkJadwal['tanggal'] < $alkToday ? 'lewat' : 'akan_datang'));
+?>
+<div class="card" id="dashboard-alkhidmah-jadwal" data-state="<?= $alkState ?>" style="margin-bottom:24px;border-left:4px solid #16a34a;">
+    <div class="card-body" style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding:18px 22px;">
+        <div style="width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;background:#dcfce7;flex-shrink:0;">🕌</div>
+        <div style="flex:1;min-width:220px;">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.05em;color:#166534;">JADWAL WAJIB <?= sanitize(strtoupper(ALKHIDMAH_KEGIATAN)) ?></div>
+            <h3 style="margin:4px 0 2px;font-size:17px;color:#0f172a;"><?= sanitize(alkhidmahFormatDate($alkJadwal['tanggal'])) ?><?= !empty($alkJadwal['waktu']) ? ' · ' . sanitize($alkJadwal['waktu']) : '' ?></h3>
+            <p style="margin:0;color:#475569;font-size:13.5px;line-height:1.55;">
+                📍 <?= sanitize($alkJadwal['lokasi'] ?: ALKHIDMAH_LOKASI) ?> · Anda <strong>wajib mengikuti sekali</strong> sesuai jadwal ini bersama teman se-prodi.
+            </p>
+            <div style="margin-top:8px;">
+                <?php if ($alkState === 'hadir'): ?>
+                    <span class="badge badge-success" style="font-size:12px;padding:4px 10px;">✅ Kehadiran tercatat</span>
+                <?php elseif ($alkState === 'hari_ini'): ?>
+                    <a href="<?= BASE_URL ?>/absensi-alkhidmah.php" class="btn btn-success" style="padding:8px 16px;font-weight:700;font-size:13px;text-decoration:none;">📍 Isi Absensi Al Khidmah Hari Ini</a>
+                <?php elseif ($alkState === 'lewat'): ?>
+                    <span class="badge badge-danger" style="font-size:12px;padding:4px 10px;">Belum tercatat hadir — hubungi admin LPPAI</span>
+                <?php else: ?>
+                    <span class="badge badge-info" style="font-size:12px;padding:4px 10px;">Akan datang</span>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Pretes Registration & Schedule (Disembunyikan jika pretes dinyatakan selesai atau CBT sudah selesai dikerjakan) -->
 <?php if (!$hidePretesMenus && $myPretesReg && !$isPretesSelesai && !$isCbtSubmitted): ?>
 <div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary); box-shadow: var(--shadow);">

@@ -21,6 +21,7 @@ $copyFiles = [
     'includes/pretes-components.php',
     'includes/user-helper.php',
     'includes/tutorial-membership.php',
+    'includes/alkhidmah-schedule.php',
     'includes/announcement-helper.php',
     'includes/pretes-cbt.php',
     'includes/pretes-cbt-interruption.php',

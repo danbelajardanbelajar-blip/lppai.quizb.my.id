@@ -5,6 +5,79 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-19 09:20:45 +0700 — Generate Jadwal Kegiatan Majlis Dzikir Al Khidmah (Masjid KH. Soefyan Abdul Wahab)
+
+**ID:** ALKHIDMAH-JADWAL-GENERATE · **Parent Git:** `611994a`.
+
+**Permintaan:** Di halaman generate jadwal tutorial, tambahkan menu generate jadwal Kegiatan Majlis Dzikir Al Khidmah di Masjid KH. Soefyan Abdul Wahab. Jadwal disusun otomatis: mahasiswa dikelompokkan bersama teman se-prodi, dengan kuota; total peserta dibagi 3 dalam 3 bulan; setiap mahasiswa wajib mengikuti sekali sesuai jadwalnya.
+
+**Keputusan pengguna:**
+- Peserta = peserta tutorial aktif (bukan peserta pretes).
+- Tanggal = Jumat awal bulan Desember, Januari, Februari.
+- Jadwal ditampilkan di dashboard mahasiswa.
+
+**Rancangan:**
+- **Aturan peserta aktif** (`includes/tutorial-membership.php`): logika `studentHasActiveTutorialRegistration` diekstrak menjadi `tutorialRegistrationsActiveFor()` tanpa mengubah perilaku. Fungsi baru `tutorialActiveParticipants()` memakai aturan yang sama untuk seluruh mahasiswa sekaligus (2 query).
+- **Modul** `includes/alkhidmah-schedule.php` (baru):
+  - Tabel `alkhidmah_jadwal_sesi` dan `alkhidmah_jadwal_peserta` (`user_id` UNIQUE = sekali per mahasiswa).
+  - `alkhidmahFirstFriday` / `alkhidmahDefaultDates`: Jumat pertama Des, Jan, Feb → 4 Des 2026, 1 Jan 2027, 5 Feb 2027.
+  - `alkhidmahPlan`: best-fit decreasing per prodi.
+    - Satu prodi masuk utuh bila muat (mengutamakan sesi yang sudah berisi prodi sama).
+    - Prodi yang melebihi kuota dipecah seminimal mungkin.
+    - Target lunak ceil(total/3) menjaga sebaran rata walau kuota dinaikkan; putaran kedua memakai kuota penuh.
+    - Sisa yang tidak muat dilaporkan.
+  - `alkhidmahGenerate`, dalam transaksi:
+    - Mode **susun ulang**: hapus jadwal lama, kuota bawaan ceil(total/3).
+    - Mode **tambah**: jadwal & tanggal lama tetap; hanya peserta aktif yang belum terjadwal dimasukkan sesuai sisa kuota.
+  - Pendukung: `alkhidmahCurrentSchedule` dan `alkhidmahScheduleForUser`.
+- **Admin** (`admin/tutorial-pengaturan-generate.php`): kartu baru "🕌 Generate Jadwal Kegiatan Majlis Dzikir Al Khidmah — Masjid KH. Soefyan Abdul Wahab" di bawah kartu Generate Jadwal.
+  - Isian: 3 tanggal (terisi otomatis, bisa diubah; label hari; peringatan bila 1 Januari/Tahun Baru atau bukan hari Jumat), kuota per kegiatan, waktu (opsional), dan mode.
+  - Aksi POST `generate_alkhidmah` (CSRF) dengan pola PRG.
+  - Hasil tampil sebagai banner `keep-alert` (tetap di halaman, tidak diubah jadi toast oleh `app.js`) berisi jumlah terjadwal dan daftar yang belum kebagian kuota.
+  - Ringkasan per kegiatan: tanggal, jumlah/kuota, bilah isi, sebaran prodi, daftar mahasiswa.
+  - Susun ulang meminta konfirmasi bila jadwal sudah ada.
+- **Dashboard mahasiswa** (`pages/dashboard.php`): kartu "JADWAL WAJIB MAJLIS DZIKIR AL KHIDMAH" (tanggal, waktu, lokasi, "wajib mengikuti sekali … bersama teman se-prodi").
+  - Status dari `absensi_alkhidmah` (NIM + tanggal): Kehadiran tercatat / tombol isi absensi di hari-H / belum tercatat bila lewat / akan datang.
+
+**Waktu simpan:** seluruh file berisi **09:20:45** karena waktu modifikasinya ter-reset oleh `git stash -u` / `git stash pop`, yang dipakai untuk membandingkan test Python dengan HEAD. Waktu edit per file yang asli tidak lagi tersedia; nilai ini hanya waktu penyimpanan terakhir yang tercatat. Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/tutorial-membership.php` | 2026-11-19 09:20:45 | 3–87 | `tutorialRegistrationsActiveFor`, `studentHasActiveTutorialRegistration`, `tutorialActiveParticipants` | Ekstraksi aturan + daftar massal peserta aktif. |
+| `includes/alkhidmah-schedule.php` | 2026-11-19 09:20:45 | 1–272 (baru) | Modul jadwal Majlis | Tabel, tanggal, perencana, generate, pembacaan. |
+| `admin/tutorial-pengaturan-generate.php` | 2026-11-19 09:20:45 | 12–15, 342–362, 833–961 | Include & flash; handler `generate_alkhidmah`; kartu Majlis | Menu generate jadwal Majlis. |
+| `pages/dashboard.php` | 2026-11-19 09:20:45 | 350–388 | Kartu jadwal Majlis | Jadwal wajib mahasiswa + status kehadiran. |
+| `tests/alkhidmah-schedule-test.php` | 2026-11-19 09:20:45 | 1–105 (baru) | Test | 27 asersi (lihat di bawah). |
+| `tests/dashboard-cbt-submitted-test.php` | 2026-11-19 09:20:45 | 24 | Daftar file harness | Tambah `alkhidmah-schedule.php`. |
+| `tests/tutorial-pretes-menu-test.py` | 2026-11-19 09:20:45 | 14 | Daftar file harness | Tambah `alkhidmah-schedule.php` (harness ini merender dashboard). |
+
+**Cakupan test baru (27 asersi):**
+- Tanggal Jumat pertama dan validasi tanggal.
+- Semua tepat sekali, kuota tidak terlampaui, prodi yang muat tidak dipecah, PAI 14 > 13 hanya dipecah ke 2 sesi.
+- Kuota dinaikkan tetap rata; kuota kurang → dilaporkan.
+- Peserta aktif = 21 (tanpa yang mundur, periode lama, dosen) dan konsisten dengan fungsi per mahasiswa.
+- Mode susun ulang: kuota 7, urut tanggal, waktu & lokasi tersimpan.
+- Mode tambah: kuota penuh → dilaporkan; kuota 9 → masuk sesi se-prodi tanpa mengubah jadwal lama.
+- Integrasi halaman & dashboard.
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l` semua file PHP yang berubah/baru: OK. `git diff --check` + cek spasi file baru: bersih.
+- `tests/alkhidmah-schedule-test.php`: 27 PASS. `tests/dashboard-cbt-submitted-test.php`: PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya).
+- `tests/tutorial-pretes-menu-test.py` gagal dengan error yang sama di HEAD tanpa perubahan ini (sudah gagal sebelumnya).
+- **Browser lokal** (`php -S` + SQLite, halaman generate asli; 21 peserta tutorial aktif dari 4 prodi):
+  - Tanggal terisi 4 Des 2026 / 1 Jan 2027 / 5 Feb 2027 dengan peringatan Tahun Baru; kuota bawaan 7.
+  - Klik Generate → 7/7/7 (PAI 7 | Hukum 5 + PAI 1 + TI 1 | Ekonomi 4 + TI 3).
+  - Ditemukan & diperbaiki sebelum commit: banner hasil sempat hilang karena `app.js` mengubah `.alert` menjadi toast; kini `keep-alert`.
+  - Dua peserta baru dengan kuota penuh → banner tetap tampil dan menyebut "2 mahasiswa belum kebagian kuota" + nama. Kuota 8 + mode tambah → keduanya terjadwal (8/8/7).
+  - Dashboard mahasiswa terjadwal menampilkan "Jumat, 4 Desember 2026 · Masjid KH. Soefyan Abdul Wahab · Akan datang".
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi.
+  - Tanggal bawaan Januari jatuh pada 1 Januari 2027 (Tahun Baru); ada peringatan dan tanggal bisa diganti admin.
+  - Absensi Al Khidmah tidak dibatasi ke tanggal jadwal (sesuai pilihan).
+  - Mahasiswa yang berhenti menjadi peserta aktif setelah dijadwalkan tetap ada di jadwal sampai disusun ulang.
+
+---
+
 ## 2026-11-18 22:15:40 +0700 — Profil Pengguna (Admin): 15 Bagian Data Tambahan (Tanpa Password Tes)
 
 **ID:** ADMIN-PROFIL-DATA-LENGKAP · **Parent Git:** `7afb1b7`.

@@ -10,7 +10,8 @@ from pathlib import Path
 repo = Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix='lppai-tutorial-menu-') as temp:
     root = Path(temp)
-    for name in ['includes/tutorial-membership.php', 'includes/sidebar.php', 'includes/pretes-helper.php',
+    for name in ['includes/tutorial-membership.php',
+    'includes/alkhidmah-schedule.php', 'includes/sidebar.php', 'includes/pretes-helper.php',
                  'includes/pretes-face-engine.php', 'includes/user-helper.php', 'includes/announcement-helper.php', 'includes/pretes-tryout.php', 'pages/dashboard.php']:
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
