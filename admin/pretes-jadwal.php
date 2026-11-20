@@ -226,6 +226,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat,
                     $active_id
                 ]);
+                // Sabtu & Ahad: khusus periode RPL
+                $periodRowForWeekend = $pdo->query("SELECT target_program FROM master_pretes WHERE id = " . (int)$active_id)->fetch();
+                pretesSaveWeekendSlots($pdo, $active_id, (string)($periodRowForWeekend['target_program'] ?? 'Semua'), $_POST);
 
                 $message = 'Pengaturan Dosen Penguji dan Kuota Pretes berhasil disimpan.';
                 $msgType = 'success';
@@ -245,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $autoRoom      = isset($_POST['auto_room']) && $_POST['auto_room'] == '1';
                 $overwrite     = isset($_POST['overwrite']) && $_POST['overwrite'] == '1';
 
-                $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                $days = pretesPeriodDays($active_pretes); // + Sabtu & Ahad untuk periode Khusus RPL
                 $totalAssigned = 0;
 
                 // Ambil daftar nama ruangan
@@ -365,6 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'edit_penugasan') {
             $regId = (int)($_POST['reg_id'] ?? 0);
             $hari  = trim($_POST['hari_pilihan'] ?? '');
+            if ($hari !== '' && $regId > 0 && !in_array($hari, pretesDaysForRegistration($pdo, $regId), true)) $hari = ''; // Sabtu/Ahad hanya periode RPL
             $dosen = trim($_POST['dosen_penguji'] ?? '');
             $ruang = trim($_POST['ruangan'] ?? '');
 
@@ -390,7 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Hitung Pendaftar per Hari pada periode aktif
-$registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$registeredCounts = array_fill_keys(pretesAllDays(), 0);
 if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
@@ -400,8 +404,8 @@ if ($active_pretes) {
     ");
     $stmtCount->execute([$active_pretes['periode']]);
     foreach ($stmtCount->fetchAll() as $row) {
-        $h = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
-        if (isset($registeredCounts[$h])) {
+        $h = pretesNormalizeDay($row['hari_pilihan'] ?? '');
+        if ($h !== '' && isset($registeredCounts[$h])) {
             $registeredCounts[$h] = (int)$row['cnt'];
         }
     }
@@ -415,7 +419,7 @@ $stmtPart = $pdo->prepare("
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
     WHERE pr.periode = ?
-    ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), pr.dosen_penguji ASC, u.nama_lengkap ASC
+    ORDER BY FIELD(pr.hari_pilihan, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'), pr.dosen_penguji ASC, u.nama_lengkap ASC
 ");
 $stmtPart->execute([$active_pretes['periode']]);
 $participants = $stmtPart->fetchAll();
@@ -424,11 +428,14 @@ $totalPeserta = count($participants);
 $totalPlotted = count(array_filter($participants, fn($p) => !empty($p['dosen_penguji'])));
 $totalUnplotted = $totalPeserta - $totalPlotted;
 
-$dayCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$dayCounts = array_fill_keys(pretesAllDays(), 0);
 foreach ($participants as $p) {
-    $dh = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
-    if (isset($dayCounts[$dh])) $dayCounts[$dh]++;
+    $dh = pretesNormalizeDay($p['hari_pilihan'] ?? '');
+    if ($dh !== '' && isset($dayCounts[$dh])) $dayCounts[$dh]++;
 }
+// Hari tampil: hari periode aktif (+ Sabtu/Ahad periode RPL) beserta label tanggalnya
+$jadwalDays = pretesDisplayDays($active_pretes ?: null, $dayCounts);
+$jadwalDayLabels = getPretesPeriodDayLabels($active_pretes ?: null)['days'];
 
 // Ambil daftar unik Dosen Penguji untuk opsi filter
 $filterDosenList = [];
@@ -503,7 +510,7 @@ include __DIR__ . '/../includes/header.php';
             
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0;">
                 <?php
-                $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                $days = pretesPeriodDays($active_pretes); // + Sabtu & Ahad untuk periode Khusus RPL
                 foreach ($days as $day):
                     $dayLower = strtolower($day);
                     $pengujiStr = $active_pretes["penguji_$dayLower"] ?? '';
@@ -516,7 +523,7 @@ include __DIR__ . '/../includes/header.php';
                 ?>
                 <div class="form-group" style="margin-bottom:0; display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <label style="font-weight:bold; font-size:14px; text-transform:capitalize; margin:0;"><?= $day ?> <span style="font-size:12px;color:#0284c7;font-weight:600;">(<?= ['Senin'=>'2 Nov','Selasa'=>'3 Nov','Rabu'=>'4 Nov','Kamis'=>'5 Nov','Jumat'=>'6 Nov'][$day] ?? '' ?>)</span></label>
+                        <label style="font-weight:bold; font-size:14px; text-transform:capitalize; margin:0;"><?= $day ?> <span style="font-size:12px;color:#0284c7;font-weight:600;">(<?= sanitize(preg_replace('/^[^,]+,\s*/', '', (string)($jadwalDayLabels[$day] ?? ''))) ?>)</span></label>
                         <span style="font-size:11px; background:#e2e8f0; color:#475569; padding:2px 6px; border-radius:4px; font-weight:600;">13.00 WIB</span>
                     </div>
                     
@@ -702,7 +709,7 @@ function addQETutorRow(day) {
                 <label for="absensi-hari">Hari</label>
                 <select id="absensi-hari" name="hari">
                     <option value="">Semua hari</option>
-                    <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                    <?php foreach ($jadwalDays as $day): ?>
                     <option value="<?= $day ?>"><?= $day ?></option>
                     <?php endforeach; ?>
                 </select>
@@ -758,7 +765,7 @@ function addQETutorRow(day) {
                     <button type="button" class="btn-filter-day btn-filter-day-active" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #0284c7;background:#0284c7;color:#fff;font-size:12px;cursor:pointer;font-weight:700;transition:all 0.2s;">
                         Semua (<?= $totalPeserta ?>)
                     </button>
-                    <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                    <?php foreach ($jadwalDays as $day): ?>
                         <button type="button" class="btn-filter-day" data-day="<?= $day ?>" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;color:#334155;font-size:12px;cursor:pointer;font-weight:600;transition:all 0.2s;">
                             <?= $day ?>: <span style="color:#0284c7;font-weight:bold;"><?= $dayCounts[$day] ?? 0 ?></span>
                         </button>
@@ -785,11 +792,9 @@ function addQETutorRow(day) {
                     </label>
                     <select id="filter-table-hari" class="form-select" style="width:100%;padding:7px 10px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;font-weight:600;background:#fff;color:#1e293b;">
                         <option value="">-- Semua Hari --</option>
-                        <option value="Senin">Senin (2 Nov)</option>
-                        <option value="Selasa">Selasa (3 Nov)</option>
-                        <option value="Rabu">Rabu (4 Nov)</option>
-                        <option value="Kamis">Kamis (5 Nov)</option>
-                        <option value="Jumat">Jumat (6 Nov)</option>
+                        <?php foreach ($jadwalDays as $day): ?>
+                        <option value="<?= $day ?>"><?= sanitize($jadwalDayLabels[$day] ?? $day) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -854,7 +859,7 @@ function addQETutorRow(day) {
                 </thead>
                 <tbody>
                     <?php foreach ($participants as $i => $p): 
-                        $curHari      = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
+                        $curHari      = pretesNormalizeDay($p['hari_pilihan'] ?? '') ?: ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
                         $curDosen     = trim($p['dosen_penguji'] ?? '');
                         $curRuangan   = trim($p['ruangan'] ?? '');
                         $isTerjadwal  = !empty($curDosen);
@@ -973,6 +978,10 @@ function addQETutorRow(day) {
                     <option value="Rabu">Rabu</option>
                     <option value="Kamis">Kamis</option>
                     <option value="Jumat">Jumat</option>
+                    <?php if (pretesPeriodAllowsWeekend($active_pretes ?: null)): ?>
+                    <option value="Sabtu">Sabtu</option>
+                    <option value="Ahad">Ahad</option>
+                    <?php endif; ?>
                 </select>
             </div>
 

@@ -511,7 +511,7 @@ $totalNoCred     = $totalPesertaAll - $totalWithCred;
 $totalFiltered   = count($rows);
 
 // Daftar Hari & Jumlah masing-masing di database
-$dayStats = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$dayStats = array_fill_keys(pretesAllDays(), 0); // + Sabtu & Ahad (periode Khusus RPL)
 $stmtDays = $pdo->prepare("
     SELECT TRIM(pr.hari_pilihan) as hari, COUNT(*) as cnt 
     FROM pretes_registrations pr
@@ -521,8 +521,8 @@ $stmtDays = $pdo->prepare("
 ");
 $stmtDays->execute($periodeScopeParams);
 while ($r = $stmtDays->fetch()) {
-    $dh = ucfirst(strtolower(trim($r['hari'] ?? '')));
-    if (isset($dayStats[$dh])) {
+    $dh = pretesNormalizeDay($r['hari'] ?? '');
+    if ($dh !== '' && isset($dayStats[$dh])) {
         $dayStats[$dh] = (int)$r['cnt'];
     }
 }
@@ -631,8 +631,9 @@ include __DIR__ . '/../includes/header.php';
                 📄 Export ke PDF (<?= $totalPesertaAll ?>)
             </a>
 
-            <!-- Per Hari -->
-            <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+            <!-- Per Hari (Sabtu/Ahad tampil untuk periode Khusus RPL atau bila sudah ada pesertanya) -->
+            <?php $exportDays = pretesDisplayDays($filterPeriode !== '' ? pretesPeriodByName($pdo, $filterPeriode) : null, $dayStats); ?>
+            <?php foreach ($exportDays as $day): ?>
                 <a href="pretes-peserta-export.php?download=1&format=xlsx&hari=<?= $day ?><?= sanitize($periodeQuery) ?>" data-no-spa="true"
                    class="btn" style="background:#f8fafc;color:#1e293b;border:1.5px solid #cbd5e1;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.2s;">
                     📅 Khusus Hari <?= $day ?> (<?= $dayStats[$day] ?? 0 ?>)
@@ -694,7 +695,7 @@ include __DIR__ . '/../includes/header.php';
                     </label>
                     <select name="hari" id="filter-hari" style="width:100%;padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:13px;background:#fff;outline:none;">
                         <option value="">Semua Hari (<?= $totalPesertaAll ?>)</option>
-                        <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                        <?php foreach ($exportDays as $day): ?>
                             <option value="<?= $day ?>" <?= ($filterHari === $day) ? 'selected' : '' ?>>
                                 <?= $day ?> (<?= $dayStats[$day] ?? 0 ?>)
                             </option>

@@ -528,6 +528,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $kuotaSenin, $kuotaSelasa, $kuotaRabu, $kuotaKamis, $kuotaJumat,
                     $masterId
                 ]);
+                // Sabtu & Ahad: khusus periode RPL
+                $masterTarget = $pdo->query("SELECT target_program FROM master_pretes WHERE id = " . (int)$masterId)->fetch();
+                pretesSaveWeekendSlots($pdo, $masterId, (string)($masterTarget['target_program'] ?? 'Semua'), $_POST);
 
                 $message = 'Jadwal tutor harian dan kuota master pretes berhasil disimpan!';
                 $msgType = 'success';
@@ -809,7 +812,7 @@ try {
                (open_until > NOW()) as is_open, created_at
         FROM pretes_attendance_sessions
         WHERE periode = ?
-        ORDER BY FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'), jam ASC, ruangan ASC, penguji ASC
+        ORDER BY FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'), jam ASC, ruangan ASC, penguji ASC
     ");
     $stmtSess->execute([$periodeName]);
     $rawSessions = $stmtSess->fetchAll() ?: [];
@@ -854,19 +857,35 @@ $masterRabu   = parsePengujiList($currentMaster['penguji_rabu'] ?? '');
 $masterKamis  = parsePengujiList($currentMaster['penguji_kamis'] ?? '');
 $masterJumat  = parsePengujiList($currentMaster['penguji_jumat'] ?? '');
 
-$daysInfo = [
-    'Senin'  => ['date' => '2 Nov 2026', 'penguji' => $masterSenin,  'kuota' => (int)($currentMaster['kuota_senin'] ?? 30)],
-    'Selasa' => ['date' => '3 Nov 2026', 'penguji' => $masterSelasa, 'kuota' => (int)($currentMaster['kuota_selasa'] ?? 30)],
-    'Rabu'   => ['date' => '4 Nov 2026', 'penguji' => $masterRabu,   'kuota' => (int)($currentMaster['kuota_rabu'] ?? 30)],
-    'Kamis'  => ['date' => '5 Nov 2026', 'penguji' => $masterKamis,  'kuota' => (int)($currentMaster['kuota_kamis'] ?? 30)],
-    'Jumat'  => ['date' => '6 Nov 2026', 'penguji' => $masterJumat,  'kuota' => (int)($currentMaster['kuota_jumat'] ?? 30)],
-];
+// Hari periode (+ Sabtu & Ahad untuk periode Khusus RPL); tanggal dari tanggal mulai periode,
+// bila kosong memakai tanggal bawaan lama (2–6 November 2026; Sabtu 7, Ahad 8).
+$days = pretesPeriodDays($currentMaster ?: null);
+$datesShort = ['Senin' => '2 Nov', 'Selasa' => '3 Nov', 'Rabu' => '4 Nov', 'Kamis' => '5 Nov', 'Jumat' => '6 Nov', 'Sabtu' => '7 Nov', 'Ahad' => '8 Nov'];
+$datesFull = ['Senin' => '2 November 2026', 'Selasa' => '3 November 2026', 'Rabu' => '4 November 2026', 'Kamis' => '5 November 2026',
+    'Jumat' => '6 November 2026', 'Sabtu' => '7 November 2026', 'Ahad' => '8 November 2026'];
+$tutorPeriodLabels = getPretesPeriodDayLabels($currentMaster ?: null);
+if ($tutorPeriodLabels['range_label'] !== '') {
+    foreach ($tutorPeriodLabels['days'] as $dName => $dLabel) {
+        $datesFull[$dName] = preg_replace('/^[^,]+,\s*/', '', $dLabel);
+        $partsD = explode(' ', $datesFull[$dName]);
+        $datesShort[$dName] = $partsD[0] . ' ' . mb_substr($partsD[1] ?? '', 0, 3);
+    }
+}
+$daysInfo = [];
+foreach ($days as $dName) {
+    $dLower = strtolower($dName);
+    $daysInfo[$dName] = [
+        'date' => $datesShort[$dName] . ' ' . substr($datesFull[$dName], -4),
+        'penguji' => parsePengujiList($currentMaster['penguji_' . $dLower] ?? ''),
+        'kuota' => (int)($currentMaster['kuota_' . $dLower] ?? 30),
+    ];
+}
 
 // Map ruangan dan kuota per tutor per hari dari pretes_attendance_sessions
 $sessionRooms = [];
 $sessionKuotas = [];
 foreach ($allSessions as $s) {
-    $h = ucfirst(strtolower(trim($s['hari'])));
+    $h = pretesNormalizeDay($s['hari']) ?: ucfirst(strtolower(trim($s['hari'])));
     $p = trim($s['penguji']);
     if (!empty($s['ruangan'])) {
         $sessionRooms[$h][$p] = trim($s['ruangan']);
@@ -887,27 +906,13 @@ try {
     ");
     $stmtTutorMhs->execute([$periodeName]);
     foreach ($stmtTutorMhs->fetchAll() as $row) {
-        $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
+        $h = pretesNormalizeDay($row['hari_pilihan']) ?: ucfirst(strtolower(trim($row['hari_pilihan'])));
         $p = trim($row['dosen_penguji']);
         $tutorTerplot[$h][$p] = (int)$row['jml'];
     }
 } catch (Throwable $e) {}
 
-$days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-$datesShort = [
-    'Senin'  => '2 Nov',
-    'Selasa' => '3 Nov',
-    'Rabu'   => '4 Nov',
-    'Kamis'  => '5 Nov',
-    'Jumat'  => '6 Nov'
-];
-$datesFull = [
-    'Senin'  => '2 November 2026',
-    'Selasa' => '3 November 2026',
-    'Rabu'   => '4 November 2026',
-    'Kamis'  => '5 November 2026',
-    'Jumat'  => '6 November 2026'
-];
+// $days, $datesShort, $datesFull: lihat di atas (mengikuti periode, + Sabtu/Ahad periode RPL)
 
 $getTutorCardDetail = function($day, $pName) use ($sessionRooms, $sessionKuotas, $tutorTerplot) {
     $rName = $sessionRooms[$day][$pName] ?? '';
@@ -1414,11 +1419,7 @@ input:checked + .slider:before { transform: translateX(16px); }
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <span style="font-size:12px; font-weight:700; color:#475569;">Filter Hari:</span>
                 <button type="button" class="btn-filter-hari btn btn-sm" data-day="" style="background:#0284c7; color:#fff; border-radius:20px; font-size:12px; padding:4px 12px;">Semua</button>
-                <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Senin" style="border-radius:20px; font-size:12px; padding:4px 12px;">Senin (2 Nov)</button>
-                <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Selasa" style="border-radius:20px; font-size:12px; padding:4px 12px;">Selasa (3 Nov)</button>
-                <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Rabu" style="border-radius:20px; font-size:12px; padding:4px 12px;">Rabu (4 Nov)</button>
-                <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Kamis" style="border-radius:20px; font-size:12px; padding:4px 12px;">Kamis (5 Nov)</button>
-                <button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="Jumat" style="border-radius:20px; font-size:12px; padding:4px 12px;">Jumat (6 Nov)</button>
+                <?php foreach ($days as $btnDay): ?><button type="button" class="btn-filter-hari btn btn-sm btn-secondary" data-day="<?= $btnDay ?>" style="border-radius:20px; font-size:12px; padding:4px 12px;"><?= $btnDay ?> (<?= sanitize($datesShort[$btnDay] ?? '') ?>)</button><?php endforeach; // + Sabtu/Ahad periode RPL ?>
             </div>
             <div style="font-size:12px; color:#64748b;">
                 💡 <em>Klik tombol <strong>✏️ Edit Sesi</strong> pada baris untuk mengubah dosen, ruang, hari, dan jam sesi.</em>
@@ -1777,11 +1778,7 @@ input:checked + .slider:before { transform: translateX(16px); }
             <div style="margin-bottom:12px;">
                 <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Pelaksanaan *</label>
                 <select name="hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
-                    <option value="Senin">Senin (2 Nov 2026)</option>
-                    <option value="Selasa">Selasa (3 Nov 2026)</option>
-                    <option value="Rabu">Rabu (4 Nov 2026)</option>
-                    <option value="Kamis">Kamis (5 Nov 2026)</option>
-                    <option value="Jumat">Jumat (6 Nov 2026)</option>
+                    <?php foreach ($days as $optDay): ?><option value="<?= $optDay ?>"><?= $optDay ?> (<?= sanitize($datesFull[$optDay] ?? '') ?>)</option><?php endforeach; // + Sabtu/Ahad periode RPL ?>
                 </select>
             </div>
 
@@ -1845,11 +1842,7 @@ input:checked + .slider:before { transform: translateX(16px); }
             <div style="margin-bottom:12px;">
                 <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Pelaksanaan *</label>
                 <select name="hari" id="edit-session-hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
-                    <option value="Senin">Senin (2 Nov 2026)</option>
-                    <option value="Selasa">Selasa (3 Nov 2026)</option>
-                    <option value="Rabu">Rabu (4 Nov 2026)</option>
-                    <option value="Kamis">Kamis (5 Nov 2026)</option>
-                    <option value="Jumat">Jumat (6 Nov 2026)</option>
+                    <?php foreach ($days as $optDay): ?><option value="<?= $optDay ?>"><?= $optDay ?> (<?= sanitize($datesFull[$optDay] ?? '') ?>)</option><?php endforeach; // + Sabtu/Ahad periode RPL ?>
                 </select>
             </div>
 
@@ -1923,22 +1916,14 @@ input:checked + .slider:before { transform: translateX(16px); }
             <div style="margin-bottom:14px;">
                 <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Sumber (Yang Disalin) *</label>
                 <select name="from_hari" required style="width:100%; padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
-                    <option value="Senin">Senin (2 Nov)</option>
-                    <option value="Selasa">Selasa (3 Nov)</option>
-                    <option value="Rabu">Rabu (4 Nov)</option>
-                    <option value="Kamis">Kamis (5 Nov)</option>
-                    <option value="Jumat">Jumat (6 Nov)</option>
+                    <?php foreach ($days as $optDay): ?><option value="<?= $optDay ?>"><?= $optDay ?> (<?= sanitize($datesShort[$optDay] ?? '') ?>)</option><?php endforeach; // + Sabtu/Ahad periode RPL ?>
                 </select>
             </div>
 
             <div style="margin-bottom:20px;">
                 <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom:4px;">Hari Tujuan *</label>
                 <select name="to_hari" required style="width:100%; padding:8px 12px; border:1.5px solid #0284c7; border-radius:8px; font-size:13px; font-weight:600; background:#fff;">
-                    <option value="Selasa">Selasa (3 Nov)</option>
-                    <option value="Rabu">Rabu (4 Nov)</option>
-                    <option value="Kamis">Kamis (5 Nov)</option>
-                    <option value="Jumat">Jumat (6 Nov)</option>
-                    <option value="Senin">Senin (2 Nov)</option>
+                    <?php foreach ($days as $optDay): ?><option value="<?= $optDay ?>"><?= $optDay ?> (<?= sanitize($datesShort[$optDay] ?? '') ?>)</option><?php endforeach; // + Sabtu/Ahad periode RPL ?>
                 </select>
             </div>
 

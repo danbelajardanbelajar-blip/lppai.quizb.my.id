@@ -18,6 +18,8 @@ function normalizePretesDay($day) {
     if (str_contains($cleaned, 'rabu') || $cleaned === 'wed' || $cleaned === 'wednesday') return 'Rabu';
     if (str_contains($cleaned, 'kamis') || $cleaned === 'thu' || $cleaned === 'thursday') return 'Kamis';
     if (str_contains($cleaned, 'jumat') || str_contains($cleaned, "jum'at") || $cleaned === 'fri' || $cleaned === 'friday') return 'Jumat';
+    if (str_contains($cleaned, 'sabtu') || $cleaned === 'sat' || $cleaned === 'saturday') return 'Sabtu';
+    if (str_contains($cleaned, 'ahad') || str_contains($cleaned, 'minggu') || $cleaned === 'sun' || $cleaned === 'sunday') return 'Ahad';
     return ucfirst($cleaned);
 }
 
@@ -145,6 +147,7 @@ function importPretesCbtData($pdo, array $rawRows, $periode, $adminId, array $op
     $autoRegister = !isset($options['auto_register']) || !empty($options['auto_register']);
 
     $periode = trim((string)$periode);
+    $periodDays = pretesPeriodDays(pretesPeriodByName($pdo, $periode)); // Sabtu & Ahad hanya untuk periode Khusus RPL
     if ($periode === '') {
         return [
             'success' => false,
@@ -335,7 +338,7 @@ function importPretesCbtData($pdo, array $rawRows, $periode, $adminId, array $op
         if (!$reg) {
             if ($autoRegister) {
                 $hari = normalizePretesDay($rawKelas);
-                if (!in_array($hari, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'], true)) {
+                if (!in_array($hari, $periodDays, true)) {
                     $hari = 'Senin';
                 }
                 $stmtInsReg->execute([$userId, $hari, $periode]);
@@ -361,7 +364,7 @@ function importPretesCbtData($pdo, array $rawRows, $periode, $adminId, array $op
             // Jika hari_pilihan di registrasi masih kosong dan di CBT ada info hari
             if (empty($reg['hari_pilihan']) && !empty($rawKelas)) {
                 $hari = normalizePretesDay($rawKelas);
-                if (in_array($hari, ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'], true)) {
+                if (in_array($hari, $periodDays, true)) {
                     $stmtUpdRegHari->execute([$hari, $regId]);
                 }
             }

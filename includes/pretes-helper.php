@@ -259,6 +259,88 @@ if (!function_exists('normalizePretesTargetProgram')) {
     }
 }
 
+/* ------------------------------------------------------------------
+ * Hari pelaksanaan pretes (PRETES-RPL-SABTU-AHAD)
+ * Senin–Jumat untuk semua periode; Sabtu & Ahad HANYA untuk periode bertarget "Khusus RPL".
+ * Kolom master_pretes: kuota_{hari} & penguji_{hari} (sabtu, ahad ditambahkan otomatis).
+ * ------------------------------------------------------------------ */
+if (!function_exists('pretesWeekdays')) {
+    function pretesWeekdays(): array { return ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']; }
+    function pretesWeekendDaysRpl(): array { return ['Sabtu', 'Ahad']; }
+    /** Seluruh hari yang dikenal sistem pretes (urutan tampilan). */
+    function pretesAllDays(): array { return array_merge(pretesWeekdays(), pretesWeekendDaysRpl()); }
+    /** Sabtu & Ahad dibuka hanya untuk periode Khusus RPL. */
+    function pretesPeriodAllowsWeekend(?array $period): bool {
+        return $period !== null && normalizePretesTargetProgram($period['target_program'] ?? 'Semua') === 'RPL';
+    }
+    /** Hari yang berlaku untuk sebuah periode. */
+    function pretesPeriodDays(?array $period): array {
+        return pretesPeriodAllowsWeekend($period) ? pretesAllDays() : pretesWeekdays();
+    }
+    /**
+     * Hari untuk tampilan/filter: hari periode + Sabtu/Ahad yang sudah punya data ($counts[hari] > 0),
+     * mis. saat menampilkan "Semua Periode".
+     */
+    function pretesDisplayDays(?array $period, array $counts = []): array {
+        $days = pretesPeriodDays($period);
+        foreach (pretesWeekendDaysRpl() as $d) {
+            if (!in_array($d, $days, true) && (int)($counts[$d] ?? 0) > 0) $days[] = $d;
+        }
+        return array_values(array_filter(pretesAllDays(), static fn($d) => in_array($d, $days, true)));
+    }
+    /** Selisih hari dari tanggal mulai (Senin) — Sabtu +5, Ahad +6. */
+    function pretesDayOffset(string $day): int {
+        $i = array_search($day, pretesAllDays(), true);
+        return $i === false ? 0 : (int)$i;
+    }
+    /** Normalisasi nama hari bebas ("sabtu", "Minggu", "ahad") → nama baku atau ''. */
+    function pretesNormalizeDay($value): string {
+        $v = strtolower(trim((string)$value));
+        if ($v === 'minggu') $v = 'ahad';
+        foreach (pretesAllDays() as $d) if (strtolower($d) === $v) return $d;
+        return '';
+    }
+    /** Baris master_pretes berdasarkan nama periode (null bila tidak ada). */
+    function pretesPeriodByName(PDO $pdo, string $periode): ?array {
+        if (trim($periode) === '') return null;
+        try {
+            $st = $pdo->prepare('SELECT * FROM master_pretes WHERE periode = ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$periode]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+    /** Hari yang boleh dipakai sebuah pendaftaran (mengikuti periode pendaftarannya). */
+    function pretesDaysForRegistration(PDO $pdo, int $registrationId): array {
+        try {
+            $st = $pdo->prepare('SELECT periode FROM pretes_registrations WHERE id = ?');
+            $st->execute([$registrationId]);
+            $periode = (string)($st->fetchColumn() ?: '');
+        } catch (Throwable $e) {
+            $periode = '';
+        }
+        return pretesPeriodDays(pretesPeriodByName($pdo, $periode));
+    }
+    /** Simpan kuota & penguji Sabtu/Ahad periode; dikosongkan bila periode bukan Khusus RPL. */
+    function pretesSaveWeekendSlots(PDO $pdo, int $periodId, string $targetProgram, array $post): void {
+        if ($periodId <= 0) return;
+        $isRpl = normalizePretesTargetProgram($targetProgram) === 'RPL';
+        // Form tanpa isian Sabtu/Ahad (mis. halaman lain) tidak boleh menghapus slot akhir pekan periode RPL
+        if ($isRpl && !array_key_exists('kuota_sabtu', $post) && !array_key_exists('kuota_ahad', $post)) return;
+        $vals = [];
+        foreach (pretesWeekendDaysRpl() as $d) {
+            $k = strtolower($d);
+            $vals[] = $isRpl ? max(0, (int)($post['kuota_' . $k] ?? 0)) : 0;
+            $list = (isset($post['penguji_' . $k]) && is_array($post['penguji_' . $k])) ? $post['penguji_' . $k] : [];
+            $vals[] = $isRpl ? implode('|||', array_filter(array_map('trim', $list))) : '';
+        }
+        $vals[] = $periodId;
+        $pdo->prepare('UPDATE master_pretes SET kuota_sabtu = ?, penguji_sabtu = ?, kuota_ahad = ?, penguji_ahad = ? WHERE id = ?')->execute($vals);
+    }
+}
+
 if (!function_exists('ensurePretesPeriodTargetColumns')) {
     /**
      * Memastikan kolom `target_program` dan `tanggal_mulai` tersedia di tabel `master_pretes`.
@@ -272,7 +354,7 @@ if (!function_exists('ensurePretesPeriodTargetColumns')) {
             return;
         }
 
-        if ($driver === 'mysql' && $verified && !empty($_SESSION['_schema_pretes_target_ok'])) {
+        if ($driver === 'mysql' && $verified && !empty($_SESSION['_schema_pretes_target_ok_v2'])) {
             return;
         }
 
@@ -287,6 +369,10 @@ if (!function_exists('ensurePretesPeriodTargetColumns')) {
                 if (!in_array('tanggal_mulai', $colNames, true)) {
                     $pdo->exec("ALTER TABLE master_pretes ADD COLUMN tanggal_mulai TEXT DEFAULT NULL");
                 }
+                foreach (['sabtu', 'ahad'] as $wd) { // Sabtu & Ahad: khusus periode RPL
+                    if (!in_array('kuota_' . $wd, $colNames, true)) $pdo->exec("ALTER TABLE master_pretes ADD COLUMN kuota_$wd INTEGER DEFAULT 0");
+                    if (!in_array('penguji_' . $wd, $colNames, true)) $pdo->exec("ALTER TABLE master_pretes ADD COLUMN penguji_$wd TEXT DEFAULT NULL");
+                }
             } else {
                 $tbl = $pdo->query("SHOW TABLES LIKE 'master_pretes'")->fetch();
                 if (!$tbl) return;
@@ -299,7 +385,16 @@ if (!function_exists('ensurePretesPeriodTargetColumns')) {
                 if (!$colTanggal) {
                     $pdo->exec("ALTER TABLE master_pretes ADD COLUMN tanggal_mulai DATE DEFAULT NULL AFTER target_program");
                 }
+                foreach (['sabtu', 'ahad'] as $wd) { // Sabtu & Ahad: khusus periode RPL
+                    if (!$pdo->query("SHOW COLUMNS FROM master_pretes LIKE 'kuota_$wd'")->fetch()) {
+                        $pdo->exec("ALTER TABLE master_pretes ADD COLUMN kuota_$wd INT DEFAULT 0");
+                    }
+                    if (!$pdo->query("SHOW COLUMNS FROM master_pretes LIKE 'penguji_$wd'")->fetch()) {
+                        $pdo->exec("ALTER TABLE master_pretes ADD COLUMN penguji_$wd VARCHAR(1000) DEFAULT NULL");
+                    }
+                }
                 $_SESSION['_schema_pretes_target_ok'] = true;
+                $_SESSION['_schema_pretes_target_ok_v2'] = true;
                 $verified = true;
             }
         } catch (Throwable $e) {
@@ -513,12 +608,12 @@ if (!function_exists('renderPretesTargetProgramBadge')) {
 
 if (!function_exists('getPretesPeriodDayLabels')) {
     /**
-     * Menghasilkan label hari (Senin-Jumat) dan rentang tanggal pelaksanaan berbahasa Indonesia.
+     * Menghasilkan label hari (Senin-Jumat; + Sabtu & Ahad untuk periode Khusus RPL) dan rentang tanggal pelaksanaan.
      *
      * @return array{days:array<string,string>, range_label:string, short_range:string}
      */
     function getPretesPeriodDayLabels(?array $period): array {
-        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+        $days = pretesPeriodDays($period);
         $defaultDays = array_combine($days, $days);
         $rawStart = trim((string)($period['tanggal_mulai'] ?? ''));
         if ($rawStart === '' || preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawStart) !== 1) {
@@ -545,13 +640,14 @@ if (!function_exists('getPretesPeriodDayLabels')) {
         ];
 
         $dayLabels = [];
-        foreach ($days as $idx => $dayName) {
+        foreach ($days as $dayName) {
+            $idx = pretesDayOffset($dayName); // Senin +0 … Jumat +4, Sabtu +5, Ahad +6
             $dt = $startDt->modify("+{$idx} days");
             $m = (int)$dt->format('n');
             $dayLabels[$dayName] = $dayName . ', ' . (int)$dt->format('j') . ' ' . ($months[$m] ?? $dt->format('F')) . ' ' . $dt->format('Y');
         }
 
-        $endDt = $startDt->modify('+4 days');
+        $endDt = $startDt->modify('+' . pretesDayOffset((string)end($days)) . ' days');
         $d1 = (int)$startDt->format('j');
         $m1 = $months[(int)$startDt->format('n')] ?? $startDt->format('F');
         $y1 = $startDt->format('Y');
@@ -1172,16 +1268,16 @@ if (!function_exists('pretesFormatScore')) {
 if (!function_exists('pretesParseHariFilter')) {
     /**
      * Filter hari multi-pilih dari parameter GET ("Senin,Rabu" atau hari[]=Senin&hari[]=Rabu).
-     * Hanya Senin–Jumat yang diterima; urutan mengikuti urutan hari.
+     * Hanya Senin–Jumat, Sabtu, Ahad yang diterima ("Minggu" → Ahad); urutan mengikuti urutan hari.
      * @return string[]
      */
     function pretesParseHariFilter($raw): array {
-        $valid = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+        $valid = pretesAllDays();
         $parts = is_array($raw) ? $raw : explode(',', (string)$raw);
         $want = [];
         foreach ($parts as $p) {
-            $d = ucfirst(strtolower(trim((string)$p)));
-            if (in_array($d, $valid, true)) $want[$d] = true;
+            $d = pretesNormalizeDay($p);
+            if ($d !== '' && in_array($d, $valid, true)) $want[$d] = true;
         }
         return array_values(array_filter($valid, static fn($d) => isset($want[$d])));
     }

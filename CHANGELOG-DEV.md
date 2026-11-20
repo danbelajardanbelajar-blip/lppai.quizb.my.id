@@ -5,6 +5,79 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-20 16:12:48 +0700 — Pretes: Hari Sabtu & Ahad Khusus Periode RPL (Dosen Penguji, Pendaftaran, Jadwal, Ekspor)
+
+**ID:** PRETES-RPL-SABTU-AHAD · **Parent Git:** `a2a9128`.
+**Permintaan:** Di `/admin/pretes-dosen.php`, tambahkan kekhususan untuk RPL agar bisa menambahkan dosen penguji pada hari Sabtu dan Ahad. Keputusan pengguna: **hanya untuk periode bertarget "Khusus RPL"**.
+
+**Rancangan:**
+- **Aturan terpusat** (`includes/pretes-helper.php`):
+  - Hari: `pretesWeekdays()`, `pretesWeekendDaysRpl()`, `pretesAllDays()`, `pretesPeriodAllowsWeekend()`, `pretesPeriodDays()`, `pretesDisplayDays()`.
+  - Konversi: `pretesDayOffset()` (Sabtu +5, Ahad +6 dari tanggal mulai) dan `pretesNormalizeDay()` ("Minggu" → Ahad).
+  - Periode & pendaftaran: `pretesPeriodByName()` dan `pretesDaysForRegistration()`.
+  - `pretesSaveWeekendSlots()` menyimpan kuota/penguji Sabtu-Ahad hanya untuk periode RPL. Periode non-RPL dikosongkan. Form tanpa isian akhir pekan tidak menghapus slot RPL.
+  - `ensurePretesPeriodTargetColumns()` menambah kolom `kuota_sabtu`, `kuota_ahad`, `penguji_sabtu`, `penguji_ahad` (MySQL & SQLite). Cache sesi diganti `_v2` agar kolom baru tetap dicek pada sesi lama.
+  - `getPretesPeriodDayLabels()`: label & rentang tanggal mengikuti hari periode (mis. "23 – 29 November 2026").
+  - `pretesParseHariFilter()` mengenali Sabtu/Ahad.
+- **Dosen Penguji & Kuota** (`admin/pretes-dosen.php`):
+  - Form tambah periode & modal edit memiliki blok "🗓️ Sabtu & Ahad — khusus periode RPL" yang hanya tampil saat Target Program = Khusus RPL (berubah langsung saat target diganti).
+  - Disimpan lewat `pretesSaveWeekendSlots()`; kuota otomatis 30 per penguji seperti hari lain.
+  - Ringkasan kuota periode aktif dan kolom kuota daftar periode menampilkan Sabtu/Ahad untuk periode RPL.
+- **Pendaftaran mahasiswa** (`pages/pretes-daftar.php`): pilihan hari, cek kuota, dan validasi server mengikuti periode (RPL: Senin–Ahad dengan tanggal). Keterangan "Senin s.d. Ahad". Periode non-RPL tetap menolak Sabtu/Ahad.
+- **Admin lain:**
+  - Peserta: validasi ubah hari mengikuti periode pendaftaran, chip/filter, opsi modal.
+  - Jadwal: form kuota & penguji per hari dengan tanggal sebenarnya, generate penguji otomatis termasuk Sabtu/Ahad, filter, urutan, edit individual tervalidasi.
+  - Pengaturan tutor: jadwal tutor harian, filter, opsi sesi/salin hari dengan tanggal periode, simpan slot akhir pekan.
+  - Cetak jadwal: hari & tanggal dari periode.
+  - Rekap nilai: filter hari.
+  - Ekspor peserta & absensi: hari dan urutan.
+  - Tab Semua Mahasiswa: chip hari.
+  - Impor CBT: kenal Sabtu/Ahad/Minggu, validasi sesuai periode.
+  - Penguji terjadwal: `pretesExaminerPeriodNames` ikut menghitung penguji Sabtu/Ahad.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris (utama) | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-helper.php` | 2026-11-20 16:08:40 | 263–357, 372–397, 616–650, 1275 | Helper hari; skema kolom; label tanggal; parser filter | Aturan Sabtu/Ahad periode RPL. |
+| `includes/pretes-examiner.php` | 2026-11-20 16:06:14 | 133 | `pretesExaminerPeriodNames` | + penguji Sabtu/Ahad. |
+| `admin/pretes-dosen.php` | 2026-11-20 16:06:32 | 121, 185, 220–230, 305, 340–347, 415, 453–460, 511–549, 646, 835–936 | Simpan; hitungan; ringkasan; data-*; daftar; form tambah & modal; JS | Isian & simpan Sabtu/Ahad khusus RPL. |
+| `pages/pretes-daftar.php` | 2026-11-20 16:06:55 | 109–119, 132, 299, 322, 336, 363 | Hitungan; validasi; teks; pilihan hari | Pendaftaran Sabtu/Ahad periode RPL. |
+| `admin/pretes-peserta.php` | 2026-11-20 16:07:30 | 184, 224, 378–387, 850, 890, 935–936, 1041–1042, 1193 | Validasi ubah hari; hitungan; chip/pill; sel tabel; modal; JS urutan | Dukungan Sabtu/Ahad. |
+| `admin/pretes-jadwal.php` | 2026-11-20 16:09:20 | 231, 251, 371, 397–438, 513, 526, 712, 768, 795–796, 862, 981 | Simpan; generate; edit individual; hitungan; form kuota; filter; modal | Dukungan Sabtu/Ahad. |
+| `admin/pretes-jadwal-cetak.php` | 2026-11-20 16:09:39 | 76, 83–94 | Hari & tanggal cetak | Dari periode. |
+| `admin/pretes-pengaturan-tutor.php` | 2026-11-20 16:11:09 | 533, 815, 862–888, 909, 1422, 1781, 1845, 1919, 1926 | Simpan; urutan; hari/tanggal; filter; opsi sesi | Dukungan Sabtu/Ahad. |
+| `admin/pretes-peserta-export.php` | 2026-11-20 16:07:56 | 514, 524, 635–636, 698 | Statistik & tombol/opsi hari | Dukungan Sabtu/Ahad. |
+| `admin/pretes-absensi-export.php` | 2026-11-20 16:07:56 | 33, 55 | Validasi & urutan hari | Dukungan Sabtu/Ahad. |
+| `admin/pretes-rekap-nilai.php` | 2026-11-20 16:07:56 | 1347 | Filter hari | Mengikuti periode. |
+| `includes/pretes-cbt-importer.php` | 2026-11-20 16:08:23 | 21, 150, 341, 367 | `normalizePretesDay`, validasi hari impor | Sabtu/Ahad. |
+| `includes/pretes-all-students-view.php` | 2026-11-20 16:08:23 | 89 | Chip hari | Mengikuti periode. |
+| `includes/pretes-all-students.php` | 2026-11-20 16:08:23 | 89 | Normalisasi hari | Ahad/Minggu. |
+| `tests/pretes-peserta-pdf-nilai-hari-test.php` | 2026-11-20 16:12:48 | 24 | Parser hari | Ekspektasi lama (Sabtu/Minggu ditolak) diganti: kini dikenali. |
+| `tests/pretes-rpl-weekend-test.php` | 2026-11-20 16:12:48 | 1–75 (baru) | Test | 23 asersi (lihat di bawah). |
+
+**Cakupan test baru (23 asersi):**
+- Aturan hari, normalisasi, offset & label/rentang tanggal.
+- Kolom otomatis; simpan RPL, pengosongan non-RPL, dan perlindungan dari form tanpa isian akhir pekan.
+- Hari valid per pendaftaran; penguji terjadwal; impor.
+- Integrasi seluruh halaman.
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l` 14 file PHP: OK. `git diff --check` + cek spasi file baru: bersih.
+- Test baru: 23 PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya).
+- **Browser/HTTP lokal** (`php -S` + SQLite; periode aktif Khusus RPL mulai 23 Nov 2026):
+  - Ringkasan kuota menampilkan Senin–Ahad.
+  - Modal edit menampilkan blok Sabtu & Ahad; memilih penguji lewat dropdown → kuota 30 otomatis; Simpan → DB `kuota_sabtu = 30`, `penguji_sabtu`, `kuota_ahad = 30`, `penguji_ahad` tersimpan.
+  - Form tambah: target RPL menampilkan blok akhir pekan, Reguler menyembunyikannya; tidak ada error konsol.
+  - Mahasiswa RPL: form pendaftaran berisi "Sabtu, 28 November 2026" & "Ahad, 29 November 2026" dan teks "Senin s.d. Ahad"; daftar Sabtu → berhasil.
+  - Periode diubah ke "Semua" → daftar Ahad ditolak "pilih hari pelaksanaan yang valid".
+  - Halaman peserta, tab semua mahasiswa, jadwal (dengan shim `FIELD` khusus SQLite di stub uji), pengaturan tutor, cetak jadwal, rekap nilai, dan halaman ekspor tampil tanpa error dengan Sabtu/Ahad.
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi (kolom baru dibuat otomatis saat halaman pretes pertama dibuka).
+  - Periode lama tanpa tanggal mulai di halaman pengaturan tutor/cetak memakai tanggal bawaan lama (2–8 Nov 2026).
+
+---
+
 ## 2026-11-20 15:10:20 +0700 — Tab Semua Mahasiswa: Filter Angkatan (+ Kolom Angkatan di Ekspor)
 
 **ID:** PRETES-TAB-ANGKATAN · **Parent Git:** `9dfa7cc`.

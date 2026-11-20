@@ -21,7 +21,7 @@ require_once $root . '/includes/pretes-helper.php';
 $t(pretesParseHariFilter('') === [], 'Hari kosong → semua hari (daftar kosong)');
 $t(pretesParseHariFilter('Rabu,senin') === ['Senin', 'Rabu'], 'Hari "Rabu,senin" → [Senin, Rabu] (urut & kapitalisasi)');
 $t(pretesParseHariFilter(['Jumat', 'Kamis', 'Kamis']) === ['Kamis', 'Jumat'], 'Array hari[] tanpa duplikat');
-$t(pretesParseHariFilter('Sabtu, Minggu, x') === [], 'Hari di luar Senin–Jumat diabaikan');
+$t(pretesParseHariFilter('Sabtu, Minggu, x, Kemis') === ['Sabtu', 'Ahad'], 'Sabtu & Ahad ("Minggu" → Ahad) dikenali untuk periode RPL; nama hari tidak dikenal diabaikan'); // PRETES-RPL-SABTU-AHAD
 $t(pretesParseHariFilter(' Selasa ') === ['Selasa'], 'Satu hari (format lama) tetap didukung');
 
 // 2) Format nilai

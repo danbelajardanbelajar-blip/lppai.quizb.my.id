@@ -30,7 +30,7 @@ foreach (['hari', 'dosen_penguji', 'ruangan'] as $key) {
     }
     $filters[$key] = trim($_GET[$key] ?? '');
 }
-if ($filters['hari'] !== '' && !in_array($filters['hari'], ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'], true)) {
+if ($filters['hari'] !== '' && !in_array($filters['hari'], pretesAllDays(), true)) { // + Sabtu & Ahad (periode RPL)
     http_response_code(400);
     exit('Hari pelaksanaan tidak valid.');
 }
@@ -52,7 +52,7 @@ $stmt = $pdo->prepare('SELECT pr.hari_pilihan, pr.dosen_penguji, pr.ruangan,
     u.id AS profile_user_id, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program
     FROM pretes_registrations pr JOIN users u ON u.id = pr.user_id
     WHERE ' . implode(' AND ', $where) . "
-    ORDER BY FIELD(COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin'), 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'),
+    ORDER BY FIELD(COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin'), 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'),
     pr.dosen_penguji, pr.ruangan, u.nama_lengkap, u.nim, pr.id");
 $stmt->execute($params);
 $participants = $stmt->fetchAll();

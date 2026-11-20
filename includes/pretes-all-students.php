@@ -86,7 +86,7 @@ function pretesAllStudentsRows(PDO $pdo, string $periode): array {
             'foto' => (string)($reg['foto'] ?? ''),
             'reg_id' => $regId,
             'periode' => (string)($reg['periode'] ?? ''),
-            'hari_pilihan' => $reg ? ucfirst(strtolower(trim((string)$reg['hari_pilihan']))) : '',
+            'hari_pilihan' => $reg ? (pretesNormalizeDay($reg['hari_pilihan']) ?: ucfirst(strtolower(trim((string)$reg['hari_pilihan'])))) : '',
             'jam' => (string)($reg['jam'] ?? ''),
             'status_pretes' => !$reg ? 'belum_daftar' : ($score === null ? 'belum_pretes' : 'sudah_pretes'),
             'score' => $score,

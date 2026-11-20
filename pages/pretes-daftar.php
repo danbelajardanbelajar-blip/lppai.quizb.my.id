@@ -106,7 +106,7 @@ if ($active_pretes) {
 $existingReg = $stmt->fetch();
 
 // Hitung Pendaftar per Hari khusus pada periode aktif (mencegah kuota tercampur antar periode di tahun ajaran sama)
-$registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$registeredCounts = array_fill_keys(pretesAllDays(), 0); // + Sabtu & Ahad (periode Khusus RPL)
 if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
@@ -116,8 +116,8 @@ if ($active_pretes) {
     ");
     $stmtCount->execute([$active_pretes['periode']]);
     foreach ($stmtCount->fetchAll() as $row) {
-        $h = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
-        if (isset($registeredCounts[$h])) {
+        $h = pretesNormalizeDay($row['hari_pilihan'] ?? '');
+        if ($h !== '' && isset($registeredCounts[$h])) {
             $registeredCounts[$h] = (int)$row['cnt'];
         }
     }
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'daft
     $hari_pilihan = trim($_POST['hari_pilihan'] ?? '');
     $fotoData     = trim($_POST['foto_data'] ?? '');
     $fotoFile     = $_FILES['foto_file'] ?? null;
-    $validDays    = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+    $validDays    = pretesPeriodDays($active_pretes ?: null); // Sabtu & Ahad hanya untuk periode Khusus RPL
 
     if (!verifyCsrf($token)) {
         $message = 'Sesi tidak valid. Silakan muat ulang halaman.';
@@ -296,6 +296,7 @@ include __DIR__ . '/../includes/header.php';
     $rangeLabel = $periodSchedule['range_label'];
     $shortRange = $periodSchedule['short_range'];
     $dayLabels = $periodSchedule['days'];
+    $dayRangeText = pretesPeriodAllowsWeekend($active_pretes ?: null) ? 'Senin s.d. Ahad' : 'Senin s.d. Jumat';
 ?>
 <div class="card" style="margin-bottom: 30px; border-top: 4px solid var(--primary);">
     <div class="card-header" style="background:#f8fafc; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -318,7 +319,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #bae6fd; font-size:13px; color:#0369a1; line-height:1.6;">
                 <?php if ($rangeLabel !== ''): ?>
-                📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (Senin s.d. Jumat).<br>
+                📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (<?= sanitize($dayRangeText ?? 'Senin s.d. Jumat') ?>).<br>
                 <?php endif; ?>
                 🕒 <strong>Waktu Pelaksanaan:</strong> Seluruh ujian pretes dilaksanakan pada <strong><?= sanitize($jamTampil) ?></strong>.
             </div>
@@ -332,7 +333,7 @@ include __DIR__ . '/../includes/header.php';
             <div style="font-size:14px; color:#334155; line-height:1.6;">
                 <?php if ($rangeLabel !== ''): ?>
                 <p style="margin:0 0 8px;">
-                    📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (Senin s.d. Jumat).
+                    📅 <strong>Tanggal Pelaksanaan:</strong> Tanggal <strong><?= sanitize($rangeLabel) ?></strong> (<?= sanitize($dayRangeText ?? 'Senin s.d. Jumat') ?>).
                 </p>
                 <?php endif; ?>
                 <p style="margin:0 0 8px;">
@@ -359,7 +360,7 @@ include __DIR__ . '/../includes/header.php';
                 <select name="hari_pilihan" required style="width:100%; padding:14px 16px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px; background-color:#fff; color:#334155; outline:none; cursor:pointer;">
                     <option value="">-- Pilih Hari &amp; Jadwal Ujian --</option>
                     <?php 
-                    $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                    $days = pretesPeriodDays($active_pretes ?: null); // + Sabtu & Ahad bila periode Khusus RPL
                     foreach ($days as $day): 
                         $dayLower = strtolower($day);
                         $kuota  = (int)($active_pretes["kuota_$dayLower"] ?? 0);

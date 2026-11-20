@@ -86,7 +86,7 @@ $statusBadge = [
                 </label>
                 <div style="font-size:12px;font-weight:600;color:#475569;">📅 Hari Pelaksanaan <small style="font-weight:500;color:#94a3b8;">(bisa beberapa)</small>
                     <div id="sm-hari-group" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;">
-                        <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $d): ?>
+                        <?php foreach (pretesDisplayDays($selectedPeriodMeta ?? null, array_count_values(array_filter(array_column($allStudentRows, 'hari_pilihan')))) as $d): // + Sabtu/Ahad periode RPL ?>
                             <label class="hari-chip"><input type="checkbox" class="sm-hari-cb" value="<?= $d ?>" <?= in_array($d, $f['hari'], true) ? 'checked' : '' ?>><span><?= $d ?></span></label>
                         <?php endforeach; ?>
                     </div>

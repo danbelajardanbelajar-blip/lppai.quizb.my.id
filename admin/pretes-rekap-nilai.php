@@ -1343,7 +1343,8 @@ include __DIR__ . '/../includes/header.php';
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
             <span style="font-size:13px; font-weight:700; color:#475569; margin-right:4px;">Filter Hari:</span>
             <?php
-            $days = ['Semua' => '', 'Senin' => 'Senin', 'Selasa' => 'Selasa', 'Rabu' => 'Rabu', 'Kamis' => 'Kamis', 'Jumat' => 'Jumat'];
+            $days = ['Semua' => ''];
+            foreach (pretesPeriodDays($selectedMaster ?? null) as $dName) $days[$dName] = $dName; // + Sabtu & Ahad untuk periode Khusus RPL
             foreach ($days as $label => $val):
                 $isActive = (strtolower($filterHari) === strtolower($val)) || ($val === '' && empty($filterHari));
                 $urlPill = "?pretes_id={$selectedPeriodId}&hari=" . urlencode($val) . "&dosen=" . urlencode($filterDosen) . "&ruang=" . urlencode($filterRuang) . "&kelengkapan=" . urlencode($filterKelengkapan) . "&status_lulus=" . urlencode($filterStatus);

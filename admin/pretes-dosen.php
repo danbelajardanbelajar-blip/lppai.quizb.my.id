@@ -117,6 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat,
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat
                 ]);
+                // Sabtu & Ahad: hanya disimpan untuk periode Khusus RPL
+                pretesSaveWeekendSlots($pdo, (int)$pdo->lastInsertId(), $targetProgram, $_POST);
 
                 $message = 'Periode Pretes baru berhasil ditambahkan!';
                 $msgType = 'success';
@@ -179,6 +181,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat,
                     $id
                 ]);
+                // Sabtu & Ahad: hanya disimpan untuk periode Khusus RPL (selain itu dikosongkan)
+                pretesSaveWeekendSlots($pdo, $id, $targetProgram, $_POST);
 
                 $message = 'Pengaturan Periode Pretes berhasil disimpan!';
                 $msgType = 'success';
@@ -213,7 +217,7 @@ $active_pretes = getActivePretesPeriod($pdo);
 $all_pretes = $pdo->query("SELECT * FROM master_pretes ORDER BY created_at DESC")->fetchAll();
 
 // Hitung Pendaftar Pretes per Hari khusus untuk periode aktif
-$registeredCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$registeredCounts = array_fill_keys(pretesAllDays(), 0);
 if ($active_pretes) {
     $stmtCount = $pdo->prepare("
         SELECT hari_pilihan, COUNT(*) as cnt 
@@ -223,8 +227,8 @@ if ($active_pretes) {
     ");
     $stmtCount->execute([$active_pretes['periode']]);
     foreach ($stmtCount->fetchAll() as $row) {
-        $h = ucfirst(strtolower(trim($row['hari_pilihan'] ?? '')));
-        if (isset($registeredCounts[$h])) {
+        $h = pretesNormalizeDay($row['hari_pilihan'] ?? '');
+        if ($h !== '' && isset($registeredCounts[$h])) {
             $registeredCounts[$h] = (int)$row['cnt'];
         }
     }
@@ -298,7 +302,7 @@ include __DIR__ . '/../includes/header.php';
             <!-- Ringkasan Kuota Harian -->
             <div style="display:flex; gap:10px; flex-wrap:wrap; font-size:13px;">
                 <?php 
-                $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+                $days = pretesPeriodDays($active_pretes); // + Sabtu & Ahad bila periode Khusus RPL
                 foreach ($days as $day): 
                     $dayLower = strtolower($day);
                     $kuota  = (int)($active_pretes["kuota_$dayLower"] ?? 0);
@@ -333,11 +337,15 @@ include __DIR__ . '/../includes/header.php';
                 data-kuota-rabu="<?= (int)$active_pretes['kuota_rabu'] ?>"
                 data-kuota-kamis="<?= (int)$active_pretes['kuota_kamis'] ?>"
                 data-kuota-jumat="<?= (int)$active_pretes['kuota_jumat'] ?>"
+                data-kuota-sabtu="<?= (int)($active_pretes['kuota_sabtu'] ?? 0) ?>"
+                data-kuota-ahad="<?= (int)($active_pretes['kuota_ahad'] ?? 0) ?>"
                 data-penguji-senin="<?= htmlspecialchars($active_pretes['penguji_senin'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 data-penguji-selasa="<?= htmlspecialchars($active_pretes['penguji_selasa'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 data-penguji-rabu="<?= htmlspecialchars($active_pretes['penguji_rabu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                 data-penguji-kamis="<?= htmlspecialchars($active_pretes['penguji_kamis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                data-penguji-jumat="<?= htmlspecialchars($active_pretes['penguji_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                data-penguji-jumat="<?= htmlspecialchars($active_pretes['penguji_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                data-penguji-sabtu="<?= htmlspecialchars($active_pretes['penguji_sabtu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                data-penguji-ahad="<?= htmlspecialchars($active_pretes['penguji_ahad'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                 ✏️ Edit Penguji & Kuota Periode Ini
             </button>
         </div>
@@ -404,6 +412,10 @@ include __DIR__ . '/../includes/header.php';
                                 <span>Rb: <b><?= $p['kuota_rabu'] ?? 0 ?></b></span>
                                 <span>Km: <b><?= $p['kuota_kamis'] ?? 0 ?></b></span>
                                 <span>Jm: <b><?= $p['kuota_jumat'] ?? 0 ?></b></span>
+                                <?php if (pretesPeriodAllowsWeekend($p)): ?>
+                                <span class="pretes-weekend-kuota" style="color:#7c3aed;">Sb: <b><?= (int)($p['kuota_sabtu'] ?? 0) ?></b></span>
+                                <span class="pretes-weekend-kuota" style="color:#7c3aed;">Ah: <b><?= (int)($p['kuota_ahad'] ?? 0) ?></b></span>
+                                <?php endif; ?>
                             </div>
                         </td>
                         <td>
@@ -438,11 +450,15 @@ include __DIR__ . '/../includes/header.php';
                                     data-kuota-rabu="<?= (int)$p['kuota_rabu'] ?>"
                                     data-kuota-kamis="<?= (int)$p['kuota_kamis'] ?>"
                                     data-kuota-jumat="<?= (int)$p['kuota_jumat'] ?>"
+                                    data-kuota-sabtu="<?= (int)($p['kuota_sabtu'] ?? 0) ?>"
+                                    data-kuota-ahad="<?= (int)($p['kuota_ahad'] ?? 0) ?>"
                                     data-penguji-senin="<?= htmlspecialchars($p['penguji_senin'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                     data-penguji-selasa="<?= htmlspecialchars($p['penguji_selasa'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                     data-penguji-rabu="<?= htmlspecialchars($p['penguji_rabu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
                                     data-penguji-kamis="<?= htmlspecialchars($p['penguji_kamis'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
-                                    data-penguji-jumat="<?= htmlspecialchars($p['penguji_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                                    data-penguji-jumat="<?= htmlspecialchars($p['penguji_jumat'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                    data-penguji-sabtu="<?= htmlspecialchars($p['penguji_sabtu'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+                                    data-penguji-ahad="<?= htmlspecialchars($p['penguji_ahad'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                     ✏️ Edit
                                 </button>
 
@@ -492,7 +508,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-group">
                     <label>Target Peserta Program *</label>
-                    <select name="target_program" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;font-weight:600;">
+                    <select name="target_program" id="create_target_program" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;font-weight:600;">
                         <option value="Semua">Semua Program (Reguler &amp; RPL)</option>
                         <option value="RPL">Khusus RPL</option>
                         <option value="Reguler">Khusus Reguler</option>
@@ -517,7 +533,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <label style="font-weight:700; display:block; margin-bottom:8px; font-size:14px; color:#1e293b;">
-                Tentukan Penguji & Kuota Hari (Senin - Jumat):
+                Tentukan Penguji & Kuota Hari (Senin - Jumat<span class="pretes-weekend-hint" data-weekend-for="create" style="display:none;">, + Sabtu &amp; Ahad untuk periode Khusus RPL</span>):
             </label>
             <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:14px; background:#f8fafc; padding:16px; border-radius:10px; border:1px solid #e2e8f0; margin-bottom:16px; overflow-x:auto;">
                 <?php
@@ -527,6 +543,17 @@ include __DIR__ . '/../includes/header.php';
                 renderPengujiSelect('kamis', $tutorsList, false);
                 renderPengujiSelect('jumat', $tutorsList, false);
                 ?>
+            </div>
+
+            <!-- Sabtu & Ahad: hanya untuk periode Khusus RPL (tampil otomatis saat Target = Khusus RPL) -->
+            <div class="pretes-weekend-days" data-weekend-for="create" style="display:none;background:#f5f3ff;border:1.5px dashed #a78bfa;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+                <div style="font-weight:700;color:#5b21b6;font-size:13.5px;margin-bottom:10px;">🗓️ Sabtu &amp; Ahad — khusus periode RPL <small style="font-weight:500;color:#6d28d9;">(Sabtu = tanggal mulai + 5 hari, Ahad = + 6 hari)</small></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+                    <?php
+                    renderPengujiSelect('sabtu', $tutorsList, false);
+                    renderPengujiSelect('ahad', $tutorsList, false);
+                    ?>
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary" style="width:auto; padding:10px 22px; font-weight:600;">
@@ -611,6 +638,17 @@ include __DIR__ . '/../includes/header.php';
                     renderPengujiSelect('rabu', $tutorsList, true);
                     renderPengujiSelect('kamis', $tutorsList, true);
                     renderPengujiSelect('jumat', $tutorsList, true);
+                    ?>
+                </div>
+            </div>
+
+            <!-- Sabtu & Ahad: hanya untuk periode Khusus RPL (tampil otomatis saat Target = Khusus RPL) -->
+            <div class="pretes-weekend-days" data-weekend-for="edit" style="display:none;background:#f5f3ff;border:1.5px dashed #a78bfa;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+                <div style="font-weight:700;color:#5b21b6;font-size:13.5px;margin-bottom:10px;">🗓️ Sabtu &amp; Ahad — khusus periode RPL <small style="font-weight:500;color:#6d28d9;">(Sabtu = tanggal mulai + 5 hari, Ahad = + 6 hari)</small></div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+                    <?php
+                    renderPengujiSelect('sabtu', $tutorsList, true);
+                    renderPengujiSelect('ahad', $tutorsList, true);
                     ?>
                 </div>
             </div>
@@ -793,6 +831,15 @@ window.populatePenguji = function(day, pengujiStr, kuotaVal) {
     }
 };
 
+// Sabtu & Ahad hanya tampil bila Target Program = Khusus RPL
+window.syncWeekendDays = function(scope) {
+    const sel = document.getElementById(scope === 'edit' ? 'edit_target_program' : 'create_target_program');
+    const show = !!sel && sel.value === 'RPL';
+    document.querySelectorAll('[data-weekend-for="' + scope + '"]').forEach(function (el) {
+        el.style.display = show ? (el.tagName === 'SPAN' ? 'inline' : 'block') : 'none';
+    });
+};
+
 window.openPretesModal = function(d) {
     document.getElementById('edit_id').value = d.id;
     document.getElementById('edit_periode').value = d.periode || '';
@@ -833,6 +880,9 @@ window.openPretesModal = function(d) {
     window.populatePenguji('rabu', d.penguji_rabu || '', d.kuota_rabu);
     window.populatePenguji('kamis', d.penguji_kamis || '', d.kuota_kamis);
     window.populatePenguji('jumat', d.penguji_jumat || '', d.kuota_jumat);
+    window.populatePenguji('sabtu', d.penguji_sabtu || '', d.kuota_sabtu || 0);
+    window.populatePenguji('ahad', d.penguji_ahad || '', d.kuota_ahad || 0);
+    window.syncWeekendDays('edit');
 
     const m = document.getElementById('editPretesModal');
     if (m) m.style.display = 'block';
@@ -854,6 +904,11 @@ window.toggleFormTambah = function() {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
+    ['create', 'edit'].forEach(function (scope) {
+        const sel = document.getElementById(scope === 'edit' ? 'edit_target_program' : 'create_target_program');
+        if (sel) sel.addEventListener('change', function () { window.syncWeekendDays(scope); });
+        window.syncWeekendDays(scope);
+    });
     document.addEventListener('click', function(e) {
         const btn = e.target.closest('.btn-edit-pretes');
         if (btn) {
@@ -875,7 +930,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 penguji_selasa: btn.getAttribute('data-penguji-selasa') || d.pengujiSelasa || '',
                 penguji_rabu: btn.getAttribute('data-penguji-rabu') || d.pengujiRabu || '',
                 penguji_kamis: btn.getAttribute('data-penguji-kamis') || d.pengujiKamis || '',
-                penguji_jumat: btn.getAttribute('data-penguji-jumat') || d.pengujiJumat || ''
+                penguji_jumat: btn.getAttribute('data-penguji-jumat') || d.pengujiJumat || '',
+                kuota_sabtu: btn.getAttribute('data-kuota-sabtu') || 0,
+                kuota_ahad: btn.getAttribute('data-kuota-ahad') || 0,
+                penguji_sabtu: btn.getAttribute('data-penguji-sabtu') || '',
+                penguji_ahad: btn.getAttribute('data-penguji-ahad') || ''
             });
         }
         if (e.target && e.target.id === 'editPretesModal') {

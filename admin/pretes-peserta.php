@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $password = trim($_POST['password_tes'] ?? '');
             $hari     = trim($_POST['hari_pilihan'] ?? '');
             $status   = trim($_POST['status'] ?? '');
-            $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+            $validDays = $regId > 0 ? pretesDaysForRegistration($pdo, $regId) : pretesWeekdays(); // Sabtu/Ahad hanya periode RPL
 
             if ($regId <= 0) {
                 $message = 'Peserta tidak valid.';
@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'update_hari') {
             $regId = (int)($_POST['reg_id'] ?? 0);
             $hari  = trim($_POST['hari_pilihan'] ?? '');
-            $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+            $validDays = $regId > 0 ? pretesDaysForRegistration($pdo, $regId) : pretesWeekdays(); // Sabtu/Ahad hanya periode RPL
             if ($regId > 0 && in_array($hari, $validDays)) {
                 $stmtNama = $pdo->prepare("SELECT u.nama_lengkap FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE pr.id = ?");
                 $stmtNama->execute([$regId]);
@@ -375,14 +375,17 @@ if ($activeTab === 'semua') {
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
 
 // Hitung sebaran hari, prodi, jenis program, dan status peserta
-$dayCounts = ['Senin' => 0, 'Selasa' => 0, 'Rabu' => 0, 'Kamis' => 0, 'Jumat' => 0];
+$dayCounts = array_fill_keys(pretesAllDays(), 0);
+// Hari yang ditampilkan: hari periode terpilih (+ Sabtu/Ahad bila Khusus RPL / sudah ada pesertanya)
+$periodByName = [];
+foreach ($masterPeriods as $mpRow) $periodByName[(string)$mpRow['periode']] = $mpRow;
 $prodiCounts = [];
 $jenisCounts = ['Reguler' => 0, 'RPL' => 0];
 $statusCounts = ['terdaftar' => 0, 'hadir' => 0, 'tidak_hadir' => 0];
 
 foreach ($participants as $p) {
-    $dh = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
-    if (isset($dayCounts[$dh])) {
+    $dh = pretesNormalizeDay($p['hari_pilihan'] ?? '');
+    if ($dh !== '' && isset($dayCounts[$dh])) {
         $dayCounts[$dh]++;
     }
     $prd = trim($p['program_studi'] ?? '');
@@ -844,7 +847,7 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Nilai filter: daftar hari dipisah koma, mis. "Senin,Rabu" (kosong = semua hari) -->
                     <input type="hidden" id="filter-hari" value="">
                     <div id="filter-hari-group" role="group" aria-label="Filter hari pelaksanaan (multi-pilih)" style="display:flex;flex-wrap:wrap;gap:6px;">
-                        <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+                        <?php foreach (pretesDisplayDays($selectedPeriodMeta, $dayCounts) as $day): ?>
                             <label class="hari-chip" data-day="<?= $day ?>">
                                 <input type="checkbox" class="filter-hari-cb" value="<?= $day ?>">
                                 <span><?= $day ?> <b><?= $dayCounts[$day] ?? 0 ?></b></span>
@@ -884,7 +887,7 @@ include __DIR__ . '/../includes/header.php';
             <button type="button" class="btn-filter-day" data-day="" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#e2e8f0;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
                 Semua (<?= $totalPeserta ?>)
             </button>
-            <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day): ?>
+            <?php foreach (pretesDisplayDays($selectedPeriodMeta, $dayCounts) as $day): ?>
                 <button type="button" class="btn-filter-day" data-day="<?= $day ?>" style="padding:4px 12px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;font-size:12px;cursor:pointer;font-weight:600;color:#334155;">
                     <?= $day ?>: <span style="color:#2563eb;font-weight:bold;"><?= $dayCounts[$day] ?? 0 ?></span>
                 </button>
@@ -929,8 +932,8 @@ include __DIR__ . '/../includes/header.php';
                         <td data-search="<?= sanitize($p['program_studi'] ?? '') ?>"><?= sanitize($p['program_studi'] ?: '-') ?></td>
                         <td data-order="<?= sanitize($rowJenis) ?>" data-search="<?= sanitize($rowJenis) ?>"><?= renderJenisProgramBadge($rowJenis, true) ?></td>
                         <?php 
-                        $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-                        $curHari = ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
+                        $validDays = pretesPeriodDays($periodByName[(string)($p['periode'] ?? '')] ?? null); // + Sabtu/Ahad periode RPL
+                        $curHari = pretesNormalizeDay($p['hari_pilihan'] ?? '') ?: ucfirst(strtolower(trim($p['hari_pilihan'] ?? '')));
                         ?>
                         <td data-order="<?= sanitize($curHari) ?>" data-search="<?= sanitize($curHari) ?>">
                             <!-- Dropdown ubah hari pelaksanaan langsung -->
@@ -1034,6 +1037,10 @@ include __DIR__ . '/../includes/header.php';
                     <option value="Rabu">Rabu</option>
                     <option value="Kamis">Kamis</option>
                     <option value="Jumat">Jumat</option>
+                    <?php if ($selectedPeriode === '__all__' || pretesPeriodAllowsWeekend($selectedPeriodMeta)): ?>
+                    <option value="Sabtu">Sabtu (khusus periode RPL)</option>
+                    <option value="Ahad">Ahad (khusus periode RPL)</option>
+                    <?php endif; ?>
                 </select>
             </div>
 
@@ -1183,7 +1190,7 @@ function getPretesTable() {
 }
 
 // Filter hari multi-pilih: nilai #filter-hari = "Senin,Rabu" (kosong = semua hari)
-var PRETES_HARI_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+var PRETES_HARI_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
 function getSelectedHari() {
     var raw = ($('#filter-hari').val() || '').split(',');
     var set = {};

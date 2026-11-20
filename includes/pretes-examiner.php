@@ -127,10 +127,10 @@ function pretesExaminerOwns(PDO $pdo, array $user, array $row): bool {
     return $rowNim !== '' && hash_equals($rowNim, $nim);
 }
 
-/** Nama-nama penguji yang dijadwalkan pada sebuah periode (master_pretes.penguji_senin..jumat). */
+/** Nama-nama penguji yang dijadwalkan pada sebuah periode (master_pretes.penguji_senin..jumat, + sabtu/ahad periode RPL). */
 function pretesExaminerPeriodNames(array $period): array {
     $names = [];
-    foreach (['senin', 'selasa', 'rabu', 'kamis', 'jumat'] as $d) {
+    foreach (['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'ahad'] as $d) {
         foreach (explode('|||', (string)($period['penguji_' . $d] ?? '')) as $n) {
             $n = trim($n);
             if ($n !== '') $names[$n] = true;

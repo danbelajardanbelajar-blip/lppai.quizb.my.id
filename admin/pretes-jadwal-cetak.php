@@ -73,26 +73,26 @@ $stmtTutorMhs = $pdo->prepare("
 $stmtTutorMhs->execute([$periodeName]);
 $tutorTerplot = [];
 foreach ($stmtTutorMhs->fetchAll() as $row) {
-    $h = ucfirst(strtolower(trim($row['hari_pilihan'])));
+    $h = pretesNormalizeDay($row['hari_pilihan']) ?: ucfirst(strtolower(trim($row['hari_pilihan'])));
     $p = trim($row['dosen_penguji']);
     $tutorTerplot[$h][$p] = (int)$row['jml'];
 }
 
-$days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-$dates = [
-    'Senin'  => '2 Nov',
-    'Selasa' => '3 Nov',
-    'Rabu'   => '4 Nov',
-    'Kamis'  => '5 Nov',
-    'Jumat'  => '6 Nov'
-];
-$datesFull = [
-    'Senin'  => '2 November 2026',
-    'Selasa' => '3 November 2026',
-    'Rabu'   => '4 November 2026',
-    'Kamis'  => '5 November 2026',
-    'Jumat'  => '6 November 2026'
-];
+// Hari periode (+ Sabtu & Ahad untuk periode Khusus RPL) dan tanggalnya dari tanggal mulai periode.
+// Bila tanggal mulai belum diisi, dipakai tanggal bawaan lama (2–6 November 2026).
+$days = pretesPeriodDays($currentMaster ?: null);
+$dates = ['Senin' => '2 Nov', 'Selasa' => '3 Nov', 'Rabu' => '4 Nov', 'Kamis' => '5 Nov', 'Jumat' => '6 Nov', 'Sabtu' => '7 Nov', 'Ahad' => '8 Nov'];
+$datesFull = ['Senin' => '2 November 2026', 'Selasa' => '3 November 2026', 'Rabu' => '4 November 2026', 'Kamis' => '5 November 2026',
+    'Jumat' => '6 November 2026', 'Sabtu' => '7 November 2026', 'Ahad' => '8 November 2026'];
+$periodDayLabels = getPretesPeriodDayLabels($currentMaster ?: null);
+if ($periodDayLabels['range_label'] !== '') {
+    foreach ($periodDayLabels['days'] as $dName => $dLabel) {
+        $datesFull[$dName] = preg_replace('/^[^,]+,\s*/', '', $dLabel);
+        $parts = explode(' ', $datesFull[$dName]);
+        $dates[$dName] = $parts[0] . ' ' . mb_substr($parts[1] ?? '', 0, 3);
+    }
+}
+$days = array_values(array_filter($days, static fn($d) => isset($dates[$d])));
 
 // Helper untuk cari kuota & terplot tutor
 function getTutorDetailLocal($day, $pName, $sessionRooms, $sessionKuotas, $tutorTerplot) {
