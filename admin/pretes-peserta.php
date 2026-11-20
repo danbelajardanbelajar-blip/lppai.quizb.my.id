@@ -357,6 +357,19 @@ $officialScores = pretesOfficialScoresByRegistration($pdo, array_column($partici
 $sudahPretesCount = count(array_filter($participants, static fn($p) => isset($officialScores[(int)$p['reg_id']])));
 
 $totalPeserta    = count($participants);
+
+// ── Tab "Semua Mahasiswa": sudah pretes / belum pretes / belum daftar pretes (sesuai periode terpilih) ──
+$activeTab = (($_GET['tab'] ?? '') === 'semua') ? 'semua' : 'terdaftar';
+$allStudentFilters = null; $allStudentRows = []; $allStudentStats = null; $allStudentProdis = [];
+if ($activeTab === 'semua') {
+    require_once __DIR__ . '/../includes/pretes-all-students.php';
+    $allStudentFilters = pretesAllStudentsFilters($_GET);
+    $allStudentAll = pretesAllStudentsRows($pdo, $selectedPeriode);
+    $allStudentStats = pretesAllStudentsStats($allStudentAll);
+    $allStudentProdis = array_values(array_unique(array_filter(array_column($allStudentAll, 'program_studi'))));
+    sort($allStudentProdis);
+    $allStudentRows = pretesAllStudentsApply($allStudentAll, array_merge($allStudentFilters, ['q' => ''])); // kata kunci → kotak cari tabel
+}
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));
 
 // Hitung sebaran hari, prodi, jenis program, dan status peserta
@@ -413,6 +426,7 @@ include __DIR__ . '/../includes/header.php';
             </small>
         </div>
         <form method="GET" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0;">
+            <?php if (($activeTab ?? 'terdaftar') === 'semua'): ?><input type="hidden" name="tab" value="semua"><?php endif; ?>
             <label for="select-periode-peserta" style="font-size:12.5px; font-weight:700; color:#334155; margin:0;">Ganti Periode:</label>
             <select name="periode" id="select-periode-peserta" onchange="this.form.submit()"
                 style="padding:8px 12px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:13px; font-weight:600; background:#fff; color:#0f172a; min-width:240px; cursor:pointer;">
@@ -707,6 +721,21 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- ── Tab: Peserta Terdaftar | Semua Mahasiswa ─────────────────── -->
+<nav class="pp-tabs" aria-label="Tampilan data peserta" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+    <a href="?<?= $selectedPeriode !== '' ? 'periode=' . urlencode($selectedPeriode) : '' ?>" data-pp-tab="terdaftar" class="pp-tab <?= $activeTab === 'terdaftar' ? 'active' : '' ?>" <?= $activeTab === 'terdaftar' ? 'aria-current="page"' : '' ?>>📋 Peserta Terdaftar Pretes <span><?= (int)$totalPeserta ?></span></a>
+    <a href="?tab=semua&amp;<?= $selectedPeriode !== '' ? 'periode=' . urlencode($selectedPeriode) : '' ?>" data-pp-tab="semua" class="pp-tab <?= $activeTab === 'semua' ? 'active' : '' ?>" <?= $activeTab === 'semua' ? 'aria-current="page"' : '' ?>>👥 Semua Mahasiswa</a>
+</nav>
+<style>
+.pp-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:1.5px solid #cbd5e1;background:#fff;color:#334155;font-weight:700;font-size:13.5px;text-decoration:none}
+.pp-tab span{background:#e2e8f0;color:#334155;border-radius:999px;padding:1px 8px;font-size:12px}
+.pp-tab.active{background:#1e40af;border-color:#1e40af;color:#fff}
+.pp-tab.active span{background:rgba(255,255,255,.2);color:#fff}
+</style>
+
+<?php if ($activeTab === 'semua'): ?>
+<?php include __DIR__ . '/../includes/pretes-all-students-view.php'; ?>
+<?php else: ?>
 <!-- ── Tabel Peserta & Credentials ──────────────────────────────── -->
 <div class="card">
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
@@ -982,6 +1011,7 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+<?php endif; // tab terdaftar ?>
 
 <!-- ── Modal Edit Data Peserta & Credentials ───────────────────── -->
 <div id="modal-edit-cred" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">

@@ -5,6 +5,49 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-20 14:52:38 +0700 — Peserta Pretes: Tab "Semua Mahasiswa" (Belum Daftar / Belum Pretes) + Ekspor Sesuai Filter
+
+**ID:** PRETES-TAB-SEMUA-MAHASISWA · **Parent Git:** `7754e18`.
+**Permintaan:** Di `/admin/pretes-peserta.php`, buat tab yang menampilkan seluruh mahasiswa agar admin tahu siapa yang belum daftar pretes dan siapa yang sudah daftar namun belum mengikuti pretes. Kolom disamakan dengan tabel peserta. Filter ditambah "belum pretes" dan "belum daftar pretes". Admin bisa mengekspor sesuai filter.
+
+**Rancangan:**
+- **Tab:** "📋 Peserta Terdaftar Pretes" (bawaan, tabel lama tidak berubah) dan "👥 Semua Mahasiswa" (`?tab=semua`). Pemilih periode mempertahankan tab aktif. Tabel lama hanya dirender pada tab-nya.
+- **Data** (`includes/pretes-all-students.php`, baru): seluruh mahasiswa (`role = mahasiswa`, tanpa akun uji 12345) beserta pendaftaran terbaru pada periode terpilih (atau semua periode).
+  - Status: **Sudah Pretes** (punya nilai resmi CBT/ujian_tulis — sama dengan kolom Nilai Pretes), **Belum Pretes** (sudah daftar, belum bernilai, termasuk CBT yang masih berlangsung), **Belum Daftar** (tidak punya pendaftaran pada periode tsb).
+  - Fungsi: `pretesAllStudentsFilters`, `pretesAllStudentsRows`, `pretesAllStudentsApply`, `pretesAllStudentsStats`, `pretesAllStudentsFilterText`.
+- **Tampilan** (`includes/pretes-all-students-view.php`, baru):
+  - Kolom sama dengan tab peserta: No, Nama (+ pasfoto), NIM, Prodi, Program, Hari / Periode ("Belum daftar" bila tidak ada), Nilai Pretes (Lulus/Tidak lulus atau "-"), Aksi (badge status + tombol Profil).
+  - 4 kartu ringkas yang bisa diklik (Semua / Sudah Pretes / Belum Pretes / Belum Daftar).
+  - **Filter:** Status Pretes (Semua / Sudah Pretes / **Belum Pretes** / **Belum Daftar Pretes** / Belum Pretes + Belum Daftar), Prodi, Program, Hari multi-pilih, tombol Reset. Cari nama/NIM memakai kotak cari tabel.
+- **Ekspor** (`admin/pretes-mahasiswa-export.php`, baru, `requireAdmin`): menerima filter yang sama + `q` dari kotak cari tabel (dikirim JS saat tombol diklik). Pencarian server mencakup kolom yang sama dengan kotak cari tabel (nama, NIM, prodi, program, hari, periode).
+  - `format=xlsx`: Excel lewat `cbtWriteXlsx`, dengan fallback CSV bila ekstensi ZIP tidak ada.
+  - `format=pdf`: dokumen A4 berkop LPPAI siap cetak/simpan PDF, berisi keterangan filter, rincian, dan rekap.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `admin/pretes-peserta.php` | 2026-11-20 14:49:19 | 361–373, 429, 724–738, 1014 | State tab & data; pemilih periode; navigasi tab; penutup tabel lama | Tab Semua Mahasiswa. |
+| `includes/pretes-all-students.php` | 2026-11-20 14:52:37 | 1–125 (baru) | Data, filter, statistik | Status pretes per mahasiswa. |
+| `includes/pretes-all-students-view.php` | 2026-11-20 14:50:11 | 1–182 (baru) | Kartu, filter, tabel, skrip ekspor | Tampilan tab. |
+| `admin/pretes-mahasiswa-export.php` | 2026-11-20 14:51:02 | 1–154 (baru) | Ekspor Excel/CSV & PDF | Ekspor sesuai filter. |
+| `tests/pretes-all-students-test.php` | 2026-11-20 14:52:38 | 1–68 (baru) | Test | 26 asersi: status per periode (sudah/belum pretes/belum daftar, periode lain, impor, semua periode), statistik, semua filter (termasuk hari multi & kata kunci prodi), integrasi halaman, ekspor. |
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l` semua file: OK. `git diff --check` + cek spasi file baru: bersih.
+- Test baru: 26 PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya).
+- **Browser lokal** (`php -S` + SQLite, jQuery + DataTables seperti footer; 28 mahasiswa: 3 sudah pretes, 1 belum pretes, 24 belum daftar):
+  - Klik tab "Semua Mahasiswa" → 8 kolom sama, DataTables aktif, tabel peserta lama tidak dirender.
+  - Pilih "Belum Pretes + Belum Daftar" → 25 data.
+  - Ketik "Hukum" di kotak cari → 7 data; tautan ekspor PDF/Excel berisi `q=Hukum`. Berkas PDF memuat 7 baris dengan keterangan filter; berkas `.xlsx` memuat 7 baris data.
+  - Chip Senin → hanya baris Senin.
+  - Tab "Peserta Terdaftar" tetap 4 baris dengan filter Status Pretes Resmi.
+  - 375px tanpa scroll horizontal; tidak ada error konsol.
+- Ditemukan & diperbaiki sebelum commit: kata kunci ekspor awalnya hanya mencari nama/NIM, sedangkan kotak cari tabel juga mencari prodi dan kolom lain; sekarang hasil ekspor sama dengan tabel.
+- **Keterbatasan:** belum diuji pada MySQL produksi.
+
+---
+
 ## 2026-11-20 08:00:25 +0700 — Personalisasi Tampilan (Tema Warna, Gaya Font, Ukuran Huruf, Kepadatan Tabel & Sidebar) di Halaman Pengaturan
 
 **ID:** UI-PERSONALIZATION-SETTINGS · **Parent Git:** `73a432a`.
