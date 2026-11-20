@@ -5,6 +5,24 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-20 19:35:25 +0700 — Review CBT: Cetak/Simpan PDF Memuat Semua Soal
+
+**ID:** CBT-REVIEW-PRINT-ALL · **Parent Git:** `8e3aeba`.
+**Masalah:** Ekspor "Cetak / Simpan PDF" di `pretes-ujian.php?cbt_review=1&attempt_id=121` hanya memuat 36 dari 50 soal.
+**Penyebab:** Saat dicetak, halaman tetap memakai layout aplikasi: `.app-wrapper` flex + `overflow-x:hidden`, `.main-content` flex column, dan animasi `transform` pada `.content-area`. Chrome memotong hasil cetak setelah sejumlah halaman. Kartu yang disembunyikan filter tampilan juga tidak ikut tercetak.
+**Perubahan:** `admin/pretes-cbt-review.php` baris 495–531 (snapshot ini), blok `@media print`:
+- Layout diratakan menjadi block (`overflow:visible`, `height:auto`, tanpa `margin-left`, `transform`, atau animasi).
+- Sidebar, overlay, dan topbar disembunyikan.
+- Kartu soal dipaksa tampil.
+- Spasi kartu dipadatkan agar ±2 soal per halaman.
+**Waktu edit:** waktu penyimpanan terakhir file (19:35:25 WIB); waktu edit per langkah tidak tercatat.
+**Verifikasi:**
+- Reproduksi statis (`style.css` asli + markup halaman, 50 soal) dicetak via Chrome headless `--print-to-pdf`. Sebelum: 27 halaman, 27 soal. Sesudah, memakai CSS dari file hasil edit: 25 halaman, 50/50 soal, juga saat 25 kartu disembunyikan filter.
+- `php -l` OK; `tests/pretes-cbt-review-test.php` 22/22 lulus; `git diff --check` bersih.
+**Keterbatasan:** Belum diuji pada data attempt 121 di hosting karena butuh login admin.
+
+---
+
 ## 2026-11-20 16:12:48 +0700 — Pretes: Hari Sabtu & Ahad Khusus Periode RPL (Dosen Penguji, Pendaftaran, Jadwal, Ekspor)
 
 **ID:** PRETES-RPL-SABTU-AHAD · **Parent Git:** `a2a9128`.

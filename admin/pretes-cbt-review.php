@@ -493,13 +493,40 @@ include __DIR__ . '/../includes/header.php';
 }
 
 @media print {
-    .review-header-bar, .quick-jump-panel, header, footer, .sidebar, .navbar {
+    .review-header-bar, .quick-jump-panel, header, footer, .sidebar, .sidebar-overlay, .topbar, .navbar {
         display: none !important;
     }
+    /* Layout aplikasi (flex + overflow-x:hidden + animasi transform) memotong hasil cetak
+       setelah beberapa halaman; ratakan menjadi block agar SEMUA butir soal ikut tercetak. */
+    html, body, .app-wrapper, .main-content, .content-area, .content-wrapper, #questionsContainer {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin-left: 0 !important;
+        transform: none !important;
+        animation: none !important;
+    }
+    .content-area, .content-wrapper {
+        padding: 0 !important;
+    }
+    /* Kartu soal selalu tampil saat dicetak walau filter tampilan sedang aktif. */
     .review-question-card {
+        display: block !important;
         page-break-inside: avoid;
+        break-inside: avoid;
+        padding: 12px 14px !important;
+        margin-bottom: 10px !important;
         border: 1px solid #cbd5e1 !important;
         box-shadow: none !important;
+    }
+    .options-review-list {
+        gap: 4px !important;
+        margin-top: 8px !important;
+    }
+    .option-review-item {
+        padding: 5px 10px !important;
     }
 }
 </style>
