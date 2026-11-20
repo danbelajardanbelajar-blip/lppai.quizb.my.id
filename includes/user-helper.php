@@ -1144,3 +1144,150 @@ if (!function_exists('ensureAdminUser')) {
         }
     }
 }
+
+if (!function_exists('ensureUiPreferencesColumn')) {
+    /**
+     * Memastikan kolom `ui_preferences` tersedia di tabel `users` (MySQL TEXT atau SQLite TEXT).
+     */
+    function ensureUiPreferencesColumn(PDO $pdo): void {
+        static $verifiedConnections = [];
+        $objectId = function_exists('spl_object_id') ? spl_object_id($pdo) : 0;
+        if (isset($verifiedConnections[$objectId])) {
+            return;
+        }
+
+        $driver = '';
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+        } catch (Throwable $e) {
+            $driver = 'mysql';
+        }
+
+        if ($driver === 'mysql' && !empty($_SESSION['_schema_ui_preferences_ok'])) {
+            $verifiedConnections[$objectId] = true;
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            $stmt = $pdo->query("PRAGMA table_info(users)");
+            $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            $exists = false;
+            foreach ($cols as $col) {
+                if (strtolower((string)($col['name'] ?? '')) === 'ui_preferences') {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists && !empty($cols)) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN ui_preferences TEXT NULL");
+            }
+            $verifiedConnections[$objectId] = true;
+            return;
+        }
+
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM users LIKE 'ui_preferences'");
+            $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+            if (!$row) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN ui_preferences TEXT NULL");
+            }
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $_SESSION['_schema_ui_preferences_ok'] = true;
+            }
+            $verifiedConnections[$objectId] = true;
+        } catch (Throwable $e) {
+            error_log('ensureUiPreferencesColumn notice: ' . $e->getMessage());
+        }
+    }
+}
+
+if (!function_exists('getDefaultUiPreferences')) {
+    function getDefaultUiPreferences(): array {
+        return [
+            'theme' => 'emerald',
+            'font_family' => 'plus-jakarta-sans',
+            'font_size' => 'normal',
+            'table_density' => 'comfortable',
+            'sidebar_mode' => 'default'
+        ];
+    }
+}
+
+if (!function_exists('getUserUiPreferences')) {
+    function getUserUiPreferences($userId, PDO $pdo = null): array {
+        $defaults = getDefaultUiPreferences();
+        if (empty($userId)) {
+            return $defaults;
+        }
+
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['ui_preferences_data']) && is_array($_SESSION['ui_preferences_data'])) {
+            return array_merge($defaults, $_SESSION['ui_preferences_data']);
+        }
+
+        if ($pdo === null && function_exists('getDBConnection')) {
+            try { $pdo = getDBConnection(); } catch (Throwable $e) { return $defaults; }
+        }
+        if (!$pdo) {
+            return $defaults;
+        }
+
+        try {
+            ensureUiPreferencesColumn($pdo);
+            $stmt = $pdo->prepare("SELECT ui_preferences FROM users WHERE id = ? LIMIT 1");
+            $stmt->execute([(int)$userId]);
+            $raw = $stmt->fetchColumn();
+            if ($raw) {
+                $decoded = json_decode((string)$raw, true);
+                if (is_array($decoded)) {
+                    $merged = array_merge($defaults, $decoded);
+                    if (session_status() === PHP_SESSION_ACTIVE) {
+                        $_SESSION['ui_preferences_data'] = $merged;
+                    }
+                    return $merged;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('getUserUiPreferences notice: ' . $e->getMessage());
+        }
+
+        return $defaults;
+    }
+}
+
+if (!function_exists('saveUserUiPreferences')) {
+    function saveUserUiPreferences($userId, array $newPrefs, PDO $pdo = null): bool {
+        $validThemes = ['emerald', 'dark', 'sapphire', 'sepia'];
+        $validFonts = ['plus-jakarta-sans', 'inter', 'lexend'];
+        $validSizes = ['normal', 'medium', 'large'];
+        $validDensities = ['comfortable', 'compact'];
+        $validSidebars = ['default', 'compact'];
+
+        $cleaned = [
+            'theme' => in_array($newPrefs['theme'] ?? '', $validThemes, true) ? $newPrefs['theme'] : 'emerald',
+            'font_family' => in_array($newPrefs['font_family'] ?? '', $validFonts, true) ? $newPrefs['font_family'] : 'plus-jakarta-sans',
+            'font_size' => in_array($newPrefs['font_size'] ?? '', $validSizes, true) ? $newPrefs['font_size'] : 'normal',
+            'table_density' => in_array($newPrefs['table_density'] ?? '', $validDensities, true) ? $newPrefs['table_density'] : 'comfortable',
+            'sidebar_mode' => in_array($newPrefs['sidebar_mode'] ?? '', $validSidebars, true) ? $newPrefs['sidebar_mode'] : 'default',
+        ];
+
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['ui_preferences_data'] = $cleaned;
+        }
+
+        if ($pdo === null && function_exists('getDBConnection')) {
+            try { $pdo = getDBConnection(); } catch (Throwable $e) { return false; }
+        }
+        if (!$pdo || empty($userId)) {
+            return false;
+        }
+
+        try {
+            ensureUiPreferencesColumn($pdo);
+            $stmt = $pdo->prepare("UPDATE users SET ui_preferences = ? WHERE id = ?");
+            return $stmt->execute([json_encode($cleaned, JSON_UNESCAPED_UNICODE), (int)$userId]);
+        } catch (Throwable $e) {
+            error_log('saveUserUiPreferences error: ' . $e->getMessage());
+            return false;
+        }
+    }
+}

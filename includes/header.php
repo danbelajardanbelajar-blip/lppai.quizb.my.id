@@ -5,6 +5,13 @@
 if (!defined('PAGE_TITLE')) define('PAGE_TITLE', 'LPPAI Corner');
 if (!defined('EXTRA_HEAD')) define('EXTRA_HEAD', '');
 $currentUser = getCurrentUser();
+$userUiPrefs = function_exists('getUserUiPreferences') ? getUserUiPreferences($currentUser['id'] ?? null) : (function_exists('getDefaultUiPreferences') ? getDefaultUiPreferences() : [
+    'theme' => 'emerald',
+    'font_family' => 'plus-jakarta-sans',
+    'font_size' => 'normal',
+    'table_density' => 'comfortable',
+    'sidebar_mode' => 'default'
+]);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -16,10 +23,32 @@ $currentUser = getCurrentUser();
     <link rel="alternate icon" href="<?= BASE_URL ?>/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Lexend:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=<?= file_exists(__DIR__ . '/../assets/css/style.css') ? filemtime(__DIR__ . '/../assets/css/style.css') : time() ?>">
     <meta name="base-url" content="<?= BASE_URL ?>">
+    <script>
+    (function() {
+        try {
+            var serverPrefs = <?= json_encode($userUiPrefs, JSON_UNESCAPED_UNICODE) ?> || {};
+            var localPrefs = {};
+            try {
+                var raw = localStorage.getItem('lppai_ui_prefs');
+                if (raw) localPrefs = JSON.parse(raw) || {};
+            } catch (e) {}
+            var prefs = Object.assign({}, serverPrefs, localPrefs);
+            var doc = document.documentElement;
+            if (prefs.theme) doc.setAttribute('data-theme', prefs.theme);
+            if (prefs.font_family) doc.setAttribute('data-font', prefs.font_family);
+            if (prefs.font_size) doc.setAttribute('data-font-size', prefs.font_size);
+            if (prefs.table_density) doc.setAttribute('data-density', prefs.table_density);
+            if (prefs.sidebar_mode) doc.setAttribute('data-sidebar', prefs.sidebar_mode);
+            try { localStorage.setItem('lppai_ui_prefs', JSON.stringify(prefs)); } catch (e) {}
+        } catch (e) {
+            console.error('UI Prefs init error:', e);
+        }
+    })();
+    </script>
     <?= EXTRA_HEAD ?>
     <?php if (isAdmin()): ?>
     <script defer src="<?= BASE_URL ?>/assets/js/admin-user-profile-links.js?v=<?= filemtime(__DIR__ . '/../assets/js/admin-user-profile-links.js') ?>"
@@ -94,7 +123,7 @@ $currentUser = getCurrentUser();
                             <span class="dropdown-icon">⚙️</span>
                             <div class="dropdown-item-text">
                                 <div class="dropdown-item-title">Pengaturan</div>
-                                <div class="dropdown-item-desc">Ubah kata sandi & info keamanan akun</div>
+                                <div class="dropdown-item-desc">Tema tampilan, kata sandi & keamanan akun</div>
                             </div>
                         </a>
                     </div>

@@ -5,6 +5,66 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-20 08:00:25 +0700 — Personalisasi Tampilan (Tema Warna, Gaya Font, Ukuran Huruf, Kepadatan Tabel & Sidebar) di Halaman Pengaturan
+
+**ID:** UI-PERSONALIZATION-SETTINGS · **Parent Git:** `73a432a`.
+
+**Permintaan:** Usulan dan implementasi sistem personalisasi tampilan lengkap (tema warna, jenis font, ukuran huruf, kepadatan tabel, dan lebar sidebar) yang dapat dikonfigurasi pengguna di halaman Pengaturan (`pengaturan.php`), memiliki pratinjau langsung (*live interactive preview*), tersimpan permanen di database akun pengguna (multi-device) serta `localStorage` browser, dan diterapkan seketika tanpa kedipan (*zero-flicker / anti-FOUC*) sejak pemuatan pertama dokumen.
+
+**Keputusan Desain & Fitur:**
+1. **Tema Warna Utama (Color Scheme):**
+   - *Emerald Royale (Bawaan):* Hijau emerald prestisius (`#0b3b22`), aksen emas champagne (`#c59b27`), dan kanvas terang bersih khas identitas LPPAI Corner.
+   - *Midnight Dark (Mode Gelap):* Kontras tinggi berbasis obsidian dark (`#0b1120` & `#131c31`), aksen neon emerald (`#10b981`), dan amber hangat (`#fbbf24`), sangat nyaman di mata untuk penggunaan malam hari atau pencahayaan redup.
+   - *Sapphire Academic:* Nuansa biru samudra akademis formal (`#0f3d68`), dipadu aksen emas kuning hangat (`#e69d24`).
+   - *Warm Sepia (Kertas Klasik):* Nuansa kertas bacaan klasik cokelat kayu hangat (`#4a3424`), lembut dan mereduksi kelelahan mata saat membaca teks panjang.
+2. **Gaya Tulisan (Tipografi):**
+   - *Plus Jakarta Sans (Bawaan):* Geometris modern, elegan, dan profesional.
+   - *Inter:* Standar UI global dengan legibilitas angka dan tabel yang sangat tajam.
+   - *Lexend:* Tipografi hasil riset ilmiah membaca yang dirancang khusus untuk mempercepat dan mempermudah pemahaman teks.
+3. **Skala Ukuran Huruf:** Normal 100% (16px), Sedang 110% (17.5px), dan Besar 120% (19px).
+4. **Kepadatan Tabel & Data:** Normal / Nyaman (spasi lega) dan Ramping / Padat (spasi rapat, hemat ruang vertikal).
+5. **Lebar Bilah Menu Samping (Sidebar):** Standar 272px dan Ramping 215px (lebih hemat ruang horizontal pada layar desktop).
+6. **Sinkronisasi Multi-Perangkat & Zero-Flicker:** Disimpan di kolom `users.ui_preferences` (JSON) dan disinkronkan ke `localStorage`. Script inline sinkron pada `<head>` mengeksekusi penyetelan atribut sebelum DOM dirender sehingga tidak ada kedipan tema saat berpindah halaman.
+
+**Waktu Penyimpanan Berkas Aktual:**
+- `includes/user-helper.php`: 20/11/2026 07.47.13 WIB
+- `includes/header.php`: 20/11/2026 07.57.22 WIB
+- `pages/pengaturan.php`: 20/11/2026 07.59.16 WIB
+- `tests/ui-personalization-test.php`: 20/11/2026 07.59.52 WIB
+- `assets/css/style.css`: 20/11/2026 08.00.25 WIB
+
+**Perubahan Berkas:**
+- `includes/user-helper.php` (baris 1145–1291):
+  - `ensureUiPreferencesColumn(PDO $pdo)`: Menjamin kolom `ui_preferences TEXT NULL` tersedia pada tabel `users` untuk MySQL dan SQLite.
+  - `getDefaultUiPreferences()`: Menyediakan konfigurasi bawaan sistem.
+  - `getUserUiPreferences($userId, PDO $pdo)`: Membaca preferensi dari sesi aktif atau basis data dengan fallback aman.
+  - `saveUserUiPreferences($userId, array $newPrefs, PDO $pdo)`: Validasi ketat berbasis whitelist nilai legal, sanitasi input, pembaruan basis data, dan sinkronisasi sesi PHP.
+- `assets/css/style.css` (baris 1, baris 2714–3033):
+  - Baris 1: Memperbarui `@import` Google Fonts untuk menyertakan font `Lexend`.
+  - Baris 2714–3033: Penambahan variabel dan aturan tema warna (`sapphire`, `sepia`, `dark`), tipografi (`plus-jakarta-sans`, `inter`, `lexend`), ukuran font, kepadatan tabel (`data-density="compact"`), dan mode sidebar (`data-sidebar="compact"`).
+- `includes/header.php` (baris 7–15, 18, 23–45, 105):
+  - Pemuatan `$userUiPrefs` pada saat pembentukan header.
+  - Penyertakan font `Lexend` pada tautan stylesheet Google Fonts.
+  - Penambahan skrip sinkron inline pada tag `<head>` sebelum first paint untuk menerapkan atribut `data-theme`, `data-font`, dll. pada `document.documentElement` tanpa kedipan.
+  - Pembaruan deskripsi submenu pengaturan di dropdown navigasi profil pengguna.
+- `pages/pengaturan.php` (baris 24–58, 91–98, 150–480, 570–715):
+  - Handler POST & AJAX `save_ui_preferences` dengan proteksi token CSRF.
+  - Kartu visual interaktif "🎨 Personalisasi Tampilan & Antarmuka" di kolom utama di atas pengaturan kata sandi, dilengkapi kartu sampel warna tema, tombol radio font & ukuran huruf, densitas tabel, lebar sidebar, dan kotak pratinjau langsung interaktif (*live preview box*).
+  - Skrip klien interaktif yang memperbarui atribut halaman secara seketika (*instant preview*), sinkronisasi instan ke `localStorage`, dan pengiriman asinkron AJAX dengan umpan balik tombol simpan serta notifikasi toast.
+- `tests/ui-personalization-test.php` (baru, baris 1–118):
+  - 24 skenario pengujian komprehensif menguji default preferences, migrasi SQLite dinamis, sanitasi input berbahaya/ilegal, penyimpanan & pembacaan konfigurasi user, serta keberadaan selektor CSS dan skrip anti-flicker di berkas produksi.
+
+**Verifikasi:**
+- Sintaks PHP seluruh berkas (`php -l`): LULUS (No syntax errors detected).
+- Pengujian unit & integrasi personalisasi (`tests/ui-personalization-test.php`): 24 PASS (0 FAIL).
+- Pengujian regresi modul terkait:
+  - `tests/alkhidmah-schedule-test.php`: 27 PASS (0 FAIL).
+  - `tests/admin-profile-extra-test.php`: 38 PASS (0 FAIL).
+  - `tests/dashboard-cbt-submitted-test.php`: 100% PASS.
+- Pemeriksaan spasi & whitespace Git (`git diff --check`): Bersih (exit code 0).
+
+---
+
 ## 2026-11-19 09:20:45 +0700 — Generate Jadwal Kegiatan Majlis Dzikir Al Khidmah (Masjid KH. Soefyan Abdul Wahab)
 
 **ID:** ALKHIDMAH-JADWAL-GENERATE · **Parent Git:** `611994a`.
