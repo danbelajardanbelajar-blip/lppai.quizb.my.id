@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-20 15:10:20 +0700 — Tab Semua Mahasiswa: Filter Angkatan (+ Kolom Angkatan di Ekspor)
+
+**ID:** PRETES-TAB-ANGKATAN · **Parent Git:** `9dfa7cc`.
+**Permintaan:** Tambahkan filter angkatan pada tab "Semua Mahasiswa" di `/admin/pretes-peserta.php`.
+
+**Rancangan:**
+- **Sumber angkatan:** `users.angkatan`; bila kosong/tidak valid diturunkan dari 2 digit awal NIM ("24…" → 2024). Aturan ini sama dengan `includes/pretes-card.php` dan impor pengguna.
+  - Fungsi baru `pretesStudentAngkatan()`.
+  - Query users memakai `SELECT *` agar tetap berjalan bila kolom angkatan belum ada.
+- **Filter:**
+  - Dropdown "📆 Angkatan" berisi daftar angkatan yang ada (terbaru dulu), dikirim dengan GET `angkatan` (4 digit; nilai lain diabaikan).
+  - Bisa digabung dengan status, prodi, program, hari, dan kata kunci.
+  - Ikut ke tautan kartu status dan teks filter ("Angkatan 2024").
+- **Tabel:** angkatan tampil kecil di bawah NIM (kolom tabel tetap sama) dan ikut terbaca kotak cari tabel.
+- **Ekspor:** parameter `angkatan` diteruskan. Excel/CSV mendapat kolom "Angkatan"; PDF mendapat kolom "Angkatan". Nama berkas memuat `_Angkatan-2024`.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-all-students.php` | 2026-11-20 15:09:28 | 10, 18–28, 41, 53–56, 83, 109, 135 | `pretesStudentAngkatan`; filter; query users; baris; penerapan filter; teks filter | Data & filter angkatan. |
+| `admin/pretes-peserta.php` | 2026-11-20 15:09:28 | 363, 371–372 | State tab Semua Mahasiswa | Daftar opsi angkatan. |
+| `includes/pretes-all-students-view.php` | 2026-11-20 15:09:28 | 4, 13, 17, 81–86, 129 | Tautan kartu status; query ekspor; dropdown angkatan; sel NIM | Filter & tampilan angkatan. |
+| `admin/pretes-mahasiswa-export.php` | 2026-11-20 15:09:28 | 5, 30, 34–39, 52, 129, 132, 139 | Nama berkas; kolom Excel/CSV; tabel PDF | Kolom & filter angkatan. |
+| `tests/pretes-all-students-test.php` | 2026-11-20 15:10:20 | 15–22, 57–63, 76 | Fixture & asersi angkatan | 7 asersi baru. |
+
+**Cakupan 7 asersi baru:**
+- Angkatan dari kolom maupun dari NIM; nilai tidak valid.
+- Filter angkatan, termasuk gabungan angkatan + status.
+- Parameter angkatan tidak valid diabaikan; teks filter memuat angkatan.
+- Markup tampilan & ekspor.
+
+**Verifikasi** (PHP 8.3.36 portable di scratchpad):
+- `php -l`: OK. `git diff --check`: bersih.
+- `tests/pretes-all-students-test.php`: 33 PASS. Seluruh `tests/*.php`: gagal hanya `tutorial-sisa-kuota-test.php` dan `user-jenis-program-test.php` (sudah gagal sebelumnya).
+- **Browser lokal** (preview SQLite, jQuery + DataTables):
+  - Dropdown Angkatan terisi; memilih 2024 → 5 mahasiswa, NIM menampilkan "Angkatan 2024".
+  - Tautan ekspor PDF memuat `angkatan=2024`. PDF: 5 baris + kolom Angkatan + filter "Angkatan 2024". XLSX: 5 baris data dengan header Angkatan, nama berkas `..._Angkatan-2024_...`.
+- **Keterbatasan:**
+  - Belum diuji pada MySQL produksi.
+  - Mahasiswa tanpa angkatan dan NIM yang tidak berawalan angka tidak muncul pada filter angkatan tertentu (tetap tampil pada "Semua Angkatan").
+
+---
+
 ## 2026-11-20 14:52:38 +0700 — Peserta Pretes: Tab "Semua Mahasiswa" (Belum Daftar / Belum Pretes) + Ekspor Sesuai Filter
 
 **ID:** PRETES-TAB-SEMUA-MAHASISWA · **Parent Git:** `7754e18`.

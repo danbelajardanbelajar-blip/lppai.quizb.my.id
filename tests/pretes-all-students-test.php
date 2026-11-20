@@ -12,14 +12,15 @@ require_once $root . '/includes/pretes-all-students.php';
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 $pdo->exec("CREATE TABLE users (id INTEGER PRIMARY KEY, nama_lengkap TEXT, nim TEXT, username TEXT, program_studi TEXT, jenis_program TEXT, role TEXT)");
+$pdo->exec("ALTER TABLE users ADD COLUMN angkatan TEXT");
 $pdo->exec("INSERT INTO users VALUES
- (1,'Ani Sudah','2601','2601','PAI','Reguler','mahasiswa'),
- (2,'Budi Belum Pretes','2602','2602','PAI','RPL','mahasiswa'),
- (3,'Cici Belum Daftar','2603','2603','Hukum','Reguler','mahasiswa'),
- (4,'Dedi Periode Lama','2604','2604','Hukum','Reguler','mahasiswa'),
- (5,'Eka Impor','2605','2605','Teknik','Reguler','mahasiswa'),
- (6,'Akun Uji','12345','12345','PAI','Reguler','mahasiswa'),
- (7,'Dosen X','','dosenx','PAI','Reguler','dosen')");
+ (1,'Ani Sudah','2601','2601','PAI','Reguler','mahasiswa',NULL),
+ (2,'Budi Belum Pretes','2602','2602','PAI','RPL','mahasiswa','2024'),
+ (3,'Cici Belum Daftar','2603','2603','Hukum','Reguler','mahasiswa',''),
+ (4,'Dedi Periode Lama','2604','2604','Hukum','Reguler','mahasiswa','2025'),
+ (5,'Eka Impor','2605','2605','Teknik','Reguler','mahasiswa','2026'),
+ (6,'Akun Uji','12345','12345','PAI','Reguler','mahasiswa',NULL),
+ (7,'Dosen X','','dosenx','PAI','Reguler','dosen',NULL)");
 $pdo->exec("CREATE TABLE pretes_registrations (id INTEGER PRIMARY KEY, user_id INT, periode TEXT, hari_pilihan TEXT, jam TEXT, foto TEXT)");
 $pdo->exec("INSERT INTO pretes_registrations VALUES (10,1,'P2026','senin','13.00',''),(20,2,'P2026','Rabu','13.00',''),(40,4,'P2025','Kamis','13.00',''),(50,5,'P2026','Rabu','13.00','')");
 $pdo->exec("CREATE TABLE pretes_cbt_attempts (id INTEGER PRIMARY KEY, user_id INT, registration_id INT, started_at INT, deadline_at INT, submitted_at INT NULL, score REAL NULL)");
@@ -53,6 +54,14 @@ $t($ids(pretesAllStudentsApply($rows, $f(['q' => 'cici']))) === [3] && $ids(pret
 $t($f(['status_pretes' => 'xx'])['status_pretes'] === '', 'Status tidak dikenal diabaikan');
 $t(str_contains(pretesAllStudentsFilterText($f(['status_pretes' => 'belum_daftar', 'hari' => 'Senin'])), 'Belum Daftar Pretes • Hari Senin'), 'Teks filter untuk ekspor');
 
+// Angkatan (PRETES-TAB-ANGKATAN): kolom angkatan, atau dari 2 digit awal NIM
+$t($by[1]['angkatan'] === '2026' && $by[2]['angkatan'] === '2024' && $by[3]['angkatan'] === '2026' && $by[4]['angkatan'] === '2025', 'Angkatan dari kolom, kosong → dari NIM (26… → 2026)');
+$t(pretesStudentAngkatan(null, 'A12') === '' && pretesStudentAngkatan('abc', '2312') === '2023', 'Angkatan tidak valid → turunan NIM / kosong');
+$t($ids(pretesAllStudentsApply($rows, $f(['angkatan' => '2026']))) === [1, 3, 5], 'Filter angkatan 2026');
+$t($ids(pretesAllStudentsApply($rows, $f(['angkatan' => '2024', 'status_pretes' => 'belum_pretes']))) === [2], 'Filter angkatan + status');
+$t($f(['angkatan' => '20x6'])['angkatan'] === '', 'Angkatan tidak valid diabaikan');
+$t(str_contains(pretesAllStudentsFilterText($f(['angkatan' => '2025'])), 'Angkatan 2025'), 'Teks filter memuat angkatan');
+
 // Integrasi halaman
 $page = file_get_contents($root . '/admin/pretes-peserta.php');
 $t(str_contains($page, "\$activeTab = ((\$_GET['tab'] ?? '') === 'semua') ? 'semua' : 'terdaftar';") && str_contains($page, 'data-pp-tab="semua"') && str_contains($page, "include __DIR__ . '/../includes/pretes-all-students-view.php'"), 'Halaman memiliki tab Semua Mahasiswa');
@@ -63,6 +72,8 @@ foreach (['<th>No</th><th>Nama</th><th>NIM</th><th>Prodi</th><th>Program</th><th
 }
 $exp = file_get_contents($root . '/admin/pretes-mahasiswa-export.php');
 $t(str_contains($exp, 'requireAdmin();') && str_contains($exp, 'pretesAllStudentsApply(pretesAllStudentsRows($pdo, $periode), $filters)') && str_contains($exp, "cbtWriteXlsx(") && str_contains($exp, 'window.print()'), 'Ekspor admin: Excel/CSV & PDF sesuai filter');
+
+$t(str_contains($view, 'id="sm-angkatan"') && str_contains($view, '\'angkatan\' => $f[\'angkatan\']') && str_contains($exp, "'Angkatan', 'Program Studi'") && str_contains($exp, '<th style="width:8%">Angkatan</th>'), 'Filter angkatan di tampilan & kolom angkatan di ekspor');
 
 if ($fail) { echo "\n$fail test gagal\n"; exit(1); }
 echo "\nSemua test tab Semua Mahasiswa lulus.\n";

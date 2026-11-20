@@ -360,7 +360,7 @@ $totalPeserta    = count($participants);
 
 // ── Tab "Semua Mahasiswa": sudah pretes / belum pretes / belum daftar pretes (sesuai periode terpilih) ──
 $activeTab = (($_GET['tab'] ?? '') === 'semua') ? 'semua' : 'terdaftar';
-$allStudentFilters = null; $allStudentRows = []; $allStudentStats = null; $allStudentProdis = [];
+$allStudentFilters = null; $allStudentRows = []; $allStudentStats = null; $allStudentProdis = []; $allStudentAngkatans = [];
 if ($activeTab === 'semua') {
     require_once __DIR__ . '/../includes/pretes-all-students.php';
     $allStudentFilters = pretesAllStudentsFilters($_GET);
@@ -368,6 +368,8 @@ if ($activeTab === 'semua') {
     $allStudentStats = pretesAllStudentsStats($allStudentAll);
     $allStudentProdis = array_values(array_unique(array_filter(array_column($allStudentAll, 'program_studi'))));
     sort($allStudentProdis);
+    $allStudentAngkatans = array_values(array_unique(array_filter(array_column($allStudentAll, 'angkatan'))));
+    rsort($allStudentAngkatans);
     $allStudentRows = pretesAllStudentsApply($allStudentAll, array_merge($allStudentFilters, ['q' => ''])); // kata kunci → kotak cari tabel
 }
 $totalBerCredentials = count(array_filter($participants, fn($p) => !empty($p['username_tes'])));

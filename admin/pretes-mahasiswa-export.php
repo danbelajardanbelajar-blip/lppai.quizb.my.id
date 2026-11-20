@@ -2,7 +2,7 @@
 /**
  * LPPAI Corner - Admin: Ekspor tab "Semua Mahasiswa" (admin/pretes-peserta.php?tab=semua) sesuai filter.
  * format=xlsx (Excel; fallback CSV bila ekstensi ZIP tidak ada) | format=pdf (dokumen A4 siap cetak / simpan PDF).
- * Filter: periode, status_pretes (sudah_pretes|belum_pretes|belum_daftar|belum_semua), prodi, jenis_program, hari (koma), q.
+ * Filter: periode, status_pretes (sudah_pretes|belum_pretes|belum_daftar|belum_semua), prodi, jenis_program, angkatan, hari (koma), q.
  */
 define('PAGE_TITLE', 'Export Status Pretes Mahasiswa');
 require_once __DIR__ . '/../includes/auth.php';
@@ -27,15 +27,16 @@ $statusText = static fn(string $s): string => ['sudah_pretes' => 'Sudah Pretes',
 $slug = static fn(string $s): string => trim(preg_replace('/[^A-Za-z0-9]+/', '-', $s), '-');
 $fileBase = 'Status_Pretes_Mahasiswa_' . $slug($periodeLabel)
     . ($filters['status_pretes'] !== '' ? '_' . $slug($filters['status_pretes']) : '')
+    . ($filters['angkatan'] !== '' ? '_Angkatan-' . $filters['angkatan'] : '')
     . ($filters['hari'] ? '_' . implode('-', $filters['hari']) : '') . '_' . $now->format('Ymd_His');
 
 if ($format !== 'pdf') {
-    $header = ['No', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Program', 'Status Pretes', 'Hari Pelaksanaan', 'Periode', 'Nilai Pretes', 'Keterangan Nilai'];
+    $header = ['No', 'NIM', 'Nama Mahasiswa', 'Angkatan', 'Program Studi', 'Program', 'Status Pretes', 'Hari Pelaksanaan', 'Periode', 'Nilai Pretes', 'Keterangan Nilai'];
     $lines = function () use ($rows, $header, $statusText) {
         yield $header;
         foreach ($rows as $i => $r) {
             yield [
-                $i + 1, (string)$r['nim'], $r['nama_lengkap'], $r['program_studi'] ?: '-', $r['jenis_program'],
+                $i + 1, (string)$r['nim'], $r['nama_lengkap'], $r['angkatan'] ?: '-', $r['program_studi'] ?: '-', $r['jenis_program'],
                 $statusText($r['status_pretes']), $r['reg_id'] ? ($r['hari_pilihan'] ?: '-') : '-', $r['periode'] ?: '-',
                 $r['score'] !== null ? ['style' => 3, 'value' => (float)$r['score']] : '-',
                 $r['score'] === null ? '-' : ($r['score'] >= 80 ? 'Lulus' : 'Tidak lulus'),
@@ -44,7 +45,7 @@ if ($format !== 'pdf') {
     };
     if (class_exists('ZipArchive')) {
         require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
-        cbtSendXlsx(cbtWriteXlsx($lines(), 'Status Pretes', [6, 16, 32, 26, 10, 16, 16, 24, 12, 16]), $fileBase . '.xlsx', true);
+        cbtSendXlsx(cbtWriteXlsx($lines(), 'Status Pretes', [6, 16, 32, 10, 26, 10, 16, 16, 24, 12, 16]), $fileBase . '.xlsx', true);
         exit;
     }
     // Fallback CSV (UTF-8 BOM agar terbaca Excel)
@@ -125,16 +126,17 @@ tr:nth-child(even) td{background:#fafbfc}
         <div><b>Rincian:</b> Sudah <?= (int)$stats['sudah_pretes'] ?> · Belum pretes <?= (int)$stats['belum_pretes'] ?> · Belum daftar <?= (int)$stats['belum_daftar'] ?></div>
     </div>
     <table>
-        <thead><tr><th style="width:5%">No</th><th style="width:13%">NIM</th><th>Nama Mahasiswa</th><th style="width:18%">Program Studi</th><th style="width:9%">Program</th><th style="width:14%">Status / Hari</th><th style="width:11%">Nilai Pretes</th></tr></thead>
+        <thead><tr><th style="width:5%">No</th><th style="width:13%">NIM</th><th>Nama Mahasiswa</th><th style="width:8%">Angkatan</th><th style="width:16%">Program Studi</th><th style="width:9%">Program</th><th style="width:14%">Status / Hari</th><th style="width:11%">Nilai Pretes</th></tr></thead>
         <tbody>
         <?php if (!$rows): ?>
-            <tr><td colspan="7" class="c muted" style="padding:28px;"><em>Tidak ada mahasiswa yang sesuai filter.</em></td></tr>
+            <tr><td colspan="8" class="c muted" style="padding:28px;"><em>Tidak ada mahasiswa yang sesuai filter.</em></td></tr>
         <?php endif; ?>
         <?php foreach ($rows as $i => $r): ?>
             <tr>
                 <td class="c"><?= $i + 1 ?></td>
                 <td class="c nim"><?= $e($r['nim'] ?: '-') ?></td>
                 <td><?= $e($r['nama_lengkap']) ?></td>
+                <td class="c"><?= $e($r['angkatan'] ?: '-') ?></td>
                 <td><?= $e($r['program_studi'] ?: '-') ?></td>
                 <td class="c"><?= $e($r['jenis_program']) ?></td>
                 <td class="c"><span class="st <?= $e($r['status_pretes']) ?>"><?= $e($statusText($r['status_pretes'])) ?></span><?php if ($r['reg_id'] && $r['hari_pilihan'] !== ''): ?><div style="font-size:8pt;color:#475569;"><?= $e($r['hari_pilihan']) ?></div><?php endif; ?></td>

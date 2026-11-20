@@ -1,7 +1,7 @@
 <?php
 /**
  * LPPAI Corner - Tampilan tab "Semua Mahasiswa" (dipanggil admin/pretes-peserta.php saat ?tab=semua).
- * Variabel: $selectedPeriode, $allStudentFilters, $allStudentRows, $allStudentStats, $allStudentProdis.
+ * Variabel: $selectedPeriode, $allStudentFilters, $allStudentRows, $allStudentStats, $allStudentProdis, $allStudentAngkatans.
  * Kolom sama dengan tab Peserta Terdaftar: No, Nama, NIM, Prodi, Program, Hari / Periode, Nilai Pretes, Aksi.
  * Filter server (GET) + kotak cari tabel; ekspor PDF/Excel memakai filter yang sama (admin/pretes-mahasiswa-export.php).
  */
@@ -10,11 +10,11 @@ $st = $allStudentStats;
 $baseQs = ['tab' => 'semua', 'periode' => $selectedPeriode];
 $statusLink = static function (string $status) use ($baseQs, $f): string {
     $q = $baseQs + array_filter(['status_pretes' => $status, 'prodi' => $f['prodi'], 'jenis_program' => $f['jenis_program'],
-        'hari' => $f['hari'] ? implode(',', $f['hari']) : ''], static fn($v) => $v !== '');
+        'angkatan' => $f['angkatan'], 'hari' => $f['hari'] ? implode(',', $f['hari']) : ''], static fn($v) => $v !== '');
     return '?' . htmlspecialchars(http_build_query($q), ENT_QUOTES, 'UTF-8');
 };
 $exportQs = array_filter(['periode' => $selectedPeriode, 'status_pretes' => $f['status_pretes'], 'prodi' => $f['prodi'],
-    'jenis_program' => $f['jenis_program'], 'hari' => $f['hari'] ? implode(',', $f['hari']) : ''], static fn($v) => $v !== '');
+    'jenis_program' => $f['jenis_program'], 'angkatan' => $f['angkatan'], 'hari' => $f['hari'] ? implode(',', $f['hari']) : ''], static fn($v) => $v !== '');
 $statusBadge = [
     'sudah_pretes' => ['#dcfce7', '#166534', 'Sudah Pretes'],
     'belum_pretes' => ['#fef3c7', '#92400e', 'Belum Pretes'],
@@ -78,6 +78,12 @@ $statusBadge = [
                         <option value="RPL" <?= $f['jenis_program'] === 'RPL' ? 'selected' : '' ?>>RPL</option>
                     </select>
                 </label>
+                <label style="font-size:12px;font-weight:600;color:#475569;">📆 Angkatan
+                    <select name="angkatan" id="sm-angkatan" onchange="this.form.submit()" style="display:block;width:100%;margin-top:5px;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:13px;background:#fff;">
+                        <option value="">Semua Angkatan</option>
+                        <?php foreach ($allStudentAngkatans ?? [] as $ang): ?><option value="<?= sanitize($ang) ?>" <?= $f['angkatan'] === $ang ? 'selected' : '' ?>><?= sanitize($ang) ?></option><?php endforeach; ?>
+                    </select>
+                </label>
                 <div style="font-size:12px;font-weight:600;color:#475569;">📅 Hari Pelaksanaan <small style="font-weight:500;color:#94a3b8;">(bisa beberapa)</small>
                     <div id="sm-hari-group" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:5px;">
                         <?php foreach (['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $d): ?>
@@ -120,7 +126,7 @@ $statusBadge = [
                                 <strong><?= adminUserProfileLink($r['nama_lengkap'], $r['user_id']) ?></strong>
                             </div>
                         </td>
-                        <td data-search="<?= sanitize($r['nim']) ?>"><?= sanitize($r['nim'] ?: '-') ?></td>
+                        <td data-search="<?= sanitize($r['nim'] . ' ' . $r['angkatan']) ?>"><?= sanitize($r['nim'] ?: '-') ?><?php if ($r['angkatan'] !== ''): ?><div style="font-size:11px;color:#64748b;">Angkatan <?= sanitize($r['angkatan']) ?></div><?php endif; ?></td>
                         <td><?= sanitize($r['program_studi'] ?: '-') ?></td>
                         <td data-order="<?= sanitize($r['jenis_program']) ?>"><?= renderJenisProgramBadge($r['jenis_program'], true) ?></td>
                         <td data-order="<?= sanitize($r['hari_pilihan']) ?>">
