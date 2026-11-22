@@ -38,9 +38,6 @@ function lppaiImportPaket2KristenProtestan(PDO $pdo, ?array $rows = null, bool $
         $isActive = $activatePackage ? 1 : 0;
 
         if ($pkgId <= 0) {
-            if ($isActive === 1) {
-                $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
-            }
             $pdo->prepare('INSERT INTO pretes_cbt_packages (code, name, description, duration_minutes, question_count, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
                 ->execute([
                     PAKET_2_KP_PKG_CODE,
@@ -56,9 +53,6 @@ function lppaiImportPaket2KristenProtestan(PDO $pdo, ?array $rows = null, bool $
             $updateSql = $activatePackage
                 ? 'UPDATE pretes_cbt_packages SET name = ?, description = ?, duration_minutes = 30, question_count = 25, is_active = 1 WHERE id = ?'
                 : 'UPDATE pretes_cbt_packages SET name = ?, description = ?, duration_minutes = 30, question_count = 25 WHERE id = ?';
-            if ($activatePackage) {
-                $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
-            }
             $pdo->prepare($updateSql)->execute([
                 'Paket 2 - Kristen Protestan',
                 'Paket 2 soal resmi pretes pendidikan agama Kristen Protestan (25 butir soal).',

@@ -82,7 +82,7 @@ if (isset($_GET['ajax'])) {
         }
         $offset = ($page - 1) * $perPage;
 
-        $stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereSql ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
+        $stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, p.name AS package_name, p.code AS package_code FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id LEFT JOIN pretes_cbt_packages p ON p.id = a.package_id $whereSql ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
         foreach ($params as $k => $v) {
             $stmt->bindValue($k, $v);
         }
@@ -255,7 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeTab = 'import';
     } elseif (in_array($action, ['save_session', 'activate_session', 'delete_session', 'delete_sessions', 'set_exam_open'], true)) {
         $activeTab = 'sessions';
-    } elseif (in_array($action, ['save_package', 'activate_package', 'delete_package', 'delete_packages'], true)) {
+    } elseif (in_array($action, ['save_package', 'activate_package', 'deactivate_package', 'delete_package', 'delete_packages'], true)) {
         $activeTab = 'packages';
     } elseif ($action === 'delete_attempt' || $action === 'delete_all_attempts') {
         $activeTab = 'results';
@@ -358,10 +358,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'activate_package') {
             $pkgId = (int)($_POST['package_id'] ?? 0);
             if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
-            if (pretesCbtActivatePackage($pdo, $pkgId)) {
-                $flashMsg = 'Paket soal aktif berhasil diubah. Peserta yang memulai ujian berikutnya akan diarahkan ke paket ini.';
+            // Aktifkan paket tanpa mematikan paket lain (multi-paket aktif)
+            if (pretesCbtActivatePackage($pdo, $pkgId, false)) {
+                $flashMsg = 'Paket soal berhasil diaktifkan. Peserta kini dapat memilih paket ini saat memulai ujian.';
             } else {
                 $flashMsg = 'Paket soal tidak ditemukan.';
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => true, 'message' => $flashMsg]);
+                exit;
+            }
+            $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=packages'); exit;
+        } elseif ($action === 'deactivate_package') {
+            $pkgId = (int)($_POST['package_id'] ?? 0);
+            if ($pkgId <= 0) throw new InvalidArgumentException('ID paket soal tidak valid.');
+            if (pretesCbtDeactivatePackage($pdo, $pkgId)) {
+                $flashMsg = 'Paket soal berhasil dinonaktifkan.';
+            } else {
+                $flashMsg = 'Paket soal gagal dinonaktifkan.';
             }
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
@@ -585,7 +601,7 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
-$stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
+$stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, p.name AS package_name, p.code AS package_code FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id LEFT JOIN pretes_cbt_packages p ON p.id = a.package_id $whereClause ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
 foreach ($params as $k => $v) {
     $stmt->bindValue($k, $v);
 }

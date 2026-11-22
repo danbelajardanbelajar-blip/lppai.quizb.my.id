@@ -43,6 +43,10 @@ if ($attempt) {
         $sessionInfo = pretesCbtGetSession($pdo, (int)$attempt['session_id']);
     }
 
+    if (!empty($attempt['package_id'])) {
+        $packageInfo = pretesCbtGetPackage($pdo, (int)$attempt['package_id']);
+    }
+
     // Ambil butir soal dan jawaban peserta
     $stmtItems = $pdo->prepare("
         SELECT position, question_id, question_text, options_json, correct_answer, answer, flagged
@@ -52,6 +56,16 @@ if ($attempt) {
     ");
     $stmtItems->execute([$attemptId]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+
+    if (!$packageInfo && !empty($items)) {
+        try {
+            $firstQId = (int)$items[0]['question_id'];
+            $pkgIdCol = (int)$pdo->query("SELECT package_id FROM pretes_cbt_questions WHERE id = $firstQId")->fetchColumn();
+            if ($pkgIdCol > 0) {
+                $packageInfo = pretesCbtGetPackage($pdo, $pkgIdCol);
+            }
+        } catch (Throwable $e) {}
+    }
 }
 
 // Helper parsing opsi jawaban A-E
@@ -588,6 +602,9 @@ include __DIR__ . '/../includes/header.php';
                         </span>
                         <?php if ($sessionInfo): ?>
                             <span class="badge badge-secondary" style="font-size:11.5px;"><?= sanitize($sessionInfo['title']) ?></span>
+                        <?php endif; ?>
+                        <?php if ($packageInfo): ?>
+                            <span class="badge badge-info" style="font-size:11.5px;background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;">📚 <?= sanitize($packageInfo['name']) ?></span>
                         <?php endif; ?>
                     </div>
                     <div style="font-size:12.5px; color:#64748b;">

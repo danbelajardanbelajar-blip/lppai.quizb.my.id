@@ -139,6 +139,13 @@
                                     <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan paket ini aktif untuk ujian peserta">Jadikan Aktif</button>
                                 </form>
+                            <?php else: ?>
+                                <form method="post" action="<?= $bankUrl ?>&amp;tab=packages" style="display:inline;margin:0 4px" onsubmit="return confirm('Nonaktifkan paket \'<?= htmlspecialchars(addslashes($pkg['name']), ENT_QUOTES, 'UTF-8') ?>\' dari pilihan ujian peserta?')">
+                                    <input type="hidden" name="action" value="deactivate_package">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
+                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px;color:#c2410c;border-color:#fed7aa" title="Nonaktifkan paket ini dari ujian peserta">Nonaktifkan</button>
+                                </form>
                             <?php endif; ?>
                             <button type="button" class="bank-button primary-sm" style="min-height:28px;padding:4px 9px;font-size:11px;font-weight:600" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= htmlspecialchars($pkg['name'], ENT_QUOTES, 'UTF-8') ?>" data-package-code="<?= htmlspecialchars($pkg['code'], ENT_QUOTES, 'UTF-8') ?>" title="Lihat &amp; kelola butir pertanyaan paket ini">📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)</button>
                             <button type="button" class="bank-button gold-sm" style="min-height:28px;padding:4px 9px;font-size:11px" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" title="Tambah soal baru ke paket ini">＋ Soal</button>
@@ -636,7 +643,11 @@
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
                         <td><?= renderJenisProgramBadge($attempt['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>
-                            <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
+                            <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span>
+                            <?php if (!empty($attempt['package_name'])): ?>
+                                <div style="margin-top:4px"><span class="bank-badge" style="background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;font-size:10.5px"><?= sanitize($attempt['package_name']) ?></span></div>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <div><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></div>
                             <?php if ($isSubmitted): ?>

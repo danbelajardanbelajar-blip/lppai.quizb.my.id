@@ -5,6 +5,71 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 14:30:00 +0700 — CBT Multi-Package Activation: Aktifkan Kedua Paket (Ubudiyah/Islam & Kristen Protestan) serta Pemilihan Paket Mahasiswa
+
+**ID:** `CBT-MULTI-PACKAGE-CHOICE` · **Parent Git:** `fdf6e19`.
+**Permintaan:** Mengapa yang aktif hanya paket Kristen Protestan? Aktifkan kedua paket (Paket 1 - Ubudiyah / Islam & Paket 2 - Kristen Protestan) dan buat mahasiswa dapat memilih salah satunya saat memulai ujian pretes resmi.
+
+**Penyebab & Analisis:**
+1. Di arsitektur CBT sebelumnya, tabel `pretes_cbt_packages` menerapkan asumsi paket aktif tunggal (`pretesCbtActivatePackage` dan `pretesCbtSavePackage` otomatis mengeksekusi `UPDATE pretes_cbt_packages SET is_active = 0` sebelum mengaktifkan paket yang dituju).
+2. Di tabel `pretes_cbt_sessions`, fungsi `pretesCbtGetActiveSession()` mengambil sesi resmi dengan `ORDER BY id DESC LIMIT 1`. Saat impor Paket 2 membuat sesi resmi baru `SESI-RESMI-PROTESTAN-2026` dengan `is_active = 1` dan ID auto-increment yang lebih tinggi dari `SESI-REGULER-2026`, sesi baru tersebut mengambil alih status aktif. Karena sesi itu hanya memuat `package_ids_json = [2]`, maka hanya Paket 2 yang aktif untuk peserta ujian.
+3. Mesin `pretesCbtStart()` sebelumnya mengumpulkan dan mengacak semua butir soal dari seluruh ID paket yang terhubung ke sesi (`WHERE package_id IN (...)`), sehingga apabila 1 sesi memuat 2 paket soal, butir soal Islam dan Kristen akan teracak dan tercampur. Selain itu, belum ada antarmuka bagi mahasiswa untuk memilih paket ujian agamanya.
+
+**Perubahan dan Alur Solusi:**
+1. **Multi-Paket Aktif & Sinkronisasi Sesi Resmi (`includes/pretes-cbt.php` & `tools/activate-both-packages.php`):**
+   - Menambahkan kolom `package_id INTEGER DEFAULT NULL` di tabel `pretes_cbt_attempts`.
+   - Menambahkan fungsi `pretesCbtEnsureMultiPackageActive(PDO $pdo)` yang mengaktifkan kedua paket (`PKT-UTAMA` / Ubudiyah dan `PKT-2-KRISTEN-PROTESTAN`) secara bersamaan (`is_active = 1`), serta menghubungkan kedua paket `[1, 2]` ke sesi resmi utama `SESI-REGULER-2026`.
+   - Mengubah `pretesCbtActivatePackage(PDO $pdo, int $pkgId, bool $exclusive = true)` agar mendukung aktivasi non-eksklusif (`$exclusive = false`), dan menambahkan `pretesCbtDeactivatePackage(PDO $pdo, int $pkgId)` dengan proteksi minimal 1 paket aktif.
+   - Menambahkan fungsi `pretesCbtGetActivePackages(PDO $pdo)` dan `pretesCbtGetAvailablePackagesForSession(PDO $pdo, ?array $session = null)`.
+2. **Isolasi Soal & Pencatatan Paket Terpilih di Mesin CBT (`includes/pretes-cbt.php` & `api/pretes-cbt.php`):**
+   - Di `pretesCbtState()`, mengembalikan daftar `available_packages` saat peserta belum memulai ujian.
+   - Di `pretesCbtStart()`, menambahkan parameter `$requestedPackageId = null`. Jika peserta memilih paket tertentu, mesin CBT secara presisi hanya menarik soal dari paket tersebut (`WHERE package_id = ? AND is_active = 1`), sehingga soal agama Islam dan Kristen Protestan tidak pernah tercampur.
+   - Kolom `package_id` tersimpan di `pretes_cbt_attempts`, dan `pretesCbtPublic()` mengembalikan `package_id` dan `package_name` peserta.
+   - Di `api/pretes-cbt.php`, memvalidasi `$packageId` dari payload. Jika terdapat lebih dari 1 paket aktif dan peserta belum memilih, sistem mengembalikan pesan instruksi untuk memilih paket.
+3. **Komponen Pemilihan Paket Mahasiswa di Antarmuka CBT (`includes/pretes-cbt-view.php`, `assets/js/pretes-cbt.js`, `assets/css/pretes-cbt-exam.css`):**
+   - Menambahkan kontainer `#cbtPackageBox` dengan kartu pilihan radio interaktif yang elegan (`.cbt-package-card`):
+     - 🕌 **Paket 1 - Paket Pretes Utama (Ubudiyah / Islam)** (25 butir soal · 30 menit)
+     - ✝️ **Paket 2 - Kristen Protestan** (25 butir soal · 30 menit)
+   - Kartu responsif terhadap klik/spasi/enter, dengan sorotan hijau zamrud aktif.
+   - Jika hanya 1 paket tersedia, otomatis dipilih tanpa menampilkan kotak pilihan (backward-compatible).
+   - Menampilkan badge paket yang sedang dikerjakan di header ujian (`#cbtActivePackagePill`) dan di kartu hasil pengerjaan.
+4. **Tampilan Admin & Review Hasil (`admin/pretes-bank-soal.php`, `includes/pretes-cbt-admin-view.php`, `admin/pretes-cbt-review.php`):**
+   - Di tab Paket Soal, admin dapat mengaktifkan atau menonaktifkan paket secara mandiri tanpa saling menghapus status aktif paket lain.
+   - Di tab Hasil Ujian dan Live Monitoring, kolom "Jenis" menampilkan label paket soal yang dikerjakan mahasiswa.
+   - Di lembar review detail pengerjaan mahasiswa (`admin/pretes-cbt-review.php`), nama paket soal tercantum secara jelas di samping judul sesi.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-22 14:27:31 | `includes/pretes-cbt.php` | 39, 88, 142, 233, 400, 435, 495, 740, 755, 800, 815 | Migrasi kolom `package_id` di `pretes_cbt_attempts`, fungsi `pretesCbtEnsureMultiPackageActive`, auto-sync multi-paket MySQL, `available_packages` di state, isolasi soal per pilihan mahasiswa di `pretesCbtStart`, helper `pretesCbtGetActivePackages` & `pretesCbtGetAvailablePackagesForSession`, serta aktivasi non-eksklusif dan deaktifasi paket aman. |
+| 2026-11-22 14:18:56 | `api/pretes-cbt.php` | 52 | Parsing parameter `package_id` pada action `start`, validasi wajib pilih jika ada multi-paket aktif, dan penerusan ke `pretesCbtStart`. |
+| 2026-11-22 14:19:23 | `includes/pretes-cbt-view.php` | 2, 25 | Penambahan kontainer `#cbtPackageBox` dan `#cbtPackageList` di atas token box, serta pill penanda paket aktif `#cbtActivePackagePill` pada header CBT. |
+| 2026-11-22 14:21:07 | `assets/js/pretes-cbt.js` | 4, 18, 95, 120, 410 | Controller render kartu pemilihan paket (`renderPackageSelection`), validasi wajib pilih sebelum `start`, pengiriman `package_id` di payload, serta tampilan nama paket aktif dan hasil ujian. |
+| 2026-11-22 14:19:38 | `assets/css/pretes-cbt-exam.css` | 21 | Aturan gaya visual kartu paket interaktif `.cbt-package-card`, status hover, dan selected/checked berbingkai hijau emerald. |
+| 2026-11-22 14:21:52 | `admin/pretes-bank-soal.php` | 85, 258, 360, 375, 604 | Dukungan action `activate_package` (non-eksklusif) dan `deactivate_package`, serta JOIN `pretes_cbt_packages` untuk membaca `package_name` pada tabel hasil dan live monitoring. |
+| 2026-11-22 14:22:47 | `includes/pretes-cbt-admin-view.php` | 134, 645 | Penambahan tombol "Nonaktifkan" di daftar paket aktif dan badge nama paket di kolom Jenis pada tabel Hasil Ujian & Live Monitoring. |
+| 2026-11-22 14:23:28 | `admin/pretes-cbt-review.php` | 42, 605 | Pembacaan dan penayangan badge nama paket soal pada lembar review ujian mahasiswa. |
+| 2026-11-22 14:23:55 | `tools/import-paket-2-kristen-protestan.php` | 40 | Penghapusan reset `is_active = 0` paket lain agar impor paket tidak mematikan paket sebelumnya. |
+| 2026-11-22 14:24:11 | `tools/activate-both-packages.php` | 1 | CLI tool mandiri untuk mengaktifkan kedua paket pretes dan menghubungkan sesi resmi secara instan. |
+| 2026-11-22 14:27:53 | `tests/pretes-multi-package-selection-test.php` | 1 | Test suite otomatis 10 pengujian end-to-end: seeding, multi-paket aktif, isolasi butir soal per agama (Islam vs Kristen), submit & penilaian, serta toggle admin. |
+| 2026-11-22 14:30:00 | `CHANGELOG-DEV.md` | 8 | Catatan rilis lengkap perubahan CBT Multi-Package Activation & Student Choice. |
+
+**Verifikasi:**
+- PHP lint syntax check pada seluruh file yang dimodifikasi (`includes/pretes-cbt.php`, `api/pretes-cbt.php`, `admin/pretes-bank-soal.php`, `admin/pretes-cbt-review.php`, `tools/import-paket-2-kristen-protestan.php`, `tools/activate-both-packages.php`, `tests/pretes-multi-package-selection-test.php`): semua `No syntax errors detected`.
+- `php tests/pretes-multi-package-selection-test.php`: 10/10 pengujian lulus sempurna (soal Islam dan Kristen terisolasi 100%, nilai terhitung akurat, kedua paket aktif bersamaan).
+- `php tests/paket-2-kristen-protestan-test.php`: 24/24 pengujian lulus sempurna.
+- `php tests/pretes-cbt-package-test.php`: 7/7 pengujian lulus sempurna.
+- `php tests/pretes-cbt-session-test.php`: 8/8 pengujian lulus sempurna.
+- `php tests/pretes-cbt-test.php`: PASS (seed bank, autosave, grading, expiry, interruption, ownership).
+- `php tests/pretes-ujian-route-test.php`: PASS (face API & CBT route dispatch).
+- `php tests/pretes-exam-access-test.php`: PASS (akses jadwal & perizinan peserta).
+- `git diff --check`: 0 error spasi/trailing whitespace.
+
+**Pelacakan:** Cari commit dengan ID `CBT-MULTI-PACKAGE-CHOICE`.
+
+---
+
 ## 2026-11-22 13:25:13 +0700 — Samakan Minggu/Ahad pretes menjadi 22 November pada pekan berjalan
 
 **ID:** PRETES-SUNDAY-SAME-WEEK · **Parent Git:** `9ab1152`.
