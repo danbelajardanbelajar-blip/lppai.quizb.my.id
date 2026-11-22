@@ -46,8 +46,8 @@ if (!function_exists('pretesCbtEnsureDefaultSessionsActive')) {
             if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
                 return;
             }
-            // Pastikan kedua sesi resmi terdaftar dan aktif
-            $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
+            // Pastikan kedua sesi resmi default berstatus aktif bersamaan
+            $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id IN (1, 2) OR code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
         } catch (Throwable $e) {}
     }
 }

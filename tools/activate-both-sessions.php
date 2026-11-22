@@ -20,7 +20,7 @@ ensurePretesCbtTables($pdo);
 echo "=== MENGAKTIFKAN SESI UJIAN RESMI MULTI-SESSION ===\n";
 
 // 1. Pastikan kedua sesi resmi default berstatus aktif
-$pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
+$pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id IN (1, 2) OR code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
 
 // 2. Tampilkan semua sesi yang berstatus aktif
 $activeSessions = pretesCbtGetActiveSessions($pdo);

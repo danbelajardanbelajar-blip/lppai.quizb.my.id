@@ -5,6 +5,49 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 16:42:30 +0700 — Tombol Reset Attempt CBT Akun Tester & Jaminan Multi-Sesi Aktif Bersamaan
+
+**ID:** `CBT-TESTER-RESET-AND-MULTI-SESSION-FIX` · **Parent Git:** `53d9b8f`.
+**Permintaan:** Mengapa akun tester NIM 12345 setelah verifikasi wajah langsung diarahkan ke soal Kristen dan tidak muncul pilihan sesi?
+
+**Penyebab & Analisis:**
+1. **Fitur Resumable CBT Memulihkan Attempt Berjalan:** Akun tester NIM 12345 sebelumnya telah memiliki rekaman attempt yang sedang berlangsung (`status = in_progress` / belum disubmit) di tabel `pretes_cbt_attempts` dari pengujian Paket 2 Kristen sebelumnya. Mesin CBT secara desain memulihkan (*resume*) attempt yang belum selesai agar mahasiswa tidak kehilangan pengerjaannya saat refresh atau verifikasi ulang kamera, sehingga sistem melewati layar intro dan pilihan sesi secara langsung ke soal attempt tersebut.
+2. **Aksi `reset_session` Hanya Menghapus Sesi PHP:** Aksi pintas `?action=reset_session` pada toolbar pengembang hanya menghapus status verifikasi kamera di `$_SESSION`, tetapi tidak membersihkan baris attempt di database, sehingga tester terus kembali ke attempt lama.
+3. **Penyelarasan Query Multi-Sesi MySQL:** Fungsi `pretesCbtEnsureDefaultSessionsActive()` diperluas agar memeriksa baik ID (`id IN (1, 2)`) maupun kode (`SESI-REGULER-2026`, `SESI-RESMI-PROTESTAN-2026`) guna menjamin kedua sesi resmi berstatus aktif bersamaan di database hosting.
+
+**Perubahan dan Alur Solusi:**
+1. **Pembersihan Attempt Tester (`pages/pretes-ujian.php`):**
+   - Menambahkan penanganan aksi `?action=reset_cbt` dan memperbarui `?action=reset_session` khusus akun tester (NIM/Username 12345) untuk menghapus seluruh rekaman pengerjaan di tabel `pretes_cbt_items` dan `pretes_cbt_attempts`.
+   - Menambahkan tombol merah **"🗑️ Reset Ujian CBT (Hapus Attempt & Pilih Sesi Baru)"** pada toolbar pengembang di bagian atas halaman ujian pretes.
+2. **Jaminan Multi-Sesi Aktif (`includes/pretes-cbt.php` & `tools/activate-both-sessions.php`):**
+   - Memperbarui `pretesCbtEnsureDefaultSessionsActive()` dan skrip CLI `tools/activate-both-sessions.php` dengan kueri `WHERE id IN (1, 2) OR code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')`.
+3. **Test Suite Otomatis (`tests/pretes-tester-reset-attempt-test.php`):**
+   - Menguji isolasi pemulihan attempt (resumability), pembersihan attempt oleh aksi tester, pemunculan kembali pilihan sesi pada layar intro, dan kepastian pemilihan Sesi 1 menghasilkan 100% soal Islam sementara Sesi 2 menghasilkan 100% soal Kristen.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `pages/pretes-ujian.php` | 2026-11-22 16:39:30 | 91–106, 313–318 | Toolbar Tester 12345 & Handler Reset | Pembersihan rekaman `pretes_cbt_items` dan `pretes_cbt_attempts` tester saat aksi reset dipanggil, serta penambahan tombol Reset Ujian CBT. |
+| `includes/pretes-cbt.php` | 2026-11-22 16:39:42 | 50 | Aktivasi Sesi Default MySQL | Penambahan filter `id IN (1, 2)` pada kueri aktivasi sesi default. |
+| `tools/activate-both-sessions.php` | 2026-11-22 16:39:48 | 23 | Skrip CLI Aktivasi Sesi | Penyelarasan kueri aktivasi multi-sesi dengan `id IN (1, 2)`. |
+| `tests/pretes-tester-reset-attempt-test.php` | 2026-11-22 16:41:46 | 1–105 (baru) | Test Suite | Pengujian 4 skenario tester resume, reset attempt, pemunculan multi-sesi, dan isolasi butir soal. |
+
+**Verifikasi:**
+- Pemeriksaan sintaks: `php -l pages/pretes-ujian.php`, `php -l includes/pretes-cbt.php`, `php -l tools/activate-both-sessions.php`, `php -l tests/pretes-tester-reset-attempt-test.php`: No syntax errors detected (PASS).
+- `git diff --check`: 0 error spasi/trailing whitespace.
+- Pengujian unit test:
+  1. `tests/pretes-tester-reset-attempt-test.php`: **4/4 PASS 100%**.
+  2. `tests/pretes-multi-session-active-test.php`: **7/7 PASS 100%**.
+  3. `tests/paket-2-kristen-protestan-test.php`: **24/24 PASS 100%**.
+  4. `tests/pretes-cbt-package-test.php`: **7/7 PASS 100%**.
+  5. `tests/pretes-cbt-session-test.php`: **8/8 PASS 100%**.
+  6. `tests/pretes-cbt-test.php`: **PASS**.
+  7. `tests/pretes-ujian-route-test.php`: **PASS**.
+  8. `tests/pretes-exam-access-test.php`: **PASS**.
+
+---
+
 ## 2026-11-22 15:52:00 +0700 — CBT Multi-Active Sessions: Dukungan Menjalankan Dua Sesi Ujian atau Lebih dalam Satu Waktu
 
 **ID:** `CBT-MULTI-ACTIVE-SESSIONS` · **Parent Git:** `0626529`.

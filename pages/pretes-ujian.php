@@ -89,11 +89,22 @@ $regId = $myReg ? (int)$myReg['id'] : 0;
 
 // Handle Aksi Pintas Pengembang / Tester 12345
 if ($isTesterPrivileged && isset($_GET['action'])) {
-    if ($_GET['action'] === 'reset_session') {
+    if ($_GET['action'] === 'reset_session' || $_GET['action'] === 'reset_cbt') {
         unset($_SESSION['pretes_cbt_verified_' . $regId]);
         unset($_SESSION['pretes_cbt_verified_v2_' . $regId]);
         unset($_SESSION['pretes_cbt_verified_999999']);
         unset($_SESSION['pretes_cbt_verified_v2_999999']);
+        // Hapus attempt ujian CBT agar tester dapat mengulang dari awal (layar intro & pemilihan sesi)
+        try {
+            $stmtAtt = $pdo->prepare('SELECT id FROM pretes_cbt_attempts WHERE user_id = ?');
+            $stmtAtt->execute([(int)$user['id']]);
+            $attIds = $stmtAtt->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($attIds)) {
+                $placeholders = implode(',', array_fill(0, count($attIds), '?'));
+                $pdo->prepare("DELETE FROM pretes_cbt_items WHERE attempt_id IN ($placeholders)")->execute($attIds);
+                $pdo->prepare("DELETE FROM pretes_cbt_attempts WHERE id IN ($placeholders)")->execute($attIds);
+            }
+        } catch (Throwable $e) {}
         header('Location: ' . BASE_URL . '/pretes-ujian.php');
         exit;
     } elseif ($_GET['action'] === 'bypass_checkin' && getenv('PRETES_ALLOW_TEST_BYPASS') === '1') {
@@ -300,7 +311,10 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <a href="?action=reset_session" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
-                    🔄 Reset Sesi (Ulang Skenario A)
+                    🔄 Reset Sesi Kamera (Skenario A)
+                </a>
+                <a href="?action=reset_cbt" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#dc2626;color:#ffffff;border:none;" onclick="return confirm('Hapus lembar ujian CBT akun tester ini agar dapat menguji ulang dari layar intro dan pemilihan sesi?')">
+                    🗑️ Reset Ujian CBT (Hapus Attempt & Pilih Sesi Baru)
                 </a>
                 <?php if (getenv('PRETES_ALLOW_TEST_BYPASS') === '1'): ?>
                 <a href="?action=bypass_checkin" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0f766e;color:#fff;">
