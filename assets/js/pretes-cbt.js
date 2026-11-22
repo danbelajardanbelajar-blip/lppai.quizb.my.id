@@ -1,7 +1,6 @@
 (function (window) {
     'use strict';
     let config, attempt = null, position = 0, target = 0, ticker = null, savePromise = null, finishing = false, needsSubmit = false, monitoringStarted = false;
-    let selectedPackageId = null;
     const pending = new Map();
     let interruption = null, interruptionRequest = null, resuming = false;
     const el = id => document.getElementById(id);
@@ -14,77 +13,6 @@
         el('cbtAnsweredCount').textContent = count + '/' + total;
         el('cbtCompletionFill').style.width = (count / total * 100) + '%';
         el('cbtCompletion').setAttribute('aria-valuenow', String(count));
-    }
-
-    function renderPackageSelection(packages) {
-        const box = el('cbtPackageBox');
-        const list = el('cbtPackageList');
-        if (!box || !list) return;
-
-        if (!Array.isArray(packages) || packages.length <= 1) {
-            box.style.display = 'none';
-            selectedPackageId = Array.isArray(packages) && packages.length === 1 ? packages[0].id : null;
-            return;
-        }
-
-        list.replaceChildren();
-        box.style.display = 'block';
-        selectedPackageId = null;
-
-        packages.forEach(pkg => {
-            const card = document.createElement('label');
-            card.className = 'cbt-package-card';
-            card.setAttribute('role', 'button');
-            card.tabIndex = 0;
-
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = 'cbt_chosen_package';
-            radio.value = String(pkg.id);
-
-            const content = document.createElement('div');
-            content.style.flex = '1';
-
-            const title = document.createElement('div');
-            title.className = 'cbt-package-card-title';
-            const isIslam = /ubudiyah|islam|utama/i.test(pkg.name) || /pkt-1|utama/i.test(pkg.code);
-            const isKristen = /kristen|protestan/i.test(pkg.name) || /kristen/i.test(pkg.code);
-            const icon = isIslam ? '🕌 ' : (isKristen ? '✝️ ' : '📚 ');
-            title.textContent = icon + pkg.name;
-
-            const meta = document.createElement('div');
-            meta.className = 'cbt-package-card-meta';
-            meta.textContent = (pkg.question_count || 25) + ' butir soal · ' + (pkg.duration_minutes || 30) + ' menit durasi';
-
-            content.appendChild(title);
-            content.appendChild(meta);
-            if (pkg.description) {
-                const desc = document.createElement('div');
-                desc.className = 'cbt-package-card-desc';
-                desc.textContent = pkg.description;
-                content.appendChild(desc);
-            }
-
-            const selectCard = () => {
-                radio.checked = true;
-                selectedPackageId = pkg.id;
-                list.querySelectorAll('.cbt-package-card').forEach(c => c.classList.remove('selected'));
-                card.classList.add('selected');
-            };
-
-            radio.onchange = selectCard;
-            card.onclick = selectCard;
-            card.onkeydown = e => {
-                if (e.key === ' ' || e.key === 'Enter') {
-                    e.preventDefault();
-                    selectCard();
-                }
-            };
-
-            card.appendChild(radio);
-            card.appendChild(content);
-            list.appendChild(card);
-        });
     }
 
     function navigation() {
@@ -165,8 +93,7 @@
         const title = document.createElement('h4'); title.textContent = 'Ujian sudah dikumpulkan';
         const score = document.createElement('strong'); score.textContent = String(result.score);
         const details = document.createElement('p');
-        const pkgText = result.package_name ? ('Paket: ' + result.package_name + ' · ') : '';
-        details.textContent = pkgText + result.correct + ' benar dari ' + result.total + ' soal. Jawaban kosong dinilai 0. Hasil CBT tersimpan di server.';
+        details.textContent = result.correct + ' benar dari ' + result.total + ' soal. Jawaban kosong dinilai 0. Hasil CBT tersimpan di server.';
         box.append(title, score, details);
         box.style.display = 'block';
         message('Terima kasih. Jawaban dan nilai akhir tidak dapat diubah setelah dikumpulkan.');
@@ -178,11 +105,7 @@
         if (!data.attempt) {
             el('cbtIntro').style.display = 'block';
             el('cbtStart').disabled = false;
-            renderPackageSelection(data.available_packages || []);
-            const readyMsg = (data.available_packages && data.available_packages.length > 1)
-                ? 'Verifikasi wajah berhasil. Silakan pilih salah satu paket mata uji di bawah, lalu tekan Mulai Ujian.'
-                : (config.readyMessage || 'Verifikasi wajah berhasil. Tekan Mulai Ujian ketika Anda siap.');
-            message(readyMsg);
+            message(config.readyMessage || 'Verifikasi wajah berhasil. Tekan Mulai Ujian ketika Anda siap.');
             return;
         }
         if (data.attempt.submitted) { showResult(data.attempt); return; }
@@ -195,16 +118,6 @@
         }
         el('cbtIntro').style.display = 'none';
         el('cbtWorkspace').style.display = 'grid';
-        if (el('cbtPackageBox')) el('cbtPackageBox').style.display = 'none';
-        const pill = el('cbtActivePackagePill');
-        if (pill) {
-            if (attempt.package_name) {
-                pill.textContent = attempt.package_name;
-                pill.style.display = 'inline-block';
-            } else {
-                pill.style.display = 'none';
-            }
-        }
         message('Paket soal tersimpan. Pilih jawaban; tunggu status tersimpan sebelum menutup halaman.');
         renderQuestion();
         if (ticker) clearInterval(ticker);
@@ -408,14 +321,6 @@
                 if (!tokenRequired) el('cbtInputToken').value = '';
             }
             el('cbtStart').onclick = async () => {
-                const packageBox = el('cbtPackageBox');
-                if (packageBox && packageBox.style.display !== 'none' && !selectedPackageId) {
-                    message('Silakan pilih salah satu paket mata uji pretes terlebih dahulu.', true);
-                    const firstCard = packageBox.querySelector('.cbt-package-card');
-                    if (firstCard) firstCard.focus();
-                    return;
-                }
-
                 let token = '';
                 const tokenInput = el('cbtInputToken');
                 if (tokenInput && tokenRequired) {
@@ -429,11 +334,7 @@
                 el('cbtStart').disabled = true;
                 message('Menyiapkan paket soal…');
                 try {
-                    const payload = { action: 'start', token: token };
-                    if (selectedPackageId) {
-                        payload.package_id = selectedPackageId;
-                    }
-                    apply(await config.request(payload));
+                    apply(await config.request({ action: 'start', token: token }));
                 } catch (error) {
                     message(error.message, true);
                     el('cbtStart').disabled = false;

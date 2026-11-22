@@ -50,15 +50,7 @@ try {
             }
         }
         $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
-        $packageId = filter_var($input['package_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
-
-        $activeSession = pretesCbtGetActiveSession($pdo);
-        $availablePkgs = pretesCbtGetAvailablePackagesForSession($pdo, $activeSession);
-        if (count($availablePkgs) > 1 && !$packageId) {
-            throw new InvalidArgumentException('Silakan pilih salah satu paket mata uji pretes terlebih dahulu.');
-        }
-
-        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester, $packageId);
+        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester);
     } else {
         if ($action === 'resume' && $cameraRequired) {
             $state = pretesCbtState($pdo, $userId, $regId);

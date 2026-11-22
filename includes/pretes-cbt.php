@@ -37,39 +37,6 @@ if (!function_exists('ensurePaket2KristenProtestan')) {
     }
 }
 
-if (!function_exists('pretesCbtEnsureMultiPackageActive')) {
-    function pretesCbtEnsureMultiPackageActive(PDO $pdo): void {
-        try {
-            // 1. Pastikan kedua paket resmi berstatus aktif
-            $pdo->exec("UPDATE pretes_cbt_packages SET is_active = 1 WHERE code IN ('PKT-UTAMA', 'PKT-PRETES-UTAMA', 'PKT-1', 'PKT-2-KRISTEN-PROTESTAN')");
-
-            // 2. Kumpulkan ID paket aktif
-            $activePkgs = $pdo->query("SELECT id, code FROM pretes_cbt_packages WHERE is_active = 1 ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
-            $activeIds = array_values(array_unique(array_map(fn($p) => (int)$p['id'], $activePkgs)));
-
-            if (!empty($activeIds)) {
-                $json = json_encode($activeIds);
-
-                // 3. Pastikan SESI-REGULER-2026 aktif dan memuat semua paket yang aktif
-                $sesRegId = $pdo->query("SELECT id FROM pretes_cbt_sessions WHERE code = 'SESI-REGULER-2026'")->fetchColumn();
-                if ($sesRegId) {
-                    $upd = $pdo->prepare("UPDATE pretes_cbt_sessions SET is_active = 1, package_ids_json = ? WHERE id = ?");
-                    $upd->execute([$json, $sesRegId]);
-                }
-
-                // 4. Jika ada SESI-RESMI-PROTESTAN-2026, sinkronkan atau jadikan nonaktif agar SESI-REGULER-2026 menjadi sesi resmi utama
-                $sesProtestanId = $pdo->query("SELECT id FROM pretes_cbt_sessions WHERE code = 'SESI-RESMI-PROTESTAN-2026'")->fetchColumn();
-                if ($sesProtestanId) {
-                    $pdo->prepare("UPDATE pretes_cbt_sessions SET package_ids_json = ?, is_active = 0 WHERE id = ?")
-                        ->execute([$json, $sesProtestanId]);
-                }
-            }
-        } catch (Throwable $e) {
-            error_log('pretesCbtEnsureMultiPackageActive notice: ' . $e->getMessage());
-        }
-    }
-}
-
 function ensurePretesCbtTables(PDO $pdo): void {
     $id = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INTEGER PRIMARY KEY AUTO_INCREMENT';
     $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
@@ -119,7 +86,6 @@ function ensurePretesCbtTables(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_attempts (
         id $id, user_id INTEGER NOT NULL, registration_id INTEGER NOT NULL,
         session_id INTEGER DEFAULT NULL,
-        package_id INTEGER DEFAULT NULL,
         started_at INTEGER NOT NULL, deadline_at INTEGER NOT NULL, submitted_at INTEGER DEFAULT NULL,
         correct_count INTEGER DEFAULT NULL, score DECIMAL(5,2) DEFAULT NULL,
         UNIQUE(user_id, registration_id)
@@ -168,24 +134,6 @@ function ensurePretesCbtTables(PDO $pdo): void {
         }
     } catch (Throwable $e) {}
 
-    // Pastikan kolom package_id ada di pretes_cbt_attempts
-    try {
-        $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-        $hasPkgCol = false;
-        if ($driver === 'sqlite') {
-            $cols = $pdo->query("PRAGMA table_info(pretes_cbt_attempts)")->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($cols as $col) {
-                if (strtolower((string)($col['name'] ?? '')) === 'package_id') { $hasPkgCol = true; break; }
-            }
-        } else {
-            $cols = $pdo->query("SHOW COLUMNS FROM pretes_cbt_attempts LIKE 'package_id'")->fetchAll(PDO::FETCH_ASSOC);
-            $hasPkgCol = !empty($cols);
-        }
-        if (!$hasPkgCol) {
-            $pdo->exec("ALTER TABLE pretes_cbt_attempts ADD COLUMN package_id INTEGER DEFAULT NULL");
-        }
-    } catch (Throwable $e) {}
-
     // Pastikan kolom shuffle_on_violation ada di pretes_cbt_sessions
     try {
         $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -229,20 +177,6 @@ function ensurePretesCbtTables(PDO $pdo): void {
         seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
     )$engine");
     ensurePaket2KristenProtestan($pdo);
-    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'sqlite') {
-        try {
-            $hasMultiKey = $pdo->query("SELECT 1 FROM pretes_cbt_initialization WHERE seed_key = 'multi-package-cbt-v1'")->fetchColumn();
-            if (!$hasMultiKey) {
-                pretesCbtEnsureMultiPackageActive($pdo);
-                $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
-                $insertIgnore = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
-                $pdo->prepare("$insertIgnore INTO pretes_cbt_initialization (seed_key, initialized_at) VALUES (?, ?)")
-                    ->execute(['multi-package-cbt-v1', time()]);
-            }
-        } catch (Throwable $e) {
-            error_log('multi-package-cbt-v1 notice: ' . $e->getMessage());
-        }
-    }
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
     if ($pdo->query("SELECT seed_key FROM pretes_cbt_initialization WHERE seed_key = 'defaults-v1'")->fetchColumn()) return;
@@ -393,29 +327,8 @@ function pretesCbtPublic(PDO $pdo, ?array $attempt, int $now): array {
             'options' => json_decode($row['options_json'], true), 'answer' => $row['answer'], 'flagged' => (bool)$row['flagged']];
     }
     $answered = count(array_filter($items, static fn($item) => $item['answer'] !== null));
-
-    $pkgId = isset($attempt['package_id']) && (int)$attempt['package_id'] > 0 ? (int)$attempt['package_id'] : null;
-    $pkgName = null;
-    if ($pkgId) {
-        $pStmt = $pdo->prepare('SELECT name FROM pretes_cbt_packages WHERE id = ?');
-        $pStmt->execute([$pkgId]);
-        $pkgName = $pStmt->fetchColumn() ?: null;
-    }
-    if (!$pkgName && !empty($items)) {
-        try {
-            $qStmt = $pdo->prepare('SELECT p.id, p.name FROM pretes_cbt_items i JOIN pretes_cbt_questions q ON i.question_id = q.id JOIN pretes_cbt_packages p ON q.package_id = p.id WHERE i.attempt_id = ? LIMIT 1');
-            $qStmt->execute([$attempt['id']]);
-            $pRow = $qStmt->fetch(PDO::FETCH_ASSOC);
-            if ($pRow) {
-                $pkgId = (int)$pRow['id'];
-                $pkgName = $pRow['name'];
-            }
-        } catch (Throwable $e) {}
-    }
-
     return ['attempt' => [
         'id' => (int)$attempt['id'], 'submitted' => $submitted,
-        'package_id' => $pkgId, 'package_name' => $pkgName,
         'remaining_seconds' => max(0, (int)$attempt['deadline_at'] - pretesCbtClock($attempt, $now)),
         'paused' => $attempt['paused_at'] !== null, 'revision' => (int)$attempt['revision'],
         'resume_position' => (int)$attempt['resume_position'], 'pause_reason' => $attempt['pause_reason'],
@@ -433,10 +346,6 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if ($attempt && $attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
         $result = pretesCbtPublic($pdo, $attempt, $now);
-        if ($attempt === null) {
-            $session = pretesCbtGetActiveSession($pdo);
-            $result['available_packages'] = pretesCbtGetAvailablePackagesForSession($pdo, $session);
-        }
         $pdo->commit();
         return $result;
     } catch (Throwable $e) {
@@ -445,7 +354,7 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
     }
 }
 
-function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null, bool $ignoreExamClosed = false, ?int $requestedPackageId = null): array {
+function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null, bool $ignoreExamClosed = false): array {
     $now ??= time();
     $pdo->beginTransaction();
     try {
@@ -491,47 +400,19 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
             }
 
             // Tentukan Paket Soal Sesi
-            $sessionPackageIds = [];
+            $packageIds = [];
             if ($session && !empty($session['package_ids_json'])) {
                 $decoded = json_decode($session['package_ids_json'], true);
                 if (is_array($decoded) && !empty($decoded)) {
-                    $sessionPackageIds = array_values(array_filter(array_map('intval', $decoded)));
+                    $packageIds = array_map('intval', $decoded);
                 }
             }
-
-            // Tentukan Kuota Soal per Kategori (Kadar Kategori)
-            $categoryQuotas = ($session && !empty($session['category_quotas_json']))
-                ? json_decode($session['category_quotas_json'], true) : [];
-            $hasCategoryQuotas = !empty($categoryQuotas) && is_array($categoryQuotas);
-
-            $chosenPackageId = null;
-            if ($hasCategoryQuotas) {
-                // Sesi dengan kuota kategori menarik soal dari seluruh paket yang dihubungkan ke sesi
-                $packageIds = !empty($sessionPackageIds) ? $sessionPackageIds : [1];
-                $chosenPackageId = $packageIds[0];
-            } else {
-                // Sesi tanpa kuota kategori: paket dipilih oleh peserta (atau auto-select jika cuma 1)
-                $availablePkgs = pretesCbtGetAvailablePackagesForSession($pdo, $session);
-                $availablePkgIds = array_map(fn($p) => (int)$p['id'], $availablePkgs);
-                if (empty($availablePkgIds)) {
-                    $availablePkgIds = !empty($sessionPackageIds) ? $sessionPackageIds : [1];
-                }
-
-                if ($requestedPackageId !== null && $requestedPackageId > 0) {
-                    if (!in_array($requestedPackageId, $availablePkgIds, true)) {
-                        $allActiveIds = array_map(fn($p) => (int)$p['id'], pretesCbtGetActivePackages($pdo));
-                        if (!in_array($requestedPackageId, $allActiveIds, true)) {
-                            throw new InvalidArgumentException("Paket soal yang dipilih tidak valid atau tidak tersedia untuk sesi ujian ini.");
-                        }
-                    }
-                    $chosenPackageId = $requestedPackageId;
-                } else {
-                    $chosenPackageId = $availablePkgIds[0];
-                }
-                $packageIds = [$chosenPackageId];
+            if (empty($packageIds)) {
+                $activePkg = pretesCbtGetActivePackage($pdo);
+                $packageIds = $activePkg ? [(int)$activePkg['id']] : [1];
             }
 
-            $firstPkg = pretesCbtGetPackage($pdo, (int)$packageIds[0]);
+            $firstPkg = !empty($packageIds) ? pretesCbtGetPackage($pdo, (int)$packageIds[0]) : null;
 
             // Tentukan Durasi Ujian
             $durationMinutes = 30;
@@ -542,8 +423,12 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
             }
             $durationSeconds = $durationMinutes * 60;
 
+            // Tentukan Kuota Soal per Kategori (Kadar Kategori)
+            $categoryQuotas = ($session && !empty($session['category_quotas_json']))
+                ? json_decode($session['category_quotas_json'], true) : [];
+
             $selected = [];
-            if ($hasCategoryQuotas) {
+            if (!empty($categoryQuotas) && is_array($categoryQuotas)) {
                 foreach ($categoryQuotas as $cat => $quota) {
                     $quota = (int)$quota;
                     if ($quota <= 0) continue;
@@ -566,6 +451,7 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
                 $bankStmt->execute($packageIds);
                 $bank = $bankStmt->fetchAll(PDO::FETCH_ASSOC);
 
+                $firstPkg = pretesCbtGetPackage($pdo, (int)$packageIds[0]);
                 $targetCount = $firstPkg && !empty($firstPkg['question_count']) ? (int)$firstPkg['question_count'] : PRETES_CBT_COUNT;
                 if (count($bank) < $targetCount) {
                     $pkgDesc = count($packageIds) === 1 && $firstPkg ? (" '" . $firstPkg['name'] . "'") : '';
@@ -574,8 +460,8 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
                 $selected = array_slice(pretesCbtShuffle($bank), 0, $targetCount);
             }
 
-            $pdo->prepare('INSERT INTO pretes_cbt_attempts (user_id, registration_id, session_id, package_id, started_at, deadline_at) VALUES (?, ?, ?, ?, ?, ?)')
-                ->execute([$userId, $registrationId, $sessionId, $chosenPackageId, $now, $now + $durationSeconds]);
+            $pdo->prepare('INSERT INTO pretes_cbt_attempts (user_id, registration_id, session_id, started_at, deadline_at) VALUES (?, ?, ?, ?, ?)')
+                ->execute([$userId, $registrationId, $sessionId, $now, $now + $durationSeconds]);
             $attemptId = (int)$pdo->lastInsertId();
 
             $stmt = $pdo->prepare('INSERT INTO pretes_cbt_items (attempt_id, position, question_id, question_text, options_json, correct_answer) VALUES (?, ?, ?, ?, ?, ?)');
@@ -738,43 +624,6 @@ function pretesCbtGetActivePackage(PDO $pdo): ?array {
     return $pkg ?: null;
 }
 
-function pretesCbtGetActivePackages(PDO $pdo): array {
-    ensurePretesCbtTables($pdo);
-    return $pdo->query('SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p WHERE p.is_active = 1 ORDER BY p.id ASC')->fetchAll(PDO::FETCH_ASSOC);
-}
-
-function pretesCbtGetAvailablePackagesForSession(PDO $pdo, ?array $session = null): array {
-    ensurePretesCbtTables($pdo);
-    $packageIds = [];
-    if ($session && !empty($session['package_ids_json'])) {
-        $decoded = json_decode($session['package_ids_json'], true);
-        if (is_array($decoded) && !empty($decoded)) {
-            $packageIds = array_map('intval', $decoded);
-        }
-    }
-
-    if (!empty($packageIds)) {
-        $placeholders = implode(',', array_fill(0, count($packageIds), '?'));
-        $stmt = $pdo->prepare("SELECT p.id, p.code, p.name, p.description, p.duration_minutes, p.question_count,
-            (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual
-            FROM pretes_cbt_packages p
-            WHERE p.id IN ($placeholders) AND p.is_active = 1
-            ORDER BY p.id ASC");
-        $stmt->execute($packageIds);
-        $packages = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!empty($packages)) {
-            return $packages;
-        }
-    }
-
-    // Fallback: semua paket yang aktif
-    return $pdo->query("SELECT p.id, p.code, p.name, p.description, p.duration_minutes, p.question_count,
-        (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual
-        FROM pretes_cbt_packages p
-        WHERE p.is_active = 1
-        ORDER BY p.id ASC")->fetchAll(PDO::FETCH_ASSOC);
-}
-
 function pretesCbtSavePackage(PDO $pdo, array $input): int {
     ensurePretesCbtTables($pdo);
     $name = trim((string)($input['name'] ?? ''));
@@ -792,8 +641,10 @@ function pretesCbtSavePackage(PDO $pdo, array $input): int {
 
     $pdo->beginTransaction();
     try {
-        if ($isActive === 0) {
-            $otherCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE is_active = 1 AND id != ' . $pkgId)->fetchColumn();
+        if ($isActive === 1) {
+            $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
+        } else {
+            $otherCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE id != ' . $pkgId)->fetchColumn();
             if ($otherCount === 0) {
                 $isActive = 1;
             }
@@ -819,14 +670,12 @@ function pretesCbtSavePackage(PDO $pdo, array $input): int {
     }
 }
 
-function pretesCbtActivatePackage(PDO $pdo, int $packageId, bool $exclusive = true): bool {
+function pretesCbtActivatePackage(PDO $pdo, int $packageId): bool {
     if ($packageId <= 0) return false;
     ensurePretesCbtTables($pdo);
     $pdo->beginTransaction();
     try {
-        if ($exclusive) {
-            $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
-        }
+        $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
         $stmt = $pdo->prepare('UPDATE pretes_cbt_packages SET is_active = 1 WHERE id = ?');
         $stmt->execute([$packageId]);
         $ok = $stmt->rowCount() > 0;
@@ -836,17 +685,6 @@ function pretesCbtActivatePackage(PDO $pdo, int $packageId, bool $exclusive = tr
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     }
-}
-
-function pretesCbtDeactivatePackage(PDO $pdo, int $packageId): bool {
-    if ($packageId <= 0) return false;
-    ensurePretesCbtTables($pdo);
-    $activeCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE is_active = 1')->fetchColumn();
-    if ($activeCount <= 1) {
-        throw new InvalidArgumentException('Minimal harus ada 1 paket soal yang aktif.');
-    }
-    $stmt = $pdo->prepare('UPDATE pretes_cbt_packages SET is_active = 0 WHERE id = ?');
-    return $stmt->execute([$packageId]);
 }
 
 function pretesCbtDeletePackage(PDO $pdo, int $packageId): bool {

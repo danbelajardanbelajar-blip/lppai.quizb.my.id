@@ -5,6 +5,54 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 15:15:00 +0700 — Anulir Perubahan CBT Multi-Package Activation (Kembali ke Kondisi fdf6e19)
+
+**ID:** `REVERT-CBT-MULTI-PACKAGE-CHOICE` · **Parent Git:** `f4bf5bd`.
+**Permintaan:** Lakukan anulir untuk perubahan terakhir (`CBT-MULTI-PACKAGE-CHOICE` pada commit `f4bf5bd`).
+
+**Alasan & Dampak:**
+1. Pengguna meminta pembatalan (anulir) atas seluruh implementasi aktivasi multi-paket CBT dan pemilihan paket oleh mahasiswa yang dibuat pada commit `f4bf5bd`.
+2. Seluruh file sumber kode dikembalikan persis ke kondisi commit `fdf6e19` (sebelum multi-package choice diterapkan):
+   - `includes/pretes-cbt.php`: Menghapus helper multi-paket (`pretesCbtEnsureMultiPackageActive`, `pretesCbtGetActivePackages`, `pretesCbtGetAvailablePackagesForSession`, `pretesCbtDeactivatePackage`), menghapus kolom/parameter `requestedPackageId` pada `pretesCbtStart`, mengembalikan logika aktivasi paket tunggal (*single-active package*).
+   - `api/pretes-cbt.php`: Menghapus parsing dan validasi `package_id` pada action `start`.
+   - `includes/pretes-cbt-view.php`: Menghapus kontainer `#cbtPackageBox` dan `#cbtPackageList` serta badge `#cbtActivePackagePill`.
+   - `assets/js/pretes-cbt.js`: Menghapus modul `renderPackageSelection` dan pengiriman `package_id` pada payload ujian.
+   - `assets/css/pretes-cbt-exam.css`: Menghapus gaya visual `.cbt-package-card`.
+   - `admin/pretes-bank-soal.php`, `includes/pretes-cbt-admin-view.php`, `admin/pretes-cbt-review.php`: Menghapus tombol deaktifasi paket, badge paket di tabel hasil ujian, live monitoring, dan lembar review.
+   - `tools/import-paket-2-kristen-protestan.php`: Mengembalikan aturan aktivasi eksklusif pada saat impor paket.
+   - Menghapus file uji `tests/pretes-multi-package-selection-test.php` dan utilitas CLI `tools/activate-both-packages.php`.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-22 15:11:29 | `includes/pretes-cbt.php` | 39, 88, 142, 233, 400, 435, 495, 740, 755, 800, 815 | Mengembalikan seluruh logika CBT ke versi commit `fdf6e19` (tanpa multi-package choice). |
+| 2026-11-22 15:11:29 | `api/pretes-cbt.php` | 52 | Menghapus parsing parameter `package_id` pada action `start`. |
+| 2026-11-22 15:11:29 | `includes/pretes-cbt-view.php` | 2, 25 | Menghapus elemen `#cbtPackageBox` dan `#cbtActivePackagePill`. |
+| 2026-11-22 15:11:29 | `assets/js/pretes-cbt.js` | 4, 18, 95, 120, 410 | Mengembalikan JS CBT ke versi commit `fdf6e19`. |
+| 2026-11-22 15:11:29 | `assets/css/pretes-cbt-exam.css` | 21 | Menghapus CSS `.cbt-package-card`. |
+| 2026-11-22 15:11:29 | `admin/pretes-bank-soal.php` | 85, 258, 360, 375, 604 | Mengembalikan manajemen bank soal dan hasil ujian ke versi commit `fdf6e19`. |
+| 2026-11-22 15:11:29 | `includes/pretes-cbt-admin-view.php` | 134, 645 | Mengembalikan tampilan admin CBT ke versi commit `fdf6e19`. |
+| 2026-11-22 15:11:29 | `admin/pretes-cbt-review.php` | 42, 605 | Mengembalikan review detail pengerjaan mahasiswa ke versi commit `fdf6e19`. |
+| 2026-11-22 15:11:29 | `tools/import-paket-2-kristen-protestan.php` | 40 | Mengembalikan fungsi impor Paket 2 ke versi commit `fdf6e19`. |
+| 2026-11-22 15:11:29 | `tests/pretes-multi-package-selection-test.php` | 1 | File dihapus seiring pembatalan fitur. |
+| 2026-11-22 15:11:29 | `tools/activate-both-packages.php` | 1 | File dihapus seiring pembatalan fitur. |
+| 2026-11-22 15:15:00 | `CHANGELOG-DEV.md` | 8 | Catatan pencatatan pembatalan paket perubahan (revert) secara lengkap. |
+
+**Verifikasi:**
+- PHP lint syntax check pada seluruh file yang di-revert: semua `No syntax errors detected`.
+- `php tests/paket-2-kristen-protestan-test.php`: 24/24 pengujian lulus sempurna.
+- `php tests/pretes-cbt-package-test.php`: 7/7 pengujian lulus sempurna.
+- `php tests/pretes-cbt-session-test.php`: 8/8 pengujian lulus sempurna.
+- `php tests/pretes-cbt-test.php`: PASS.
+- `php tests/pretes-ujian-route-test.php`: PASS.
+- `php tests/pretes-exam-access-test.php`: PASS.
+- `git diff --check`: 0 error spasi/trailing whitespace.
+
+**Pelacakan:** Cari commit dengan ID `REVERT-CBT-MULTI-PACKAGE-CHOICE`.
+
+---
+
 ## 2026-11-22 14:30:00 +0700 — CBT Multi-Package Activation: Aktifkan Kedua Paket (Ubudiyah/Islam & Kristen Protestan) serta Pemilihan Paket Mahasiswa
 
 **ID:** `CBT-MULTI-PACKAGE-CHOICE` · **Parent Git:** `fdf6e19`.
