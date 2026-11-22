@@ -5,6 +5,67 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 08:28:33 +0700 — Impor 25 Butir Soal Ujian Resmi "Paket 2 - Kristen Protestan" ke Bank Soal CBT
+
+**ID:** CBT-PAKET-2-KRISTEN-PROTESTAN · **Parent Git:** `301fbd8`.
+
+**Permintaan:** Membantu impor 25 butir soal pilihan ganda pendidikan agama Kristen Protestan menjadi paket soal resmi bernama "Paket 2 - Kristen Protestan", bukan try out.
+
+**Rancangan & Spesifikasi:**
+1. **Paket Soal (`pretes_cbt_packages`):**
+   - Kode: `PKT-2-KRISTEN-PROTESTAN`
+   - Nama: `Paket 2 - Kristen Protestan`
+   - Deskripsi: `Paket 2 soal resmi pretes pendidikan agama Kristen Protestan (25 butir soal).`
+   - Durasi: 30 menit · Kuota: 25 butir · Status bawaan: Terdaftar di bank soal.
+2. **25 Butir Soal (`pretes_cbt_questions`):**
+   - Kode: `PKT2-KP-001` s.d `PKT2-KP-025`.
+   - Distribusi Kunci Jawaban: Rotasi merata A–E (masing-masing tepat 5 soal: A=5, B=5, C=5, D=5, E=5) untuk tampilan bank soal yang profesional; opsi tetap diacak ulang secara acak oleh mesin CBT per peserta ujian.
+   - Kategori kurikulum terstruktur: *Kitab Suci*, *Gereja & Denominasi*, *Sejarah & Tokoh*, *Dasar Iman*, *Ibadah & Sakramen*, dan *Hari Raya & Nilai Kasih*.
+   - Menyertakan teks penjelasan pada sumber data.
+3. **Sesi Ujian Resmi (`pretes_cbt_sessions`):**
+   - Kode: `SESI-RESMI-PROTESTAN-2026`
+   - Judul: `Sesi Pretes Resmi – Kristen Protestan`
+   - Mode: `'resmi'` (*Bukan tryout*, pengerjaan 1 kali dengan sakelar ujian resmi).
+   - Pengawasan Kamera: `wajib`.
+   - Passing Grade: 65.00 · Waktu: 30 menit.
+4. **Distribusi & Kemudahan Akses:**
+   - Berkas spreadsheet Excel `downloads/paket-2-kristen-protestan.xlsx` siap unduh & siap impor.
+   - Tombol unduh langsung di tab Impor Bank Soal panel admin (`?cbt_bank=1&download=paket2kp`).
+   - Skrip CLI `tools/import-paket-2-kristen-protestan.php` untuk eksekusi server / terminal.
+   - Hook migrasi otomatis di `ensurePretesCbtTables` (MySQL produksi) dengan penanda `pretes_cbt_initialization` (`paket-2-kristen-protestan-v1`) sehingga paket otomatis aktif di hosting tanpa repot.
+
+**Waktu Penyimpanan Berkas Aktual:**
+- `data/soal-paket-2-kristen-protestan.csv`: 22/11/2026 08.15.56 WIB
+- `data/paket-2-kristen-protestan.php`: 22/11/2026 08.18.07 WIB
+- `downloads/paket-2-kristen-protestan.xlsx`: 22/11/2026 08.18.34 WIB
+- `tools/import-paket-2-kristen-protestan.php`: 22/11/2026 08.24.42 WIB
+- `admin/pretes-bank-soal.php`: 22/11/2026 08.21.45 WIB
+- `includes/pretes-cbt-admin-view.php`: 22/11/2026 08.21.45 WIB
+- `includes/pretes-cbt.php`: 22/11/2026 08.28.08 WIB
+- `tests/paket-2-kristen-protestan-test.php`: 22/11/2026 08.28.33 WIB
+
+**Perubahan Berkas:**
+- `data/soal-paket-2-kristen-protestan.csv` (baru): Berkas CSV mentah berisi 25 soal, opsi A–E, kunci A, dan penjelasan.
+- `data/paket-2-kristen-protestan.php` (baru, 25 baris data): Struktur array data soal terstandarisasi untuk bank CBT dengan rotasi kunci merata dan kategori rapi.
+- `downloads/paket-2-kristen-protestan.xlsx` (baru): Berkas Excel biner terformat sesuai template bank soal CBT (header: Kode Soal, Kategori, Pertanyaan, Pilihan A–E, Kunci, Status).
+- `tools/import-paket-2-kristen-protestan.php` (baru, baris 1–178): Skrip impor CLI dan fungsi pustaka `lppaiImportPaket2KristenProtestan(PDO $pdo)` yang aman dan idempoten.
+- `includes/pretes-cbt.php` (baris 8–41, baris 181): Helper `ensurePaket2KristenProtestan(PDO $pdo)` dipanggil di `ensurePretesCbtTables` untuk auto-seed pada basis data produksi.
+- `admin/pretes-bank-soal.php` (baris 11, baris 220): Rute unduhan `download=paket2kp`.
+- `includes/pretes-cbt-admin-view.php` (baris 370): Tombol pintas unduh berkas .xlsx Paket 2 di tab impor.
+- `tests/paket-2-kristen-protestan-test.php` (baru, baris 1–138): 24 pengujian otomatis validasi data, distribusi kunci, pembacaan Excel, integritas sesi resmi, dan simulasi CBT peserta.
+
+**Verifikasi:**
+- Sintaks PHP seluruh berkas (`php -l`): LULUS (No syntax errors detected).
+- Pengujian unit & integrasi (`tests/paket-2-kristen-protestan-test.php`): 24 PASS (0 FAIL).
+- Pengujian regresi CBT:
+  - `tests/pretes-cbt-test.php`: PASS.
+  - `tests/pretes-cbt-delete-test.php`: 100% PASS (50 checks).
+  - `tests/tryout-mudah-import-test.php`: PASS.
+  - `tests/ui-personalization-test.php`: 24 PASS (0 FAIL).
+- Pemeriksaan spasi & whitespace Git (`git diff --check`): Bersih (exit code 0).
+
+---
+
 ## 2026-11-20 19:35:25 +0700 — Review CBT: Cetak/Simpan PDF Memuat Semua Soal
 
 **ID:** CBT-REVIEW-PRINT-ALL · **Parent Git:** `8e3aeba`.

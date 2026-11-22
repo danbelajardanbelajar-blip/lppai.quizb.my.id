@@ -367,6 +367,7 @@
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <a data-no-spa class="bank-button gold" href="<?= $bankUrl ?>&amp;download=pretes177" title="Unduh master bank soal 177 butir yang sudah terformat sesuai template siap impor">📥 Unduh File Soal Pretes (177 Soal) .xlsx</a>
+                <a data-no-spa class="bank-button" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe" href="<?= $bankUrl ?>&amp;download=paket2kp" title="Unduh master 25 butir Paket 2 - Kristen Protestan siap impor .xlsx">✝️ Unduh Paket 2 - Kristen Protestan (.xlsx)</a>
                 <a data-no-spa class="bank-button" href="<?= $bankUrl ?>&amp;download=template" title="Unduh format template kosong">↓ Unduh Template Kosong .xlsx</a>
             </div>
         </div>

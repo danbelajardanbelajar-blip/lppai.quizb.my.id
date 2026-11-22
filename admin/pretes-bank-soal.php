@@ -8,6 +8,7 @@ $tryoutLabelCache = [];
 require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
 $bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
 if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
+if (isset($_GET['download']) && $_GET['download'] === 'paket2kp') cbtSendXlsx(__DIR__ . '/../downloads/paket-2-kristen-protestan.xlsx', 'paket-2-kristen-protestan.xlsx');
 $pdo = getDBConnection();
 ensurePretesCbtTables($pdo);
 

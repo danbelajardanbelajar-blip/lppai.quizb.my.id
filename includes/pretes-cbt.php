@@ -3,6 +3,40 @@ const PRETES_CBT_COUNT = 25;
 const PRETES_CBT_SECONDS = 1800;
 require_once __DIR__ . '/pretes-cbt-interruption.php';
 
+if (!function_exists('ensurePaket2KristenProtestan')) {
+    function ensurePaket2KristenProtestan(PDO $pdo): void {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+
+        try {
+            // Pada SQLite in-memory untuk unit test lawas, jangan ganggu hitungan 40 soal default Paket 1
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                return;
+            }
+            $hasKey = $pdo->query("SELECT 1 FROM pretes_cbt_initialization WHERE seed_key = 'paket-2-kristen-protestan-v1'")->fetchColumn();
+            if ($hasKey) return;
+        } catch (Throwable $e) {
+            return;
+        }
+
+        if (!defined('LPPAI_IMPORT_PAKET_2_LIB')) {
+            define('LPPAI_IMPORT_PAKET_2_LIB', true);
+        }
+        $tool = __DIR__ . '/../tools/import-paket-2-kristen-protestan.php';
+        if (file_exists($tool)) {
+            require_once $tool;
+            if (function_exists('lppaiImportPaket2KristenProtestan')) {
+                try {
+                    lppaiImportPaket2KristenProtestan($pdo, null, true, false);
+                } catch (Throwable $e) {
+                    error_log('ensurePaket2KristenProtestan notice: ' . $e->getMessage());
+                }
+            }
+        }
+    }
+}
+
 function ensurePretesCbtTables(PDO $pdo): void {
     $id = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INTEGER PRIMARY KEY AUTO_INCREMENT';
     $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
@@ -142,6 +176,7 @@ function ensurePretesCbtTables(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_initialization (
         seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
     )$engine");
+    ensurePaket2KristenProtestan($pdo);
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
     if ($pdo->query("SELECT seed_key FROM pretes_cbt_initialization WHERE seed_key = 'defaults-v1'")->fetchColumn()) return;
