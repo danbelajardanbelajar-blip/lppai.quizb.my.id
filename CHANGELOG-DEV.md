@@ -5,6 +5,48 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 18:10:00 +0700 — Isolasi Mutlak Paket Soal Sesi CBT Kristen & Islam Serta Pembersihan Lembar Soal Tercemar
+
+**ID:** `CBT-SESSION-PACKAGE-ISOLATION-FIX` · **Parent Git:** `88e407c928f191462e0b03ecefc6377c814ef0da`.
+**Permintaan:** Mengapa pada sesi ujian resmi Kristen Protestan (ERWIN MANDHASARI SIMANJUNTAK) muncul soal fiqih/ubudiyah Islam ("Di manakah batas aurat perempuan merdeka dalam shalat?"), padahal isi paket soal Kristen Protestan tidak memuat soal tersebut?
+
+**Penyebab & Analisis:**
+1. **Residu Konfigurasi Relasi Multi-Paket Database (`package_ids_json`):** Pada commit `f4bf5bd` sebelum revert, skrip sempat mengeksekusi `UPDATE pretes_cbt_sessions SET package_ids_json = '[1, 2]'` pada kedua sesi resmi. Ketika kode dianulir pada commit `0626529` (REVERT), kode PHP dikembalikan tetapi nilai kolom `package_ids_json` di tabel MySQL database server tetap tertinggal berisi `[1, 2]`.
+2. **Pengacakan Bank Soal Gabungan (`package_id IN (1, 2)`):** Di `pretesCbtStart()`, sistem membaca `package_ids_json` dan menjalankan kueri `SELECT * FROM pretes_cbt_questions WHERE package_id IN (1, 2) AND is_active = 1`. Akibatnya, 177 butir soal Paket 1 Ubudiyah dan 25 butir soal Paket 2 Kristen digabungkan menjadi total 202 soal dalam satu kolam acak. Karena 87.6% kolam adalah soal Ubudiyah, lembar ujian peserta Kristen Protestan (seperti Erwin Mandhasari Simanjuntak) mendapatkan butir soal Ubudiyah Islam (termasuk soal no. 81 tentang batas aurat perempuan merdeka dalam shalat).
+3. **Penyelarasan Multi-Sesi Sebelumnya Belum Mengunci Relasi Paket:** Fungsi `pretesCbtEnsureDefaultSessionsActive()` sebelumnya hanya memperbarui status `is_active = 1`, tetapi belum menormalkan kembali kolom `package_ids_json` ke ID paket tunggal masing-masing sesi.
+
+**Perubahan dan Alur Solusi:**
+1. **Normalisasi & Isolasi Paket Sesi Resmi (`includes/pretes-cbt.php`):**
+   - Memperbarui `pretesCbtEnsureDefaultSessionsActive()` agar secara otomatis mengunci `package_ids_json` pada `SESI-REGULER-2026` / ID 1 secara permanen ke `[$islamPkgId]` (Paket 1 Ubudiyah Islam) dan pada `SESI-RESMI-PROTESTAN-2026` ke `[$kristenPkgId]` (Paket 2 Kristen Protestan).
+   - Menambahkan pembersihan otomatis terhadap rekaman attempt yang tercemar butir soal lintas agama (`pretesCbtDeleteAttempt()`) sehingga peserta yang sedang berlangsung dengan soal keliru (seperti Erwin Mandhasari Simanjuntak) langsung bersih dan dapat memulai ulang lembar ujian 100% murni soal Kristen.
+2. **Hard Safety Guard Anti-Kontaminasi di `pretesCbtStart()` (`includes/pretes-cbt.php`):**
+   - Menyaring secara ketat array `$packageIds` saat ujian dimulai: sesi Kristen Protestan secara mutlak membuang seluruh ID paket Islam (`array_diff`), dan sesi Reguler membuang ID paket Kristen.
+3. **Penyelarasan CLI Tool (`tools/activate-both-sessions.php`):**
+   - Memanggil `pretesCbtEnsureDefaultSessionsActive($pdo, true)` agar aktivasi sesi melalui terminal server langsung menormalkan relasi paket dan membersihkan attempt tercemar.
+4. **Test Suite Komprehensif (`tests/pretes-session-package-isolation-test.php`):**
+   - Menguji 7 skenario isolasi: seed 2 paket soal, simulasi database tercemar `[1, 2]`, attempt tercemar, verifikasi normalisasi `package_ids_json`, pembersihan attempt tercemar, jaminan 100% soal Kristen untuk peserta Kristen, jaminan 100% soal Islam untuk peserta Muslim, dan ketahanan hard safety guard saat database dirusak kembali.
+
+Waktu = **waktu penyimpanan terakhir file** (WIB; waktu edit per baris tidak tercatat). Baris = snapshot commit entri ini.
+
+| File | Simpan terakhir | Baris | Bagian | Perubahan |
+|---|---|---|---|---|
+| `includes/pretes-cbt.php` | 2026-11-22 18:07:58 | 40–94, 520–542 | Isolasi Relasi Paket Sesi & Safety Guard | Normalisasi `package_ids_json` Sesi Islam [1] & Kristen [2], pembersihan attempt tercemar, dan hard safety guard anti-kontaminasi di `pretesCbtStart()`. |
+| `tools/activate-both-sessions.php` | 2026-11-22 18:05:54 | 22–24 | Skrip CLI Aktivasi Sesi | Pemanggilan `pretesCbtEnsureDefaultSessionsActive($pdo, true)` untuk menjamin isolasi paket. |
+| `tests/pretes-session-package-isolation-test.php` | 2026-11-22 18:07:14 | 1–199 (baru) | Test Suite | 7 pengujian otomatis isolasi paket sesi resmi, pembersihan attempt tercemar, dan perlindungan runtime. |
+
+**Verifikasi:**
+- Pemeriksaan sintaks: `php -l includes/pretes-cbt.php`, `php -l tools/activate-both-sessions.php`, `php -l tests/pretes-session-package-isolation-test.php`: No syntax errors detected (PASS).
+- `git diff --check`: 0 error spasi/trailing whitespace.
+- Pengujian unit test:
+  1. `tests/pretes-session-package-isolation-test.php`: **7/7 PASS 100%**.
+  2. `tests/pretes-multi-session-active-test.php`: **7/7 PASS 100%**.
+  3. `tests/pretes-tester-reset-attempt-test.php`: **4/4 PASS 100%**.
+  4. `tests/paket-2-kristen-protestan-test.php`: **24/24 PASS 100%**.
+  5. `tests/pretes-cbt-review-test.php`: **22/22 PASS 100%**.
+  6. `tests/pretes-cbt-delete-test.php`: **PASS 100%**.
+
+---
+
 ## 2026-11-22 16:42:30 +0700 — Tombol Reset Attempt CBT Akun Tester & Jaminan Multi-Sesi Aktif Bersamaan
 
 **ID:** `CBT-TESTER-RESET-AND-MULTI-SESSION-FIX` · **Parent Git:** `53d9b8f`.

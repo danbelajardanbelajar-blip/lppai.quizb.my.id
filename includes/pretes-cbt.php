@@ -38,16 +38,61 @@ if (!function_exists('ensurePaket2KristenProtestan')) {
 }
 
 if (!function_exists('pretesCbtEnsureDefaultSessionsActive')) {
-    function pretesCbtEnsureDefaultSessionsActive(PDO $pdo): void {
+    function pretesCbtEnsureDefaultSessionsActive(PDO $pdo, bool $force = false): void {
         static $checked = false;
-        if ($checked) return;
+        if ($checked && !$force) return;
         $checked = true;
         try {
-            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' && !$force) {
                 return;
             }
-            // Pastikan kedua sesi resmi default berstatus aktif bersamaan
+            // 1. Pastikan kedua sesi resmi default berstatus aktif bersamaan
             $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id IN (1, 2) OR code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
+
+            // 2. Normalisasi keterhubungan paket soal ke sesi masing-masing agar 100% terisolasi
+            $islamPkgId = (int)$pdo->query("SELECT id FROM pretes_cbt_packages WHERE code IN ('PKT-UTAMA', 'PKT-PRETES-UTAMA', 'PKT-1') ORDER BY id ASC LIMIT 1")->fetchColumn();
+            $kristenPkgId = (int)$pdo->query("SELECT id FROM pretes_cbt_packages WHERE code = 'PKT-2-KRISTEN-PROTESTAN' LIMIT 1")->fetchColumn();
+
+            if ($islamPkgId > 0) {
+                $updIslam = $pdo->prepare("UPDATE pretes_cbt_sessions SET package_ids_json = ? WHERE code = 'SESI-REGULER-2026' OR id = 1");
+                $updIslam->execute([json_encode([$islamPkgId])]);
+
+                // Bersihkan attempt sesi Reguler yang tercemar butir soal luar paket Islam
+                $corruptedRegAttempts = $pdo->query("
+                    SELECT DISTINCT a.id
+                    FROM pretes_cbt_attempts a
+                    JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                    JOIN pretes_cbt_items i ON i.attempt_id = a.id
+                    JOIN pretes_cbt_questions q ON q.id = i.question_id
+                    WHERE (s.code = 'SESI-REGULER-2026' OR s.id = 1)
+                      AND q.package_id != {$islamPkgId}
+                ")->fetchAll(PDO::FETCH_COLUMN);
+
+                foreach ($corruptedRegAttempts as $cId) {
+                    pretesCbtDeleteAttempt($pdo, (int)$cId);
+                }
+            }
+
+            if ($kristenPkgId > 0) {
+                $updKristen = $pdo->prepare("UPDATE pretes_cbt_sessions SET package_ids_json = ? WHERE code = 'SESI-RESMI-PROTESTAN-2026'");
+                $updKristen->execute([json_encode([$kristenPkgId])]);
+
+                // Bersihkan attempt sesi Kristen yang tercemar butir soal di luar paket Kristen
+                // (misal Erwin Mandhasari Simanjuntak yang sempat memulai saat paket sesi tercampur)
+                $corruptedKristenAttempts = $pdo->query("
+                    SELECT DISTINCT a.id
+                    FROM pretes_cbt_attempts a
+                    JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                    JOIN pretes_cbt_items i ON i.attempt_id = a.id
+                    JOIN pretes_cbt_questions q ON q.id = i.question_id
+                    WHERE s.code = 'SESI-RESMI-PROTESTAN-2026'
+                      AND q.package_id != {$kristenPkgId}
+                ")->fetchAll(PDO::FETCH_COLUMN);
+
+                foreach ($corruptedKristenAttempts as $cId) {
+                    pretesCbtDeleteAttempt($pdo, (int)$cId);
+                }
+            }
         } catch (Throwable $e) {}
     }
 }
@@ -471,6 +516,29 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
                     $packageIds = array_map('intval', $decoded);
                 }
             }
+
+            // Proteksi isolasi sesi resmi standar: saring kontaminasi silang paket soal antar agama
+            if ($session && !empty($packageIds)) {
+                $sesCode = (string)($session['code'] ?? '');
+                if ($sesCode === 'SESI-RESMI-PROTESTAN-2026') {
+                    // Hilangkan paket non-Kristen jika tercampur di sesi Kristen
+                    $islamIds = $pdo->query("SELECT id FROM pretes_cbt_packages WHERE code IN ('PKT-UTAMA', 'PKT-PRETES-UTAMA', 'PKT-1', 'PKT-UBUD-ISLAM')")->fetchAll(PDO::FETCH_COLUMN);
+                    $packageIds = array_values(array_diff($packageIds, array_map('intval', $islamIds)));
+                    if (empty($packageIds)) {
+                        $kpPkgId = (int)$pdo->query("SELECT id FROM pretes_cbt_packages WHERE code IN ('PKT-2-KRISTEN-PROTESTAN', 'PKT-KRISTEN-PROT') LIMIT 1")->fetchColumn();
+                        if ($kpPkgId > 0) $packageIds = [$kpPkgId];
+                    }
+                } elseif ($sesCode === 'SESI-REGULER-2026' || (int)($session['id'] ?? 0) === 1) {
+                    // Hilangkan paket non-Islam jika tercampur di sesi Reguler
+                    $kristenIds = $pdo->query("SELECT id FROM pretes_cbt_packages WHERE code IN ('PKT-2-KRISTEN-PROTESTAN', 'PKT-KRISTEN-PROT')")->fetchAll(PDO::FETCH_COLUMN);
+                    $packageIds = array_values(array_diff($packageIds, array_map('intval', $kristenIds)));
+                    if (empty($packageIds)) {
+                        $regPkgId = (int)$pdo->query("SELECT id FROM pretes_cbt_packages WHERE code IN ('PKT-UTAMA', 'PKT-PRETES-UTAMA', 'PKT-1', 'PKT-UBUD-ISLAM') ORDER BY id ASC LIMIT 1")->fetchColumn();
+                        if ($regPkgId > 0) $packageIds = [$regPkgId];
+                    }
+                }
+            }
+
             if (empty($packageIds)) {
                 $activePkg = pretesCbtGetActivePackage($pdo);
                 $packageIds = $activePkg ? [(int)$activePkg['id']] : [1];
