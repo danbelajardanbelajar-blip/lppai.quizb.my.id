@@ -172,6 +172,10 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <style>
+.face-check-loading{display:inline-flex;align-items:center;gap:8px;max-width:100%}
+.face-check-spinner{display:inline-block;flex:0 0 auto;width:1em;height:1em;box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:face-check-spin .75s linear infinite}
+@keyframes face-check-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.face-check-spinner{animation:none}}
 /* ── Styling Khusus Portal Proctoring Ujian Pretes ── */
 .proctoring-badge {
     display: inline-flex;
@@ -462,7 +466,7 @@ include __DIR__ . '/../includes/header.php';
                             </div>
                         </div>
 
-                        <div id="checkinAlert" style="display:none; margin:10px auto; padding:12px 14px; border-radius:10px; font-size:12px; text-align:left; line-height:1.5;"></div>
+                        <div id="checkinAlert" role="status" aria-live="polite" style="display:none; margin:10px auto; padding:12px 14px; border-radius:10px; font-size:12px; text-align:left; line-height:1.5;"></div>
 
                         <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:10px;">
                             <button type="button" class="btn btn-secondary" onclick="startCheckinCamera(true)" style="font-size:11.5px; padding:7px 12px; border-radius:8px; font-weight:600;">
@@ -929,7 +933,7 @@ function runInitialCheckin() {
         await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembalikan kepala ke posisi seperti langkah pertama. Tahan hingga hitung mundur selesai.', 3, sample);
         const guide = document.getElementById('facePoseGuide');
         if (guide) guide.style.display = 'none';
-        if (alertBox) alertBox.textContent = 'Sedang memeriksa ciri wajah dan gerakan di server…';
+        if (alertBox) alertBox.innerHTML = '<span class="face-check-loading"><span class="face-check-spinner" aria-hidden="true"></span><span>Sedang memeriksa ciri wajah dan gerakan di server…</span></span>';
         return requestProctoringCheck({
             action: 'initial_checkin',
             challenge_id: challenge.challenge_id,

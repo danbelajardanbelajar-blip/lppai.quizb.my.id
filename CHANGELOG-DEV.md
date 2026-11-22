@@ -5,6 +5,28 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 19:44:45 +0700 — Ikon loading kecil pada pesan pemeriksaan wajah
+
+**ID:** PRETES-FACE-CHECK-LOADING · **Parent Git:** `872f40f`.
+**Permintaan:** Tambahkan gambar loading kecil seukuran teks di samping pesan Sedang memeriksa ciri wajah dan gerakan di server.
+
+**Perubahan dan alasan:** Tambahkan spinner CSS berbentuk lingkaran di kiri pesan, berukuran 1em mengikuti ukuran teks (12 px pada tampilan sekarang), warna mengikuti teks dan jarak 8 px. Spinner tampil hanya pada fase menunggu hasil initial_checkin dan otomatis tergantikan saat pesan hasil/salah/timeout menimpa textContent. Status memakai role=status dan aria-live=polite, spinner dekoratif aria-hidden. Preferensi reduced-motion menonaktifkan putaran. Tidak memakai gambar eksternal atau mengubah proses verifikasi, payload, layanan VPS, maupun batas timeout.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Nomor baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-22 19:44:00 | `pages/pretes-ujian.php` | 175, 469, 936 | CSS spinner, aksesibilitas kotak status, dan markup indikator pada fase menunggu hasil wajah. |
+| 2026-11-22 19:44:45 | `CHANGELOG-DEV.md` | 8 | Entri PRETES-FACE-CHECK-LOADING beserta alasan dan verifikasi. |
+
+**Verifikasi:** `php -l pages/pretes-ujian.php`, `php tests/pretes-ujian-route-test.php`, `node tests/pretes-ujian-camera-test.cjs`, serta `git diff --check` lulus. Chrome headless merender CSS dan markup asli pada viewport 390 px: spinner berukuran sama dengan teks 12 px, animasi aktif, tidak ada overflow, dan spinner hilang ketika kotak diganti pesan hasil/timeout. Pemeriksaan browser dijalankan secara sementara melalui stdin tanpa menambahkan file pengujian untuk perubahan visual kecil ini. Runtime PHP portable lokal di scratch/php-runtime dipakai pada PATH per proses.
+
+**Batas verifikasi:** Uji lokal, bukan sesi verifikasi wajah produksi. Penambahan ini adalah indikator visual menunggu; tidak memperbaiki penyebab timeout server. Tidak ada perubahan skema/data produksi atau konfigurasi VPS. Push Git tidak membuktikan deployment hosting.
+
+**Pelacakan:** Cari commit dengan ID `PRETES-FACE-CHECK-LOADING`.
+
+---
+
 ## 2026-11-22 18:10:00 +0700 — Isolasi Mutlak Paket Soal Sesi CBT Kristen & Islam Serta Pembersihan Lembar Soal Tercemar
 
 **ID:** `CBT-SESSION-PACKAGE-ISOLATION-FIX` · **Parent Git:** `88e407c928f191462e0b03ecefc6377c814ef0da`.
