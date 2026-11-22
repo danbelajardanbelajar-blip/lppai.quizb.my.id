@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 13:25:13 +0700 — Samakan Minggu/Ahad pretes menjadi 22 November pada pekan berjalan
+
+**ID:** PRETES-SUNDAY-SAME-WEEK · **Parent Git:** `9ab1152`.
+**Permintaan:** Perbaiki jadwal Minggu agar mengacu hari ini, Minggu, 22 November 2026, bukan 15 November 2026.
+
+**Penyebab:** Label jadwal periode memakai offset Ahad +6 dari tanggal mulai Senin, tetapi pretesExamDayOffset memakai Minggu/Ahad -1. Kartu peserta juga memiliki pemetaan tanggal tertulis tetap Minggu, 15 Nov 2026 dan rentang 16–20 November yang tidak menyertakan akhir pekan RPL.
+
+**Perubahan dan alasan:** Akses CBT memakai normalisasi nama hari dan offset yang sama dengan tampilan jadwal. Dengan tanggal_mulai 16 November 2026, Minggu/Ahad kini 22 November 2026, sesuai pekan periode; bukan mengganti semua periode dengan tanggal hari ini. Kartu peserta mengambil tanggal dari jadwal pribadi dan rentang periode aktif sehingga tidak menampilkan tanggal 15 November secara tetap. Jam ujian tetap memakai jam pendaftaran (default 13.00 WIB), tester tetap 04.25 WIB, dan batas akhir tetap 23.59.59 WIB pada hari pilihan. Sakelar admin dan jadwal sesi tetap diperiksa.
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-22 13:23:34 | `includes/pretes-exam-access.php` | 20, 21, 23 | pretesExamDayOffset memakai normalisasi dan offset helper bersama; Minggu/Ahad menjadi +6 dari Senin awal periode, menggantikan -1; alias Jumat lama tetap didukung. |
+| 2026-11-22 13:23:34 | `includes/pretes-participant-view.php` | 1, 103, 118, 135, 400 | Hapus pemetaan tanggal tetap termasuk Minggu15November; hari peserta memakai jadwal pribadi dan cadangan helper periode. Rentang tanggal di judul/kartu/daftar sesi mengikuti periode aktif. |
+| 2026-11-22 13:24:40 | `tests/pretes-exam-access-test.php` | 68, 70, 72, 74, 101 | Sesuaikan tester Minggu22 November, uji peserta RPL Ahad pada15/22/23 November, alias hari dan periode pekan berikutnya, serta render kartu peserta asli berisi22 November dan rentang16–22 November. |
+| 2026-11-22 13:25:13 | `CHANGELOG-DEV.md` | 8 | Entri PRETES-SUNDAY-SAME-WEEK beserta penyebab dan bukti verifikasi. |
+
+**Verifikasi:** PHP lint ketiga file berubah; `php tests/pretes-exam-access-test.php`; `php tests/pretes-peserta-instruksi-test.php`; `php tests/pretes-peserta-aktif-test.php`; `git diff --check` lulus. Uji SQLite membuktikan tanggal 15 November masih before_schedule,22 November sebelum jam peserta tertutup, tepat 13.00 terbuka, dan23 November after_schedule; alias Minggu/Ahad serta periode berikutnya23 November menuju Ahad, 29 November konsisten. Tester memiliki label Minggu22 November04.25. Render view kartu peserta asli memuat Ahad22 November2026 dan rentang16–22 November2026, tanpa tanggal 15 November yang dibekukan. Aturan peserta aktif/program, kelulusan, sakelar sesi, tryout dan integrasi halaman/API tetap lulus.
+
+**Lingkungan pengujian:** PHP lama di PATH/C:/xampp/php tidak tersedia pada lingkungan saat ini. PHP CLI portable 8.3.37 diambil dari distribusi resmi windows.php.net, checksum SHA256 diverifikasi sesuai metadata rilis, lalu diekstrak di scratch/php-runtime yang diabaikan Git. Ekstensi SQLite/mbstring/zip dan zona Asia/Jakarta disetel hanya pada runtime lokal tersebut; tidak mengubah konfigurasi hosting.
+
+**Batas verifikasi:** Nilai tanggal_mulai database produksi belum dibaca/diubah. Perubahan memastikan perhitungan mengikuti tanggal mulai periode; untuk acuan 16 November, Minggu adalah22 November. Tidak mengubah data atau skema produksi. Push Git tidak membuktikan deployment hosting.
+
+**Pelacakan:** Cari commit dengan ID `PRETES-SUNDAY-SAME-WEEK`.
+
+---
+
 ## 2026-11-22 08:28:33 +0700 — Impor 25 Butir Soal Ujian Resmi "Paket 2 - Kristen Protestan" ke Bank Soal CBT
 
 **ID:** CBT-PAKET-2-KRISTEN-PROTESTAN · **Parent Git:** `301fbd8`.

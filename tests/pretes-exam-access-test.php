@@ -65,19 +65,60 @@ $check(pretesExamAccess($pdo, $mhs(4), $at('2026-11-18 13:30:00'))['reason'] ===
 // Syarat melihat link & tryout
 $check(pretesExamIsRegisteredActive($pdo, $mhs(1)) && !pretesExamIsRegisteredActive($pdo, $mhs(2)) && !pretesExamIsRegisteredActive($pdo, $mhs(3)), 'Hanya terdaftar periode aktif yang boleh melihat link/try out');
 
-// Akun tester 12345: jadwal otomatis Minggu 15 Nov 2026 pukul 04.25 WIB
+// Akun tester 12345: jadwal otomatis Minggu 22 Nov 2026 pukul 04.25 WIB
 $testerUser = ['id' => 12345, 'username' => '12345', 'nim' => '12345', 'role' => 'mahasiswa', 'jenis_program' => 'Reguler'];
-$tPre = pretesExamAccess($pdo, $testerUser, $at('2026-11-15 04:24:00'));
+$tPre = pretesExamAccess($pdo, $testerUser, $at('2026-11-22 04:24:00'));
 $check(!$tPre['allowed'] && $tPre['reason'] === 'before_schedule', 'Tester 12345 sebelum 04.25 Minggu → belum dibuka');
-$tOpen = pretesExamAccess($pdo, $testerUser, $at('2026-11-15 04:26:00'));
+$tOpen = pretesExamAccess($pdo, $testerUser, $at('2026-11-22 04:26:00'));
 $check($tOpen['allowed'] === true && $tOpen['reason'] === 'open', 'Tester 12345 setelah 04.25 Minggu → dibuka');
-$check(strpos($tOpen['schedule']['label'] ?? '', 'Minggu, 15 November 2026 pukul 04.25 WIB') !== false, 'Label jadwal tester 12345 Minggu 15 Nov 04.25 WIB');
+$check(strpos($tOpen['schedule']['label'] ?? '', 'Minggu, 22 November 2026 pukul 04.25 WIB') !== false, 'Label jadwal tester 12345 Minggu 22 Nov 04.25 WIB');
+
+// Sunday/Ahad must match the RPL display and remain tied to the configured week.
+$pdo->exec("INSERT INTO master_pretes (id,periode,tahun_ajaran,status,target_program,tanggal_mulai)
+    VALUES(3,'Pretes RPL','2026/2027','aktif','RPL','2026-11-16')");
+$pdo->exec("INSERT INTO pretes_registrations(id,user_id,periode,hari_pilihan,jam)
+    VALUES(14,6,'Pretes RPL','Ahad','13.00 WIB')");
+$rplUser = $mhs(6, 'RPL');
+$check(pretesExamAccess($pdo,$rplUser,$at('2026-11-15 13:00:00'))['reason']==='before_schedule','Sunday Nov 15 is not the scheduled Sunday');
+$check(pretesExamAccess($pdo,$rplUser,$at('2026-11-22 12:59:59'))['reason']==='before_schedule','Sunday before registered time remains closed');
+$check(pretesExamAccess($pdo,$rplUser,$at('2026-11-22 13:00:00'))['allowed']===true,'Sunday Nov 22 opens at the registered time');
+$check(pretesExamAccess($pdo,$rplUser,$at('2026-11-23 00:00:00'))['reason']==='after_schedule','Sunday closes at end of its scheduled day');
+foreach (['Minggu','Ahad',' ahad '] as $day) {
+    $schedule=pretesExamPersonalSchedule(['tanggal_mulai'=>'2026-11-16'],['hari_pilihan'=>$day,'jam'=>'13.00']);
+    $check($schedule['opens_at']===$at('2026-11-22 13:00:00'),'Sunday alias uses +6 days: '.$day);
+}
+$nextWeek=pretesExamPersonalSchedule(['tanggal_mulai'=>'2026-11-23'],['hari_pilihan'=>'Ahad']);
+$check($nextWeek['opens_at']===$at('2026-11-29 13:00:00'),'Future periods use their own Sunday, not a hardcoded today');
+$displayDates=getPretesPeriodDayLabels(['tanggal_mulai'=>'2026-11-16','target_program'=>'RPL']);
+$check($displayDates['days']['Ahad']==='Ahad, 22 November 2026','Display and exam access agree on Sunday Nov 22');
 
 // Link Try Out
 $check(pretesExamTryoutLink($pdo) === null, 'Tanpa tryout aktif → tidak ada link');
 $tid = pretesCbtSaveSession($pdo, ['title' => 'TO 1', 'package_ids' => [1], 'mode' => 'tryout', 'is_active' => 1]);
 $link = pretesExamTryoutLink($pdo);
 $check($link && strpos($link['url'], 'tryout.php?sesi=' . $tid) !== false, 'Satu tryout aktif → link langsung ke sesinya');
+
+// Render the real participant card: no frozen Nov 15 date or weekday-only date range.
+if (!function_exists('sanitize')) {
+    function sanitize($value) { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
+}
+$renderSundayCard = static function () use ($pdo): string {
+    $activePretes = ['tanggal_mulai'=>'2026-11-16','target_program'=>'RPL'];
+    $myReg = ['periode'=>'Pretes RPL','hari_pilihan'=>'Ahad','jam'=>'13.00 WIB','status'=>'terdaftar'];
+    $user = ['id'=>6,'role'=>'mahasiswa','jenis_program'=>'RPL'];
+    $examSchedule = pretesExamPersonalSchedule($activePretes, $myReg);
+    $examAccess = ['schedule'=>$examSchedule,'reason'=>'before_schedule'];
+    $isUjianDibuka = false;
+    $isTesterPrivileged = false;
+    $schedules = [];
+    ob_start();
+    include __DIR__ . '/../includes/pretes-participant-view.php';
+    return ob_get_clean();
+};
+$cardHtml = $renderSundayCard();
+$check(strpos($cardHtml,'Ahad, 22 November 2026') !== false,'Actual participant card shows Sunday Nov 22');
+$check(strpos($cardHtml,'16 – 22 November 2026') !== false,'Actual RPL card period range includes Sunday');
+$check(strpos($cardHtml,'15 Nov 2026') === false,'Actual participant card no longer shows frozen Nov 15');
 
 // Integrasi statis
 $root = dirname(__DIR__);

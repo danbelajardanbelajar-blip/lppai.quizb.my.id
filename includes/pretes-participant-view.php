@@ -1,3 +1,7 @@
+<?php
+$participantPeriodDates = getPretesPeriodDayLabels($activePretes ?? null);
+$participantRange = $participantPeriodDates['short_range'];
+?>
 <style>
 /* ── Layout & Grid Responsif Khusus Pretes Mahasiswa ── */
 .pretes-info-grid {
@@ -96,7 +100,7 @@
     <div style="margin-bottom:20px;">
         <h2 class="page-title" style="margin:0;">Pretes Saya</h2>
         <p style="margin:4px 0 0;color:#64748b;font-size:13.5px;">
-            Tutorial Ubudiyah Unisda (Pelaksanaan: 16 – 20 November 2026). Periksa jadwal Anda dan persiapkan diri mengikuti ujian.
+            Tutorial Ubudiyah Unisda<?= $participantRange !== '' ? ' (Pelaksanaan: ' . sanitize($participantRange) . ')' : '' ?>. Periksa jadwal Anda dan persiapkan diri mengikuti ujian.
         </p>
     </div>
 
@@ -111,7 +115,7 @@
                         Jadwal Pelaksanaan Pretes Anda
                     </h3>
                     <div style="font-size:12px;color:#ccfbf1;margin-top:2px;">
-                        Periode: <strong><?= sanitize($myReg['periode']) ?> (16 – 20 Nov 2026)</strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
+                        Periode: <strong><?= sanitize($myReg['periode']) ?><?= $participantRange !== '' ? ' (' . sanitize($participantRange) . ')' : '' ?></strong> | Status: <strong style="text-transform:capitalize;"><?= sanitize(str_replace('_', ' ', $myReg['status'] ?? 'Terdaftar')) ?></strong>
                     </div>
                 </div>
             </div>
@@ -128,17 +132,11 @@
                     <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">📅 Hari Ujian</div>
                     <div style="font-size:15px;font-weight:800;color:#0f172a;word-break:break-word;">
                         <?php
-                        $dMap = [
-                            'senin' => 'Senin, 16 Nov 2026',
-                            'selasa' => 'Selasa, 17 Nov 2026',
-                            'rabu' => 'Rabu, 18 Nov 2026',
-                            'kamis' => 'Kamis, 19 Nov 2026',
-                            'jumat' => 'Jumat, 20 Nov 2026',
-                            'minggu' => 'Minggu, 15 Nov 2026',
-                            'ahad' => 'Minggu, 15 Nov 2026'
-                        ];
-                        $hClean = strtolower(trim((string)($myReg['hari_pilihan'] ?? '')));
-                        echo sanitize($dMap[$hClean] ?? ($myReg['hari_pilihan'] ?: 'Belum ditentukan'));
+                        $personalLabel = $examAccess['schedule']['label'] ?? '';
+                        $dayKey = pretesNormalizeDay($myReg['hari_pilihan'] ?? '');
+                        $dayLabel = $personalLabel !== '' ? explode(' pukul ', $personalLabel, 2)[0]
+                            : ($participantPeriodDates['days'][$dayKey] ?? ($myReg['hari_pilihan'] ?: 'Belum ditentukan'));
+                        echo sanitize($dayLabel);
                         ?>
                     </div>
                 </div>
@@ -399,7 +397,7 @@
 
         <div class="card-body" style="padding:18px 16px;">
             <h4 style="margin:0 0 12px;font-size:14.5px;font-weight:800;color:#0f172a;">
-                📅 Sesi Jadwal Pretes yang Tersedia (16 – 20 November 2026):
+                📅 Sesi Jadwal Pretes yang Tersedia<?= $participantRange !== '' ? ' (' . sanitize($participantRange) . ')' : '' ?>:
             </h4>
 
             <?php if (empty($schedules)): ?>

@@ -17,14 +17,12 @@ require_once __DIR__ . '/pretes-cbt.php';
 const PRETES_EXAM_DEFAULT_TIME = '13:00';
 const PRETES_EXAM_TZ = 'Asia/Jakarta';
 
-/** Offset hari dari tanggal_mulai (Senin = 0 ... Jumat = 4), sama dengan getPretesPeriodDayLabels(). */
+/** Shared day offsets: Monday +0 through Sunday +6, matching the displayed schedule. */
 function pretesExamDayOffset(string $hari): ?int {
-    $map = [
-        'senin' => 0, 'selasa' => 1, 'rabu' => 2, 'kamis' => 3, 'jumat' => 4, "jum'at" => 4, 'sabtu' => 5,
-        'minggu' => -1, 'ahad' => -1
-    ];
     $key = strtolower(trim($hari));
-    return $map[$key] ?? null;
+    if ($key === "jum'at") $key = 'jumat';
+    $day = pretesNormalizeDay($key);
+    return $day === '' ? null : pretesDayOffset($day);
 }
 
 /** "13.00 WIB (Jam 1)" → [13, 0]; tidak terbaca → 13.00. */
