@@ -15,13 +15,16 @@
     </header>
 
     <div class="bank-stats">
+        <?php $activeSessions = pretesCbtGetActiveSessions($pdo); $activeSesCount = count($activeSessions); ?>
         <div class="bank-stat">
             <small>Sesi Ujian Aktif</small>
-            <strong style="font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="<?= $activeSession ? sanitize($activeSession['title']) : 'Belum Ada Sesi Aktif' ?>">
-                <?= $activeSession ? sanitize($activeSession['title']) : 'Belum Ada Sesi' ?>
+            <strong style="font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="<?= $activeSesCount > 1 ? ($activeSesCount . ' Sesi Aktif') : ($activeSession ? sanitize($activeSession['title']) : 'Belum Ada Sesi Aktif') ?>">
+                <?= $activeSesCount > 1 ? ($activeSesCount . ' Sesi Aktif') : ($activeSession ? sanitize($activeSession['title']) : 'Belum Ada Sesi') ?>
             </strong>
             <span>
-                <?php if ($activeSession): ?>
+                <?php if ($activeSesCount > 1): ?>
+                    <?= implode(', ', array_map(fn($s) => sanitize($s['title']), $activeSessions)) ?>
+                <?php elseif ($activeSession): ?>
                     <?= (int)$activeSession['duration_minutes'] ?> mnt · 
                     <?= $activeSession['camera_mode'] === 'wajib' ? '📷 Kamera Wajib' : ($activeSession['camera_mode'] === 'tidak_aktif' ? '🚫 Tanpa Kamera' : '📷 Kamera Opsional') ?>
                     <?= !empty($activeSession['token_required']) ? ' · 🔑 Token: ' . sanitize($activeSession['token']) : '' ?>
@@ -327,7 +330,14 @@
                                     <input type="hidden" name="action" value="activate_session">
                                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                     <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
-                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Jadikan sesi ini aktif untuk ujian mahasiswa">Set Aktif</button>
+                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Aktifkan sesi ini untuk ujian mahasiswa">🟢 Aktifkan</button>
+                                </form>
+                            <?php else: ?>
+                                <form method="post" action="<?= $bankUrl ?>&amp;tab=sessions" style="display:inline;margin:0 3px">
+                                    <input type="hidden" name="action" value="deactivate_session">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                    <button type="submit" class="bank-button danger-sm" style="min-height:28px;padding:4px 8px;font-size:11px" title="Nonaktifkan sesi ini">🔴 Nonaktifkan</button>
                                 </form>
                             <?php endif; ?>
                             <?php if (($ses['mode'] ?? 'resmi') !== 'tryout'): $rowOpen = (int)($ses['exam_open'] ?? 0) === 1; ?>
@@ -636,7 +646,11 @@
                         <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
                         <td><?= renderJenisProgramBadge($attempt['jenis_program'] ?? 'Reguler', true) ?></td>
                         <td><?php $jenis = pretesTryoutAttemptLabel($pdo, $attempt, $tryoutLabelCache); ?>
-                            <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span></td>
+                            <span class="bank-badge" style="<?= $jenis['kind'] === 'tryout' ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= sanitize($jenis['label']) ?></span>
+                            <?php if (!empty($attempt['session_title'])): ?>
+                                <div style="margin-top:3px"><span class="bank-badge session" style="font-size:10px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1" title="Sesi: <?= sanitize($attempt['session_title']) ?>">🎯 <?= sanitize($attempt['session_title']) ?></span></div>
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <div><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></div>
                             <?php if ($isSubmitted): ?>

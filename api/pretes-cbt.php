@@ -49,8 +49,9 @@ try {
                 throw new RuntimeException('Ujian hanya dapat dimulai untuk pendaftaran pretes pada periode yang sedang berlangsung.');
             }
         }
+        $sessionIdInput = filter_var($input['session_id'] ?? null, FILTER_VALIDATE_INT);
         $tokenInput = isset($input['token']) && is_string($input['token']) ? trim($input['token']) : null;
-        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester);
+        $data = pretesCbtStart($pdo, $userId, $regId, null, $tokenInput, null, $isTester, $sessionIdInput ?: null);
     } else {
         if ($action === 'resume' && $cameraRequired) {
             $state = pretesCbtState($pdo, $userId, $regId);

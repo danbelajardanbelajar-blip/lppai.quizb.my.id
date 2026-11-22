@@ -253,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'save_question';
     if ($action === 'import_xlsx') {
         $activeTab = 'import';
-    } elseif (in_array($action, ['save_session', 'activate_session', 'delete_session', 'delete_sessions', 'set_exam_open'], true)) {
+    } elseif (in_array($action, ['save_session', 'activate_session', 'deactivate_session', 'delete_session', 'delete_sessions', 'set_exam_open'], true)) {
         $activeTab = 'sessions';
     } elseif (in_array($action, ['save_package', 'activate_package', 'delete_package', 'delete_packages'], true)) {
         $activeTab = 'packages';
@@ -298,10 +298,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'activate_session') {
             $sesId = (int)($_POST['session_id'] ?? 0);
             if ($sesId <= 0) throw new InvalidArgumentException('ID sesi ujian tidak valid.');
-            if (pretesCbtActivateSession($pdo, $sesId)) {
-                $flashMsg = 'Sesi ujian aktif berhasil diperbarui. Peserta akan diarahkan ke sesi ini.';
+            if (pretesCbtActivateSession($pdo, $sesId, false)) {
+                $flashMsg = 'Sesi ujian berhasil diaktifkan.';
             } else {
-                $flashMsg = 'Sesi ujian tidak ditemukan.';
+                $flashMsg = 'Sesi ujian tidak ditemukan atau gagal diaktifkan.';
             }
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
@@ -309,6 +309,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
             $_SESSION['cbt_bank_flash'] = $flashMsg;
+            header('Location: ' . $bankUrl . '&tab=sessions'); exit;
+        } elseif ($action === 'deactivate_session') {
+            $sesId = (int)($_POST['session_id'] ?? 0);
+            if ($sesId <= 0) throw new InvalidArgumentException('ID sesi ujian tidak valid.');
+            if (pretesCbtDeactivateSession($pdo, $sesId)) {
+                $flashMsg = 'Sesi ujian berhasil dinonaktifkan.';
+            } else {
+                $flashErr = 'Gagal menonaktifkan sesi ujian. Minimal harus ada 1 sesi ujian resmi yang aktif.';
+            }
+            if ($isAjax) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['success' => empty($flashErr), 'message' => $flashErr ?: $flashMsg]);
+                exit;
+            }
+            if (!empty($flashErr)) {
+                $_SESSION['cbt_bank_flash_error'] = $flashErr;
+            } else {
+                $_SESSION['cbt_bank_flash'] = $flashMsg;
+            }
             header('Location: ' . $bankUrl . '&tab=sessions'); exit;
         } elseif ($action === 'delete_session') {
             $sesId = (int)($_POST['session_id'] ?? 0);
@@ -585,7 +604,7 @@ if ($page > $totalPages) {
 }
 $offset = ($page - 1) * $perPage;
 
-$stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereClause ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
+$stmt = $pdo->prepare("SELECT a.*, u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, s.title AS session_title, s.code AS session_code FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id $whereClause ORDER BY a.started_at DESC LIMIT $perPage OFFSET $offset");
 foreach ($params as $k => $v) {
     $stmt->bindValue($k, $v);
 }

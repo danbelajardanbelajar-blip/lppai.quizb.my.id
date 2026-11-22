@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="<?= BASE_URL ?>/pretes-ujian.php?cbt_style=exam&amp;v=<?= filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css') ?>">
 <section class="cbt-shell" id="pretesCbt" aria-label="CBT Pretes Ubudiyah">
     <div class="cbt-heading">
-        <div><div class="cbt-eyebrow">LPPAI / Ruang Asesmen</div><h3>CBT Pretes Ubudiyah</h3><p>Soal acak terstandar · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
+        <div><div class="cbt-eyebrow">LPPAI / Ruang Asesmen</div><h3>CBT Pretes Ubudiyah <span id="cbtActiveSessionPill" class="bank-badge session" style="display:none;margin-left:8px;background:#e0e7ff;color:#3730a3;font-size:11px;vertical-align:middle"></span></h3><p>Soal acak terstandar · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
         <div class="cbt-time-box"><small>Sisa waktu ujian</small><div class="cbt-timer" id="cbtTimer">--:--</div></div>
     </div>
     <div class="cbt-completion"><b>Terjawab <span id="cbtAnsweredCount">0/0</span></b><div id="cbtCompletion" class="cbt-progress-track" role="progressbar" aria-label="Soal terjawab" aria-valuemin="0" aria-valuemax="25" aria-valuenow="0"><span id="cbtCompletionFill"></span></div></div>
@@ -12,6 +12,10 @@
             <div class="cbt-intro-facts"><span>Soal pilihan ganda A–E</span><span>Durasi terhitung server</span><span>Satu kali pengumpulan</span></div>
             <p>Anda mendapat soal dan pilihan jawaban acak. Saat meninggalkan halaman atau pemeriksaan kamera tidak sesuai, popup menutup soal dan waktu dijeda setelah dikonfirmasi server. Soal yang sedang terbuka dikosongkan, dipindahkan ke posisi acak di antara soal yang belum dijawab, dan pilihannya diacak ulang. Jawaban soal lain tetap tersimpan.</p>
             <p>Gunakan nomor soal untuk berpindah dan tandai soal yang ingin diperiksa kembali. Setelah dikumpulkan, jawaban tidak dapat diubah.</p>
+            <div id="cbtSessionBox" style="display:none;margin:16px auto;max-width:440px;text-align:left">
+                <label style="display:block;font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px">🎯 Pilih Sesi Ujian:</label>
+                <div id="cbtSessionList" style="display:flex;flex-direction:column;gap:10px"></div>
+            </div>
             <div id="cbtTokenBox" style="display:none;margin:16px auto;background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px;max-width:380px;text-align:left">
                 <label for="cbtInputToken" style="display:block;font-size:12px;font-weight:700;color:#854d0e;margin-bottom:6px">🔑 Masukkan Token Ujian *</label>
                 <input type="text" id="cbtInputToken" maxlength="32" placeholder="TOKEN" style="font-family:monospace;font-size:16px;font-weight:800;letter-spacing:2px;text-align:center;text-transform:uppercase;padding:8px 12px;border:1.5px solid #ca8a04;border-radius:8px;width:100%;box-sizing:border-box;background:#fff">

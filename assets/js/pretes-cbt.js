@@ -100,17 +100,103 @@
         if (config.onSubmitted) config.onSubmitted();
     }
 
+    let selectedSessionId = null;
+    let tokenRequired = window.TOKEN_REQUIRED === true;
+
+    function updateTokenRequirement(session) {
+        if (!session) return;
+        tokenRequired = !!session.token_required;
+        const tokenBox = el('cbtTokenBox');
+        const tokenInput = el('cbtInputToken');
+        if (tokenBox) {
+            tokenBox.style.display = tokenRequired ? 'block' : 'none';
+        }
+        if (tokenInput) {
+            tokenInput.disabled = !tokenRequired;
+            tokenInput.required = tokenRequired;
+            if (!tokenRequired) tokenInput.value = '';
+        }
+    }
+
+    function renderSessionSelection(sessions) {
+        const box = el('cbtSessionBox');
+        const list = el('cbtSessionList');
+        if (!box || !list) return;
+        if (!sessions || sessions.length <= 1) {
+            box.style.display = 'none';
+            if (sessions && sessions.length === 1) {
+                selectedSessionId = sessions[0].id;
+                updateTokenRequirement(sessions[0]);
+            }
+            return;
+        }
+        box.style.display = 'block';
+        list.innerHTML = '';
+        sessions.forEach((s, idx) => {
+            const card = document.createElement('label');
+            card.className = 'cbt-session-card' + (idx === 0 ? ' selected' : '');
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'cbt_session_choice';
+            radio.value = s.id;
+            radio.checked = idx === 0;
+            if (idx === 0) {
+                selectedSessionId = s.id;
+                updateTokenRequirement(s);
+            }
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'session-title';
+            titleDiv.textContent = '🎯 ' + s.title;
+
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'session-meta';
+            const pkgs = (s.package_names && s.package_names.length) ? ' · Paket: ' + s.package_names.join(', ') : '';
+            metaDiv.textContent = (s.duration_minutes || 30) + ' menit' + pkgs + (s.token_required ? ' · 🔑 Token Wajib' : '');
+
+            card.appendChild(radio);
+            card.appendChild(titleDiv);
+            card.appendChild(metaDiv);
+
+            radio.onchange = () => {
+                selectedSessionId = s.id;
+                list.querySelectorAll('.cbt-session-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                updateTokenRequirement(s);
+            };
+            card.onclick = (e) => {
+                if (e.target !== radio) {
+                    radio.checked = true;
+                    radio.onchange();
+                }
+            };
+            list.appendChild(card);
+        });
+    }
+
     function apply(data) {
         if (!data.success) throw new Error(data.message || 'CBT belum dapat dimuat.');
         if (!data.attempt) {
             el('cbtIntro').style.display = 'block';
             el('cbtStart').disabled = false;
+            if (data.available_sessions) {
+                renderSessionSelection(data.available_sessions);
+            }
             message(config.readyMessage || 'Verifikasi wajah berhasil. Tekan Mulai Ujian ketika Anda siap.');
             return;
         }
         if (data.attempt.submitted) { showResult(data.attempt); return; }
         attempt = data.attempt;
         target = Date.now() + attempt.remaining_seconds * 1000;
+        const pill = el('cbtActiveSessionPill');
+        if (pill) {
+            if (data.attempt.session_title) {
+                pill.textContent = '🎯 ' + data.attempt.session_title;
+                pill.style.display = 'inline-block';
+            } else {
+                pill.style.display = 'none';
+            }
+        }
         if (attempt.paused) {
             position = Math.max(0, (attempt.resume_position || 1) - 1);
             interruption = { confirmed: true };
@@ -334,7 +420,11 @@
                 el('cbtStart').disabled = true;
                 message('Menyiapkan paket soal…');
                 try {
-                    apply(await config.request({ action: 'start', token: token }));
+                    const payload = { action: 'start', token: token };
+                    if (selectedSessionId) {
+                        payload.session_id = selectedSessionId;
+                    }
+                    apply(await config.request(payload));
                 } catch (error) {
                     message(error.message, true);
                     el('cbtStart').disabled = false;

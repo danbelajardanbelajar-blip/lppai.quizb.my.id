@@ -5,6 +5,69 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-22 15:52:00 +0700 — CBT Multi-Active Sessions: Dukungan Menjalankan Dua Sesi Ujian atau Lebih dalam Satu Waktu
+
+**ID:** `CBT-MULTI-ACTIVE-SESSIONS` · **Parent Git:** `0626529`.
+**Permintaan:** Atur agar sesi yang berjalan bisa menjalankan 2 sesi dalam satu waktu, karena aturan sesi yang sekarang ada jika sesi satu diaktifkan maka sesi lain mati. Sekarang atur agar admin bisa mengaktifkan dua sesi atau lebih dalam satu waktu.
+
+**Penyebab & Analisis:**
+1. Di arsitektur sesi sebelumnya (`pretes_cbt_sessions`), fungsi `pretesCbtActivateSession()` dan `pretesCbtSaveSession()` menjalankan `UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')` setiap kali satu sesi diaktifkan, sehingga mengaktifkan Sesi A otomatis mematikan Sesi B.
+2. Di antarmuka admin Sesi Ujian (`includes/pretes-cbt-admin-view.php`), sesi yang sedang aktif hanya memiliki label status tanpa tombol "Nonaktifkan", sehingga admin tidak dapat mengatur status sesi secara fleksibel dan mandiri.
+3. Kueri sesi aktif tunggal (`pretesCbtGetActiveSession`) memakai `LIMIT 1` tanpa dukungan pemilihan sesi bagi mahasiswa jika terdapat lebih dari satu sesi resmi yang aktif bersamaan.
+
+**Perubahan dan Alur Solusi:**
+1. **Dukungan Multi-Sesi Aktif di Backend (`includes/pretes-cbt.php`):**
+   - Menambahkan parameter `$exclusive = false` pada `pretesCbtActivateSession(PDO $pdo, int $sessionId, bool $exclusive = false)` sehingga aktivasi suatu sesi tidak lagi mematikan sesi lainnya.
+   - Menambahkan fungsi `pretesCbtDeactivateSession(PDO $pdo, int $sessionId)` dengan proteksi minimal 1 sesi resmi tetap aktif.
+   - Memperbarui `pretesCbtSaveSession()` agar penyimpanan sesi aktif tidak mematikan sesi resmi lainnya.
+   - Menambahkan fungsi `pretesCbtGetActiveSessions(PDO $pdo)` yang mengembalikan seluruh sesi resmi aktif lengkap beserta metadata paket soal yang digunakannya.
+   - Memperbarui `pretesCbtGetActiveSession(PDO $pdo, ?int $preferredSessionId = null)` agar mendukung pembacaan sesi aktif spesifik berdasarkan ID atau fallback sesi default.
+   - Memperbarui `pretesCbtExamStatus()` agar mengevaluasi seluruh sesi aktif (ujian terbuka jika setidaknya ada 1 sesi aktif yang berstatus dibuka).
+   - Menambahkan fungsi `pretesCbtEnsureDefaultSessionsActive(PDO $pdo)` untuk memastikan sesi resmi default aktif di lingkungan MySQL hosting.
+2. **Pengatur Sesi Mandiri di Admin Panel (`admin/pretes-bank-soal.php` & `includes/pretes-cbt-admin-view.php`):**
+   - Mendukung action `deactivate_session` dan `activate_session` di controller admin.
+   - Di tab Sesi Ujian, setiap baris sesi aktif memiliki tombol **"🔴 Nonaktifkan"**, dan sesi non-aktif memiliki tombol **"🟢 Aktifkan"**.
+   - Kartu statistik atas menampilkan jumlah sesi aktif (misal "2 Sesi Aktif") dan daftar judul sesi.
+   - Di tabel Hasil Ujian & Live Monitoring, kolom jenis menampilkan badge nama sesi yang dikerjakan mahasiswa (`session_title`).
+3. **Pemilihan Sesi bagi Mahasiswa Saat Multi-Sesi Aktif (`includes/pretes-cbt-view.php`, `assets/js/pretes-cbt.js`, `assets/css/pretes-cbt-exam.css`):**
+   - Di `pretesCbtState()`, jika terdapat lebih dari 1 sesi aktif, mengembalikan daftar `available_sessions`.
+   - Di `includes/pretes-cbt-view.php`, menambahkan kontainer `#cbtSessionBox` di atas form token.
+   - Di `assets/js/pretes-cbt.js`, menambahkan fungsi `renderSessionSelection()` untuk merender kartu sesi interaktif (`.cbt-session-card`). Jika hanya 1 sesi aktif, otomatis dipilih tanpa menampilkan kotak pemilih (100% backward-compatible).
+   - Di `api/pretes-cbt.php` & `pretesCbtStart()`, menerima parameter `session_id` dari peserta dan mengunci pengerjaan pada paket soal sesi tersebut.
+4. **Alat CLI & Unit Test Suite (`tools/activate-both-sessions.php` & `tests/pretes-multi-session-active-test.php`):**
+   - Menyediakan script CLI `tools/activate-both-sessions.php` untuk mengaktifkan sesi resmi multi-session langsung dari terminal server.
+   - Membuat test suite `tests/pretes-multi-session-active-test.php` yang memverifikasi 7 skenario (seeding multi-sesi, isolasi butir soal per sesi, penilaian masing-masing sesi, dan toggle aktivasi/deaktivasi admin dengan proteksi keamanan).
+
+Waktu berikut adalah penyimpanan terakhir file dalam WIB sampai detik. Baris merujuk awal blok perubahan pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-22 15:50:53 | `includes/pretes-cbt.php` | 39, 194, 345, 360, 400, 865, 890, 1013, 1054, 1075, 1160 | Fungsi `pretesCbtEnsureDefaultSessionsActive`, `available_sessions` di state, isolasi sesi di `pretesCbtStart`, helper `pretesCbtGetActiveSessions`, aktivasi non-eksklusif di `pretesCbtActivateSession`, dan penambahan `pretesCbtDeactivateSession`. |
+| 2026-11-22 15:39:43 | `api/pretes-cbt.php` | 52 | Penerimaan dan validasi parameter `session_id` pada action `start`. |
+| 2026-11-22 15:40:54 | `admin/pretes-bank-soal.php` | 256, 298, 607 | Action `deactivate_session` dan `activate_session` non-eksklusif, serta JOIN `pretes_cbt_sessions` untuk pembacaan `session_title`. |
+| 2026-11-22 15:42:16 | `includes/pretes-cbt-admin-view.php` | 18, 327, 648 | Stat multi-sesi aktif, tombol toggle "🟢 Aktifkan" / "🔴 Nonaktifkan" pada setiap baris sesi, dan badge sesi pada tabel hasil ujian. |
+| 2026-11-22 15:43:02 | `includes/pretes-cbt-view.php` | 4, 15 | Kontainer `#cbtSessionBox` dan badge `#cbtActiveSessionPill` pada heading CBT. |
+| 2026-11-22 15:44:32 | `assets/js/pretes-cbt.js` | 100, 140, 420 | Controller `renderSessionSelection()`, update kebutuhan token per sesi, pengiriman `session_id` saat `start`, dan penayangan badge sesi aktif. |
+| 2026-11-22 15:43:36 | `assets/css/pretes-cbt-exam.css` | 20 | Aturan visual gaya kartu sesi `.cbt-session-card` responsif. |
+| 2026-11-22 15:45:00 | `tools/activate-both-sessions.php` | 1 | Script CLI untuk aktivasi instan multi-sesi resmi dari terminal server. |
+| 2026-11-22 15:49:53 | `tests/pretes-multi-session-active-test.php` | 1 | Test suite otomatis multi-active sessions (7 skenario pengujian komprehensif). |
+| 2026-11-22 15:52:00 | `CHANGELOG-DEV.md` | 8 | Catatan sistematis fitur CBT Multi-Active Sessions. |
+
+**Verifikasi:**
+- PHP lint syntax check pada seluruh file yang dimodifikasi: semua `No syntax errors detected`.
+- `php tests/pretes-multi-session-active-test.php`: 7/7 pengujian lulus sempurna (kedua sesi aktif bersamaan, isolasi butir soal per sesi 100%, submit dan penilaian akurat, proteksi toggle sesi admin berjalan presisi).
+- `php tests/paket-2-kristen-protestan-test.php`: 24/24 pengujian lulus sempurna.
+- `php tests/pretes-cbt-package-test.php`: 7/7 pengujian lulus sempurna.
+- `php tests/pretes-cbt-session-test.php`: 8/8 pengujian lulus sempurna.
+- `php tests/pretes-cbt-test.php`: PASS.
+- `php tests/pretes-ujian-route-test.php`: PASS.
+- `php tests/pretes-exam-access-test.php`: PASS.
+- `git diff --check`: 0 error spasi/trailing whitespace.
+
+**Pelacakan:** Cari commit dengan ID `CBT-MULTI-ACTIVE-SESSIONS`.
+
+---
+
 ## 2026-11-22 15:15:00 +0700 — Anulir Perubahan CBT Multi-Package Activation (Kembali ke Kondisi fdf6e19)
 
 **ID:** `REVERT-CBT-MULTI-PACKAGE-CHOICE` · **Parent Git:** `f4bf5bd`.

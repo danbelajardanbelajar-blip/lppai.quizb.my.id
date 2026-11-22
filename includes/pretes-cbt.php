@@ -37,6 +37,21 @@ if (!function_exists('ensurePaket2KristenProtestan')) {
     }
 }
 
+if (!function_exists('pretesCbtEnsureDefaultSessionsActive')) {
+    function pretesCbtEnsureDefaultSessionsActive(PDO $pdo): void {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        try {
+            if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+                return;
+            }
+            // Pastikan kedua sesi resmi terdaftar dan aktif
+            $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 1 WHERE code IN ('SESI-REGULER-2026', 'SESI-RESMI-PROTESTAN-2026')");
+        } catch (Throwable $e) {}
+    }
+}
+
 function ensurePretesCbtTables(PDO $pdo): void {
     $id = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INTEGER PRIMARY KEY AUTO_INCREMENT';
     $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
@@ -177,6 +192,7 @@ function ensurePretesCbtTables(PDO $pdo): void {
         seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
     )$engine");
     ensurePaket2KristenProtestan($pdo);
+    pretesCbtEnsureDefaultSessionsActive($pdo);
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
     if ($pdo->query("SELECT seed_key FROM pretes_cbt_initialization WHERE seed_key = 'defaults-v1'")->fetchColumn()) return;
@@ -327,8 +343,18 @@ function pretesCbtPublic(PDO $pdo, ?array $attempt, int $now): array {
             'options' => json_decode($row['options_json'], true), 'answer' => $row['answer'], 'flagged' => (bool)$row['flagged']];
     }
     $answered = count(array_filter($items, static fn($item) => $item['answer'] !== null));
+
+    $sessionTitle = null;
+    if (!empty($attempt['session_id'])) {
+        $stmtSes = $pdo->prepare('SELECT title FROM pretes_cbt_sessions WHERE id = ?');
+        $stmtSes->execute([(int)$attempt['session_id']]);
+        $sessionTitle = $stmtSes->fetchColumn() ?: null;
+    }
+
     return ['attempt' => [
         'id' => (int)$attempt['id'], 'submitted' => $submitted,
+        'session_id' => (int)($attempt['session_id'] ?? 0),
+        'session_title' => $sessionTitle,
         'remaining_seconds' => max(0, (int)$attempt['deadline_at'] - pretesCbtClock($attempt, $now)),
         'paused' => $attempt['paused_at'] !== null, 'revision' => (int)$attempt['revision'],
         'resume_position' => (int)$attempt['resume_position'], 'pause_reason' => $attempt['pause_reason'],
@@ -346,6 +372,22 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if ($attempt && $attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
         $result = pretesCbtPublic($pdo, $attempt, $now);
+        if (!$attempt) {
+            $activeSessions = pretesCbtGetActiveSessions($pdo);
+            if (count($activeSessions) > 1) {
+                $result['available_sessions'] = array_map(function($s) {
+                    return [
+                        'id' => (int)$s['id'],
+                        'code' => $s['code'],
+                        'title' => $s['title'],
+                        'description' => $s['description'],
+                        'duration_minutes' => (int)($s['duration_minutes'] ?: 30),
+                        'token_required' => !empty($s['token_required']),
+                        'package_names' => $s['package_names'] ?? []
+                    ];
+                }, $activeSessions);
+            }
+        }
         $pdo->commit();
         return $result;
     } catch (Throwable $e) {
@@ -354,14 +396,36 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
     }
 }
 
-function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null, bool $ignoreExamClosed = false): array {
+function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = null, ?string $token = null, ?array $forcedSession = null, bool $ignoreExamClosed = false, ?int $requestedSessionId = null): array {
     $now ??= time();
     $pdo->beginTransaction();
     try {
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if (!$attempt) {
             // Tryout memakai sesinya sendiri; ujian resmi memakai sesi resmi yang aktif
-            $session = $forcedSession ?? pretesCbtGetActiveSession($pdo);
+            $session = null;
+            if ($forcedSession) {
+                $session = $forcedSession;
+            } elseif ($requestedSessionId !== null && $requestedSessionId > 0) {
+                $session = pretesCbtGetSession($pdo, $requestedSessionId);
+                if (!$session || empty($session['is_active'])) {
+                    throw new InvalidArgumentException('Sesi ujian yang dipilih tidak aktif.');
+                }
+            } elseif (!empty($token)) {
+                $activeSessions = pretesCbtGetActiveSessions($pdo);
+                $tokenClean = strtoupper(trim((string)$token));
+                foreach ($activeSessions as $as) {
+                    if (!empty($as['token']) && strtoupper(trim((string)$as['token'])) === $tokenClean) {
+                        $session = $as;
+                        break;
+                    }
+                }
+                if (!$session) {
+                    $session = pretesCbtGetActiveSession($pdo);
+                }
+            } else {
+                $session = pretesCbtGetActiveSession($pdo);
+            }
             $sessionId = $session ? (int)$session['id'] : null;
 
             // Sakelar admin: pengerjaan ujian resmi ditutup (tryout tidak memakai sakelar ini)
@@ -795,8 +859,43 @@ function pretesCbtGetSession(PDO $pdo, int $sessionId): ?array {
     return $ses;
 }
 
-function pretesCbtGetActiveSession(PDO $pdo): ?array {
+function pretesCbtGetActiveSessions(PDO $pdo): array {
     ensurePretesCbtTables($pdo);
+    $rows = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $packages = pretesCbtGetPackages($pdo);
+    $pkgMap = [];
+    foreach ($packages as $pkg) {
+        $pkgMap[(int)$pkg['id']] = $pkg;
+    }
+    foreach ($rows as &$ses) {
+        $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
+        $ses['package_ids'] = array_map('intval', $pkgIds);
+        $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
+        $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
+        $pNames = [];
+        foreach ($ses['package_ids'] as $pid) {
+            if (isset($pkgMap[$pid])) $pNames[] = $pkgMap[$pid]['name'];
+        }
+        $ses['package_names'] = $pNames;
+    }
+    unset($ses);
+    return $rows;
+}
+
+function pretesCbtGetActiveSession(PDO $pdo, ?int $preferredSessionId = null): ?array {
+    ensurePretesCbtTables($pdo);
+    if ($preferredSessionId !== null && $preferredSessionId > 0) {
+        $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE id = ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
+        $stmt->execute([$preferredSessionId]);
+        $ses = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($ses) {
+            $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
+            $ses['package_ids'] = array_map('intval', $pkgIds);
+            $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
+            $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
+            return $ses;
+        }
+    }
     $ses = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if (!$ses) return null;
     $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
@@ -908,11 +1007,8 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
     $pdo->beginTransaction();
     try {
         if ($mode === 'resmi') {
-            if ($isActive === 1) {
-                // Hanya satu sesi RESMI aktif; sesi tryout tidak ikut dinonaktifkan
-                $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
-            } else {
-                $otherCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != " . $sessionId . " AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
+            if ($isActive === 0) {
+                $otherCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != " . (int)$sessionId . " AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
                 if ($otherCount === 0) {
                     $isActive = 1;
                 }
@@ -951,17 +1047,46 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
     }
 }
 
-function pretesCbtActivateSession(PDO $pdo, int $sessionId): bool {
+function pretesCbtActivateSession(PDO $pdo, int $sessionId, bool $exclusive = false): bool {
+    if ($sessionId <= 0) return false;
+    ensurePretesCbtTables($pdo);
+    $pdo->beginTransaction();
+    try {
+        if ($exclusive) {
+            $modeStmt = $pdo->prepare('SELECT mode FROM pretes_cbt_sessions WHERE id = ?');
+            $modeStmt->execute([$sessionId]);
+            if ((string)$modeStmt->fetchColumn() !== 'tryout') {
+                $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
+            }
+        }
+        $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id = ?');
+        $stmt->execute([$sessionId]);
+        $ok = $stmt->rowCount() > 0;
+        $pdo->commit();
+        return $ok;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
+function pretesCbtDeactivateSession(PDO $pdo, int $sessionId): bool {
     if ($sessionId <= 0) return false;
     ensurePretesCbtTables($pdo);
     $pdo->beginTransaction();
     try {
         $modeStmt = $pdo->prepare('SELECT mode FROM pretes_cbt_sessions WHERE id = ?');
         $modeStmt->execute([$sessionId]);
-        if ((string)$modeStmt->fetchColumn() !== 'tryout') {
-            $pdo->exec("UPDATE pretes_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
+        $mode = (string)$modeStmt->fetchColumn();
+
+        if ($mode !== 'tryout') {
+            $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
+            if ($activeCount <= 1) {
+                $pdo->rollBack();
+                return false;
+            }
         }
-        $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET is_active = 1 WHERE id = ?');
+        $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET is_active = 0 WHERE id = ?');
         $stmt->execute([$sessionId]);
         $ok = $stmt->rowCount() > 0;
         $pdo->commit();
@@ -1030,25 +1155,48 @@ function pretesCbtSetExamOpen(PDO $pdo, int $sessionId, bool $open): bool {
  */
 function pretesCbtExamStatus(PDO $pdo, ?int $now = null): array {
     $now ??= time();
-    $session = pretesCbtGetActiveSession($pdo);
-    $fmt = static fn(int $ts) => (new DateTimeImmutable('@' . $ts))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
-    if (!$session) {
+    $activeSessions = pretesCbtGetActiveSessions($pdo);
+    if (empty($activeSessions)) {
         return ['open' => false, 'reason' => 'no_session', 'session' => null,
             'notice' => 'Belum ada sesi ujian pretes resmi yang aktif. Silakan tunggu informasi dari admin LPPAI.'];
     }
-    if ((int)($session['exam_open'] ?? 1) !== 1) {
-        return ['open' => false, 'reason' => 'closed', 'session' => $session,
+
+    $fmt = static fn(int $ts) => (new DateTimeImmutable('@' . $ts))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+
+    $anyOpen = false;
+    $bestSession = null;
+    $firstNotice = '';
+
+    foreach ($activeSessions as $session) {
+        $isOpen = (int)($session['exam_open'] ?? 1) === 1;
+        if (!empty($session['start_time']) && ($ts = strtotime($session['start_time'])) !== false && $now < $ts) {
+            $isOpen = false;
+            if (!$firstNotice) $firstNotice = "Ujian pretes '{$session['title']}' dapat dimulai pada {$fmt($ts)} WIB.";
+        }
+        if (!empty($session['end_time']) && ($ts = strtotime($session['end_time'])) !== false && $now > $ts) {
+            $isOpen = false;
+            if (!$firstNotice) $firstNotice = "Sesi ujian pretes telah ditutup sejak {$fmt($ts)} WIB.";
+        }
+
+        if ($isOpen) {
+            $anyOpen = true;
+            $bestSession = $session;
+            break;
+        }
+    }
+
+    if ($anyOpen) {
+        return ['open' => true, 'reason' => 'open', 'session' => $bestSession, 'notice' => 'Pengerjaan ujian pretes telah dibuka.'];
+    }
+
+    $fallbackSession = $activeSessions[0];
+    if ((int)($fallbackSession['exam_open'] ?? 1) !== 1) {
+        return ['open' => false, 'reason' => 'closed', 'session' => $fallbackSession,
             'notice' => 'Pengerjaan ujian pretes belum dibuka / sedang ditutup oleh admin. Silakan persiapkan diri dan tunggu informasi pembukaan ujian.'];
     }
-    if (!empty($session['start_time']) && ($ts = strtotime($session['start_time'])) !== false && $now < $ts) {
-        return ['open' => false, 'reason' => 'not_started', 'session' => $session,
-            'notice' => "Ujian pretes dapat dimulai pada {$fmt($ts)} WIB."];
-    }
-    if (!empty($session['end_time']) && ($ts = strtotime($session['end_time'])) !== false && $now > $ts) {
-        return ['open' => false, 'reason' => 'ended', 'session' => $session,
-            'notice' => "Sesi ujian pretes telah ditutup sejak {$fmt($ts)} WIB."];
-    }
-    return ['open' => true, 'reason' => 'open', 'session' => $session, 'notice' => 'Pengerjaan ujian pretes telah dibuka.'];
+
+    return ['open' => false, 'reason' => 'closed', 'session' => $fallbackSession,
+        'notice' => $firstNotice ?: 'Pengerjaan ujian pretes sedang tidak dapat diakses saat ini.'];
 }
 
 // ══════════════════════════════════════════════════════════════════════════

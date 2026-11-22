@@ -18,3 +18,4 @@
 .cbt-interruption-card button:disabled{opacity:.55;cursor:wait}
 .cbt-interruption-card button:focus-visible{outline:3px solid #fbbf24;outline-offset:4px}
 @media(max-width:600px){.cbt-interruption{padding:16px}.cbt-interruption-card{padding:24px}}
+.cbt-session-card{display:block;position:relative;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:10px;background:#ffffff;cursor:pointer;transition:all .15s ease-in-out;text-align:left}.cbt-session-card:hover{border-color:#059669;background:#f0fdf4}.cbt-session-card.selected{border-color:#059669;background:#ecfdf5;box-shadow:0 0 0 2px rgba(5,150,105,.2)}.cbt-session-card input[type="radio"]{position:absolute;top:14px;right:14px;accent-color:#059669}.cbt-session-card .session-title{font-size:14px;font-weight:700;color:#0f172a;padding-right:28px}.cbt-session-card .session-meta{font-size:11.5px;color:#64748b;margin-top:4px}
