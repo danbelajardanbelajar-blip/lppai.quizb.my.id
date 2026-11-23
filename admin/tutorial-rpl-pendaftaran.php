@@ -9,6 +9,9 @@ require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/tutorial-rpl-registration.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-periods.php';
+if (file_exists(__DIR__ . '/../includes/tutorial-rpl-helper.php')) {
+    require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
+}
 
 if (!function_exists('sanitize')) {
     function sanitize($v) {
@@ -37,6 +40,9 @@ $query = is_string($_GET['q'] ?? null) ? mb_substr(trim($_GET['q']), 0, 80) : ''
 try {
     $pdo = getDBConnection();
     ensureTutorialRplRegistrationTable($pdo);
+    if (function_exists('ensureTutorialRplTables')) {
+        ensureTutorialRplTables($pdo);
+    }
 
     $hasMembers = tutorialRplTableExists($pdo, 'tutorial_rpl_members');
     $hasClasses = tutorialRplTableExists($pdo, 'tutorial_rpl_classes');
@@ -51,6 +57,29 @@ try {
     $fotoCol  = in_array('foto', $userColumns, true) ? 'u.foto' : "'' AS foto";
     $hpCol    = in_array('no_hp', $userColumns, true) ? 'u.no_hp' : "'' AS no_hp";
     $fakCol   = in_array('fakultas', $userColumns, true) ? 'u.fakultas' : "'' AS fakultas";
+
+    // Deteksi kolom tutorial_rpl_members secara dinamis
+    $memberCols = [];
+    if ($hasMembers) {
+        $memberCols = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? array_column($pdo->query('PRAGMA table_info(tutorial_rpl_members)')->fetchAll(PDO::FETCH_ASSOC), 'name')
+            : array_column($pdo->query('SHOW COLUMNS FROM tutorial_rpl_members')->fetchAll(PDO::FETCH_ASSOC), 'Field');
+    }
+    $colDriveVer = in_array('drive_verified', $memberCols, true) ? 'm.drive_verified' : '0';
+    $colExam     = in_array('nilai_ujian_tulis', $memberCols, true) ? 'm.nilai_ujian_tulis' : (in_array('exam_score', $memberCols, true) ? 'm.exam_score' : 'NULL');
+    $colPraktik  = in_array('nilai_praktik', $memberCols, true) ? 'm.nilai_praktik' : 'NULL';
+    $colAkhir    = in_array('nilai_akhir', $memberCols, true) ? 'm.nilai_akhir' : 'NULL';
+    $colStatus   = in_array('status_lulus', $memberCols, true) ? 'm.status_lulus' : "'proses'";
+
+    // Deteksi kolom tutorial_rpl_classes secara dinamis
+    $classCols = [];
+    if ($hasClasses) {
+        $classCols = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite'
+            ? array_column($pdo->query('PRAGMA table_info(tutorial_rpl_classes)')->fetchAll(PDO::FETCH_ASSOC), 'name')
+            : array_column($pdo->query('SHOW COLUMNS FROM tutorial_rpl_classes')->fetchAll(PDO::FETCH_ASSOC), 'Field');
+    }
+    $colKelompok = in_array('nama_kelompok', $classCols, true) ? 'c.nama_kelompok' : 'NULL';
+    $colDosenId  = in_array('dosen_id', $classCols, true) ? 'c.dosen_id' : 'NULL';
 
     // ── Handle Form POST Actions ────────────────────────────────────────────
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -166,7 +195,7 @@ try {
         LEFT JOIN tutorial_rpl_classes c ON c.id = m.class_id
         LEFT JOIN users tutor ON tutor.id = c.dosen_id
     " : "
-        LEFT JOIN (SELECT NULL as id, NULL as user_id, NULL as class_id, NULL as drive_verified, NULL as exam_score, NULL as nilai_praktik, NULL as nilai_akhir, NULL as status_lulus) m ON 1=0
+        LEFT JOIN (SELECT NULL as id, NULL as user_id, NULL as class_id, NULL as drive_verified, NULL as nilai_ujian_tulis, NULL as exam_score, NULL as nilai_praktik, NULL as nilai_akhir, NULL as status_lulus) m ON 1=0
         LEFT JOIN (SELECT NULL as id, NULL as nama_kelompok, NULL as dosen_id) c ON 1=0
         LEFT JOIN (SELECT NULL as id, NULL as nama_lengkap) tutor ON 1=0
     ";
@@ -176,8 +205,15 @@ try {
         u.nama_lengkap, u.nim, u.jenis_program,
         $prodiCol, $emailCol, $fotoCol, $hpCol, $fakCol,
         a.nama_lengkap AS actor_name,
-        m.id AS member_id, m.class_id, m.drive_verified, m.exam_score, m.nilai_praktik, m.nilai_akhir, m.status_lulus,
-        c.nama_kelompok, c.dosen_id,
+        m.id AS member_id, m.class_id,
+        $colDriveVer AS drive_verified,
+        $colExam AS exam_score,
+        $colExam AS nilai_ujian_tulis,
+        $colPraktik AS nilai_praktik,
+        $colAkhir AS nilai_akhir,
+        $colStatus AS status_lulus,
+        $colKelompok AS nama_kelompok,
+        $colDosenId AS dosen_id,
         tutor.nama_lengkap AS tutor_name,
         p.nama AS periode_nama, p.gelombang AS periode_gelombang
     ";
@@ -186,8 +222,8 @@ try {
         $stmtReg = $pdo->query("
             SELECT $selectCols
             FROM tutorial_rpl_registrations r
-            JOIN users u ON u.id = r.user_id
-            JOIN tutorial_rpl_registration_periods p ON p.id = r.period_id
+            LEFT JOIN users u ON u.id = r.user_id
+            LEFT JOIN tutorial_rpl_registration_periods p ON p.id = r.period_id
             LEFT JOIN users a ON a.id = r.registered_by
             $baseJoinMembers
             ORDER BY r.id DESC
@@ -197,8 +233,8 @@ try {
         $stmtReg = $pdo->prepare("
             SELECT $selectCols
             FROM tutorial_rpl_registrations r
-            JOIN users u ON u.id = r.user_id
-            JOIN tutorial_rpl_registration_periods p ON p.id = r.period_id
+            LEFT JOIN users u ON u.id = r.user_id
+            LEFT JOIN tutorial_rpl_registration_periods p ON p.id = r.period_id
             LEFT JOIN users a ON a.id = r.registered_by
             $baseJoinMembers
             WHERE r.period_id = ?
@@ -226,7 +262,7 @@ try {
     $error = $e->getMessage();
 } catch (Throwable $e) {
     error_log('RPL admin registration: ' . $e->getMessage());
-    $error = 'Pendaftaran atau hasil pretes belum dapat diperiksa. Coba kembali; jika berulang hubungi pengelola server.';
+    $error = 'Data pendaftar tutorial RPL belum dapat dimuat (' . $e->getMessage() . '). Coba muat ulang; jika berulang hubungi administrator.';
 }
 
 $notice = $_SESSION['rpl_admin_registration_notice'] ?? '';

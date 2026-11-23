@@ -5,6 +5,44 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 21:07:37 +0700 — Perbaikan resolusi dinamis kolom nilai ujian dan relasi anggota tutorial RPL pada halaman Data Pendaftar
+
+**ID:** TUTORIAL-RPL-PENDAFTARAN-EXAM-SCORE-COLUMN-FIX · **Parent Git:** `5d6a0a6`.
+
+**Permintaan dan dasar perbaikan:** Laporan pengguna disertai tangkapan layar modal SweetAlert error "Gagal: Pendaftaran atau hasil pretes belum dapat diperiksa. Coba kembali; jika berulang hubungi pengelola server." yang muncul di halaman produksi `https://lppai.quizb.my.id/admin/tutorial-rpl-pendaftaran.php` saat dibuka administrator padahal mahasiswa sudah banyak yang mendaftar.
+Investigasi menunjukkan kueri data pendaftar memanggil kolom `m.exam_score` dari tabel `tutorial_rpl_members`. Pada skema basis data MySQL produksi, tabel `tutorial_rpl_members` menggunakan nama kolom `nilai_ujian_tulis` (bukan `exam_score`), sehingga MySQL melempar `PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'm.exam_score' in 'field list'` yang memicu blok penanganan `catch (Throwable $e)` dan memunculkan pop-up galat tersebut.
+
+**Perubahan dan alasan:**
+1. **Deteksi Kolom Dinamis & Pemetaan Nilai Ujian (`admin/tutorial-rpl-pendaftaran.php`):**
+   - Menambahkan deteksi kolom dinamis pada tabel `tutorial_rpl_members` (`$memberCols`) dan `tutorial_rpl_classes` (`$classCols`) via `PRAGMA table_info` (SQLite) / `SHOW COLUMNS` (MySQL).
+   - Memetakan nilai ujian tulis secara cerdas: memprioritaskan `m.nilai_ujian_tulis`, fallback ke `m.exam_score`, dan `NULL` jika belum ada kolom nilai, dengan alias ganda `exam_score` dan `nilai_ujian_tulis` sehingga kode view yang menampilkan nilai CBT tetap berfungsi normal.
+   - Memastikan kolom `drive_verified`, `nilai_praktik`, `nilai_akhir`, `status_lulus`, `nama_kelompok`, dan `dosen_id` memiliki fallback ekspresi SQL yang aman sehingga kueri tidak pernah gagal akibat perbedaan versi skema tabel.
+2. **Koneksi Skema Helper (`admin/tutorial-rpl-pendaftaran.php`):**
+   - Memanggil `ensureTutorialRplTables($pdo)` secara kondisional jika `includes/tutorial-rpl-helper.php` tersedia untuk memastikan tabel pendukung `tutorial_rpl_classes` dan `tutorial_rpl_members` beserta kolom migrasinya selalu terinisialisasi.
+3. **Penyempurnaan Relasi Kueri (LEFT JOIN):**
+   - Mengubah `JOIN tutorial_rpl_registration_periods` dan `JOIN users` menjadi `LEFT JOIN` pada kueri pendaftar agar data pendaftar tidak hilang atau memicu error seandainya ada data periode atau pengguna yang anomali.
+4. **Penyempurnaan Pesan Error Penanganan:**
+   - Memperbaiki pesan penanganan galat di blok `catch (Throwable $e)` agar menyertakan konteks spesifik tutorial RPL yang informatif dan tidak lagi menampilkan pesan usang yang menyebutkan "pretes".
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 21:07:37 | `admin/tutorial-rpl-pendaftaran.php` | 9-265 | Penyertaan helper, deteksi kolom dinamis m.nilai_ujian_tulis sebagai exam_score, LEFT JOIN relasi periode/user, dan perbaikan penanganan tangkap galat. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `admin/tutorial-rpl-pendaftaran.php` lulus tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Pengujian unit kueri dengan skema riil `tutorial_rpl_members` (tanpa kolom exam_score) di `scratch/test-pendaftaran-members-query.php` lulus 100%.
+- Pengujian fungsional `tests/tutorial-rpl-registration-test.php` lulus 100%.
+- Seluruh 11 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
+---
+
 ## 2026-11-23 17:50:00 +0700 — Penyelarasan antarmuka Data Pendaftar Tutorial RPL menyerupai Data Peserta Pretes
 
 **ID:** TUTORIAL-RPL-PENDAFTARAN-PESERTA-ALIGNMENT · **Parent Git:** `78a76b9`.
