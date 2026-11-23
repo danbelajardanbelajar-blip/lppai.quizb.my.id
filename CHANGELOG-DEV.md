@@ -5,6 +5,46 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 15:43:00 +0700 — Perombakan besar antarmuka satu pintu Modal Edit 1200px & Grid Kuota Harian Tutorial RPL ala Pretes Dosen
+
+**ID:** TUTORIAL-RPL-PERIODE-MODAL-GRID-OVERHAUL · **Parent Git:** `412e136`.
+
+**Permintaan dan dasar perbaikan:** Evaluasi menunjukkan halaman `admin/tutorial-rpl-periode.php` masih dirasa terlalu rumit karena alur pengeditan mengharuskan reload ke bawah halaman dan penambahan dosen dilakukan per baris bebas yang panjang tanpa pembagian hari terstruktur. Dilakukan perombakan besar-besaran agar menyerupai penuh arsitektur `admin/pretes-dosen.php`: Modal Edit pop-up lebar 1200px satu pintu, Grid Harian (Senin - Minggu) dengan tombol penambahan tutor per hari (+), kalkulasi otomatis kuota harian (30 x jumlah tutor), form tambah periode yang collapsible, dan memastikan seluruh data tetap khusus untuk keperluan Tutorial RPL Online.
+
+**Perubahan dan alasan:**
+1. **Modal Edit Lebar 1200px Satu Pintu (`#editRplModal`):**
+   - Menggantikan alur pengeditan lama yang me-reload formulir di bawah tabel. Mengklik tombol "✏️ Edit" di tabel maupun di kartu periode aktif kini memunculkan modal pop-up selebar 1200px berlatar blur (`backdrop-filter: blur(2px)`).
+   - Seluruh pengaturan metadata (Nama, Gelombang, Buka WIB, Tutup WIB, Kuota Total, Status Aktif) dan jadwal dosen tutor tersaji lengkap dalam satu layar.
+2. **Arsitektur Grid Kuota Harian (Senin - Minggu):**
+   - Mengadopsi struktur `renderPengujiSelect` persis seperti Pretes Dosen: grid 5 hari kerja (Senin - Jumat) dan kontainer khusus akhir pekan (Sabtu & Minggu / Ahad) khusus mahasiswa RPL.
+   - Di setiap kolom hari: admin dapat memilih tutor, menambah tutor pada hari tersebut dengan tombol `+` hijau, menghapus dengan `×`, serta kuota harian otomatis terhitung 30 per tutor (dapat disesuaikan manual).
+3. **Card Tambah Periode Baru Collapsible (`#card-tambah-periode`):**
+   - Menjadikan formulir buat periode baru default tersembunyi (`display:none`) agar antarmuka ringkas, bersih, dan fokus pada ringkasan aktif serta daftar periode. Tombol "➕ Tambah Periode Baru" membuka formulir secara mulus.
+4. **Parser Cerdas Jadwal Backend:**
+   - Memetakan input harian (`penguji_senin[]`, `kuota_senin`, dst.) secara otomatis menjadi data relasional `schedules` untuk disimpan ke `tutorial_rpl_period_tutors`.
+   - Tetap menjaga kompatibilitas penuh dengan pengiriman array `schedules` langsung dan proteksi pemotongan form `schedules_complete`.
+5. **Eksklusivitas Tutorial RPL:**
+   - Menjamin seluruh operasi hanya berinteraksi dengan tabel `tutorial_rpl_registration_periods`, `tutorial_rpl_period_tutors`, dan `tutorial_rpl_registrations` tanpa mencampuri Pretes.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 15:41:53 | `admin/tutorial-rpl-periode.php` | 1-760 | Perombakan besar antarmuka satu pintu Modal Edit 1200px (`#editRplModal`), grid hari (Senin - Minggu), selektor tutor harian dinamis (+), kalkulasi kuota otomatis, Card Tambah collapsible, dan parser schedules terpadu. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `admin/tutorial-rpl-periode.php` lulus tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa whitespace error.
+- Pengujian fungsional dan isolasi `tests/tutorial-rpl-periods-test.php` lulus 100%.
+- Pengujian navigasi dan struktur `tests/tutorial-rpl-structure-test.php` lulus 100%.
+- Seluruh 11 suite pengujian Tutorial RPL lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan database SQLite lingkungan terisolasi dan PHP CLI lokal.
+- Deployment hosting memerlukan penarikan commit Git ke server produksi aktif.
+
+---
+
 ## 2026-11-23 15:29:00 +0700 — Penyelarasan antarmuka Periode Tutorial RPL menyerupai Pretes Dosen
 
 **ID:** TUTORIAL-RPL-PERIODE-PRETES-ALIGNMENT · **Parent Git:** `787a713`.
