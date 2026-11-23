@@ -1,6 +1,6 @@
 <?php
 /**
- * LPPAI Corner - Dosen: Bimbingan & Penilaian Tutorial RPL Online (Tahap 3)
+ * LPPAI Corner - Dosen: Bimbingan & Penilaian Tutorial RPL Online
  */
 define('PAGE_TITLE', 'Tutorial RPL Online (Bimbingan Dosen)');
 require_once __DIR__ . '/../includes/auth.php';
@@ -15,9 +15,7 @@ $userId = (int)($user['id'] ?? 0);
 $nim = trim((string)($user['nim'] ?? ''));
 $nama = trim((string)($user['nama_lengkap'] ?? ''));
 
-// Ambil kelompok yang diampu dosen login (atau semua jika tester 12345)
-$isTester = ($nim === '12345' || (string)($user['username'] ?? '') === '12345' || $userId === 12345);
-
+// Ambil kelompok bimbingan yang sah diampu dosen login
 $sql = "
     SELECT c.*,
            (SELECT COUNT(*) FROM tutorial_rpl_members m WHERE m.class_id = c.id) AS terisi,
@@ -25,16 +23,11 @@ $sql = "
            (SELECT COUNT(*) FROM tutorial_rpl_members m WHERE m.class_id = c.id AND m.exam_submitted = 1) AS cbt_selesai
     FROM tutorial_rpl_classes c
     WHERE c.is_active = 1
+      AND (c.dosen_id = ? OR (c.dosen_nim IS NOT NULL AND c.dosen_nim = ?) OR c.dosen_nama = ?)
+    ORDER BY c.id ASC
 ";
-$params = [];
-if (!$isTester) {
-    $sql .= " AND (c.dosen_id = ? OR (c.dosen_nim IS NOT NULL AND c.dosen_nim = ?) OR c.dosen_nama = ?)";
-    $params = [$userId, $nim, $nama];
-}
-$sql .= " ORDER BY c.id ASC";
-
 $stmt = $pdo->prepare($sql);
-$stmt->execute($params);
+$stmt->execute([$userId, $nim, $nama]);
 $myClasses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $selectedClassId = (int)($_GET['class_id'] ?? ($myClasses[0]['id'] ?? 0));
@@ -46,45 +39,75 @@ foreach ($myClasses as $c) {
     }
 }
 
-// Proses Form Penilaian & Verifikasi
+// Proses Form Penilaian & Verifikasi dengan Proteksi CSRF
 $message = '';
 $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = trim($_POST['action'] ?? '');
+    $token = $_POST['csrf_token'] ?? '';
+    if (!verifyCsrf($token)) {
+        $message = 'Sesi formulir tidak valid atau telah kedaluwarsa. Silakan muat ulang halaman.';
+        $msgType = 'danger';
+    } else {
+        $action = trim($_POST['action'] ?? '');
 
-    if ($action === 'save_evaluation') {
-        $memberId = (int)($_POST['member_id'] ?? 0);
-        $driveVerified = (int)($_POST['drive_verified'] ?? 1);
-        $notes = trim($_POST['drive_notes'] ?? '');
-        $nilaiPraktikRaw = trim($_POST['nilai_praktik'] ?? '');
-        $nilaiPraktik = ($nilaiPraktikRaw !== '') ? max(0, min(100, (float)$nilaiPraktikRaw)) : null;
+        if ($action === 'save_evaluation') {
+            $memberId = (int)($_POST['member_id'] ?? 0);
+            $driveVerified = (int)($_POST['drive_verified'] ?? 1);
+            $notes = trim($_POST['drive_notes'] ?? '');
+            $nilaiPraktikRaw = trim($_POST['nilai_praktik'] ?? '');
+            $nilaiPraktik = ($nilaiPraktikRaw !== '') ? max(0, min(100, (float)$nilaiPraktikRaw)) : null;
 
-        if ($memberId > 0) {
-            try {
-                tutorialRplSaveEvaluation($pdo, $memberId, $nilaiPraktik, $driveVerified, $notes);
-                $message = 'Evaluasi dan verifikasi tugas mahasiswa berhasil disimpan.';
-                $msgType = 'success';
-            } catch (Throwable $e) {
-                $message = 'Gagal menyimpan evaluasi: ' . $e->getMessage();
-                $msgType = 'danger';
+            if ($memberId > 0 && $currentClass) {
+                // Validasi kepemilikan anggota dalam kelas bimbingan dosen aktif
+                $checkMember = $pdo->prepare("SELECT id FROM tutorial_rpl_members WHERE id = ? AND class_id = ?");
+                $checkMember->execute([$memberId, (int)$currentClass['id']]);
+                if (!$checkMember->fetch()) {
+                    $message = 'Akses ditolak: mahasiswa tidak terdaftar pada kelompok bimbingan ini.';
+                    $msgType = 'danger';
+                } else {
+                    try {
+                        tutorialRplSaveEvaluation($pdo, $memberId, $nilaiPraktik, $driveVerified, $notes);
+                        $message = 'Evaluasi dan verifikasi tugas mahasiswa berhasil disimpan.';
+                        $msgType = 'success';
+                    } catch (Throwable $e) {
+                        $message = 'Gagal menyimpan evaluasi: ' . $e->getMessage();
+                        $msgType = 'danger';
+                    }
+                }
             }
-        }
-    } elseif ($action === 'batch_verify') {
-        $selectedMemberIds = $_POST['member_ids'] ?? [];
-        $verifyStatus = (int)($_POST['batch_status'] ?? 1);
+        } elseif ($action === 'batch_verify') {
+            $selectedMemberIds = $_POST['member_ids'] ?? [];
+            $verifyStatus = (int)($_POST['batch_status'] ?? 1);
 
-        if (!is_array($selectedMemberIds) || empty($selectedMemberIds)) {
-            $message = 'Pilih mahasiswa yang ingin diverifikasi tugasnya.';
-            $msgType = 'warning';
-        } else {
-            try {
-                $count = tutorialRplBatchVerify($pdo, $selectedMemberIds, $verifyStatus);
-                $label = ($verifyStatus === 1) ? 'diverifikasi sah' : 'dibatalkan verifikasinya';
-                $message = "Berhasil memperbarui $count tugas mahasiswa menjadi $label.";
-                $msgType = 'success';
-            } catch (Throwable $e) {
-                $message = 'Gagal verifikasi massal: ' . $e->getMessage();
-                $msgType = 'danger';
+            if (!is_array($selectedMemberIds) || empty($selectedMemberIds)) {
+                $message = 'Pilih minimal satu mahasiswa yang ingin diverifikasi tugasnya.';
+                $msgType = 'warning';
+            } elseif ($currentClass) {
+                $selectedMemberIds = array_filter(array_map('intval', $selectedMemberIds), fn($id) => $id > 0);
+                if (empty($selectedMemberIds)) {
+                    $message = 'Data mahasiswa tidak valid.';
+                    $msgType = 'warning';
+                } else {
+                    $placeholders = implode(',', array_fill(0, count($selectedMemberIds), '?'));
+                    $checkStmt = $pdo->prepare("SELECT id FROM tutorial_rpl_members WHERE class_id = ? AND id IN ($placeholders)");
+                    $checkStmt->execute(array_merge([(int)$currentClass['id']], $selectedMemberIds));
+                    $validIds = $checkStmt->fetchAll(PDO::FETCH_COLUMN);
+
+                    if (empty($validIds)) {
+                        $message = 'Tidak ada mahasiswa valid yang dipilih dalam kelompok bimbingan ini.';
+                        $msgType = 'warning';
+                    } else {
+                        try {
+                            $count = tutorialRplBatchVerify($pdo, $validIds, $verifyStatus);
+                            $label = ($verifyStatus === 1) ? 'diverifikasi sah' : 'dibatalkan verifikasinya';
+                            $message = "Berhasil memperbarui $count tugas mahasiswa menjadi $label.";
+                            $msgType = 'success';
+                        } catch (Throwable $e) {
+                            $message = 'Gagal verifikasi massal: ' . $e->getMessage();
+                            $msgType = 'danger';
+                        }
+                    }
+                }
             }
         }
     }
@@ -120,13 +143,14 @@ foreach ($members as $m) {
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
-    <div>
-        <h2 style="margin:0 0 4px 0; font-size:22px; font-weight:800; color:var(--text-dark);">
-            🌐 Tutorial RPL Online — Bimbingan Dosen
-        </h2>
-        <p style="margin:0; font-size:13.5px; color:#64748b;">
-            Tinjau video rekaman hafalan di Google Drive, berikan penilaian evaluasi praktik, serta verifikasi kelengkapan tugas mahasiswa bimbingan.
+<!-- Header Pengantar Halaman Terpadu -->
+<div class="card" style="margin-bottom:20px; border-left:4px solid var(--primary);">
+    <div class="card-body" style="padding:16px 20px;">
+        <h3 style="margin:0 0 4px 0; font-size:18px; font-weight:800; color:var(--text-dark);">
+            Bimbingan &amp; Penilaian Tutorial RPL Online
+        </h3>
+        <p style="margin:0; font-size:13.5px; color:var(--text-muted, #64748b);">
+            Tinjau video rekaman hafalan di Google Drive, berikan evaluasi nilai praktik, serta verifikasi kelengkapan tugas mahasiswa bimbingan.
         </p>
     </div>
 </div>
@@ -147,13 +171,13 @@ include __DIR__ . '/../includes/header.php';
         </p>
     </div>
 <?php else: ?>
-    <!-- Pilihan Tab Kelompok Dosen -->
-    <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+    <!-- Tab Pemilihan Kelompok Bimbingan Dosen -->
+    <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
         <?php foreach ($myClasses as $cls): ?>
             <?php $isActiveTab = ((int)$cls['id'] === $selectedClassId); ?>
-            <a href="?class_id=<?= (int)$cls['id'] ?>" class="btn <?= $isActiveTab ? 'btn-primary' : 'btn-secondary' ?>" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; text-decoration:none;">
+            <a href="?class_id=<?= (int)$cls['id'] ?>" class="btn <?= $isActiveTab ? 'btn-primary' : 'btn-outline' ?>" style="display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:700; text-decoration:none; border-radius:999px; padding:7px 16px;">
                 <span>🏫</span> <?= sanitize($cls['nama_kelompok']) ?>
-                <span class="badge" style="background:<?= $isActiveTab ? 'rgba(255,255,255,0.25)' : '#e2e8f0' ?>; color:<?= $isActiveTab ? '#fff' : '#475569' ?>; font-size:11px;">
+                <span class="badge" style="background:<?= $isActiveTab ? 'rgba(255,255,255,0.25)' : '#e2e8f0' ?>; color:<?= $isActiveTab ? '#fff' : '#475569' ?>; font-size:11px; padding:2px 7px; border-radius:999px;">
                     <?= (int)$cls['terisi'] ?> Mhs
                 </span>
             </a>
@@ -194,20 +218,20 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Card Folder Google Drive Kelas -->
-        <div class="card" style="margin-bottom:20px; border-left:4px solid #059669; border-radius:12px; background:#f0fdf4;">
+        <div class="card" style="margin-bottom:20px; border-left:4px solid var(--primary); background:var(--bg-card, #ffffff);">
             <div class="card-body" style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
                 <div>
-                    <h3 style="margin:0 0 4px 0; font-size:17px; font-weight:700; color:#065f46;">
-                        <?= sanitize($currentClass['nama_kelompok']) ?>
+                    <h3 style="margin:0 0 4px 0; font-size:16.5px; font-weight:700; color:var(--text-dark);">
+                        📁 Folder Tugas Kelas: <?= sanitize($currentClass['nama_kelompok']) ?>
                     </h3>
-                    <p style="margin:0; font-size:13px; color:#64748b;">
+                    <p style="margin:0; font-size:13px; color:var(--text-muted, #64748b);">
                         <?= sanitize($currentClass['periode']) ?> · <?= sanitize($currentClass['gelombang'] ?? 'Gelombang 1') ?>
                     </p>
                 </div>
                 <div>
                     <?php if (!empty($currentClass['drive_url'])): ?>
                         <a href="<?= sanitize($currentClass['drive_url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
-                            <span>📁</span> Buka Folder Tugas Google Drive ↗
+                            <span>📂</span> Buka Google Drive Kelas ↗
                         </a>
                     <?php else: ?>
                         <span style="font-size:12.5px; color:#94a3b8; font-style:italic;">Folder Google Drive belum diatur oleh admin</span>
@@ -217,7 +241,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <!-- Form Pencarian Mahasiswa Bimbingan -->
-        <div class="card" style="margin-bottom:20px; border-radius:12px;">
+        <div class="card" style="margin-bottom:20px;">
             <div class="card-body" style="padding:14px 20px;">
                 <form method="GET" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <input type="hidden" name="class_id" value="<?= (int)$currentClass['id'] ?>">
@@ -236,9 +260,10 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Form Aksi Massal & Tabel Mahasiswa Bimbingan -->
         <form method="POST" id="form-tutor-batch">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="class_id" value="<?= (int)$currentClass['id'] ?>">
 
-            <div id="tutor-batch-bar" style="display:none; background:#065f46; color:#fff; border-radius:12px; padding:12px 18px; margin-bottom:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; box-shadow:0 8px 20px rgba(6,95,70,0.35);">
+            <div id="tutor-batch-bar" style="display:none; background:var(--primary-dark, #065f46); color:#fff; border-radius:12px; padding:12px 18px; margin-bottom:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; box-shadow:0 8px 20px rgba(6,95,70,0.35);">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:18px;">🔘</span>
                     <span id="tutor-selected-count" style="font-weight:700; font-size:14px;">0 Mahasiswa Terpilih</span>
@@ -254,13 +279,13 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <div class="card" style="box-shadow:var(--shadow); border-radius:12px; overflow:hidden;">
-                <div class="card-header" style="background:#f8fafc; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div class="card" style="margin-bottom:24px;">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <span style="font-weight:700; color:var(--text-dark);">
                         📋 Daftar Mahasiswa Bimbingan (<?= count($members) ?>)
                     </span>
-                    <span style="font-size:12px; color:#64748b;">
-                        <em>Klik tombol 📝 Evaluasi pada baris mahasiswa untuk input nilai praktik &amp; catatan bimbingan.</em>
+                    <span style="font-size:12px; color:var(--text-muted, #64748b);">
+                        <em>Klik tombol 📝 Evaluasi untuk input nilai praktik &amp; catatan bimbingan.</em>
                     </span>
                 </div>
                 <div class="card-body" style="padding:0;">
@@ -272,7 +297,7 @@ include __DIR__ . '/../includes/header.php';
                         <div class="table-responsive">
                             <table class="table" style="margin:0; width:100%;">
                                 <thead>
-                                    <tr style="background:#f1f5f9; text-align:left; font-size:12.5px; color:#475569;">
+                                    <tr>
                                         <th style="padding:12px 14px; width:36px; text-align:center;">
                                             <input type="checkbox" id="check-all-tutor" onclick="toggleTutorSelectAll(this)" style="cursor:pointer; transform:scale(1.15);">
                                         </th>
@@ -309,7 +334,7 @@ include __DIR__ . '/../includes/header.php';
                                             </td>
                                             <td style="padding:12px 14px; text-align:center; vertical-align:middle;">
                                                 <?php if ($m['drive_verified']): ?>
-                                                    <span class="badge badge-emerald" style="font-size:11px; padding:3px 8px;">✅ Terverifikasi</span>
+                                                    <span class="badge badge-success" style="font-size:11px; padding:3px 8px;">✅ Terverifikasi</span>
                                                 <?php elseif ($m['drive_submitted']): ?>
                                                     <span class="badge badge-info" style="font-size:11px; padding:3px 8px;">⏳ Menunggu Verifikasi</span>
                                                 <?php else: ?>
@@ -330,7 +355,7 @@ include __DIR__ . '/../includes/header.php';
                                             </td>
                                             <td style="padding:12px 14px; text-align:center; vertical-align:middle;">
                                                 <?php if ($m['exam_submitted']): ?>
-                                                    <span class="badge badge-emerald" style="font-size:11px; padding:3px 8px;">
+                                                    <span class="badge badge-success" style="font-size:11px; padding:3px 8px;">
                                                         ✅ Selesai (<?= $m['nilai_ujian_tulis'] !== null ? (float)$m['nilai_ujian_tulis'] : '-' ?>)
                                                     </span>
                                                 <?php else: ?>
@@ -339,7 +364,7 @@ include __DIR__ . '/../includes/header.php';
                                             </td>
                                             <td style="padding:12px 14px; text-align:center; vertical-align:middle;">
                                                 <?php if ($isHadir): ?>
-                                                    <span class="badge badge-emerald" style="font-size:11.5px; font-weight:700; padding:4px 10px;">✅ Hadir Sah</span>
+                                                    <span class="badge badge-success" style="font-size:11.5px; font-weight:700; padding:4px 10px;">✅ Hadir Sah</span>
                                                 <?php else: ?>
                                                     <span class="badge badge-danger" style="font-size:11px; padding:3px 8px;">Belum Lengkap</span>
                                                 <?php endif; ?>
@@ -363,12 +388,13 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Modal Evaluasi & Verifikasi Mahasiswa -->
 <div id="modal-eval" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center; padding:16px;">
-    <div style="background:#fff; border-radius:14px; width:100%; max-width:460px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden;">
+    <div style="background:#fff; border-radius:14px; width:100%; max-width:480px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden;">
         <div style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
             <h4 style="margin:0; font-size:15px; font-weight:700; color:#1e293b;">📝 Evaluasi Tugas &amp; Praktik Hafalan</h4>
             <button type="button" onclick="document.getElementById('modal-eval').style.display='none';" style="background:none; border:none; font-size:18px; cursor:pointer; color:#64748b;">✕</button>
         </div>
         <form method="POST" style="padding:20px;">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
             <input type="hidden" name="action" value="save_evaluation">
             <input type="hidden" name="member_id" id="eval-member-id" value="">
 
@@ -379,7 +405,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div style="margin-bottom:14px;">
-                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Status Verifikasi Tugas Google Drive</label>
+                <label for="eval-drive-verified" style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Status Verifikasi Tugas Google Drive</label>
                 <select name="drive_verified" id="eval-drive-verified" class="form-control" style="width:100%;">
                     <option value="1">✅ Terverifikasi (Tugas Video Hafalan Sah)</option>
                     <option value="0">⏳ Belum Diverifikasi / Perlu Revisi</option>
@@ -387,13 +413,13 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div style="margin-bottom:14px;">
-                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Nilai Praktik Hafalan (0 - 100)</label>
+                <label for="eval-nilai-praktik" style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Nilai Praktik Hafalan (0 - 100)</label>
                 <input type="number" step="0.1" min="0" max="100" name="nilai_praktik" id="eval-nilai-praktik" class="form-control" placeholder="Contoh: 85.0" style="width:100%;">
                 <small style="color:#64748b; font-size:11.5px; display:block; margin-top:2px;">Passing grade kelulusan: 80.0</small>
             </div>
 
             <div style="margin-bottom:18px;">
-                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Catatan / Umpan Balik Tutor</label>
+                <label for="eval-drive-notes" style="display:block; font-size:13px; font-weight:600; margin-bottom:5px; color:#334155;">Catatan / Umpan Balik Tutor</label>
                 <textarea name="drive_notes" id="eval-drive-notes" class="form-control" rows="3" placeholder="Catatan kelancaran makhraj, tajwid, atau hafalan..." style="width:100%;"></textarea>
             </div>
 

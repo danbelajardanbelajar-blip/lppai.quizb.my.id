@@ -5,6 +5,48 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 14:50:00 +0700 — Penyelarasan antarmuka Tutorial RPL & perbaikan keamanan CSRF bimbingan dosen
+
+**ID:** TUTORIAL-RPL-SECURITY-DESIGN-ALIGNMENT · **Parent Git:** `7369b45`.
+
+**Permintaan dan dasar perbaikan:** Evaluasi kejanggalan antarmuka dan bug pada halaman Tutorial RPL Online dibandingkan standar design system LPPAI. Ditemukan celah keamanan form tanpa token CSRF dan bypass tester hardcoded pada bimbingan dosen (`dosen/tutorial-rpl.php`), dominasi inline styling yang mengabaikan tema warna dinamis `data-theme`, duplikasi judul halaman di bawah topbar, kontainer arbitrer (`max-width: 760px` dan `820px`), serta struktur kartu tanpa `.card-header` dan `.card-body`.
+
+**Perubahan dan alasan:**
+1. **Keamanan & Kontrol Akses Dosen (`dosen/tutorial-rpl.php`):**
+   - Tambahkan proteksi token CSRF pada formulir evaluasi individu (`#modal-eval`) dan aksi massal (`#form-tutor-batch`). Di sisi backend, validasi `verifyCsrf()` diterapkan ketat sebelum memproses data POST.
+   - Hapus *hardcoded tester bypass* (`$isTester = ($nim === '12345' || ...)`) agar seluruh akun terikat hak akses kelompok bimbingan yang sah.
+   - Tambahkan validasi kepemilikan anggota bimbingan (*cross-class protection*) agar dosen tidak dapat mengevaluasi atau memverifikasi mahasiswa di luar kelas bimbingannya.
+2. **Penyelarasan Antarmuka Sisi Dosen (`dosen/tutorial-rpl.php`):**
+   - Hapus duplikasi header `<h2>` inline dengan emoji; gantikan dengan kartu pengantar terpadu yang memanfaatkan variabel tema CSS (`var(--primary)`, `var(--text-dark)`, `var(--text-muted)`).
+   - Selaraskan styling tabel mahasiswa dengan kelas `.table-responsive` dan `.table`, serta standardisasi status badge (`.badge-success`, `.badge-info`, `.badge-warning`, `.badge-secondary`, `.badge-danger`).
+   - Perbarui tab navigasi kelas bimbingan menjadi pill terstruktur dengan indikator kuota yang rapi dan responsif di layar ponsel.
+   - Perbaiki kartu tautan Google Drive dan modal evaluasi agar konsisten dengan komponen modal LPPAI.
+3. **Penyelarasan Antarmuka Sisi Mahasiswa (`pages/tutorial-rpl.php` & `pages/tutorial-rpl-daftar.php`):**
+   - Hilangkan batas lebar arbitrer (760px dan 820px); standarkan kontainer menjadi `.tutorial-rpl-container` (maksimal 960px) yang terpusat dan responsif.
+   - Harmonisasi hero banner dengan gradien dinamis `linear-gradient(135deg, var(--primary, #0b3b22), var(--primary-light, #156138))` yang adaptif terhadap pilihan tema pengguna di sistem.
+   - Standardisasi struktur kartu dengan blok `.card`, `.card-header`, dan `.card-body` yang konsisten dengan `style.css`.
+   - Rapikan tabel riwayat pendaftaran dengan pembungkus `.table-responsive` dan kelas `.table`.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 14:46:17 | `dosen/tutorial-rpl.php` | 3, 18, 26, 46, 60, 83, 128, 158, 198, 240, 258, 365 | Proteksi CSRF, pembersihan bypass tester, validasi kelas bimbingan, kartu pengantar bertema, tab kelas terstruktur, table/badge styling standar. |
+| 2026-11-23 14:46:29 | `pages/tutorial-rpl.php` | 20, 21, 32 | Kontainer 960px responsif, hero banner gradien dinamis bertema, standardisasi card-header/card-body. |
+| 2026-11-23 14:46:53 | `pages/tutorial-rpl-daftar.php` | 49, 50, 56, 106 | Kontainer 960px, hero banner gradien tema sistem, struktur card standar, dan tabel riwayat responsive. |
+| 2026-11-23 14:47:44 | `tests/tutorial-rpl-dosen-csrf-test.php` | 1-190 | Uji 16 asersi: penolakan POST tanpa CSRF/CSRF salah, keberhasilan evaluasi dan batch verify dengan CSRF valid, isolasi cross-class, serta verifikasi penghapusan bypass tester 12345. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada keempat berkas berubah/tambahan lulus tanpa error sintaks.
+- `git diff --check` lulus tanpa whitespace error.
+- Seluruh 11 suite pengujian Tutorial RPL lulus 100%: `tutorial-rpl-dosen-csrf-test` (16/16 asersi PASS), `tutorial-rpl-cbt-nilai-test`, `tutorial-rpl-day-quota-test`, `tutorial-rpl-pages-500-fix-test`, `tutorial-rpl-periods-test`, `tutorial-rpl-plotting-test`, `tutorial-rpl-registration-policy-test`, `tutorial-rpl-registration-test`, `tutorial-rpl-structure-test`, `tutorial-rpl-verification-test`.
+
+**Batas/deployment:**
+- Pengujian menggunakan database SQLite lingkungan terisolasi dan PHP CLI lokal; belum diuji pada MySQL server produksi.
+- Deployment hosting memerlukan penarikan commit ini ke server tujuan.
+
+---
+
 ## 2026-11-23 11:43:00 +0700 — Dosen, pilihan hari, dan kuota dosen dalam periode Tutorial RPL
 
 **ID:** TUTORIAL-RPL-LECTURER-DAY-QUOTA · **Parent Git:** `adc17ae`.
