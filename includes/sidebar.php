@@ -189,7 +189,7 @@ if (!function_exists('isNavGroupActive')) {
                         <span class="icon">📅</span> Periode Pendaftaran RPL
                     </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="page-nav <?= menuActive('tutorial-rpl-pendaftaran.php') ?>">
-                        <span class="icon">📝</span> Pendaftaran Peserta RPL
+                        <span class="icon">📝</span> Data Pendaftar Tutorial RPL
                     </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="page-nav <?= menuActive('tutorial-rpl-kelas.php') ?>">
                         <span class="icon">🏫</span> Kelola Kelompok & Tutor

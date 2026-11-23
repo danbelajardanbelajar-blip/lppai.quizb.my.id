@@ -5,6 +5,54 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 17:50:00 +0700 — Penyelarasan antarmuka Data Pendaftar Tutorial RPL menyerupai Data Peserta Pretes
+
+**ID:** TUTORIAL-RPL-PENDAFTARAN-PESERTA-ALIGNMENT · **Parent Git:** `78a76b9`.
+
+**Permintaan dan dasar perbaikan:** Permintaan penyesuaian halaman `admin/tutorial-rpl-pendaftaran.php`: merubah nama menu di sidebar menjadi "Data Pendaftar Tutorial RPL" dan merombak tampilan serta fungsionalitas halamannya agar selaras dan menyerupai `admin/pretes-peserta.php`. Sebelumnya halaman pendaftaran tutorial RPL menggunakan banner gradien hijau tua gelap yang kaku, belum memiliki kartu statistik pendaftar, belum ada panel filter multi-kolom (Prodi, Hari, Status Kelas, Status Video), belum ada shortcut chip distribusi hari, serta tabel pendaftar belum menyajikan status penempatan kelas, status verifikasi tugas video, dropdown ubah hari cepat, modal edit pendaftaran, maupun fitur ekspor data.
+
+**Perubahan dan alasan:**
+1. **Navigasi Sidebar (`includes/sidebar.php`):**
+   - Mengubah label menu navigasi dari "Pendaftaran Peserta RPL" menjadi "Data Pendaftar Tutorial RPL".
+2. **Pemilih Periode di Atas (`admin/tutorial-rpl-pendaftaran.php`):**
+   - Menambahkan kartu pemilih periode bergaris kiri `var(--primary)` dengan informasi status pendaftaran, jadwal WIB, badge aktif, dan dropdown pemilih periode instan (termasuk opsi Arsip Gabungan Semua Periode).
+3. **Statistik Ringkas (`stat-grid`):**
+   - Menampilkan 4 kartu ringkasan: Total Pendaftar RPL (👥), Sudah Masuk Kelompok Kelas (🏫), Menunggu Plotting Kelas (⏳), dan Kapasitas Kuota Periode (📊).
+4. **Card Daftarkan Mahasiswa Manual Collapsible (`#card-manual-register`):**
+   - Merapikan formulir pencarian dan pendaftaran mahasiswa manual dalam kartu collapsible yang dapat dibuka/tutup dengan tombol "➕ Daftarkan Manual".
+   - Mendukung pencarian instan nama/NIM dan pemilihan hari bimbingan tutorial RPL yang tersedia.
+5. **Panel Filter Multi-Kolom & Distribusi Hari:**
+   - Menambahkan panel filter instan di atas tabel: filter Program Studi, filter Hari Pilihan, filter Status Kelompok Kelas (Sudah/Belum Diplot), dan filter Verifikasi Tugas Video (Terverifikasi/Belum).
+   - Menambahkan shortcut chip pill distribusi hari (Semua, Senin, Selasa, dst.) yang menyaring tabel secara interaktif saat diklik.
+   - Tombol reset semua filter.
+6. **Tabel Data Pendaftar Lengkap:**
+   - Menampilkan nomor, foto thumbnail + link profil pengguna (`adminUserProfileLink`), NIM, prodi, badge program RPL, dropdown ubah hari pilihan langsung (POST CSRF `action="update_hari"`), nama kelompok bimbingan & dosen tutor, badge status verifikasi tugas video, nilai CBT / akhir, waktu daftar & jalur (Mandiri/Admin), tombol edit modal, dan tombol hapus pendaftaran berproteksi CSRF.
+   - Kolom tabel dapat diekspor langsung ke file spreadsheet (.csv / Excel) dan dicetak.
+7. **Modal Edit Pendaftaran (`#modal-edit-pendaftar`):**
+   - Modal pop-up bersih di tengah layar untuk mengganti hari bimbingan mahasiswa.
+8. **Kompatibilitas Skema Tabel Dinamis:**
+   - Menambahkan deteksi kolom tabel `users` secara dinamis (`program_studi`, `email`, `foto`, dll.) sehingga aman dan kompatibel penuh baik di lingkungan uji SQLite terisolasi maupun basis data MySQL produksi.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 17:46:39 | `includes/sidebar.php` | 192 | Label menu sidebar diubah menjadi "Data Pendaftar Tutorial RPL". |
+| 2026-11-23 17:49:01 | `admin/tutorial-rpl-pendaftaran.php` | 1-560 | Redesain total halaman Data Pendaftar Tutorial RPL ala pretes-peserta: Card pemilih periode, 4 stat cards, Card pendaftaran manual collapsible, filter multi-kolom prodi/hari/kelas/video, chip distribusi hari, tabel pendaftar terpadu, modal edit, dan ekspor excel. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `admin/tutorial-rpl-pendaftaran.php` dan `includes/sidebar.php` lulus tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa whitespace error.
+- Pengujian fungsional pendaftaran `tests/tutorial-rpl-registration-test.php` lulus 100% (kedua jalur registrasi mandiri/admin, kuota, concurrency, idempotensi, otorisasi, penolakan pretes lulus, isolasi HTTP handler admin).
+- Pengujian navigasi dan struktur `tests/tutorial-rpl-structure-test.php` lulus 100%.
+- Seluruh 11 suite pengujian Tutorial RPL lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan database SQLite lingkungan terisolasi dan PHP CLI lokal.
+- Deployment hosting memerlukan penarikan commit Git ke server produksi aktif.
+
+---
+
 ## 2026-11-23 15:43:00 +0700 — Perombakan besar antarmuka satu pintu Modal Edit 1200px & Grid Kuota Harian Tutorial RPL ala Pretes Dosen
 
 **ID:** TUTORIAL-RPL-PERIODE-MODAL-GRID-OVERHAUL · **Parent Git:** `412e136`.
