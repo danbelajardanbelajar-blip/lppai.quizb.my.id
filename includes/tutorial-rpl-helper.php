@@ -206,7 +206,45 @@ if (!function_exists('tutorialRplGetMembers')) {
  * Ambil daftar dosen untuk pilihan tutor RPL.
  */
 if (!function_exists('tutorialRplGetTutors')) {
-    function tutorialRplGetTutors(PDO $pdo): array {
+    /**
+ * Ambil data keanggotaan kelas Tutorial RPL aktif untuk seorang mahasiswa.
+ */
+if (!function_exists('tutorialRplGetStudentMembership')) {
+    function tutorialRplGetStudentMembership(PDO $pdo, int $userId): ?array {
+        ensureTutorialRplTables($pdo);
+        $stmt = $pdo->prepare("
+            SELECT m.*,
+                   c.nama_kelompok, c.periode, c.gelombang,
+                   c.dosen_id, c.dosen_nim, c.dosen_nama, c.dosen_wa,
+                   c.drive_url, c.catatan AS class_catatan
+            FROM tutorial_rpl_members m
+            JOIN tutorial_rpl_classes c ON m.class_id = c.id
+            WHERE m.user_id = ? AND c.is_active = 1
+            ORDER BY m.id DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+}
+
+/**
+ * Konfirmasi pengunggahan tugas video ke Google Drive oleh mahasiswa.
+ */
+if (!function_exists('tutorialRplConfirmDriveSubmission')) {
+    function tutorialRplConfirmDriveSubmission(PDO $pdo, int $memberId, int $userId, int $submitted = 1): bool {
+        ensureTutorialRplTables($pdo);
+        $stmt = $pdo->prepare("
+            UPDATE tutorial_rpl_members
+            SET drive_submitted = ?
+            WHERE id = ? AND user_id = ?
+        ");
+        return $stmt->execute([$submitted, $memberId, $userId]);
+    }
+}
+
+function tutorialRplGetTutors(PDO $pdo): array {
         try {
             $stmt = $pdo->query("SELECT id, nim, nama_lengkap, no_hp, no_hp AS whatsapp FROM users WHERE role = 'dosen' ORDER BY nama_lengkap ASC");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);

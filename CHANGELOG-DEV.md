@@ -5,6 +5,46 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 15:05:00 +0700 — Student Hub & integrasi ruang kelas, penugasan Drive, dan CBT Tutorial RPL Online
+
+**ID:** TUTORIAL-RPL-STUDENT-HUB-CBT-INTEGRATION · **Parent Git:** `d4425bc`.
+
+**Permintaan dan dasar perbaikan:** Implementasi Paket 3 (Student Hub & Integration) dan Paket 4 (Pencatatan & Deployment). Sebelumnya mahasiswa program RPL yang sudah terdaftar dan di-plot tidak memiliki ruang kelas untuk melihat kelompoknya, nomor kontak WhatsApp dosen tutor, tautan folder Google Drive penugasan video hafalan, konfirmasi pengunggahan tugas, maupun akses ke Ujian Tulis CBT Tutorial RPL.
+
+**Perubahan dan alasan:**
+1. **Helper Keanggotaan & Konfirmasi Tugas (`includes/tutorial-rpl-helper.php`):**
+   - Menambahkan fungsi `tutorialRplGetStudentMembership(PDO $pdo, int $userId): ?array` untuk mengambil informasi kelompok aktif, dosen tutor, nomor WA, tautan folder Google Drive kelas, catatan kelas, status verifikasi tugas, nilai praktik, nilai CBT, dan status kelulusan mahasiswa.
+   - Menambahkan fungsi `tutorialRplConfirmDriveSubmission(PDO $pdo, int $memberId, int $userId, int $submitted = 1): bool` yang memungkinkan mahasiswa mengonfirmasi bahwa video rekaman hafalan telah diunggah ke Google Drive kelompok bimbingan.
+2. **Halaman Ujian Tulis CBT Mahasiswa (`pages/tutorial-rpl-cbt.php`):**
+   - Halaman pengerjaan ujian daring khusus mahasiswa RPL: proteksi otorisasi program RPL dan keanggotaan kelas aktif, verifikasi token masuk ujian berbasis sesi dengan proteksi CSRF, render butir soal interaktif kategori Ubudiyah/Thaharah/Sholat/Jenazah, kalkulasi skor otomatis, sinkronisasi attempt ke `tutorial_rpl_cbt_attempts`, dan pembaruan `tutorial_rpl_members` (termasuk nilai akhir bobot 50% praktik + 50% CBT serta evaluasi passing grade).
+   - Menampilkan lembar hasil/scorecard setelah ujian diselesaikan.
+3. **Hub Ruang Kelas & Status Bimbingan Mahasiswa (`pages/tutorial-rpl.php`):**
+   - Mengembangkan `tutorial-rpl.php` sebagai sentra aktivitas mahasiswa RPL: jika sudah terplot ke kelompok kelas, tampil kartu bimbingan terpadu (nama kelompok, dosen tutor, tombol chat WA tutor, tombol tautan folder Google Drive kelas, status verifikasi tugas video beserta umpan balik/catatan tutor, tombol konfirmasi unggah tugas dengan proteksi CSRF, status dan link menuju CBT daring, serta indikator kelulusan presensi hadir sah komposit).
+   - Mempertahankan kartu status pendaftaran dan aturan periode pendaftaran pada bagian bawah untuk mahasiswa yang belum terplot atau belum mendaftar, menjaga kompatibilitas penuh dengan suite pengujian periode.
+4. **Navigasi Sidebar Mahasiswa RPL (`includes/sidebar.php`):**
+   - Menambahkan menu `Info & Kelas RPL` (`tutorial-rpl.php`) pada kelompok navigasi Tutorial RPL bagi mahasiswa program RPL.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 14:59:17 | `includes/tutorial-rpl-helper.php` | 209 | Fungsi helper `tutorialRplGetStudentMembership` dan `tutorialRplConfirmDriveSubmission`. |
+| 2026-11-23 15:00:20 | `pages/tutorial-rpl-cbt.php` | 1-224 | Halaman pengerjaan CBT mahasiswa RPL: verifikasi token, soal ujian, scoring otomatis, kartu hasil nilai. |
+| 2026-11-23 15:01:46 | `includes/sidebar.php` | 460 | Menu "Info & Kelas RPL" pada role Mahasiswa RPL di sidebar. |
+| 2026-11-23 15:03:54 | `pages/tutorial-rpl.php` | 2, 6, 26, 45, 95 | Hub kelas terpadu mahasiswa RPL: kartu bimbingan kelompok, dosen tutor + WA, link Google Drive penugasan video, status verifikasi tugas, tombol konfirmasi unggah, status & tautan CBT, serta indikator presensi hadir sah. |
+| 2026-11-23 15:02:57 | `tests/tutorial-rpl-student-hub-test.php` | 1-260 | Suite uji 21 asersi: helper membership/drive submission, render hub kelompok/dosen/drive, konfirmasi unggah tugas POST CSRF, akses CBT token & submit pengerjaan, scorecard, presensi hadir sah komposit, dan navigasi sidebar. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada kelima berkas berubah/tambahan lulus tanpa error sintaks.
+- `git diff --check` lulus tanpa whitespace error.
+- Seluruh 11 suite pengujian Tutorial RPL lulus 100%: `tutorial-rpl-student-hub-test` (21/21 asersi PASS), `tutorial-rpl-dosen-csrf-test` (16/16 asersi PASS), `tutorial-rpl-cbt-nilai-test`, `tutorial-rpl-day-quota-test`, `tutorial-rpl-pages-500-fix-test`, `tutorial-rpl-periods-test`, `tutorial-rpl-plotting-test`, `tutorial-rpl-registration-policy-test`, `tutorial-rpl-registration-test`, `tutorial-rpl-structure-test`, `tutorial-rpl-verification-test`.
+
+**Batas/deployment:**
+- Pengujian menggunakan database SQLite lingkungan terisolasi dan PHP CLI lokal; belum diuji pada MySQL server produksi.
+- Deployment hosting memerlukan penarikan commit ini ke server tujuan.
+
+---
+
 ## 2026-11-23 14:50:00 +0700 — Penyelarasan antarmuka Tutorial RPL & perbaikan keamanan CSRF bimbingan dosen
 
 **ID:** TUTORIAL-RPL-SECURITY-DESIGN-ALIGNMENT · **Parent Git:** `7369b45`.

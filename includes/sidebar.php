@@ -457,6 +457,9 @@ if (!function_exists('isNavGroupActive')) {
 
             <?php if (strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL'): ?>
             <div class="menu-label">Tutorial RPL</div>
+            <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
+                <span class="icon">🌐</span><span class="nav-text">Info &amp; Kelas RPL</span>
+            </a>
             <a href="<?= BASE_URL ?>/tutorial-rpl-daftar.php" class="page-nav <?= menuActive('tutorial-rpl-daftar.php') ?>">
                 <span class="icon">📝</span><span class="nav-text">Daftar Tutorial RPL</span>
             </a>
