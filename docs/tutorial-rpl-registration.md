@@ -1,6 +1,6 @@
 # Aturan pendaftaran Tutorial RPL
 
-Status: tahap 2 — kebijakan bersama dan pengelolaan periode admin tersedia.
+Status: tahap 3 — periode dan pendaftaran mahasiswa melalui jalur mandiri/admin tersedia.
 
 ## Ketentuan pengguna
 
@@ -29,21 +29,23 @@ database tidak boleh dianggap sebagai mahasiswa belum pretes.
 - Tidak ada periode yang otomatis dibuat atau diaktifkan. Setelah deployment, buka halaman admin, periksa isian awal, centang aktif bila sesuai, lalu simpan. Tanpa periode aktif, halaman mahasiswa tidak menampilkan pendaftaran terbuka. Kegagalan database juga tidak membuka pendaftaran.
 - Hanya satu periode aktif (constraint UNIQUE pada slot aktif nullable), termasuk ketika dua admin menyimpan bersamaan. Nonaktifkan periode lama sebelum mengaktifkan periode lain; riwayat disimpan dan tidak ada aksi hapus.
 - Semua POST wajib admin dan CSRF valid. Edit memakai nomor versi agar formulir lama tidak menimpa perubahan yang lebih baru. Waktu simpan/ubah dan ID admin dicatat dalam tabel. Waktu database di tabel ini berupa waktu lokal WIB, bukan UTC.
-- Halaman informasi mahasiswa `/tutorial-rpl.php` dan kartu aturan admin memakai periode aktif dari database. Tautan ke formulir tutorial umum dihapus dari halaman RPL karena formulir itu belum melayani pendaftaran khusus RPL.
+- Halaman informasi mahasiswa `/tutorial-rpl.php` dan kartu aturan admin memakai periode aktif dari database. Pendaftaran khusus RPL memakai `/tutorial-rpl-daftar.php`, terpisah dari formulir tutorial umum.
 - `tutorialRplPeriodPolicy()` menggabungkan periode database dengan aturan tetap nilai 80 dan kedua jalur. Handler tahap 3 wajib memuat periode terbaru melalui helper ini, bukan memakai nilai tanggal bawaan fungsi kebijakan tanpa konteks periode. `tutorialRplRegistrationDecision()` menerima konteks periode sebagai argumen keenam.
 
-## Batas tahap 2 dan pekerjaan berikutnya
+## Pendaftaran peserta (tahap 3)
 
-Tahap ini belum membuat tabel pendaftaran mahasiswa, formulir mandiri/admin
-untuk mendaftarkan peserta, atau menghubungkan hasil daftar ke
-`tutorial_rpl_members`. Kuota periode baru disimpan; penegakannya saat menerima
-pendaftaran harus dibuat pada tahap 3 dengan transaksi dan pemeriksaan kuota.
-Aktivasi periode belum berarti formulir pendaftaran sudah tersedia.
+- Mandiri: `/tutorial-rpl-daftar.php`, menu **Daftar Tutorial RPL** pada sidebar mahasiswa RPL. Menu ini tidak tergantung pernah daftar pretes atau menu tutorial reguler. Mahasiswa hanya dapat mendaftarkan akun sendiri; ID target dari POST tidak dipakai.
+- Admin: **Tutorial RPL Online → Pendaftaran Peserta RPL**, URL `/admin/tutorial-rpl-pendaftaran.php`. Pilih periode, cari nama/NIM (minimal dua karakter, maksimal 20 hasil), lalu tekan **Daftarkan**. Riwayat menampilkan 50 pendaftaran terbaru pada periode terpilih, termasuk jalur, waktu, dan pelaku. Periode lama dapat dibuka untuk membaca riwayat, tetapi pendaftaran baru tetap harus periode aktif dan dalam jadwal.
+- Tabel `tutorial_rpl_registrations` dibuat idempoten saat halaman pendaftaran dibuka. Menyimpan period_id, user_id, channel, registered_by, registered_at dalam WIB, serta snapshot bukti kelayakan. Constraint UNIQUE(period_id,user_id) dan pemeriksaan transaksi mencegah duplikasi antarjalur; pengiriman ulang mengembalikan pendaftaran lama tanpa mengubah jalur/pelaku awal.
+- Role/program pelaku dan mahasiswa diambil ulang dari database saat simpan. Kedua POST memakai CSRF. Bukti skor/status dari POST diabaikan. Kelulusan, jadwal dan kuota dibaca ulang di transaksi, bukan hanya tampilan GET.
+- Kuota dipakai bersama kedua jalur. Periode dikunci dengan SELECT FOR UPDATE pada MySQL dan BEGIN IMMEDIATE pada SQLite sebelum menghitung dan menyisipkan. Kuota 0 tanpa batas. Edit periode menolak kuota baru di bawah jumlah pendaftar yang sudah ada.
+- Bukti resmi dibaca tanpa helper yang menelan error: hasil `pretes_results` terbaru berstatus lulus dihormati termasuk status historis tanpa nilai numerik (tidak mengarang nilai 80). Jika status lulus memiliki angka di bawah 80 atau nilai tidak valid, pendaftaran ditahan untuk diperiksa admin.
+- Bila belum ada status lulus historis: gunakan CBT resmi yang sudah dikumpulkan (registration_id positif dan pemilik sesuai), atau nilai asesmen `ujian_tulis`. Pada mode CBT saja, gunakan hasil resmi terakhir yang sudah dikumpulkan, sehingga pendaftaran pretes baru yang masih pending tidak menghapus kelulusan sebelumnya. Pada mode komponen lengkap, nilai mengikuti pendaftaran pretes terbaru. Tryout dan CBT belum dikumpulkan tidak membebaskan tutorial. Mode `cbt_only` mengikuti batas 80; mode `cbt_tasks` mengikuti seluruh komponen aktif RPL minimal 80. Pengaturan mode/komponen dibaca langsung tanpa fallback saat query gagal; tabel konfigurasi yang belum pernah dibuat memakai nilai bawaan proyek. JSON/nilai tidak valid dan kegagalan query menghentikan simpan, tidak diubah menjadi "belum pretes".
+- Pendaftaran belum otomatis menambah `tutorial_rpl_members` atau menempatkan mahasiswa ke kelas. Tampilan menegaskan pembagian kelas terpisah. Mahasiswa melihat riwayat 10 pendaftaran terakhir miliknya.
 
-Tahap 3 membuat kedua formulir dan penyimpanan pendaftaran dengan validasi ini,
-CSRF, transaksi, pemeriksaan data terbaru, serta pencegahan duplikasi. Bukti
-kelulusan harus diambil dari sumber resmi aplikasi, termasuk status kelulusan
-historis; konflik status dan nilai perlu ditangani sebelum menerima pendaftaran.
+## Pekerjaan berikutnya dan deployment
+
+Deploy kode, buka halaman periode untuk menyiapkan tabel, periksa jadwal/kuota dan aktifkan periode yang sesuai. Tidak ada periode yang dibuka otomatis oleh paket kode ini. Lakukan uji dengan database MySQL/akun hosting sebelum pengumuman; verifikasi lokal memakai SQLite dan fixture autentikasi.
+
 Tahap 4 menghubungkan menu/pengumuman dan plotting hanya peserta RPL terdaftar.
-Kuota kelas, keanggotaan, dan pencatatan pelaku pendaftaran dilengkapi pada tahap
-penyimpanan; aturan ini tidak mengubah kelas atau data peserta yang sudah ada.
+Kuota kelas dan keanggotaan dilengkapi pada tahap plotting; paket pendaftaran ini tidak mengubah kelas atau anggota yang sudah ada. Pencatatan pelaku pendaftaran sudah tersedia pada tahap 3.

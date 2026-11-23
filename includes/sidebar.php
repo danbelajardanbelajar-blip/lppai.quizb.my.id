@@ -168,6 +168,7 @@ if (!function_exists('isNavGroupActive')) {
             <?php
             $tutorialRplPages = [
                 'tutorial-rpl-periode.php',
+                'tutorial-rpl-pendaftaran.php',
                 'tutorial-rpl-kelas.php',
                 'tutorial-rpl-peserta.php',
                 'tutorial-rpl-presensi.php',
@@ -180,12 +181,15 @@ if (!function_exists('isNavGroupActive')) {
                 <button type="button" class="nav-group-toggle <?= $isTutorialRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialRplGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🌐</span>
                     <span class="nav-text">Tutorial RPL Online</span>
-                    <span class="nav-badge">6</span>
+                    <span class="nav-badge">7</span>
                     <span class="chevron">▾</span>
                 </button>
                 <div class="nav-group-content">
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-periode.php" class="page-nav <?= menuActive('tutorial-rpl-periode.php') ?>">
                         <span class="icon">📅</span> Periode Pendaftaran RPL
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="page-nav <?= menuActive('tutorial-rpl-pendaftaran.php') ?>">
+                        <span class="icon">📝</span> Pendaftaran Peserta RPL
                     </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="page-nav <?= menuActive('tutorial-rpl-kelas.php') ?>">
                         <span class="icon">🏫</span> Kelola Kelompok & Tutor
@@ -451,6 +455,12 @@ if (!function_exists('isNavGroupActive')) {
             <?php endif; ?>
             <?php endif; ?>
 
+            <?php if (strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL'): ?>
+            <div class="menu-label">Tutorial RPL</div>
+            <a href="<?= BASE_URL ?>/tutorial-rpl-daftar.php" class="page-nav <?= menuActive('tutorial-rpl-daftar.php') ?>">
+                <span class="icon">📝</span><span class="nav-text">Daftar Tutorial RPL</span>
+            </a>
+            <?php endif; ?>
             <?php if ($showTutorialMenus): ?>
             <div class="menu-label">Tutorial</div>
             <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="page-nav <?= menuActive('tutorial-pendaftaran.php') ?>">

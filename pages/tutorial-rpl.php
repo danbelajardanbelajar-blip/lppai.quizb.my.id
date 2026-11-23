@@ -34,7 +34,8 @@ include __DIR__ . '/../includes/header.php';
         <?php if ($unavailable): ?>
             <p>Silakan coba kembali atau hubungi admin LPPAI.</p>
         <?php elseif ($status === 'open'): ?>
-            <p>Formulir khusus RPL sedang disiapkan. Informasi pembukaan pendaftaran akan disampaikan admin.</p>
+            <p>Mahasiswa RPL yang belum pretes atau belum lulus dapat mendaftar. Kelulusan dan kuota diperiksa saat pendaftaran.</p>
+            <a class="btn btn-primary" href="<?= BASE_URL ?>/tutorial-rpl-daftar.php">Daftar Tutorial RPL</a>
         <?php elseif ($status === 'soon'): ?>
             <p>Silakan kembali sesuai waktu buka yang tercantum di atas.</p>
         <?php else: ?>

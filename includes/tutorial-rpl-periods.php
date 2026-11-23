@@ -1,6 +1,18 @@
 <?php
 require_once __DIR__ . '/tutorial-rpl-registration-policy.php';
 
+/** Optional configuration tables may be absent on older installations; query errors propagate. */
+function tutorialRplTableExists(PDO $pdo, string $name): bool
+{
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $stmt = $pdo->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?");
+    } else {
+        $stmt = $pdo->prepare('SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?');
+    }
+    $stmt->execute([$name]);
+    return $stmt->fetchColumn() !== false;
+}
+
 function ensureTutorialRplPeriodTable(PDO $pdo): void
 {
     $mysql = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
@@ -65,12 +77,22 @@ function tutorialRplSavePeriod(PDO $pdo, array $data, array $actor): int
     $pdo->beginTransaction();
     try {
         if ($active) {
-            $check = $pdo->prepare('SELECT id FROM tutorial_rpl_registration_periods WHERE active_slot = 1 AND id <> ?');
+            $suffix = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+            $check = $pdo->prepare('SELECT id FROM tutorial_rpl_registration_periods WHERE active_slot = 1 AND id <> ?' . $suffix);
             $check->execute([$id]);
             if ($check->fetchColumn()) throw new InvalidArgumentException('Masih ada periode aktif. Nonaktifkan periode tersebut terlebih dahulu.');
         }
         $values = [$nama, $gelombang, $opens, $closes, $quota, $active, (int)$actor['id'], $now];
         if ($id > 0) {
+            $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+            $current = $pdo->prepare('SELECT id FROM tutorial_rpl_registration_periods WHERE id=?' . $lock);
+            $current->execute([$id]);
+            if (!$current->fetchColumn()) throw new InvalidArgumentException('Periode tidak ditemukan.');
+            if ($quota > 0 && tutorialRplTableExists($pdo, 'tutorial_rpl_registrations')) {
+                $used = $pdo->prepare('SELECT COUNT(*) FROM tutorial_rpl_registrations WHERE period_id=?');
+                $used->execute([$id]);
+                if ($quota < (int)$used->fetchColumn()) throw new InvalidArgumentException('Kuota tidak boleh lebih kecil dari jumlah mahasiswa yang sudah terdaftar.');
+            }
             $version = filter_var($data['version'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
             if (!$version) throw new InvalidArgumentException('Versi periode tidak valid. Muat ulang halaman.');
             $stmt = $pdo->prepare('UPDATE tutorial_rpl_registration_periods SET nama=?, gelombang=?, opens_at=?, closes_at=?, quota=?, active_slot=?, updated_by=?, updated_at=?, version=version+1 WHERE id=? AND version=?');

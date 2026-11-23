@@ -64,7 +64,7 @@ include __DIR__ . '/../includes/header.php';
 @media(max-width:640px){.rpl-period-grid{grid-template-columns:1fr}}
 </style>
 <div class="rpl-period-hero"><h2>Periode Pendaftaran Tutorial RPL</h2><p>Atur jadwal dan kuota khusus mahasiswa RPL, terpisah dari tutorial reguler.</p></div>
-<div class="rpl-period-note">Halaman ini mengatur periode pendaftaran khusus RPL. Formulir pendaftaran mahasiswa secara mandiri dan melalui admin belum tersedia. Mengaktifkan periode belum membuka formulir tersebut.</div>
+<div class="rpl-period-note">Periode aktif mengikuti jadwal WIB untuk pendaftaran mandiri maupun melalui admin. <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php">Buka pendaftaran peserta RPL</a>.</div>
 <?php if ($error): ?><div class="alert alert-danger" role="alert"><?= $escape($error) ?></div><?php endif; ?>
 <?php if ($saved): ?><div class="alert alert-success" role="status">Periode berhasil disimpan.</div><?php endif; ?>
 <?php if ($ready): ?>
@@ -77,7 +77,7 @@ include __DIR__ . '/../includes/header.php';
 <div><label for="gelombang">Gelombang</label><input class="form-control" id="gelombang" name="gelombang" maxlength="50" required value="<?= $escape($form['gelombang']) ?>"></div>
 <div><label for="opens_at">Buka pendaftaran (WIB)</label><input class="form-control" type="datetime-local" step="1" id="opens_at" name="opens_at" required value="<?= $escape(str_replace(' ', 'T', $form['opens_at'])) ?>"></div>
 <div><label for="closes_at">Tutup pendaftaran (WIB)</label><input class="form-control" type="datetime-local" step="1" id="closes_at" name="closes_at" required value="<?= $escape(str_replace(' ', 'T', $form['closes_at'])) ?>"></div>
-<div><label for="quota">Kuota pendaftar</label><input class="form-control" type="number" id="quota" name="quota" min="0" max="1000000" required value="<?= $escape($form['quota']) ?>"><small>0 = tanpa batas. Terpisah dari kuota kelas. Kuota ini akan diterapkan ketika fitur pendaftaran khusus RPL tersedia.</small></div>
+<div><label for="quota">Kuota pendaftar</label><input class="form-control" type="number" id="quota" name="quota" min="0" max="1000000" required value="<?= $escape($form['quota']) ?>"><small>0 = tanpa batas. Kuota ini berlaku bersama untuk kedua jalur pendaftaran, terpisah dari kuota kelas.</small></div>
 <div><label><input style="width:auto" type="checkbox" name="active_slot" value="1" <?= (int)$form['active_slot'] === 1 ? 'checked' : '' ?>> Aktifkan periode</label><small>Hanya satu periode aktif. Status buka/tutup mengikuti jadwal WIB. Hilangkan centang untuk menonaktifkan tanpa menghapus riwayat.</small></div>
 </div>
 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px"><button type="submit" class="btn btn-primary">Simpan periode</button><a class="btn btn-secondary" href="<?= BASE_URL ?>/admin/tutorial-rpl-periode.php">Buat baru / batal edit</a></div>

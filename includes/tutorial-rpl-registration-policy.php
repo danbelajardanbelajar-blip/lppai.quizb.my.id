@@ -44,6 +44,10 @@ function tutorialRplRegistrationDecision(array $student, array $actor, string $c
         ? (($actor['role'] ?? '') === 'admin' && (int)($actor['id'] ?? 0) > 0)
         : (($actor['role'] ?? '') === 'mahasiswa' && (int)($actor['id'] ?? 0) === (int)$student['id']);
     if (!$authorized) return $result + ['reason' => 'forbidden'];
+    // Historical official pass records may predate numeric score storage.
+    if ($pretes && !empty($pretes['official']) && !empty($pretes['submitted']) && !empty($pretes['legacy_pass'])) {
+        return array_replace($result, ['exempt' => true, 'reason' => 'passed_pretes']);
+    }
     if ($pretes && !empty($pretes['official']) && !empty($pretes['submitted'])) {
         $score = $pretes['score'] ?? null;
         if (!is_numeric($score) || !is_finite((float)$score) || (float)$score < 0 || (float)$score > 100) {

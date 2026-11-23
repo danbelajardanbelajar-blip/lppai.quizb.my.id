@@ -146,6 +146,7 @@ $adminHtml = $renderSidebar(['id' => 1, 'role' => 'admin', 'nama_lengkap' => 'Ad
 $check(str_contains($adminHtml, 'data-group="admin-tutorial-rpl"'), 'Admin sidebar memiliki data-group="admin-tutorial-rpl"');
 $check(str_contains($adminHtml, 'Tutorial RPL Online'), 'Admin sidebar memuat judul "Tutorial RPL Online"');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-periode.php'), 'Admin sidebar memuat menu periode pendaftaran RPL');
+$check(str_contains($adminHtml, 'admin/tutorial-rpl-pendaftaran.php'), 'Admin sidebar memuat menu pendaftaran peserta RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-kelas.php'), 'Admin sidebar memuat link tutorial-rpl-kelas.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-peserta.php'), 'Admin sidebar memuat link tutorial-rpl-peserta.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-presensi.php'), 'Admin sidebar memuat link tutorial-rpl-presensi.php');
@@ -166,6 +167,9 @@ $check(!str_contains($dosenNonTutorHtml, 'dosen/tutorial-rpl.php'), 'Dosen Non-T
 $mhsHtml = $renderSidebar(['id' => 101, 'role' => 'mahasiswa', 'nim' => '20260101', 'nama_lengkap' => 'Budi Santoso']);
 $check(!str_contains($mhsHtml, 'admin-tutorial-rpl'), 'Mahasiswa sidebar: Bebas dari menu admin tutorial RPL');
 $check(!str_contains($mhsHtml, 'tutorial-rpl-kelas.php'), 'Mahasiswa sidebar: Bebas dari link admin');
+$check(!str_contains($mhsHtml, 'tutorial-rpl-daftar.php'), 'Mahasiswa non-RPL tidak diberi menu pendaftaran RPL');
+$rplHtml = $renderSidebar(['id'=>101, 'role'=>'mahasiswa', 'jenis_program'=>'RPL', 'nim'=>'20260101', 'nama_lengkap'=>'Mahasiswa RPL']);
+$check(str_contains($rplHtml, 'tutorial-rpl-daftar.php'), 'Mahasiswa RPL dapat membuka pendaftaran tanpa bergantung menu tutorial reguler');
 
 echo "\n=== TEST 3: Smoke Test Halaman Baru Tutorial RPL ===\n";
 // Pastikan semua file halaman baru ada di disk dan valid PHP

@@ -5,6 +5,36 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 11:23:37 +0700 — Tahap 3 pendaftaran Tutorial RPL mandiri dan melalui admin
+
+**ID:** TUTORIAL-RPL-REGISTRATION-FORMS-STAGE3 · **Parent Git:** `147f014`.
+
+**Perubahan dan alasan:** Sediakan formulir mandiri dan admin yang menyimpan pendaftaran terpisah dari keanggotaan kelas. Kedua jalur memakai periode aktif, batas waktu WIB, bukti pretes resmi, kuota bersama, dan UNIQUE(period_id,user_id). Role/program pelaku dan target dimuat ulang dari database; mahasiswa tidak dapat mengirim ID target lain. POST dilindungi CSRF, prepared statement, transaksi serta penguncian periode (MySQL FOR UPDATE; SQLite BEGIN IMMEDIATE) sebelum menghitung/menyimpan. Pengiriman ulang mengembalikan baris lama tanpa mengubah audit awal. Simpan waktu WIB, ID pelaku, jalur dan snapshot bukti kelayakan. Kuota tidak dapat diturunkan di bawah jumlah pendaftar. Menu mandiri RPL tidak bergantung pernah daftar pretes atau gate tutorial reguler.
+
+**Sumber kelulusan:** Hasil resmi historis berstatus lulus dihormati; nilai historis di bawah 80 yang bertentangan dengan status ditahan untuk diperiksa. Tidak mengarang angka bagi status historis tanpa nilai. Selain itu gunakan CBT resmi terkumpul (bukan tryout) atau penilaian komponen, mengikuti mode kelulusan RPL yang sudah ada. Pada mode CBT saja, pendaftaran pretes baru yang masih pending tidak menghapus hasil resmi sebelumnya. Mode komponen mengikuti semua komponen wajib minimal 80. Query gagal/JSON atau nilai tidak valid menghentikan pendaftaran, bukan dianggap belum pretes.
+
+Waktu berikut adalah **waktu penyimpanan terakhir file yang tersedia**, bukan riwayat setiap edit. Baris adalah awal hunk untuk file lama atau rentang penuh untuk file baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 11:22:11 | `includes/tutorial-rpl-registration.php` | 1-159 | Skema pendaftar RPL, adapter bukti resmi tanpa menelan query error, transaksi dua jalur, audit, kuota bersama, duplikasi idempoten. |
+| 2026-11-23 11:20:36 | `pages/tutorial-rpl-daftar.php` | 1-66 | Pendaftaran mandiri akun sendiri, CSRF, status/kuota, bukti dan riwayat 10 pendaftaran. |
+| 2026-11-23 11:20:36 | `admin/tutorial-rpl-pendaftaran.php` | 1-65 | Pendaftaran admin dengan cari nama/NIM, filter periode, CSRF, dan daftar 50 terbaru beserta pelaku/jalur. |
+| 2026-11-23 11:17:29 | `includes/tutorial-rpl-periods.php` | 4, 80, 87 | Pemeriksaan tabel opsional dan penguncian edit periode; larang kuota di bawah jumlah pendaftar. |
+| 2026-11-23 11:13:08 | `includes/tutorial-rpl-registration-policy.php` | 47 | Hormati status lulus resmi historis yang belum memiliki nilai numerik tanpa mengarang skor. |
+| 2026-11-23 11:14:59 | `admin/tutorial-rpl-periode.php` | 67, 80 | Tautkan formulir admin dan jelaskan kuota sudah berlaku untuk kedua jalur. |
+| 2026-11-23 11:15:29 | `includes/sidebar.php` | 171, 184, 191, 458 | Menu admin pendaftar dan menu mandiri khusus RPL di luar gate tutorial reguler/pretes; jumlah menu 7. |
+| 2026-11-23 11:14:59 | `pages/tutorial-rpl.php` | 37 | Tautan informasi jadwal ke formulir khusus RPL yang sudah tersedia. |
+| 2026-11-23 11:22:11 | `tests/tutorial-rpl-registration-test.php` | 1-137 | Uji bukti resmi/legacy/komponen, role terbaru, CSRF, handler, kuota, duplikasi dan dua proses memperebutkan sisa satu tempat. |
+| 2026-11-23 11:21:29 | `tests/tutorial-rpl-structure-test.php` | 149, 170 | Assert menu admin baru dan akses menu RPL tanpa mengubah menu reguler. |
+| 2026-11-23 11:22:29 | `docs/tutorial-rpl-registration.md` | 3, 32, 35, 37, 49, 51 | Alur tahap 3, prioritas sumber pretes, transaksi, tabel, cara deploy dan batas plotting tahap 4. |
+
+**Verifikasi:** PHP lint 10 file PHP berubah/tambahan lulus; git diff --check lulus. Sembilan suite lokal lulus: tutorial-rpl-registration, tutorial-rpl-periods, tutorial-rpl-registration-policy, tutorial-rpl-structure, tutorial-rpl-plotting, tutorial-rpl-pages-500-fix, pretes-rpl-flow, pretes-aktif-hide-tutorial-menu, mahasiswa-unregistered-hide-menu. Suite baru mengeksekusi handler admin/mahasiswa dalam subprocess dengan fixture autentikasi/SQLite, termasuk CSRF, akun Reguler, penolakan lulus, role palsu dari sesi, target user POST palsu, duplikasi, bukti setelah request baru, kuota penuh, konflik status, nilai rusak, DB error, dan perubahan kuota. Uji dua proses nyata terhadap satu sisa kuota menghasilkan tepat satu berhasil dan satu ditolak. Chrome headless/PHP lokal lulus daftar mandiri, daftar admin, bukti tersimpan dan pembebasan nilai 80; desktop 1280 px dan ponsel 390 px tanpa overflow halaman atau error JS/PHP. Screenshot ditinjau di scratch/rpl-registration-preview (fixture, bukan hosting). Suite structure tetap mencetak log tabel fixture membership/pretes/master_gelombang yang tidak disediakan; semua assertion lulus.
+
+**Batas/deployment:** Belum diuji dengan MySQL/akun hosting produksi atau deployment. Kode tidak membuat/mengaktifkan periode produksi secara otomatis. Halaman pendaftaran menyiapkan tabel baru secara idempoten; periode harus ditetapkan admin. Data pendaftar belum otomatis menjadi tutorial_rpl_members atau ditempatkan ke kelas. Integrasi plotting hanya pendaftar serta pengumuman tetap tahap 4; plotting lama masih berperilaku seperti sebelumnya. Commit memakai ID ini; pull --rebase dan push setelah commit.
+
+---
+
 ## 2026-11-23 11:07:55 +0700 — Tahap 2 pengelolaan periode pendaftaran Tutorial RPL
 
 **ID:** TUTORIAL-RPL-REGISTRATION-PERIOD-STAGE2 · **Parent Git:** `fe3e8ec`.
