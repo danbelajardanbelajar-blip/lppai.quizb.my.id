@@ -12,8 +12,37 @@ function ensureTutorialRplRegistrationTable(PDO $pdo): void
         id $id, period_id INT NOT NULL, user_id INT NOT NULL,
         channel VARCHAR(10) NOT NULL, registered_by INT NOT NULL,
         registered_at DATETIME NOT NULL, evidence_json TEXT NOT NULL,
+        hari_pilihan VARCHAR(20) NULL, schedule_id INT NULL, day_selected_by INT NULL, day_selected_at DATETIME NULL,
         UNIQUE(period_id, user_id)
     )$engine");
+    $columns = $mysql ? array_column($pdo->query('SHOW COLUMNS FROM tutorial_rpl_registrations')->fetchAll(PDO::FETCH_ASSOC),'Field')
+        : array_column($pdo->query('PRAGMA table_info(tutorial_rpl_registrations)')->fetchAll(PDO::FETCH_ASSOC),'name');
+    foreach (['hari_pilihan'=>'VARCHAR(20) NULL','schedule_id'=>'INT NULL','day_selected_by'=>'INT NULL','day_selected_at'=>'DATETIME NULL'] as $name=>$type) {
+        if (!in_array($name,$columns,true)) {
+            try { $pdo->exec("ALTER TABLE tutorial_rpl_registrations ADD COLUMN $name $type"); }
+            catch (PDOException $e) {
+                // Only a concurrent successful migration may be ignored.
+                $fresh = $mysql ? array_column($pdo->query('SHOW COLUMNS FROM tutorial_rpl_registrations')->fetchAll(PDO::FETCH_ASSOC),'Field')
+                    : array_column($pdo->query('PRAGMA table_info(tutorial_rpl_registrations)')->fetchAll(PDO::FETCH_ASSOC),'name');
+                if (!in_array($name,$fresh,true)) throw $e;
+            }
+        }
+    }
+}
+
+/** Capacity is per lecturer per day; the student chooses a day, never a lecturer. */
+function tutorialRplDayAvailability(PDO $pdo, int $periodId): array
+{
+    $rows = tutorialRplPeriodTutors($pdo,$periodId); $days = [];
+    $stmt = $pdo->prepare('SELECT schedule_id,COUNT(*) AS used FROM tutorial_rpl_registrations WHERE period_id=? GROUP BY schedule_id'); $stmt->execute([$periodId]);
+    $counts = []; foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) $counts[(int)$row['schedule_id']] = (int)$row['used'];
+    foreach (TUTORIAL_RPL_DAYS as $day) foreach ($rows as $row) {
+        if ($row['hari']!==$day || $row['dosen_role']!=='dosen') continue;
+        if (!isset($days[$day])) $days[$day]=['quota'=>0,'used'=>0,'remaining'=>0];
+        $used = $counts[(int)$row['id']] ?? 0;
+        $days[$day]['quota']+=(int)$row['quota']; $days[$day]['used']+=$used; $days[$day]['remaining']+=max(0,(int)$row['quota']-$used);
+    }
+    return $days;
 }
 
 function tutorialRplValidPretesScore($score): bool
@@ -118,7 +147,7 @@ function tutorialRplRegistrationReason(string $reason): string
 }
 
 /** Caller validates CSRF. Lock the selected period before counting to serialize both channels. */
-function tutorialRplRegister(PDO $pdo, int $periodId, int $studentId, array $actor, string $channel, ?int $now = null): array
+function tutorialRplRegister(PDO $pdo, int $periodId, int $studentId, array $actor, string $channel, ?int $now = null, ?string $day = null): array
 {
     $sqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
     if ($sqlite) $pdo->exec('BEGIN IMMEDIATE'); else $pdo->beginTransaction();
@@ -138,20 +167,30 @@ function tutorialRplRegister(PDO $pdo, int $periodId, int $studentId, array $act
         if (in_array($access['reason'], ['forbidden','invalid_channel','not_rpl_student'], true)) throw new DomainException(tutorialRplRegistrationReason($access['reason']));
         // Repeated POST is idempotent, including after the window closes or quota fills.
         $existing = tutorialRplRegistrationFor($pdo, $periodId, $studentId);
-        if ($existing) {
+        if ($existing && $existing['schedule_id'] !== null) {
             if ($sqlite) $pdo->exec('COMMIT'); else $pdo->commit();
             return ['id'=>(int)$existing['id'], 'created'=>false];
         }
         $evidence = tutorialRplPretesEvidence($pdo, $studentId);
         $decision = tutorialRplRegistrationDecision($student, $freshActor, $channel, $evidence, $now, $policy);
         if (!$decision['allowed']) throw new DomainException(tutorialRplRegistrationReason($decision['reason']));
-        if ((int)$period['quota'] > 0 && tutorialRplRegistrationCount($pdo, $periodId) >= (int)$period['quota']) throw new DomainException('Kuota pendaftaran periode ini sudah penuh.');
+        if (!$existing && (int)$period['quota'] > 0 && tutorialRplRegistrationCount($pdo, $periodId) >= (int)$period['quota']) throw new DomainException('Kuota pendaftaran periode ini sudah penuh.');
+        if (!in_array($day,TUTORIAL_RPL_DAYS,true)) throw new DomainException('Pilih hari tutorial yang tersedia terlebih dahulu.');
+        $stmt = $pdo->prepare("SELECT s.id,s.quota,COALESCE(r.used,0) AS used FROM tutorial_rpl_period_tutors s JOIN users u ON u.id=s.dosen_id AND u.role='dosen' LEFT JOIN (SELECT schedule_id,COUNT(*) AS used FROM tutorial_rpl_registrations WHERE period_id=? GROUP BY schedule_id) r ON r.schedule_id=s.id WHERE s.period_id=? AND s.hari=? ORDER BY used,s.id");
+        $stmt->execute([$periodId,$periodId,$day]); $seat = null;
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) if ((int)$row['used']<(int)$row['quota']) { $seat=$row; break; }
+        if (!$seat) throw new DomainException('Hari yang dipilih tidak tersedia atau kuota dosen pada hari tersebut sudah penuh. Pilih hari lain.');
         $stamp = (new DateTimeImmutable('@' . ($now ?? time())))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('Y-m-d H:i:s');
-        $stmt = $pdo->prepare('INSERT INTO tutorial_rpl_registrations (period_id,user_id,channel,registered_by,registered_at,evidence_json) VALUES (?,?,?,?,?,?)');
-        $stmt->execute([$periodId,$studentId,$channel,(int)$freshActor['id'],$stamp,json_encode(['pretes'=>$evidence,'policy_id'=>$policy['id']],JSON_THROW_ON_ERROR)]);
-        $id = (int)$pdo->lastInsertId();
+        if ($existing) {
+            $pdo->prepare('UPDATE tutorial_rpl_registrations SET hari_pilihan=?,schedule_id=?,day_selected_by=?,day_selected_at=? WHERE id=? AND schedule_id IS NULL')->execute([$day,$seat['id'],$freshActor['id'],$stamp,$existing['id']]);
+            $id=(int)$existing['id'];
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO tutorial_rpl_registrations (period_id,user_id,channel,registered_by,registered_at,evidence_json,hari_pilihan,schedule_id,day_selected_by,day_selected_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $stmt->execute([$periodId,$studentId,$channel,(int)$freshActor['id'],$stamp,json_encode(['pretes'=>$evidence,'policy_id'=>$policy['id']],JSON_THROW_ON_ERROR),$day,(int)$seat['id'],$freshActor['id'],$stamp]);
+            $id = (int)$pdo->lastInsertId();
+        }
         if ($sqlite) $pdo->exec('COMMIT'); else $pdo->commit();
-        return ['id'=>$id, 'created'=>true];
+        return ['id'=>$id, 'created'=>!$existing,'day_selected'=>true];
     } catch (Throwable $e) {
         if ($sqlite) $pdo->exec('ROLLBACK'); elseif ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;

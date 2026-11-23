@@ -5,6 +5,38 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 11:43:00 +0700 — Dosen, pilihan hari, dan kuota dosen dalam periode Tutorial RPL
+
+**ID:** TUTORIAL-RPL-LECTURER-DAY-QUOTA · **Parent Git:** `adc17ae`.
+
+**Permintaan dan dasar skrip:** Pelajari pembuatan periode pretes/tutorial lama sebelum tahap 4. Skrip yang dibaca: admin/pretes-dosen.php (create/edit master_pretes dan daftar penguji per hari), admin/tutorial-kelas.php (create/edit master_gelombang dan baris tutor/hitungan kuota per hari); juga konteks admin/pretes-jadwal.php, pretes-pengaturan-tutor.php, tutorial-pengaturan-generate.php. Pola beberapa dosen per hari diadaptasi khusus RPL dengan ID akun dan kuota tiap dosen/hari, tanpa mengubah periode pretes/tutorial reguler.
+
+**Perubahan dan alasan:** Tambahkan baris dosen yang bisa ditambah/dihapus pada form periode: pilih akun dosen yang tersedia, hari Senin-Minggu, kuota minimal 1 (awal 30). Kuota berlaku per dosen pada masing-masing hari; dosen sama boleh pada hari berbeda. Periode aktif wajib memiliki minimal satu baris valid; duplikasi dosen/hari ditolak. Simpan jadwal bersama periode dalam transaksi/versi edit. Formulir terpotong ditolak agar tidak diam-diam menghapus konfigurasi. Batas total periode opsional 0 berarti mengikuti kapasitas dosen tanpa batas tambahan.
+
+**Alur pendaftaran:** Mahasiswa memilih hari lalu daftar; admin juga memilih hari untuk mahasiswa. Server memeriksa ulang sisa kapasitas dan mereservasi tempat pada dosen yang masih muat di hari terpilih, di dalam kunci periode yang sama dengan pemeriksaan kuota total/kelulusan. Dosen tidak dipilih mahasiswa dan reservasi belum membentuk kelas. Hari penuh tidak dapat dipilih pada UI serta ditolak server. Kirim ulang tidak memakai tempat baru atau memindahkan hari. Jadwal yang sudah terisi tidak dapat dihapus/diganti atau dikurangi kuotanya melewati jumlah terisi. Perubahan role dosen menghilangkan kapasitasnya; periode tetap dapat dinonaktifkan dengan mempertahankan riwayat.
+
+**Migrasi aman:** Tabel tutorial_rpl_period_tutors dibuat idempoten. Kolom hari_pilihan, schedule_id, day_selected_by, day_selected_at ditambahkan bila belum tersedia pada tutorial_rpl_registrations. Data lama tetap ada dengan hari kosong; pemilihan hari pada periode yang sedang dibuka memperbarui baris lama tanpa mengubah audit pendaftaran awal, sementara pelaku/waktu pilih hari dicatat terpisah. Tidak mengisi hari secara acak atau mengubah tutorial_rpl_members.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 11:40:36 | `admin/tutorial-rpl-periode.php` | 10, 18, 21, 31, 42, 59, 79, 95, 98, 112, 116 | Form tambah/hapus baris dosen, hari Senin-Minggu, kuota per dosen/hari; edit memuat data; marker formulir lengkap dan tampilan responsif. |
+| 2026-11-23 11:39:57 | `includes/tutorial-rpl-periods.php` | 3, 31, 165 | Tabel jadwal dosen per periode, validasi role/hari/duplikasi, simpan atomik bersama periode dan perlindungan kapasitas terisi. |
+| 2026-11-23 11:41:10 | `includes/tutorial-rpl-registration.php` | 15, 18, 150, 170, 177, 184, 193 | Migrasi hari/reservasi/audit pemilihan; hitung sisa hari; reservasi dosen dalam kunci periode; dukung pendaftar lama tanpa hari. |
+| 2026-11-23 11:38:28 | `pages/tutorial-rpl-daftar.php` | 7, 19, 37, 56, 58, 62, 71 | Mahasiswa wajib pilih hari lalu daftar; pilihan penuh dinonaktifkan, receipt/riwayat menampilkan hari; dukung pemilihan hari pendaftar lama. |
+| 2026-11-23 11:38:29 | `admin/tutorial-rpl-pendaftaran.php` | 7, 19, 32, 34, 40, 54, 61, 64 | Admin wajib pilih hari, tampilan sisa kapasitas/riwayat hari; dukung melengkapi hari pendaftar lama tanpa duplikasi. |
+| 2026-11-23 11:36:50 | `tests/tutorial-rpl-day-quota-test.php` | 1-64 | Uji validasi jadwal, dua dosen per hari, hari akhir pekan, kuota terisi, migrasi lama, audit dan race kuota dosen. |
+| 2026-11-23 11:40:36 | `tests/tutorial-rpl-registration-test.php` | 18, 21, 35, 45, 51, 54, 72, 79, 113, 119, 121, 126, 129, 131, 136 | Lengkapi fixture jadwal; uji pilihan hari persisten, POST tanpa hari/hari palsu dan regresi jalur mandiri/admin. |
+| 2026-11-23 11:40:36 | `tests/tutorial-rpl-periods-test.php` | 11, 16, 89, 98 | Lengkapi fixture dosen/jadwal; uji handler menolak periode aktif tanpa dosen dan formulir terpotong. |
+| 2026-11-23 11:39:57 | `docs/tutorial-rpl-registration.md` | 3, 11, 27, 40, 44, 53 | Dokumentasi pola periode lama, kuota per dosen/hari, pemilihan hari, migrasi, cara konfigurasi dan batas plotting. |
+
+**Verifikasi:** PHP lint 8 berkas PHP berubah/tambahan lulus; git diff --check lulus. Delapan suite lulus: tutorial-rpl-day-quota, tutorial-rpl-registration, tutorial-rpl-periods, tutorial-rpl-registration-policy, tutorial-rpl-structure, tutorial-rpl-plotting, tutorial-rpl-pages-500-fix, pretes-rpl-flow. Uji kuota baru memakai dua proses SQLite nyata: saat kuota total tidak dibatasi dan kuota dosen/hari tersisa 1, tepat satu pendaftar diterima; uji periode/kuota total bersamaan sebelumnya juga tetap lulus. Migrasi schema lama berulang mempertahankan data/audit; penurunan/penghapusan kapasitas terisi ditolak dan transaksi/version rollback. Handler nyata diuji dengan auth fixture termasuk CSRF, hari kosong/palsu, dan jadwal tanpa dosen. Dua alur Chrome headless/PHP lokal lulus: buat/edit periode dengan tambah/hapus baris dosen serta persistensi hari/kuota; daftar mandiri/admin dengan pilih hari dan receipt, pembebasan pretes. Desktop dan ponsel 390 px tanpa overflow halaman atau error JS/PHP; screenshot ditinjau di scratch/rpl-period-preview dan scratch/rpl-registration-preview. Suite structure mencetak log tabel fixture membership/pretes/master_gelombang yang tidak tersedia; semua assertion lulus.
+
+**Batas/deployment:** Verifikasi memakai SQLite dan fixture autentikasi, belum MySQL/hosting produksi. Setelah deployment admin harus melengkapi dosen/hari/kuota pada periode RPL lama; tanpa konfigurasi itu pilihan hari belum tersedia. Tidak membuat akun dosen baru lewat halaman ini; pilih akun dosen dari Kelola Pengguna. Reservasi kapasitas belum membuat kelas atau plotting; tahap 4 tetap terpisah. Commit memakai ID ini, diikuti pull --rebase dan push.
+
+---
+
 ## 2026-11-23 11:23:37 +0700 — Tahap 3 pendaftaran Tutorial RPL mandiri dan melalui admin
 
 **ID:** TUTORIAL-RPL-REGISTRATION-FORMS-STAGE3 · **Parent Git:** `147f014`.

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 require_once __DIR__ . '/../includes/tutorial-rpl-registration.php';
 $escape = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-$error = ''; $period = null; $existing = null; $decision = null; $history = []; $count = 0;
+$error = ''; $period = null; $existing = null; $decision = null; $history = []; $count = 0; $days = [];
 $actor = getCurrentUser();
 try {
     $pdo = getDBConnection();
@@ -16,8 +16,10 @@ try {
         }
         $periodId = filter_var($_POST['period_id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
         if (!$periodId) throw new DomainException('Periode tidak valid. Muat ulang halaman.');
-        $result = tutorialRplRegister($pdo, $periodId, (int)$actor['id'], $actor, 'mandiri');
-        $_SESSION['rpl_registration_notice'] = $result['created'] ? 'Pendaftaran Tutorial RPL berhasil disimpan. Anda menunggu pembagian kelas.' : 'Anda sudah terdaftar pada periode ini. Tidak dibuat pendaftaran ganda.';
+        $day = $_POST['hari_pilihan'] ?? null;
+        if (!is_string($day) || !in_array($day,TUTORIAL_RPL_DAYS,true)) throw new DomainException('Pilih hari tutorial yang tersedia terlebih dahulu.');
+        $result = tutorialRplRegister($pdo, $periodId, (int)$actor['id'], $actor, 'mandiri', null, $day);
+        $_SESSION['rpl_registration_notice'] = !empty($result['day_selected']) ? 'Pendaftaran dan pilihan hari Tutorial RPL berhasil disimpan. Anda menunggu pembagian kelas.' : 'Anda sudah terdaftar pada periode ini. Tidak dibuat pendaftaran ganda.';
         header('Location: ' . BASE_URL . '/tutorial-rpl-daftar.php'); exit;
         } catch (DomainException $e) { $error = $e->getMessage(); }
     }
@@ -32,6 +34,11 @@ try {
     if ($period) {
         $existing = tutorialRplRegistrationFor($pdo, (int)$period['id'], (int)$actor['id']);
         $count = tutorialRplRegistrationCount($pdo, (int)$period['id']);
+        $days = tutorialRplDayAvailability($pdo,(int)$period['id']);
+        if (!$existing && (int)$period['quota']>0) {
+            foreach ($days as &$capacity) $capacity['remaining']=min($capacity['remaining'],max(0,(int)$period['quota']-$count));
+            unset($capacity);
+        }
         $decision = tutorialRplRegistrationDecision($student, $student, 'mandiri', tutorialRplPretesEvidence($pdo, (int)$student['id']), null, tutorialRplPeriodPolicy($period));
     }
 } catch (DomainException $e) { $error = $e->getMessage(); }
@@ -46,20 +53,24 @@ include __DIR__ . '/../includes/header.php';
 <section class="card"><div class="card-header">Periode pendaftaran</div><div class="card-body">
 <?php if ($period): ?>
 <h3><?= $escape($period['nama']) ?> · <?= $escape($period['gelombang']) ?></h3><p><?= $escape(tutorialRplPeriodSchedule($period)) ?></p>
-<p>Terdaftar: <strong><?= $count ?></strong> · Kuota: <strong><?= (int)$period['quota'] === 0 ? 'Tanpa batas' : (int)$period['quota'] ?></strong></p>
+<p>Terdaftar: <strong><?= $count ?></strong> · Kuota: <strong><?= (int)$period['quota'] === 0 ? 'Mengikuti kuota dosen' : (int)$period['quota'] ?></strong></p>
 <?php if ($existing): ?>
-<div class="alert alert-success">Anda sudah terdaftar sejak <?= $escape($existing['registered_at']) ?> WIB. Pendaftaran tersimpan; pembagian kelas diinformasikan terpisah.</div>
-<?php elseif (!$error && $decision): ?>
+<div class="alert alert-success">Anda sudah terdaftar sejak <?= $escape($existing['registered_at']) ?> WIB. Hari pilihan: <strong><?= $escape($existing['hari_pilihan'] ?? 'Belum dipilih (pendaftaran lama)') ?></strong>. Pembagian kelas diinformasikan terpisah.</div>
+<?php endif; ?>
+<?php if ((!$existing || $existing['schedule_id']===null) && !$error && $decision): ?>
 <?php if (!$decision['allowed']): ?><div class="alert alert-info"><?= $escape(tutorialRplRegistrationReason($decision['reason'])) ?></div>
-<?php elseif ((int)$period['quota'] > 0 && $count >= (int)$period['quota']): ?><div class="alert alert-warning">Kuota pendaftaran periode ini sudah penuh.</div>
-<?php else: ?><p>Dengan mendaftar, akun Anda dicatat sebagai pendaftar periode ini. Penempatan kelas dilakukan terpisah.</p>
-<form method="post" action="<?= BASE_URL ?>/tutorial-rpl-daftar.php"><input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>"><input type="hidden" name="period_id" value="<?= (int)$period['id'] ?>"><button class="btn btn-primary" type="submit">Daftar Tutorial RPL</button></form>
+<?php elseif (!$existing && (int)$period['quota'] > 0 && $count >= (int)$period['quota']): ?><div class="alert alert-warning">Kuota pendaftaran periode ini sudah penuh.</div>
+<?php elseif (!array_filter($days,static fn($d)=>$d['remaining']>0)): ?><div class="alert alert-warning">Pilihan hari belum tersedia atau seluruh kuota dosen sudah penuh. Silakan hubungi admin.</div>
+<?php else: ?><p>Pilih hari yang sesuai, lalu klik Daftar. Penempatan kelas dilakukan terpisah.</p>
+<form method="post" action="<?= BASE_URL ?>/tutorial-rpl-daftar.php"><input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>"><input type="hidden" name="period_id" value="<?= (int)$period['id'] ?>">
+<label for="hari_pilihan">Hari tutorial</label><select class="form-control" id="hari_pilihan" name="hari_pilihan" required><option value="">Pilih hari</option><?php foreach ($days as $day=>$capacity): ?><option value="<?= $escape($day) ?>" <?= $capacity['remaining']<1?'disabled':'' ?>><?= $escape($day) ?> · <?= $capacity['remaining']>0 ? 'Sisa '.$capacity['remaining'].' tempat' : 'Penuh' ?></option><?php endforeach; ?></select>
+<button class="btn btn-primary" type="submit" style="margin-top:14px"><?= $existing ? 'Simpan pilihan hari' : 'Daftar Tutorial RPL' ?></button></form>
 <?php endif; endif; ?>
 <?php elseif (!$error): ?><p>Belum ada periode aktif. Silakan hubungi admin.</p><?php endif; ?>
 </div></section>
-<section class="card"><div class="card-header">Riwayat pendaftaran Anda</div><div class="card-body" style="overflow-x:auto"><table class="table"><thead><tr><th>Periode</th><th>Waktu (WIB)</th><th>Jalur</th></tr></thead><tbody>
-<?php foreach ($history as $row): ?><tr><td><?= $escape($row['nama']) ?><br><?= $escape($row['gelombang']) ?></td><td><?= $escape($row['registered_at']) ?></td><td><?= $escape($row['channel']) ?></td></tr><?php endforeach; ?>
-<?php if (!$history): ?><tr><td colspan="3">Belum ada pendaftaran tersimpan.</td></tr><?php endif; ?>
+<section class="card"><div class="card-header">Riwayat pendaftaran Anda</div><div class="card-body" style="overflow-x:auto"><table class="table"><thead><tr><th>Periode</th><th>Waktu (WIB)</th><th>Hari</th><th>Jalur</th></tr></thead><tbody>
+<?php foreach ($history as $row): ?><tr><td><?= $escape($row['nama']) ?><br><?= $escape($row['gelombang']) ?></td><td><?= $escape($row['registered_at']) ?></td><td><?= $escape($row['hari_pilihan'] ?? 'Belum dipilih') ?></td><td><?= $escape($row['channel']) ?></td></tr><?php endforeach; ?>
+<?php if (!$history): ?><tr><td colspan="4">Belum ada pendaftaran tersimpan.</td></tr><?php endif; ?>
 </tbody></table></div></section>
 <a class="btn btn-secondary" href="<?= BASE_URL ?>/tutorial-rpl.php">Kembali ke informasi RPL</a>
 </div>

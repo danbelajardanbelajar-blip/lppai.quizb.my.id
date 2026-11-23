@@ -8,11 +8,12 @@ function rejectsPeriod(callable $operation, string $message): void {
     throw new RuntimeException('FAIL: expected rejection: ' . $message);
 }
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$pdo->exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,role TEXT,nama_lengkap TEXT); INSERT OR IGNORE INTO users VALUES(100,'dosen','Dosen RPL')");
 ensureTutorialRplPeriodTable($pdo);
 ensureTutorialRplPeriodTable($pdo);
 $admin = ['id' => 7, 'role' => 'admin'];
 $data = ['nama' => 'Tutorial RPL <2026>', 'gelombang' => 'Gelombang 1', 'opens_at' => '2026-11-23T00:00:00',
-    'closes_at' => '2026-11-27T23:59:59', 'quota' => '250', 'active_slot' => '1'];
+    'closes_at' => '2026-11-27T23:59:59', 'quota' => '250', 'active_slot' => '1','schedules_complete'=>'1','schedules'=>[['dosen_id'=>100,'hari'=>'Senin','quota'=>250]]];
 checkPeriod(tutorialRplActivePeriod($pdo) === null, 'fresh database has no implicitly active period');
 checkPeriod(tutorialRplRegistrationWindow(null, tutorialRplPeriodPolicy(null)) === 'inactive', 'no fallback opening from old constants');
 $id = tutorialRplSavePeriod($pdo, $data, $admin);
@@ -85,6 +86,8 @@ $request = static function(array $payload) use ($fixture): array {
     checkPeriod($code===0 && ($errors==='' || $expectedLog), 'handler has no unexpected PHP errors: '.$errors);
     return json_decode($output,true,512,JSON_THROW_ON_ERROR);
 };
+$fixtureDb=new PDO('sqlite:'.$fixture.'/test.sqlite');
+$fixtureDb->exec("CREATE TABLE users(id INTEGER PRIMARY KEY,role TEXT,nama_lengkap TEXT); INSERT INTO users VALUES(100,'dosen','Dosen RPL')"); $fixtureDb=null;
 try {
     $get=$request([]);
     checkPeriod($get['status']===200 && str_contains($get['html'],'csrf_token'), 'admin GET renders form and CSRF token');
@@ -92,6 +95,10 @@ try {
     checkPeriod($invalid['status']===403 && str_contains($invalid['html'],'kedaluwarsa'), 'missing CSRF rejected');
     $db=new PDO('sqlite:'.$fixture.'/test.sqlite');
     checkPeriod((int)$db->query('SELECT COUNT(*) FROM tutorial_rpl_registration_periods')->fetchColumn()===0,'CSRF failure writes nothing');
+    $empty=$request(['method'=>'POST','post'=>array_replace($data,['csrf_token'=>'valid-token','schedules'=>[]])]);
+    checkPeriod(str_contains($empty['html'],'minimal satu dosen') && (int)$db->query('SELECT COUNT(*) FROM tutorial_rpl_registration_periods')->fetchColumn()===0,'actual period handler rejects activation without lecturer days');
+    $truncated=$data;unset($truncated['schedules_complete']);$truncated['csrf_token']='valid-token';
+    checkPeriod(str_contains($request(['method'=>'POST','post'=>$truncated])['html'],'belum terkirim lengkap'),'truncated schedule form cannot silently remove rows');
     checkPeriod($request(['method'=>'POST','role'=>'mahasiswa','post'=>$data+['csrf_token'=>'valid-token']])['status']===403,'nonadmin rejected by page guard');
     checkPeriod((int)$db->query('SELECT COUNT(*) FROM tutorial_rpl_registration_periods')->fetchColumn()===0,'nonadmin writes nothing');
     checkPeriod($request(['method'=>'POST','post'=>$data+['csrf_token'=>'valid-token']])['status']===302,'valid POST redirects');
