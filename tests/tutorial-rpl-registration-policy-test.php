@@ -38,7 +38,7 @@ $check(tutorialRplRegistrationDecision($student, ['id'=>4,'role'=>'dosen'], 'adm
 $check(tutorialRplRegistrationDecision(array_replace($student,['jenis_program'=>'Reguler']), $admin, 'admin', null, $open)['reason'] === 'not_rpl_student', 'Reguler is outside the RPL policy');
 $check(tutorialRplRegistrationDecision($student, $admin, 'other', null, $open)['reason'] === 'invalid_channel', 'Unknown channel rejected');
 ob_start(); include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php'; $html = ob_get_clean();
-foreach (['belum mengikuti pretes', 'belum lulus pretes', '80', '23 November 2026', '27 November 2026', 'mandiri', 'melalui admin'] as $text) {
+foreach (['belum mengikuti pretes', 'belum lulus pretes', '80', '23/11/2026', '27/11/2026', 'mandiri', 'melalui admin'] as $text) {
     $check(str_contains($html,$text), 'Shared rules include '.$text);
 }
 if ($failures) { fwrite(STDERR, "FAIL:\n".implode("\n",$failures)."\n"); exit(1); }

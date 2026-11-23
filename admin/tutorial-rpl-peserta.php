@@ -6,10 +6,16 @@ define('PAGE_TITLE', 'Data Peserta & Plotting RPL Online');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 requireAdmin();
-require_once __DIR__ . '/../includes/tutorial-rpl-registration-policy.php';
+require_once __DIR__ . '/../includes/tutorial-rpl-periods.php';
 
 $pdo = getDBConnection();
 ensureTutorialRplTables($pdo);
+$rplRegistrationPolicy = tutorialRplPeriodPolicy(null);
+try {
+    $rplRegistrationPolicy = tutorialRplPeriodPolicy(tutorialRplActivePeriod($pdo));
+} catch (Throwable $e) {
+    error_log('RPL period unavailable: ' . $e->getMessage());
+}
 
 $message = '';
 $msgType = '';

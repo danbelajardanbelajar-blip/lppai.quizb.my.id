@@ -16,6 +16,7 @@ mkdir($temporary . '/dosen', 0777, true);
 $copyFiles = [
     'includes/tutorial-rpl-helper.php',
     'includes/tutorial-rpl-registration-policy.php',
+    'includes/tutorial-rpl-periods.php',
     'includes/tutorial-rpl-registration-rules-view.php',
     'includes/pretes-examiner.php',
     'includes/pretes-helper.php',
@@ -144,6 +145,7 @@ $renderSidebar = function(array $user): string {
 $adminHtml = $renderSidebar(['id' => 1, 'role' => 'admin', 'nama_lengkap' => 'Administrator']);
 $check(str_contains($adminHtml, 'data-group="admin-tutorial-rpl"'), 'Admin sidebar memiliki data-group="admin-tutorial-rpl"');
 $check(str_contains($adminHtml, 'Tutorial RPL Online'), 'Admin sidebar memuat judul "Tutorial RPL Online"');
+$check(str_contains($adminHtml, 'admin/tutorial-rpl-periode.php'), 'Admin sidebar memuat menu periode pendaftaran RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-kelas.php'), 'Admin sidebar memuat link tutorial-rpl-kelas.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-peserta.php'), 'Admin sidebar memuat link tutorial-rpl-peserta.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-presensi.php'), 'Admin sidebar memuat link tutorial-rpl-presensi.php');

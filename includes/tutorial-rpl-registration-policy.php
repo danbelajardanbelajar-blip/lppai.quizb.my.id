@@ -13,9 +13,10 @@ function tutorialRplRegistrationPolicy(): array
     ];
 }
 
-function tutorialRplRegistrationWindow(?int $now = null): string
+function tutorialRplRegistrationWindow(?int $now = null, ?array $period = null): string
 {
-    $policy = tutorialRplRegistrationPolicy();
+    $policy = $period ?? tutorialRplRegistrationPolicy();
+    if (array_key_exists('active_slot', $policy) && (int)$policy['active_slot'] !== 1) return 'inactive';
     $tz = new DateTimeZone($policy['timezone']);
     $opens = (new DateTimeImmutable($policy['opens_at'], $tz))->getTimestamp();
     $closes = (new DateTimeImmutable($policy['closes_at'], $tz))->getTimestamp();
@@ -29,10 +30,10 @@ function tutorialRplRegistrationWindow(?int $now = null): string
  * official, submitted, score. In-progress/tryout results never grant an exemption.
  * Database lookup failures must be handled as unavailable by the caller, not as null.
  */
-function tutorialRplRegistrationDecision(array $student, array $actor, string $channel, ?array $pretes = null, ?int $now = null): array
+function tutorialRplRegistrationDecision(array $student, array $actor, string $channel, ?array $pretes = null, ?int $now = null, ?array $period = null): array
 {
-    $policy = tutorialRplRegistrationPolicy();
-    $window = tutorialRplRegistrationWindow($now);
+    $policy = array_replace(tutorialRplRegistrationPolicy(), $period ?? []);
+    $window = tutorialRplRegistrationWindow($now, $policy);
     $result = ['allowed' => false, 'eligible' => false, 'exempt' => false, 'channel' => $channel, 'window' => $window];
     if (!in_array($channel, $policy['channels'], true)) return $result + ['reason' => 'invalid_channel'];
     if (($student['role'] ?? '') !== 'mahasiswa' || (int)($student['id'] ?? 0) < 1
@@ -53,5 +54,5 @@ function tutorialRplRegistrationDecision(array $student, array $actor, string $c
         }
     }
     return array_replace($result, ['eligible' => true, 'allowed' => $window === 'open',
-        'reason' => $window === 'open' ? 'eligible' : ($window === 'soon' ? 'not_open_yet' : 'registration_closed')]);
+        'reason' => $window === 'open' ? 'eligible' : ($window === 'soon' ? 'not_open_yet' : ($window === 'inactive' ? 'no_active_period' : 'registration_closed'))]);
 }

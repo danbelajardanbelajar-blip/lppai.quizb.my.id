@@ -167,6 +167,7 @@ if (!function_exists('isNavGroupActive')) {
                         <!-- TUTORIAL RPL ONLINE -->
             <?php
             $tutorialRplPages = [
+                'tutorial-rpl-periode.php',
                 'tutorial-rpl-kelas.php',
                 'tutorial-rpl-peserta.php',
                 'tutorial-rpl-presensi.php',
@@ -179,10 +180,13 @@ if (!function_exists('isNavGroupActive')) {
                 <button type="button" class="nav-group-toggle <?= $isTutorialRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialRplGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🌐</span>
                     <span class="nav-text">Tutorial RPL Online</span>
-                    <span class="nav-badge">5</span>
+                    <span class="nav-badge">6</span>
                     <span class="chevron">▾</span>
                 </button>
                 <div class="nav-group-content">
+                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-periode.php" class="page-nav <?= menuActive('tutorial-rpl-periode.php') ?>">
+                        <span class="icon">📅</span> Periode Pendaftaran RPL
+                    </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="page-nav <?= menuActive('tutorial-rpl-kelas.php') ?>">
                         <span class="icon">🏫</span> Kelola Kelompok & Tutor
                     </a>

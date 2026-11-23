@@ -5,6 +5,34 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 11:07:55 +0700 — Tahap 2 pengelolaan periode pendaftaran Tutorial RPL
+
+**ID:** TUTORIAL-RPL-REGISTRATION-PERIOD-STAGE2 · **Parent Git:** `fe3e8ec`.
+
+**Perubahan dan alasan:** Tambahkan halaman admin khusus periode RPL, terpisah dari pretes/tutorial reguler. Admin dapat membuat dan mengedit nama, gelombang, jadwal sampai detik dalam WIB, kuota (0 tanpa batas), dan status aktif. Satu periode aktif dijamin constraint database; versi edit mencegah penimpaan formulir lama. POST dilindungi guard admin, CSRF, validasi server, transaksi dan prepared statement. Tidak ada hapus atau aktivasi otomatis. Tabel dibuat idempoten ketika halaman admin periode dibuka. Informasi mahasiswa/kartu aturan admin membaca periode aktif; tanpa periode aktif atau ketika query gagal tidak menggunakan jadwal lama sebagai pendaftaran terbuka. Halaman RPL tidak lagi menaut ke formulir tutorial reguler yang belum mendukung alur RPL.
+
+Waktu berikut adalah **penyimpanan terakhir file yang tersedia**, bukan riwayat seluruh aktivitas edit. Baris adalah awal hunk pada snapshot ini untuk berkas lama atau rentang penuh untuk berkas baru.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 11:06:52 | `admin/tutorial-rpl-periode.php` | 1-93 | Halaman admin buat/edit periode, CSRF, daftar status, kuota, aktivasi dan redirect sesudah simpan. |
+| 2026-11-23 11:06:52 | `includes/tutorial-rpl-periods.php` | 1-96 | Tabel khusus dan CRUD tervalidasi, transaksi, satu slot aktif unik, versi edit, pencatatan admin dan waktu WIB. |
+| 2026-11-23 11:01:11 | `includes/tutorial-rpl-registration-policy.php` | 16, 18, 33, 35, 57 | Konteks periode database dan status inactive untuk fungsi waktu/keputusan bersama. |
+| 2026-11-23 11:02:08 | `includes/tutorial-rpl-registration-rules-view.php` | 1, 8 | Kartu aturan membaca jadwal aktif, tanpa tanggal tetap pada tampilan. |
+| 2026-11-23 11:02:08 | `pages/tutorial-rpl.php` | 2, 5, 20, 30, 32, 37, 41, 43 | Informasi periode dari database; tanpa periode atau saat DB gagal tidak menyatakan dibuka; hapus tautan formulir reguler. |
+| 2026-11-23 11:02:08 | `admin/tutorial-rpl-peserta.php` | 9, 13 | Kartu aturan memakai periode aktif yang sama. |
+| 2026-11-23 11:02:08 | `includes/sidebar.php` | 170, 183, 187 | Menu Periode Pendaftaran RPL dan jumlah menu RPL 6. |
+| 2026-11-23 11:04:29 | `tests/tutorial-rpl-periods-test.php` | 1-123 | Uji persistensi, tanggal, kuota, otorisasi, constraint aktif, stale edit, CSRF serta handler admin/halaman mahasiswa dalam subprocess. |
+| 2026-11-23 11:02:08 | `tests/tutorial-rpl-registration-policy-test.php` | 41 | Sesuaikan ekspektasi format tanggal kartu aturan. |
+| 2026-11-23 11:05:23 | `tests/tutorial-rpl-structure-test.php` | 19, 148 | Fixture helper periode dan verifikasi menu sidebar admin. |
+| 2026-11-23 11:05:07 | `docs/tutorial-rpl-registration.md` | 3, 10, 24, 26, 42 | Cara pakai dan inisialisasi tabel tahap 2 serta batas penerapan kuota/formulir tahap 3. |
+
+**Verifikasi:** PHP lint seluruh 10 berkas PHP berubah/tambahan lulus. Enam suite lokal lulus: tutorial-rpl-periods, tutorial-rpl-registration-policy, tutorial-rpl-structure, tutorial-rpl-plotting, tutorial-rpl-pages-500-fix, pretes-rpl-flow. Uji periode mengeksekusi handler admin dan halaman mahasiswa sebenarnya dengan auth fixture/SQLite: simpan/edit, input tidak valid, CSRF hilang, nonadmin, tanggal konfigurasi dinamis, tidak ada periode aktif, dan DB tidak tersedia. Constraint UNIQUE juga diuji melalui SQL langsung; tidak menjalankan simulasi beban konkuren. Chrome headless dengan PHP server lokal dan fixture auth/SQLite lulus buat/simpan/redirect/edit, desktop 1366 px dan ponsel 390 px tanpa overflow halaman atau error JS/PHP; screenshot diperiksa di scratch/rpl-period-preview. git diff --check lulus. Suite structure memiliki log tabel fixture membership/pretes/master_gelombang yang tidak disediakan, namun semua assertion lulus.
+
+**Batas/deployment:** Belum menguji MySQL atau hosting produksi, belum membuat/mengaktifkan periode di produksi. Setelah deployment, buka menu admin periode untuk inisialisasi tabel, periksa isian awal 23–27 November 2026 WIB lalu simpan bila sesuai. Kuota baru tersimpan sebagai konfigurasi, belum ditegakkan pada pendaftaran. Formulir mandiri/admin pendaftaran peserta serta pengaitan ke kelas tetap tahap 3 dan berikutnya. Pengujian browser memakai fixture, bukan akun/database produksi. Commit memakai ID entri ini; pull --rebase dan push dilakukan setelah commit.
+
+---
+
 ## 2026-11-23 10:54:23 +0700 — Tahap 1 aturan pendaftaran Tutorial RPL
 
 **ID:** TUTORIAL-RPL-REGISTRATION-POLICY-STAGE1 · **Parent Git:** `aa5280c`.
