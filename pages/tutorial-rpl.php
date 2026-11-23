@@ -6,13 +6,9 @@
 define('PAGE_TITLE', 'Pendaftaran Tutorial RPL Gelombang 1');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
+require_once __DIR__ . '/../includes/tutorial-rpl-registration-policy.php';
 
-const TUTORIAL_RPL_GEL1_START = '2026-11-23';
-const TUTORIAL_RPL_GEL1_END = '2026-11-27';
-
-$tz = new DateTimeZone('Asia/Jakarta');
-$today = (new DateTimeImmutable('now', $tz))->format('Y-m-d');
-$status = $today < TUTORIAL_RPL_GEL1_START ? 'soon' : ($today > TUTORIAL_RPL_GEL1_END ? 'closed' : 'open');
+$status = tutorialRplRegistrationWindow();
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -25,6 +21,7 @@ include __DIR__ . '/../includes/header.php';
         </p>
     </div>
 
+    <?php include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php'; ?>
     <div class="card" style="margin-top:18px;border-radius:16px;padding:22px 22px;">
         <?php if ($status === 'soon'): ?>
             <div style="display:flex;gap:12px;align-items:flex-start;">

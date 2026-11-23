@@ -5,6 +5,30 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 10:54:23 +0700 — Tahap 1 aturan pendaftaran Tutorial RPL
+
+**ID:** TUTORIAL-RPL-REGISTRATION-POLICY-STAGE1 · **Parent Git:** `aa5280c`.
+
+**Perubahan dan alasan:** Tetapkan aturan bersama sesuai jawaban pengguna: RPL belum pretes/belum lulus boleh mendaftar; lulus pretes resmi minimal 80 dibebaskan; periode 23 November 2026 00:00:00 sampai 27 November 2026 23:59:59 WIB. Kedua jalur mandiri/admin memakai kebijakan dan batas waktu sama. Tambahkan fungsi keputusan murni dengan validasi pelaku dan bukti hasil resmi; belum tersambung ke handler pendaftaran. Tampilkan aturan pada halaman informasi dan admin RPL, serta dokumentasikan tahap berikutnya.
+
+Waktu berikut adalah **waktu penyimpanan terakhir** yang tersedia, bukan riwayat tiap penekanan simpan. Nomor baris merujuk snapshot paket ini (awal hunk untuk berkas lama, rentang penuh untuk berkas baru).
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 10:51:23 | `includes/tutorial-rpl-registration-policy.php` | 1-57 | Kebijakan dan keputusan bersama: kelayakan, pengecualian nilai >=80, otorisasi, periode WIB. |
+| 2026-11-23 10:51:23 | `includes/tutorial-rpl-registration-rules-view.php` | 1-12 | Tampilan aturan bersama untuk mahasiswa dan admin. |
+| 2026-11-23 10:51:27 | `pages/tutorial-rpl.php` | 9, 11, 24 | Status tanggal memakai fungsi bersama dan tampilkan aturan. |
+| 2026-11-23 10:51:27 | `admin/tutorial-rpl-peserta.php` | 9, 138 | Tampilkan aturan bersama tanpa mengubah handler plotting. |
+| 2026-11-23 10:52:09 | `tests/tutorial-rpl-registration-policy-test.php` | 1-45 | Uji batas nilai/tanggal, bukti hasil, hak akses dan aturan bersama. |
+| 2026-11-23 10:53:40 | `tests/tutorial-rpl-structure-test.php` | 18 | Lengkapi dependensi fixture dengan dua berkas aturan baru. |
+| 2026-11-23 10:51:23 | `docs/tutorial-rpl-registration.md` | 1-40 | Ketentuan tahap 1 dan batas integrasi tahap berikutnya. |
+
+**Verifikasi:** PHP lint keenam berkas PHP lulus; pengujian registration-policy, structure, pages-500-fix, plotting, verification, cbt-nilai lulus; `git diff --check` lulus. Fixture structure mencetak peringatan tabel membership/pretes/master_gelombang yang tidak disediakan fixture; pemeriksaan tetap lulus. Belum melakukan uji browser/DB produksi atau deployment.
+
+**Batas tahap:** Belum membuat formulir mandiri/admin, tabel pendaftaran, adapter hasil pretes historis, maupun integrasi plotting pendaftar. Formulir tutorial umum masih memakai aturan lama; paket ini belum berarti pendaftaran RPL siap dibuka. Commit dicari dengan ID entri di atas; pull/rebase dan push dilakukan sesudah commit sesuai alur proyek.
+
+---
+
 ## 2026-11-22 19:44:45 +0700 — Ikon loading kecil pada pesan pemeriksaan wajah
 
 **ID:** PRETES-FACE-CHECK-LOADING · **Parent Git:** `872f40f`.

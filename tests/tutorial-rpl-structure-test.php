@@ -15,6 +15,8 @@ mkdir($temporary . '/dosen', 0777, true);
 
 $copyFiles = [
     'includes/tutorial-rpl-helper.php',
+    'includes/tutorial-rpl-registration-policy.php',
+    'includes/tutorial-rpl-registration-rules-view.php',
     'includes/pretes-examiner.php',
     'includes/pretes-helper.php',
     'includes/tutorial-membership.php',

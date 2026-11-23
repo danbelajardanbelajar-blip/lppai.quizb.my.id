@@ -6,6 +6,7 @@ define('PAGE_TITLE', 'Data Peserta & Plotting RPL Online');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 requireAdmin();
+require_once __DIR__ . '/../includes/tutorial-rpl-registration-policy.php';
 
 $pdo = getDBConnection();
 ensureTutorialRplTables($pdo);
@@ -134,6 +135,7 @@ try {
 }
 
 include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php';
 ?>
 
 <!-- Header Halaman -->
