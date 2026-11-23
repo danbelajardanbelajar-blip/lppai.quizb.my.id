@@ -5,6 +5,51 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-23 15:29:00 +0700 — Penyelarasan antarmuka Periode Tutorial RPL menyerupai Pretes Dosen
+
+**ID:** TUTORIAL-RPL-PERIODE-PRETES-ALIGNMENT · **Parent Git:** `787a713`.
+
+**Permintaan dan dasar perbaikan:** Permintaan penyesuaian antarmuka halaman `admin/tutorial-rpl-periode.php` agar selaras dan menyerupai `admin/pretes-dosen.php`. Sebelumnya halaman `admin/tutorial-rpl-periode.php` menggunakan banner hero berwarna hijau tua gelap (`.rpl-period-hero`) yang tidak konsisten dengan layout admin sistem, belum memiliki kartu status periode aktif dengan ringkasan kuota harian/sisa kursi per hari, belum ada tombol cepat pengaktifan periode langsung dari tabel, serta tabel dan form input belum mengadopsi standar kartu dan input border-radius yang terstruktur rapi seperti di `admin/pretes-dosen.php`.
+
+**Perubahan dan alasan:**
+1. **Banner & Header Bersih:** Menghapus `.rpl-period-hero` bergradien kaku; digantikan dengan standar admin LPPAI, topbar judul, dan kotak informasi panduan pendaftaran peserta RPL terpadu.
+2. **Card 1: Status Periode Aktif & Ringkasan Kuota Harian:**
+   - Menambahkan kartu ringkasan periode aktif dengan `border-left: 5px solid var(--primary)` dan background `#f8fafc`.
+   - Menampilkan nama periode, badge status penerimaan pendaftaran, badge gelombang, jadwal WIB, dan batas kuota total.
+   - Menghitung dan merender kartu-kartu kecil ringkasan kuota harian (Senin - Minggu) mencakup: nama hari, jumlah dosen tutor, total kuota, kuota terisi dari `tutorial_rpl_registrations`, dan sisa kursi (warna hijau jika tersedia, merah jika minus).
+   - Tombol cepat aksi: "✏️ Edit Penguji & Kuota Periode Ini".
+   - Menampilkan alert peringatan ramah bila belum ada periode yang berstatus aktif.
+3. **Card 2: Daftar Semua Periode Terpadu:**
+   - Card header dilengkapi tombol "➕ Tambah Periode Baru" dengan handler JavaScript `toggleFormTambah()`.
+   - Tabel menampilkan kolom: Periode (lengkap dengan badge aktif & tanggal jadwal), Gelombang, Target Jalur, Kuota Hari (Sn-Mg per hari), Batas Kuota, Status (badge Aktif/Nonaktif & status jendela registrasi), serta Aksi.
+   - Menambahkan form tombol "✅ Aktifkan" berproteksi CSRF untuk mengaktifkan periode secara instan dari tabel tanpa harus membuka formulir edit.
+   - Menambahkan tombol "🗑️ Hapus" berproteksi CSRF dengan konfirmasi dan validasi proteksi integritas pendaftar.
+   - Baris periode aktif ditandai dengan highlight latar belakang `#f0fdf4`.
+   - Empty state informatif dengan ikon kalender jika belum ada data.
+4. **Card 3: Form Tambah & Edit Periode Modern:**
+   - Merapikan struktur form metadata (Nama, Gelombang, Buka WIB, Tutup WIB, Kuota Total, Checkbox Aktifkan) dalam grid responsif dengan input ber-border `#cbd5e1` dan radius 6px.
+   - Merapikan kontainer Dosen Tutor & Kuota Hari (`#rpl-tutor-rows`) dengan latar `#f8fafc`, kartu per baris tutor putih, selector dosen tutor, hari bimbingan, input kuota, dan tombol hapus baris.
+   - Menjaga seluruh input token CSRF, version concurrency, `schedules_complete`, dan asersi pengujian backend tetap kompatibel 100%.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-23 15:28:46 | `admin/tutorial-rpl-periode.php` | 1-525 | Redesain lengkap halaman periode Tutorial RPL: Card 1 periode aktif + kuota harian, Card 2 tabel periode + aksi aktifkan/hapus, Card 3 form tambah/edit modern, serta handler POST set_active & delete. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `admin/tutorial-rpl-periode.php` lulus tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa whitespace error.
+- Pengujian fungsional handler HTTP dan persistensi `tests/tutorial-rpl-periods-test.php` lulus 100% (semua asersi pembuatan, aktivasi, CSRF, penolakan baris kosong/terpotong, concurrency version, validasi waktu WIB, dan isolasi proses handler).
+- Pengujian navigasi dan struktur `tests/tutorial-rpl-structure-test.php` lulus 100%.
+- Seluruh 11 suite pengujian Tutorial RPL lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan database SQLite lingkungan uji lokal dan PHP CLI lokal; pengujian di database MySQL produksi disarankan saat rilis live.
+- Deployment hosting memerlukan penarikan commit Git ke server produksi.
+
+---
+
 ## 2026-11-23 15:05:00 +0700 — Student Hub & integrasi ruang kelas, penugasan Drive, dan CBT Tutorial RPL Online
 
 **ID:** TUTORIAL-RPL-STUDENT-HUB-CBT-INTEGRATION · **Parent Git:** `d4425bc`.
