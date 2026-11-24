@@ -247,7 +247,7 @@ assert(str_contains($pageContent, 'fillExistingClasses'), 'Checkbox fillExisting
 assert(str_contains($pageContent, 'overwritePlotting'), 'Checkbox overwritePlotting harus tersedia');
 assert(str_contains($pageContent, 'matchHariPilihan'), 'Checkbox matchHariPilihan harus tersedia');
 assert(str_contains($pageContent, 'autoCreateClasses'), 'Checkbox autoCreateClasses harus tersedia');
-assert(str_contains($pageContent, 'tutorial-rpl-peserta.php'), 'Harus menautkan ke halaman peserta');
+assert(str_contains($pageContent, 'tutorial-rpl-kelas.php'), 'Harus menautkan ke halaman kelola kelompok RPL');
 
 echo "✅ PASS: Seluruh elemen esensial pada admin/tutorial-rpl-pengaturan-generate.php lengkap dan valid.\n\n";
 

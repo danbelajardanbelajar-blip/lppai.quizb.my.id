@@ -171,7 +171,6 @@ if (!function_exists('isNavGroupActive')) {
                 'tutorial-rpl-pendaftaran.php',
                 'tutorial-rpl-pengaturan-generate.php',
                 'tutorial-rpl-kelas.php',
-                'tutorial-rpl-peserta.php',
                 'tutorial-rpl-presensi.php',
                 'tutorial-rpl-cbt.php',
                 'tutorial-rpl-nilai.php'
@@ -182,7 +181,7 @@ if (!function_exists('isNavGroupActive')) {
                 <button type="button" class="nav-group-toggle <?= $isTutorialRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialRplGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🌐</span>
                     <span class="nav-text">Tutorial RPL Online</span>
-                    <span class="nav-badge">8</span>
+                    <span class="nav-badge">7</span>
                     <span class="chevron">▾</span>
                 </button>
                 <div class="nav-group-content">
@@ -197,9 +196,6 @@ if (!function_exists('isNavGroupActive')) {
                     </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="page-nav <?= menuActive('tutorial-rpl-kelas.php') ?>">
                         <span class="icon">🏫</span> Kelola Kelompok &amp; Tutor
-                    </a>
-                    <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php" class="page-nav <?= menuActive('tutorial-rpl-peserta.php') ?>">
-                        <span class="icon">👥</span> Data Peserta & Plotting
                     </a>
                     <a href="<?= BASE_URL ?>/admin/tutorial-rpl-presensi.php" class="page-nav <?= menuActive('tutorial-rpl-presensi.php') ?>">
                         <span class="icon">✅</span> Verifikasi Tugas & Presensi

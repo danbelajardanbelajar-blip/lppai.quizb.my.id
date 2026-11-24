@@ -22,7 +22,7 @@ $copyFiles = [
     'includes/pretes-helper.php',
     'includes/tutorial-membership.php',
     'admin/tutorial-rpl-kelas.php',
-    'admin/tutorial-rpl-peserta.php',
+    'admin/tutorial-rpl-pengaturan-generate.php',
     'admin/tutorial-rpl-presensi.php',
     'admin/tutorial-rpl-cbt.php',
     'admin/tutorial-rpl-nilai.php',
@@ -148,7 +148,7 @@ $check(str_contains($adminHtml, 'Tutorial RPL Online'), 'Admin sidebar memuat ju
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-periode.php'), 'Admin sidebar memuat menu periode pendaftaran RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-pendaftaran.php'), 'Admin sidebar memuat menu pendaftaran peserta RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-kelas.php'), 'Admin sidebar memuat link tutorial-rpl-kelas.php');
-$check(str_contains($adminHtml, 'admin/tutorial-rpl-peserta.php'), 'Admin sidebar memuat link tutorial-rpl-peserta.php');
+$check(str_contains($adminHtml, 'admin/tutorial-rpl-pengaturan-generate.php'), 'Admin sidebar memuat link tutorial-rpl-pengaturan-generate.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-presensi.php'), 'Admin sidebar memuat link tutorial-rpl-presensi.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-cbt.php'), 'Admin sidebar memuat link tutorial-rpl-cbt.php');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-nilai.php'), 'Admin sidebar memuat link tutorial-rpl-nilai.php');
@@ -176,7 +176,7 @@ echo "\n=== TEST 3: Smoke Test Halaman Baru Tutorial RPL ===\n";
 $newPages = [
     'includes/tutorial-rpl-helper.php',
     'admin/tutorial-rpl-kelas.php',
-    'admin/tutorial-rpl-peserta.php',
+    'admin/tutorial-rpl-pengaturan-generate.php',
     'admin/tutorial-rpl-presensi.php',
     'admin/tutorial-rpl-cbt.php',
     'admin/tutorial-rpl-nilai.php',

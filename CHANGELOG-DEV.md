@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-24 07:53:42 +0700 — Penghapusan total halaman admin/tutorial-rpl-peserta.php dan pembersihan relasi navigasi
+
+**ID:** TUTORIAL-RPL-PESERTA-PAGE-REMOVAL · **Parent Git:** `961c85f`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk menghapus total halaman `https://lppai.quizb.my.id/admin/tutorial-rpl-peserta.php`. Seluruh fungsionalitas penempatan dan distribusi mahasiswa RPL kini telah dialihkan secara terpadu melalui halaman Pengaturan & Generate RPL (`admin/tutorial-rpl-pengaturan-generate.php`) serta Data Pendaftar Tutorial RPL (`admin/tutorial-rpl-pendaftaran.php`), sehingga keberadaan berkas `admin/tutorial-rpl-peserta.php` tidak lagi diperlukan.
+
+**Perubahan dan alasan:**
+1. **Penghapusan Berkas (`admin/tutorial-rpl-peserta.php`):**
+   - Menghapus berkas `admin/tutorial-rpl-peserta.php` dari repositori secara permanen via `git rm`.
+2. **Pembersihan Navigasi Sidebar (`includes/sidebar.php`):**
+   - Menghapus `'tutorial-rpl-peserta.php'` dari array daftar halaman `$tutorialRplPages`.
+   - Menghapus item menu `Data Peserta & Plotting` (`admin/tutorial-rpl-peserta.php`) dari daftar navigasi grup Tutorial RPL Online.
+   - Menyesuaikan badge count grup navigasi Tutorial RPL Online dari 8 menjadi 7.
+3. **Penyelarasan Tautan Antar-Halaman:**
+   - **`admin/tutorial-rpl-pengaturan-generate.php`:** Mengubah tautan hasil plotting dan aksi tabel anggota agar mengarah ke `tutorial-rpl-pendaftaran.php` dan `tutorial-rpl-kelas.php`.
+   - **`admin/tutorial-rpl-kelas.php`:** Mengubah tautan tombol anggota kelompok (ikon 👥) agar mengarah ke `tutorial-rpl-pendaftaran.php`.
+4. **Pembaruan Suite Pengujian:**
+   - **`tests/tutorial-rpl-structure-test.php`:** Mengganti rujukan dan verifikasi sidebar dari `tutorial-rpl-peserta.php` ke `tutorial-rpl-pengaturan-generate.php`.
+   - **`tests/tutorial-rpl-pengaturan-generate-test.php`:** Menyelaraskan asersi tautan navigasi.
+   - **`tests/tutorial-rpl-pages-500-fix-test.php` & `tests/tutorial-rpl-plotting-test.php`:** Membersihkan rujukan komentar yang menyebutkan halaman yang dihapus.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 07:53:01 | `admin/tutorial-rpl-peserta.php` | 1-485 | Penghapusan total berkas dari repositori. |
+| 2026-11-24 07:52:06 | `includes/sidebar.php` | 168-205 | Penghapusan tutorial-rpl-peserta.php dari $tutorialRplPages, penghapusan menu sidebar, penyesuaian badge count jadi 7. |
+| 2026-11-24 07:52:30 | `admin/tutorial-rpl-pengaturan-generate.php` | 355-738 | Penyelarasan tombol header, link hasil plotting, dan aksi tabel kelompok ke tutorial-rpl-pendaftaran.php. |
+| 2026-11-24 07:52:54 | `admin/tutorial-rpl-kelas.php` | 286-291 | Pengalihan tombol aksi anggota kelompok (👥) ke tutorial-rpl-pendaftaran.php. |
+| 2026-11-24 07:53:42 | `tests/tutorial-rpl-structure-test.php` | 20-185 | Penyelarasan berkas coreFiles, asersi sidebar, dan smoke test halaman tutorial RPL baru. |
+| 2026-11-24 07:53:42 | `tests/tutorial-rpl-pengaturan-generate-test.php` | 248-252 | Pembaruan asersi tautan navigasi halaman. |
+| 2026-11-24 07:53:42 | `tests/tutorial-rpl-pages-500-fix-test.php` | 1-70 | Pembersihan komentar rujukan berkas yang dihapus. |
+| 2026-11-24 07:53:42 | `tests/tutorial-rpl-plotting-test.php` | 5-12 | Pembersihan komentar rujukan berkas yang dihapus. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada seluruh berkas berubah lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Seluruh 12 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa kegagalan.
+- Pemeriksaan pemindaian `Select-String` memastikan tidak ada sisa tautan mati atau referensi kode aktif ke `tutorial-rpl-peserta.php`.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
 ## 2026-11-24 07:11:16 +0700 — Pembuatan halaman Pengaturan Dosen & Kuota serta Generate Plotting Tutorial RPL Online
 
 **ID:** TUTORIAL-RPL-PENGATURAN-GENERATE-PAGE · **Parent Git:** `62257d9`.

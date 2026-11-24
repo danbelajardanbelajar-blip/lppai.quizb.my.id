@@ -354,10 +354,7 @@ include __DIR__ . '/../includes/header.php';
         </p>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">
-            <span>👥</span> Data Peserta &amp; Plotting
-        </a>
-        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
+        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">
             <span>🏫</span> Kelola Kelompok RPL
         </a>
         <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
@@ -435,8 +432,8 @@ include __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <div style="margin-top: 14px;">
-            <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php" class="btn btn-sm btn-primary" style="font-weight: 600;">
-                Lihat Hasil Plotting di Data Peserta RPL &rarr;
+            <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="btn btn-sm btn-primary" style="font-weight: 600;">
+                Lihat Data Pendaftar &amp; Penempatan Kelompok &rarr;
             </a>
         </div>
     </div>
@@ -731,7 +728,7 @@ include __DIR__ . '/../includes/header.php';
                             <span style="font-size: 11px; color: #64748b;"><?= $pct ?>% terisi</span>
                         </td>
                         <td style="padding: 10px 14px; text-align: center; white-space: nowrap;">
-                            <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php?class_id=<?= (int)$c['id'] ?>" class="btn btn-sm btn-secondary" style="font-size: 12px; padding: 4px 8px;" title="Lihat Anggota Kelompok">
+                            <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="btn btn-sm btn-secondary" style="font-size: 12px; padding: 4px 8px;" title="Lihat Data Pendaftar">
                                 👥 Anggota (<?= $terisi ?>)
                             </a>
                         </td>

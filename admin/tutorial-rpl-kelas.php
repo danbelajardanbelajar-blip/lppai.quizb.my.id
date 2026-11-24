@@ -285,7 +285,7 @@ include __DIR__ . '/../includes/header.php';
                                 </td>
                                 <td style="padding:14px 16px; text-align:center; vertical-align:middle;">
                                     <div style="display:flex; justify-content:center; gap:6px; flex-wrap:wrap;">
-                                        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-peserta.php?class_id=<?= (int)$cls['id'] ?>" class="btn btn-sm btn-info" title="Kelola Anggota Mahasiswa" style="padding:4px 8px; font-size:12px;">
+                                        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pendaftaran.php" class="btn btn-sm btn-info" title="Data Pendaftar Mahasiswa" style="padding:4px 8px; font-size:12px;">
                                             👥
                                         </a>
                                         <button type="button" class="btn btn-sm btn-warning" onclick="editClass(<?= htmlspecialchars(json_encode($cls), ENT_QUOTES) ?>)" title="Edit Kelompok" style="padding:4px 8px; font-size:12px;">

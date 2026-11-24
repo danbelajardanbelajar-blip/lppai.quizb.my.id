@@ -6,7 +6,6 @@
  * 2. Batch Unplot (Pelepasan massal)
  * 3. Auto-Distribusi Merata (Round-robin load balancing)
  * 4. Kueri Siswa dengan Status CBT Pretes & Filter (Kelas, Plotting, Search)
- * 5. Eksekusi Form Action di admin/tutorial-rpl-peserta.php
  */
 
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';

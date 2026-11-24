@@ -1,6 +1,6 @@
 <?php
 /**
- * Test Regression: Fix HTTP 500 on admin/tutorial-rpl-peserta.php and admin/tutorial-rpl-presensi.php
+ * Test Regression: Fix HTTP 500 on admin/tutorial-rpl-presensi.php
  *
  * Verifies that all SQL queries in helper and pages work against production schema
  * where users table only contains `no_hp` (no `whatsapp` column).
@@ -62,7 +62,7 @@ assert(!empty($tutors[0]['no_hp']), 'Tutor phone must be present');
 assert(!empty($tutors[0]['whatsapp']), 'Tutor whatsapp alias must be present');
 echo "[PASS] tutorialRplGetTutors works on table without whatsapp column\n";
 
-// 2. Test tutorialRplGetStudentsWithPretes (used in tutorial-rpl-peserta.php)
+// 2. Test tutorialRplGetStudentsWithPretes
 $students = tutorialRplGetStudentsWithPretes($pdo);
 assert(count($students) === 2, 'Should return 2 RPL students');
 assert($students[0]['nama_lengkap'] === 'Bambang Sudiro' || $students[0]['nama_lengkap'] === 'Siti Rahmawati', 'Student returned');
