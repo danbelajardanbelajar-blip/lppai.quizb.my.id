@@ -1,3 +1,45 @@
+## 2026-11-25 04:01:00 +0700 — Perbaikan Tombol Edit Sesi Ujian dan Koreksi Sintaks JavaScript pada CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-FIX-EDIT-SESSION-CLICK · **Parent Git:** `3e3f790a7bb47ddea0e2fd9245d5a05cfbcafd18`.
+
+**Permintaan dan dasar perbaikan:** Merespons pertanyaan pengguna ("menhgapa menu edit di halaman ini tidak bisa diklik? https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=sessions"):
+1. **Penyebab Utama (Root Cause)**:
+   - Tombol "Edit" pada tabel sesi dan paket soal tidak merespons klik karena blok `<script>` utama pada halaman `admin/tutorial-rpl-cbt.php` mengalami kegagalan kompilasi JavaScript (*compile-time SyntaxError*) di peramban pengguna, yang mengakibatkan seluruh fungsi controller modal (`openSessionModal`, `cbtOpenModal`, dll.) tidak terdaftar di objek `window`.
+   - Kegagalan sintaks tersebut bersumber dari:
+     1. Penggunaan flag `JSON_HEX_QUOT` pada output `json_encode` di dalam tag `<script>` yang menghasilkan karakter `"` untuk kunci/nilai objek JavaScript. Peramban mengevaluasi `"` sebagai token tidak valid saat parsing object literal, memicu `SyntaxError: Invalid or unexpected token`.
+     2. Pada listener event konfirmasi hapus massal (`submit`), terdapat pemisah baris fisik (*unescaped literal newlines*) di dalam string literal tunggal (`join('
+• ')` dan pesan confirm), yang memicu `SyntaxError: unterminated string literal`.
+     3. Pada fungsi `renderAttemptRow(att)`, penggabungan string atribut `onsubmit` memuat kutip tunggal tanpa escape (`confirm('Reset attempt...'`), memicu `SyntaxError: Unexpected identifier 'Reset'`.
+     4. Pada tombol baris tabel, atribut `onclick` memuat payload JSON serial yang panjang dan rentan terhadap tabrakan kutip HTML/JS.
+2. **Implementasi & Perbaikan Komprehensif**:
+   - **`admin/tutorial-rpl-cbt.php`**:
+     - Mengubah handler tombol Edit Sesi (`data-action="edit-session"`) dan Edit Paket (`data-action="edit-package"`) untuk memanggil fungsi berbasis ID integer yang bersih: `openEditSessionModalById(sessionId)` dan `openEditPackageModalById(packageId)`.
+     - Menyimpan cache array data bersih di JavaScript tanpa `JSON_HEX_QUOT`: `const PACKAGES_DATA = ...` dan `const SESSIONS_DATA = ...`.
+     - Menambahkan handler delegasi event klik pada `document` untuk `[data-action="edit-session"]` dan `[data-action="edit-package"]` sehingga tombol tetap dapat diklik secara responsif baik melalui pemanggilan langsung maupun event delegation.
+     - Memperbaiki escape urutan string literal JavaScript (`
+`, `'`) pada dialog konfirmasi hapus massal dan reset/delete attempt di `renderAttemptRow(att)`.
+     - Mengamankan dialog konfirmasi hapus sesi per baris menggunakan `json_encode` yang aman.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 04:00:27 | `admin/tutorial-rpl-cbt.php` | 845-852, 1054-1065, 1937-1960, 2202-2258, 2898-2915 | Perbaikan pemanggilan edit sesi & paket by ID, eliminasi JSON_HEX_QUOT, koreksi string newline & single quote escape, dan penambahan handler event delegation. |
+
+**Verifikasi:**
+- Validasi Sintaks JavaScript Node.js (`node --check`) pada seluruh blok `<script>` lulus 100% tanpa error (`Node JS syntax check returncode: 0`, `JS SYNTAX 100% VALID`).
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- Ketiadaan BOM (`BOM: False`) dan ketiadaan mojibake (`mojibake count: 0`) terverifikasi pada berkas.
+- `git diff --check` bersih 100% tanpa whitespace warning atau encoding conflict.
+- Seluruh 4 test suites lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (4/4 tahap ALL PASS).
+  - `tests/tutorial-rpl-student-hub-test.php` (4/4 test ALL PASS).
+  - `tests/tutorial-rpl-pages-500-fix-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian fungsional berjalan pada runtime PHP 8.3 CLI lokal. Push Git memperbarui repositori sumber; verifikasi deployment hosting dilakukan terpisah di server produksi.
+
 ## 2026-11-24 21:07:00 +0700 — Penyelarasan Total Tab Sesi Ujian CBT Tutorial RPL Berparitas Penuh dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-SESSION-TAB-TOTAL-PARITY · **Parent Git:** `b152c43b8b09a23baf4afc171dc74c528811b061`.

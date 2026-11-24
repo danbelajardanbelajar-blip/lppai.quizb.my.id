@@ -847,7 +847,7 @@ include __DIR__ . '/../includes/header.php';
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" title="Tambah butir soal ke paket ini">
                                             ＋ Soal
                                         </button>
-                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditPackageModal(<?= json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-package" title="Edit Paket Soal">
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick="openEditPackageModalById(<?= (int)$pkg['id'] ?>);" data-action="edit-package" data-package-id="<?= (int)$pkg['id'] ?>" title="Edit Paket Soal">
                                             ✏️ Edit
                                         </button>
                                         <?php if ((int)$pkg['id'] > 2): ?>
@@ -1056,8 +1056,8 @@ include __DIR__ . '/../includes/header.php';
                                     <button type="submit" class="bank-button <?= $rowOpen ? 'danger-sm' : '' ?>" style="min-height:28px;padding:4px 8px;font-size:11px" title="<?= $rowOpen ? 'Tutup pengerjaan ujian untuk sesi ini' : 'Buka pengerjaan ujian untuk sesi ini' ?>"><?= $rowOpen ? '🔴 Tutup Ujian' : '🟢 Buka Ujian' ?></button>
                                 </form>
                             <?php endif; ?>
-                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick='openSessionModal(true, <?= htmlspecialchars(json_encode($ses, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
-                            <form method="post" action="?tab=sessions" style="display:inline;margin:0 0 0 3px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Sesi Ujian '<?= htmlspecialchars(addslashes($ses['title']), ENT_QUOTES, 'UTF-8') ?>'?')">
+                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick="openEditSessionModalById(<?= (int)$ses['id'] ?>)">✏️ Edit</button>
+                            <form method="post" action="?tab=sessions" style="display:inline;margin:0 0 0 3px" onsubmit="return confirm(<?= htmlspecialchars(json_encode("PERINGATAN: Yakin ingin menghapus Sesi Ujian '" . $ses['title'] . "'?"), ENT_QUOTES, 'UTF-8') ?>)">
                                 <input type="hidden" name="action" value="delete_session">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
@@ -1939,7 +1939,26 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 window.CBT_PACKAGE_CATEGORIES = <?= json_encode($packageCategoriesMap, JSON_UNESCAPED_UNICODE) ?>;
-const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+const PACKAGES_DATA = <?= json_encode($packages, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+window.PACKAGES_DATA = PACKAGES_DATA;
+window.SESSIONS_DATA = SESSIONS_DATA;
+
+window.openEditPackageModalById = function (packageId) {
+    packageId = parseInt(packageId, 10);
+    const pkg = (window.PACKAGES_DATA || []).find(p => parseInt(p.id, 10) === packageId);
+    if (pkg) {
+        openEditPackageModal(pkg);
+    }
+};
+
+window.openEditSessionModalById = function (sessionId) {
+    sessionId = parseInt(sessionId, 10);
+    const ses = (window.SESSIONS_DATA || []).find(s => parseInt(s.id, 10) === sessionId);
+    if (ses) {
+        window.openSessionModal(true, ses);
+    }
+};
 
 function get(id) { return document.getElementById(id); }
 
@@ -2185,6 +2204,20 @@ document.addEventListener('click', function (e) {
         window.openSessionModal(false);
         return;
     }
+    const btnEditPkg = e.target.closest('[data-action="edit-package"]');
+    if (btnEditPkg) {
+        e.preventDefault();
+        const pkgId = parseInt(btnEditPkg.getAttribute('data-package-id') || '0', 10);
+        if (pkgId > 0) window.openEditPackageModalById(pkgId);
+        return;
+    }
+    const btnEditSes = e.target.closest('[data-action="edit-session"]');
+    if (btnEditSes) {
+        e.preventDefault();
+        const sesId = parseInt(btnEditSes.getAttribute('data-session-id') || '0', 10);
+        if (sesId > 0) window.openEditSessionModalById(sesId);
+        return;
+    }
 });
 
 document.addEventListener('change', function (event) {
@@ -2217,13 +2250,9 @@ document.addEventListener('submit', function (event) {
         event.preventDefault();
         return;
     }
-    const labels = checked.map(item => item.dataset.itemLabel || ('#' + item.value)).slice(0, 5).join('
-• ');
-    const more = checked.length > 5 ? ('
-...dan ' + (checked.length - 5) + ' sesi lainnya.') : '';
-    if (!confirm('PERINGATAN: Hapus permanen ' + checked.length + ' sesi ujian terpilih?
-
-• ' + labels + more)) {
+    const labels = checked.map(item => item.dataset.itemLabel || ('#' + item.value)).slice(0, 5).join('\n• ');
+    const more = checked.length > 5 ? ('\n...dan ' + (checked.length - 5) + ' sesi lainnya.') : '';
+    if (!confirm('PERINGATAN: Hapus permanen ' + checked.length + ' sesi ujian terpilih?\n\n• ' + labels + more)) {
         event.preventDefault();
     }
 });
@@ -2871,14 +2900,14 @@ function initCbtLiveMonitor() {
         const actionCellHtml =
             '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">' +
                 '<button type="button" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" onclick="openReviewModal(' + att.id + ');" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">👁️ Review</button>' +
-                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm('Reset attempt ujian mahasiswa ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\n\nMahasiswa akan diizinkan memulai ujian kembali dari awal.')">' +
+                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Reset attempt ujian mahasiswa \' + safeName + \' (NIM: \' + safeNim + \')?\\n\\nMahasiswa akan diizinkan memulai ujian kembali dari awal.\')">' +
                     '<input type="hidden" name="action" value="reset_attempt">' +
                     '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
                     '<input type="hidden" name="user_id" value="' + att.user_id + '">' +
                     '<input type="hidden" name="class_id" value="' + att.class_id + '">' +
                     '<button type="submit" class="bank-button" style="padding:4px 8px;font-size:11.5px;" title="Izinkan Ujian Ulang">🔄 Reset</button>' +
                 '</form>' +
-                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\n\nData jawaban dan nilai akan dihapus, dan mahasiswa dapat memulai ujian kembali.')">' +
+                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT \' + safeName + \' (NIM: \' + safeNim + \')?\\n\\nData jawaban dan nilai akan dihapus, dan mahasiswa dapat memulai ujian kembali.\')">' +
                     '<input type="hidden" name="action" value="delete_attempt">' +
                     '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
                     '<button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT mahasiswa ini">🗑️ Hapus</button>' +
