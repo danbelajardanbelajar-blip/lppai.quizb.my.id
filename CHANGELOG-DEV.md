@@ -1,3 +1,54 @@
+## 2026-11-24 16:30:00 +0700 — Penyelarasan Paket Soal, Sesi Ujian, dan Penindihan Data Soal CBT Tutorial RPL Berparitas Penuh dengan CBT Pretes RPL
+
+**ID:** TUTORIAL-RPL-CBT-PACKAGES-SESSIONS-SYNC · **Parent Git:** `9331121d07451d023b3355094f12823704c714c5`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk menyamakan paket soal dan sesi ujian CBT Tutorial RPL dengan CBT Pretes RPL, serta menindih data soal lama:
+1. **Skema Basis Data (`includes/tutorial-rpl-helper.php`)**:
+   - Menambahkan tabel `tutorial_rpl_cbt_packages`: menyimpan data paket soal (`id`, `code`, `name`, `description`, `duration_minutes`, `question_count`, `is_active`, `created_at`).
+   - Menambahkan kolom `package_id` pada tabel `tutorial_rpl_cbt_questions` (default 1).
+   - Menambahkan kolom `package_ids_json` pada tabel `tutorial_rpl_cbt_sessions`.
+   - Menambahkan kolom `session_id` dan `package_id` pada tabel `tutorial_rpl_cbt_attempts` untuk mencatat sesi dan paket yang dikerjakan mahasiswa.
+2. **Penyelarasan 2 Paket Soal & 2 Sesi Ujian**:
+   - Paket 1: `PKT-TUTOR-UTAMA` (Paket 1 - Utama Ubudiyah / Keislaman, 40 butir soal dari `data/pretes-cbt-bank.php`, kuota ujian 25 butir soal).
+   - Paket 2: `PKT-2-KRISTEN-PROTESTAN` (Paket 2 - Kristen Protestan, 25 butir soal dari `data/paket-2-kristen-protestan.php`).
+   - Sesi 1: `SESI-TUTORIAL-RPL-2026` (Sesi Ujian Tulis Tutorial RPL 2026/2027 Utama / Muslim, terhubung ke Paket 1, durasi 90 menit, passing grade 70.00, token `TUTOR26`, gerbang dibuka).
+   - Sesi 2: `SESI-TUTORIAL-PROTESTAN-2026` (Sesi Ujian Tulis Tutorial RPL – Kristen Protestan, terhubung ke Paket 2, durasi 90 menit, passing grade 70.00, token `TUTOR26`, gerbang dibuka).
+3. **Penindihan Data Soal Lama dengan Soal Resmi CBT Pretes**:
+   - 10 data butir soal dummy lama (`TUTOR-RPL-Q%`) ditindih bersih dengan 65 butir soal resmi dari CBT Pretes RPL (40 butir soal Muslim + 25 butir soal Kristen Protestan).
+   - Fungsi `tutorialRplCbtSeedPackagesAndQuestions(PDO $pdo, bool $force = false)` menginisialisasi Paket 1 & 2, Sesi 1 & 2, serta mengimpor data butir soal secara otomatis dan terisolasi.
+4. **Pembaruan Panel Admin (`admin/tutorial-rpl-cbt.php`)**:
+   - Tab 1 (Bank Soal): Filter dropdown Paket Soal (Semua Paket, Paket 1 Muslim, Paket 2 Kristen), badge paket per butir soal di tabel, tombol `🔄 Pulihkan & Tindih Soal CBT Pretes`, modal tambah/edit soal dilengkapi pilihan Paket Soal.
+   - Tab 2 (Sesi Ujian): Tabel ringkasan 2 sesi ujian (Utama & Kristen) dengan status gerbang masing-masing dan tombol aksi toggle cepat, serta form konfigurasi per sesi yang interaktif.
+   - Tab 3 (Impor Excel): Ditambahkan dropdown pemilihan Paket Soal tujuan impor (`package_id`).
+   - Tab 4 (Hasil & Monitoring): Ditambahkan kolom `Sesi & Paket` pada tabel monitoring, filter dropdown berdasarkan Paket Soal, dan ekspor Excel kini menyertakan kolom Sesi Ujian dan Paket Soal.
+5. **Pembaruan Sisi Mahasiswa (`pages/tutorial-rpl-cbt.php`)**:
+   - Layar Intro: Deteksi sesi adaptif berdasarkan riwayat agama mahasiswa (`isPretesUserKristen()`) dengan pilihan dropdown sesi ujian yang fleksibel, dan verifikasi token disesuaikan dengan sesi terpilih.
+   - Ruang Ujian: Attempt pengerjaan otomatis mengambil 25 butir soal dari paket yang terhubung ke sesi tersebut (Paket 1 untuk mahasiswa Muslim, Paket 2 untuk mahasiswa Kristen Protestan).
+   - Pencatatan `session_id` dan `package_id` ke dalam rekaman attempt mahasiswa.
+6. **Pengujian Komprehensif (`tests/tutorial-rpl-cbt-parity-test.php`)**:
+   - Test suite diperluas ke 9 tahapan: verifikasi 5 tabel, 2 paket soal, 2 sesi ujian 90m, penindihan 65 butir soal pretes, alur ujian mahasiswa Muslim (Paket 1, scoring 100%, sinkronisasi), alur ujian mahasiswa Kristen Protestan (Paket 2, scoring 100%), reset attempt, impor/ekspor multi-paket, dan verifikasi antarmuka admin/mahasiswa.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 16:27:39 | `includes/tutorial-rpl-helper.php` | 944-1148, 1222-1275, 1370-1393, 1498-1582, 1756-1910 | Skema `tutorial_rpl_cbt_packages`, fungsi `tutorialRplCbtSeedPackagesAndQuestions`, filter `package_id` bank soal, adaptasi sesi attempt, multi-package Excel import/export. |
+| 2026-11-24 16:22:49 | `admin/tutorial-rpl-cbt.php` | 34-44, 114-250, 360-480, 500-650, 750-860, 950-1080 | Antarmuka panel admin: filter paket soal, tombol tindih soal CBT pretes, tabel 2 sesi ujian, form edit sesi, pilihan paket impor Excel, kolom sesi/paket monitoring. |
+| 2026-11-24 16:24:59 | `pages/tutorial-rpl-cbt.php` | 20-35, 116-195, 321-335, 555-556 | Selektor sesi adaptif pada layar gateway intro, deteksi agama mahasiswa (`isPretesUserKristen`), penarikan soal sesuai paket sesi, kompatibilitas opsi array A-E. |
+| 2026-11-24 16:25:46 | `tests/tutorial-rpl-cbt-parity-test.php` | 1-245 | Test suite otomatis 9 tahap: paritas 5 tabel, 2 paket soal, 2 sesi ujian 90m, 65 soal pretes, pengerjaan Muslim vs Kristen, reset attempt, impor/ekspor multi-paket. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada berkas `includes/tutorial-rpl-helper.php`, `admin/tutorial-rpl-cbt.php`, `pages/tutorial-rpl-cbt.php`, dan `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% tanpa syntax error.
+- `git diff --check` bersih tanpa konflik atau whitespace issues.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap PASS).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% PASS.
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% PASS.
+- Test pendukung `tests/pretes-rpl-sync-kelola-nilai-test.php` lulus 100% PASS.
+- Test pendukung `tests/tutorial-rpl-student-status-test.php` lulus 100% PASS.
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+
 ## 2026-11-24 16:00:00 +0700 — Penyelarasan Paritas Penuh CBT Ujian Tulis Tutorial RPL dengan CBT Pretes (Sisi Admin & Sisi Mahasiswa)
 
 **ID:** TUTORIAL-RPL-CBT-PARITY-ADMIN-MAHASISWA · **Parent Git:** `5db5e86`.

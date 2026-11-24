@@ -18,7 +18,19 @@ $isRpl = (strtoupper(trim((string)($user['jenis_program'] ?? ''))) === 'RPL');
 $escape = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 
 $membership = tutorialRplGetStudentMembership($pdo, $userId);
-$session = tutorialRplCbtGetSession($pdo);
+
+// Deteksi apakah mahasiswa terdaftar Kristen Protestan
+$isKristen = function_exists('isPretesUserKristen') ? isPretesUserKristen($pdo, $userId) : false;
+
+// Ambil seluruh sesi yang tersedia
+$sessions = tutorialRplCbtGetSessions($pdo);
+
+// Tentukan sesi yang dituju (berdasarkan parameter URL/POST atau deteksi agama)
+$selectedSessionId = isset($_GET['session_id']) && (int)$_GET['session_id'] > 0
+    ? (int)$_GET['session_id']
+    : (isset($_POST['session_id']) && (int)$_POST['session_id'] > 0 ? (int)$_POST['session_id'] : ($isKristen ? 2 : 1));
+
+$session = tutorialRplCbtGetSession($pdo, $selectedSessionId);
 $error = '';
 $notice = '';
 
@@ -102,17 +114,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = trim($_POST['action'] ?? '');
 
         if ($action === 'verify_token') {
+            $targetSessionId = (int)($_POST['session_id'] ?? $selectedSessionId);
+            $session = tutorialRplCbtGetSession($pdo, $targetSessionId);
             $inputToken = strtoupper(trim((string)($_POST['token'] ?? '')));
             $validToken = strtoupper(trim((string)($session['token'] ?? 'TUTOR26')));
             if ($inputToken !== '' && $inputToken === $validToken) {
                 $_SESSION['tutorial_rpl_cbt_token_verified'] = true;
+                $_SESSION['tutorial_rpl_cbt_session_id'] = $targetSessionId;
                 if ($membership) {
-                    tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session);
+                    tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session, $targetSessionId);
                 }
-                header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php');
+                header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php?session_id=' . $targetSessionId);
                 exit;
             } else {
-                $error = 'Token ujian tidak valid. Silakan periksa kembali token yang diberikan admin atau tutor.';
+                $error = 'Token ujian tidak valid untuk sesi ' . ($session['title'] ?? '') . '. Silakan periksa kembali token yang diberikan admin atau tutor.';
             }
         } elseif ($action === 'submit_exam') {
             if (!$membership) {
@@ -120,10 +135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif (empty($session['exam_open'])) {
                 $error = 'Akses ujian telah ditutup.';
             } else {
-                $questions = tutorialRplCbtGetQuestions($pdo);
+                $questions = tutorialRplCbtGetQuestions($pdo, null, (int)($session['id'] ?? 1));
                 if (empty($questions)) {
-                    tutorialRplCbtSeedQuestionsIfEmpty($pdo);
-                    $questions = tutorialRplCbtGetQuestions($pdo);
+                    tutorialRplCbtSeedPackagesAndQuestions($pdo, true);
+                    $questions = tutorialRplCbtGetQuestions($pdo, null, (int)($session['id'] ?? 1));
                 }
 
                 $totalQuestions = count($questions);
@@ -160,6 +175,9 @@ if ($membership && empty($membership['exam_submitted'])) {
     $existingAttempt = tutorialRplCbtGetStudentAttempt($pdo, $userId, (int)$membership['class_id']);
     if ($existingAttempt) {
         $attempt = $existingAttempt;
+        if (!empty($attempt['session_id'])) {
+            $session = tutorialRplCbtGetSession($pdo, (int)$attempt['session_id']);
+        }
         $isTokenVerified = true; // Langsung izinkan pengerjaan jika attempt sudah berjalan
         $now = time();
         $deadline = (int)($attempt['deadline_at'] ?? ($attempt['started_at'] + ((int)$session['duration_minutes'] * 60)));
@@ -179,7 +197,7 @@ if ($membership && empty($membership['exam_submitted'])) {
             $items = tutorialRplCbtGetAttemptItems($pdo, (int)$attempt['id']);
         }
     } elseif ($isTokenVerified && !empty($session['exam_open'])) {
-        $attempt = tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session);
+        $attempt = tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session, (int)($session['id'] ?? 1));
         $deadline = (int)$attempt['deadline_at'];
         $remainingSeconds = max(0, $deadline - time());
         $items = tutorialRplCbtGetAttemptItems($pdo, (int)$attempt['id']);
@@ -303,6 +321,19 @@ include __DIR__ . '/../includes/header.php';
                     <form method="POST" action="<?= BASE_URL ?>/tutorial-rpl-cbt.php" style="margin-top:20px;">
                         <input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>">
                         <input type="hidden" name="action" value="verify_token">
+
+                        <div style="margin:16px 0; text-align:left;">
+                            <label for="cbtSessionSelect" style="display:block; font-size:12.5px; font-weight:800; color:#1e293b; margin-bottom:6px;">
+                                📌 Sesi &amp; Paket Ujian CBT:
+                            </label>
+                            <select id="cbtSessionSelect" name="session_id" class="bank-input" style="font-weight:700; width:100%;" onchange="window.location.href='<?= BASE_URL ?>/tutorial-rpl-cbt.php?session_id=' + this.value;">
+                                <?php foreach ($sessions as $s): ?>
+                                    <option value="<?= (int)$s['id'] ?>" <?= (int)$s['id'] === (int)$session['id'] ? 'selected' : '' ?>>
+                                        <?= (int)$s['id'] === 2 ? '✝️ ' : '🕌 ' ?><?= $escape($s['title']) ?> (Durasi: <?= (int)$s['duration_minutes'] ?> Menit)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
                         <div id="cbtTokenBox" style="display:block; margin:16px 0; background:#fefce8; border:1.5px solid #fde047; border-radius:12px; padding:16px; text-align:left;">
                             <label for="cbtInputToken" style="display:block; font-size:12.5px; font-weight:800; color:#854d0e; margin-bottom:6px;">
@@ -522,7 +553,7 @@ include __DIR__ . '/../includes/header.php';
             const currentAnswer = (item.answer || '').toUpperCase();
 
             letters.forEach((letter, lIdx) => {
-                const text = item.options[lIdx] || '';
+                const text = item.options[lIdx] || item.options[letter] || '';
                 if (!text && lIdx >= 2) return; // opsi C, D, E opsional jika kosong
 
                 const label = document.createElement('label');
