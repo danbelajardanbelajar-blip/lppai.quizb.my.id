@@ -1,3 +1,50 @@
+## 2026-11-24 19:16:00 +0700 — Penyelarasan Total Tab Hasil Ujian & Live Monitoring CBT Tutorial RPL Berparitas 100% dengan CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-RESULTS-PARITY-PRETES · **Parent Git:** `143829237f571dd976b17c74e99dea8382cf9999`.
+
+**Permintaan dan dasar perbaikan:** Merespons instruksi pengguna ("tiru kode https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=results yang ad di pretes rpl secara total"):
+1. **Latar Belakang & Identifikasi Kebutuhan**:
+   - Tab Hasil Ujian (`tab=results`) pada CBT Pretes RPL (`includes/pretes-cbt-admin-view.php`) memiliki fungsionalitas Live Monitoring mutakhir yang memungkinkan pengawas/admin memantau pengerjaan ujian peserta secara real-time, melihat sisa waktu countdown detik per detik, status berlangsung dengan animasi pulsa, progres pengerjaan (jumlah soal dijawab, persentase, dan flag ragu-ragu), live score sementara, filter sub-tabs (Live, Selesai, Semua), filter chips paket & kelulusan, form pencarian & filter kelompok terpadu, aksi per record (Review, Reset, Hapus), aksi massal Hapus Semua Hasil, paginasi per halaman (10, 25, 50, 100), serta polling AJAX auto-refresh real-time tanpa reload halaman.
+   - Sebelumnya, tab `results` di `admin/tutorial-rpl-cbt.php` masih berformat tabel statis sederhana tanpa dukungan live monitoring, countdown timer, auto-refresh, pagination, dan filter terstruktur.
+2. **Implementasi & Peningkatan**:
+   - **`admin/tutorial-rpl-cbt.php`**:
+     - Menambahkan endpoint AJAX `?ajax=live_results` yang menghitung metrik live attempts, live item statistics (answered, flagged, live_correct, live_wrong), status pengerjaan (ongoing, submitted, expired), durasi dan sisa waktu, serta pagination secara efisien dalam format JSON.
+     - Menambahkan penanganan aksi POST: `delete_attempt`, `delete_all_attempts` (berdasarkan scope paket), dan penyempurnaan `reset_attempt`.
+     - Mereplikasi tampilan Tab 4 (`tab=results`) secara total mengikuti Tab 6 CBT Pretes:
+       - Header panel dinamis dengan rangkuman mode (Live, Selesai, Semua), tombol aksi `🗑️ Hapus Semua Hasil`, tombol ekspor hasil Excel (`?download=results`) yang mengikuti filter aktif, dan badge indikator filter ekspor.
+       - Status sub-tabs: `⚡ Sedang Berlangsung (Live)` (dengan counter dan efek glow pulse saat ada peserta aktif), `✓ Riwayat Selesai`, dan `📋 Semua Sesi`.
+       - Toolbar Live Monitoring: pulse dot hijau real-time, badge jumlah peserta aktif, jam pembaruan WIB (`H:i:s`), checkbox auto-refresh, dropdown interval auto-refresh (5s, 10s, 30s), dan tombol manual `🔄 Segarkan`.
+       - Filter toolbar: baris filter chips Paket (`Semua`, `📦 Paket 1 (Muslim)`, `📦 Paket 2 (Kristen)`), baris filter chips Hasil (`Semua`, `✓ Lulus`, `✕ Belum Memenuhi`), dropdown filter Kelompok RPL, input pencarian (Nama/NIM/Prodi), tombol Cari & Reset, serta tag filter aktif.
+       - Tabel hasil `cbtLiveResultsTable` dengan 10 kolom berparitas: Peserta (nama link profil + prodi), NIM, Kelompok & Tutor, Paket/Sesi, Waktu & Sisa (jam mulai WIB, durasi pengerjaan, countdown clock `⏳ Xm Ys` live 1 detik, atau waktu habis), Status (`✓ Selesai`, `⚡ Berlangsung`, `⌛ Waktu Habis`), Progres Dikerjakan (jumlah soal, bar progres warna dinamis, tag ragu), Benar/Salah (benar hijau, salah merah, sisa abu-abu), Nilai (skor final + badge lulus/belum memenuhi atau skor live), dan Aksi (`👁️ Review`, `🔄 Reset`, `🗑️ Hapus`).
+       - Paginasi `cbt-pagination-bar` dengan navigasi halaman lengkap (first, prev, number links, ellipsis, next, last) dan pemilih item per halaman.
+     - Menambahkan client-side JavaScript untuk Live Monitoring: interval 1 detik untuk countdown clock pengerjaan aktif, modul polling `fetchLiveResults()`, DOM diff updater `updateTableRows()` yang memperbarui cell in-place secara halus tanpa menghilangkan fokus atau posisi scroll, serta event delegation.
+   - **`includes/tutorial-rpl-helper.php`**:
+     - Menambahkan fungsi helper `tutorialRplCbtDeleteAttempt(PDO $pdo, int $attemptId): bool` untuk menghapus 1 attempt ujian peserta beserta data detail butir soalnya.
+     - Menambahkan fungsi helper `tutorialRplCbtDeleteAllAttempts(PDO $pdo, string $scope): int` untuk menghapus seluruh attempt ujian berdasarkan filter cakupan.
+     - Menambahkan fungsi helper `tutorialRplCbtResultFilters(array $get): array` untuk memvalidasi dan membersihkan parameter query string filter hasil.
+     - Menambahkan fungsi helper `tutorialRplCbtResultWhere(array $filters, int $now, float $passingGrade): array` untuk membangun SQL query clause yang aman dan terparameterisasi.
+     - Menambahkan fungsi helper `tutorialRplCbtResultPassCounts(PDO $pdo, array $filters, int $now, float $passingGrade): array` untuk menghitung jumlah peserta lulus vs belum memenuhi syarat secara cepat.
+     - Menambahkan fungsi helper `buildTutorialRplResultUrl(array $overrides): string` untuk membangun URL navigasi filter dan paginasi yang konsisten.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 19:14:47 | `admin/tutorial-rpl-cbt.php` | 118-271, 478-509, 533-611, 990-1380, 2250-2580 | Implementasi endpoint AJAX live_results, data prep, view Tab 4 hasil & live monitoring, dan client-side polling JS. |
+| 2026-11-24 19:14:47 | `includes/tutorial-rpl-helper.php` | 1345-1540 | Penambahan fungsi helper delete attempt, delete all, result filters, where clause, pass counts, dan URL builder. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php` dan `php.exe -l includes/tutorial-rpl-helper.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- `git diff --check` bersih tanpa konflik atau trailing whitespace.
+- Test suites paritas dan fungsionalitas berjalan dan lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (ALL PASS).
+  - `tests/tutorial-rpl-student-hub-test.php` (4/4 test ALL PASS).
+  - `tests/tutorial-rpl-pages-500-fix-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian fungsional berjalan pada runtime PHP 8.3 CLI lokal. Push Git memperbarui repositori sumber; verifikasi deployment hosting dilakukan terpisah di server produksi.
+
 ## 2026-11-24 18:53:00 +0700 — Penyelarasan Aksi Sesi Ujian Menjadi Edit & Hapus per Record di CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-SESSION-PER-RECORD-ACTIONS · **Parent Git:** `5b937a022ec750915cf1bb8f7e59fecab28a980e`.

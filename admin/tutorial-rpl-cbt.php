@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * LPPAI Corner - Admin: Pengaturan Sesi & Paket Soal Ujian Tulis Tutorial RPL (CBT)
  * Arsitektur modern berparitas dengan CBT Pretes: 4 Tab (Paket Soal, Sesi Ujian, Impor Excel, Hasil Ujian).
@@ -13,7 +13,7 @@ $pdo = getDBConnection();
 ensureTutorialRplTables($pdo);
 ensureTutorialRplCbtTables($pdo);
 
-// ── Penanganan Unduhan Berkas Excel ──────────────────────────────────────────
+// â”€â”€ Penanganan Unduhan Berkas Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['download'])) {
     $dl = $_GET['download'];
     if ($dl === 'template') {
@@ -46,7 +46,7 @@ if (isset($_GET['download'])) {
     }
 }
 
-// ── Endpoint AJAX Responsif ──────────────────────────────────────────────────
+// â”€â”€ Endpoint AJAX Responsif â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if (isset($_GET['ajax'])) {
     header('Content-Type: application/json; charset=utf-8');
     if ($_GET['ajax'] === 'package_questions') {
@@ -115,6 +115,159 @@ if (isset($_GET['ajax'])) {
         ]);
         exit;
     }
+    if ($_GET['ajax'] === 'live_results') {
+        $cbtFilters = tutorialRplCbtResultFilters($_GET);
+        $statusFilter = $cbtFilters['status_filter'];
+        $filter = $cbtFilters['result_filter'];
+        $searchQuery = $cbtFilters['q'];
+        $groupFilter = $cbtFilters['group'];
+        $page = $cbtFilters['page'];
+        $perPage = $cbtFilters['per_page'];
+
+        $now = time();
+        $passingGrade = 70.0;
+
+        [$whereSql, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
+
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereSql");
+        foreach ($params as $k => $v) {
+            $countStmt->bindValue($k, $v);
+        }
+        $countStmt->execute();
+        $totalFiltered = (int)$countStmt->fetchColumn();
+
+        $totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
+
+        $stmt = $pdo->prepare("
+            SELECT a.*,
+                   u.nama_lengkap, u.nim, u.program_studi,
+                   c.nama_kelompok, c.dosen_nama,
+                   s.title AS session_title, s.code AS session_code,
+                   p.name AS package_name, p.code AS package_code
+            FROM tutorial_rpl_cbt_attempts a
+            JOIN users u ON a.user_id = u.id
+            JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
+            LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
+            $whereSql
+            ORDER BY a.started_at DESC
+            LIMIT $perPage OFFSET $offset
+        ");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+        $itemStatsMap = [];
+        if (!empty($attemptIds)) {
+            $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+            $stmtStats = $pdo->prepare("
+                SELECT
+                    attempt_id,
+                    COUNT(*) AS total_items,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+                    SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+                FROM tutorial_rpl_cbt_items
+                WHERE attempt_id IN ($placeholders)
+                GROUP BY attempt_id
+            ");
+            $stmtStats->execute($attemptIds);
+            foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $itemStatsMap[(int)$row['attempt_id']] = $row;
+            }
+        }
+
+        $data = [];
+        foreach ($attempts as $a) {
+            $attId = (int)$a['id'];
+            $stat = $itemStatsMap[$attId] ?? null;
+            $totalItems = $stat ? (int)$stat['total_items'] : (int)($a['total_questions'] ?? 25);
+            $answered = $stat ? (int)$stat['answered_count'] : 0;
+            $flagged = $stat ? (int)$stat['flagged_count'] : 0;
+            $unanswered = max(0, $totalItems - $answered);
+            $isSubmitted = ($a['submitted_at'] !== null);
+            $deadline = (int)($a['deadline_at'] ?? ($a['started_at'] + 90 * 60));
+            $isExpired = (!$isSubmitted && $now >= $deadline);
+            $isOngoing = (!$isSubmitted && !$isExpired);
+            $remainingSeconds = max(0, $deadline - $now);
+
+            $correct = $isSubmitted ? (int)($a['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
+            $wrong = $isSubmitted ? max(0, $totalItems - $correct) : ($stat ? (int)$stat['live_wrong_count'] : 0);
+            $score = $isSubmitted ? ($a['score'] !== null ? (float)$a['score'] : null) : ($totalItems > 0 ? round(($correct / $totalItems) * 100, 1) : 0.0);
+
+            $durationSeconds = $isSubmitted ? max(0, (int)$a['submitted_at'] - (int)$a['started_at']) : 0;
+            $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+
+            $pkgId = (int)($a['package_id'] ?? 1);
+            $pkgDesc = ($pkgId === 2) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)';
+
+            $data[] = [
+                'id' => $attId,
+                'user_id' => (int)$a['user_id'],
+                'class_id' => (int)$a['class_id'],
+                'nama_lengkap' => $a['nama_lengkap'],
+                'nim' => $a['nim'] ?? '-',
+                'program_studi' => $a['program_studi'] ?? '',
+                'nama_kelompok' => $a['nama_kelompok'] ?? '-',
+                'dosen_nama' => $a['dosen_nama'] ?? '-',
+                'package_id' => $pkgId,
+                'package_desc' => $pkgDesc,
+                'session_title' => $a['session_title'] ?? ($pkgId === 2 ? 'Sesi Kristen' : 'Sesi Utama'),
+                'started_at' => (int)$a['started_at'],
+                'started_at_wib' => $startedWib,
+                'is_submitted' => $isSubmitted,
+                'is_ongoing' => $isOngoing,
+                'is_expired' => $isExpired,
+                'deadline_at' => $deadline,
+                'remaining_seconds' => $remainingSeconds,
+                'duration_seconds' => $durationSeconds,
+                'total_items' => $totalItems,
+                'answered_count' => $answered,
+                'unanswered_count' => $unanswered,
+                'flagged_count' => $flagged,
+                'correct_count' => $correct,
+                'wrong_count' => $wrong,
+                'score' => $score !== null ? number_format($score, 1) : null,
+                'progress_percent' => $totalItems > 0 ? min(100, round(($answered / $totalItems) * 100)) : 0
+            ];
+        }
+
+        $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
+        $totalPkg1 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
+        $totalPkg2 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
+        $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+        $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+
+        echo json_encode([
+            'success' => true,
+            'timestamp' => $now,
+            'timestamp_wib' => (new DateTimeImmutable('@' . $now))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i:s') . ' WIB',
+            'ongoing_count' => $ongoingCount,
+            'finished_count' => $finishedCount,
+            'total_all' => $totalAll,
+            'total_pkg1' => $totalPkg1,
+            'total_pkg2' => $totalPkg2,
+            'total_filtered' => $totalFiltered,
+            'page' => $page,
+            'per_page' => $perPage,
+            'total_pages' => $totalPages,
+            'status_filter' => $statusFilter,
+            'result_filter' => $filter,
+            'group' => $cbtFilters['group'],
+            'pass_filter' => $cbtFilters['pass_filter'],
+            'pass_counts' => tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade),
+            'data' => $data
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
 
 $message = '';
@@ -133,7 +286,7 @@ if (!in_array($activeTab, $allowedTabs, true)) {
     $activeTab = 'packages';
 }
 
-// ── Handle POST Actions ──────────────────────────────────────────────────────
+// â”€â”€ Handle POST Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -234,7 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $sessionToToggle = tutorialRplCbtGetSession($pdo, $sesId);
         $newStatus = empty($sessionToToggle['exam_open']) ? 1 : 0;
         tutorialRplCbtUpdateSession($pdo, array_merge($sessionToToggle, ['exam_open' => $newStatus]));
-        $statusLabel = $newStatus ? '🟢 DIBUKA' : '🔴 DITUTUP';
+        $statusLabel = $newStatus ? 'ًںں¢ DIBUKA' : 'ًں”´ DITUTUP';
         $message = "Gerbang {$sessionToToggle['title']} berhasil {$statusLabel}.";
         $msgType = 'success';
         $activeTab = 'sessions';
@@ -322,10 +475,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msgType = 'danger';
             }
         }
+    } elseif ($action === 'delete_attempt') {
+        $attemptId = (int)($_POST['attempt_id'] ?? 0);
+        if ($attemptId > 0 && tutorialRplCbtDeleteAttempt($pdo, $attemptId)) {
+            $message = 'Sesi ujian peserta berhasil dihapus. Peserta kini dapat mengulang ujian kembali.';
+            $msgType = 'success';
+        } else {
+            $message = 'Gagal menghapus sesi ujian peserta.';
+            $msgType = 'danger';
+        }
+        $activeTab = 'results';
+    } elseif ($action === 'delete_all_attempts') {
+        $scope = trim((string)($_POST['delete_scope'] ?? 'all'));
+        $deletedCount = tutorialRplCbtDeleteAllAttempts($pdo, $scope);
+        $message = "Berhasil menghapus {$deletedCount} data sesi ujian peserta.";
+        $msgType = 'success';
+        $activeTab = 'results';
     } elseif ($action === 'reset_attempt') {
         $userId = (int)($_POST['user_id'] ?? 0);
         $classId = (int)($_POST['class_id'] ?? 0);
-        if ($userId > 0 && $classId > 0 && tutorialRplCbtResetAttempt($pdo, $userId, $classId)) {
+        $attId = (int)($_POST['attempt_id'] ?? 0);
+        if ($attId > 0 && tutorialRplCbtDeleteAttempt($pdo, $attId)) {
+            $message = 'Attempt ujian peserta berhasil di-reset. Peserta kini dapat mengulang ujian kembali.';
+            $msgType = 'success';
+        } elseif ($userId > 0 && $classId > 0 && tutorialRplCbtResetAttempt($pdo, $userId, $classId)) {
             $message = 'Attempt ujian peserta berhasil di-reset. Peserta kini dapat mengulang ujian kembali.';
             $msgType = 'success';
         } else {
@@ -343,7 +516,6 @@ $sessionKristen = tutorialRplCbtGetSession($pdo, 2);
 
 $selectedPackageId = (isset($_GET['package_id']) && $_GET['package_id'] !== '') ? (int)$_GET['package_id'] : null;
 $questions = tutorialRplCbtGetQuestions($pdo, null, $selectedPackageId);
-$attempts = tutorialRplCbtGetAttempts($pdo);
 
 // Kategori unik untuk filter
 $categories = [];
@@ -354,23 +526,94 @@ foreach ($questions as $q) {
 }
 sort($categories);
 
-// Statistik Hasil Ujian
-$totalAttempts = count($attempts);
+// Statistik Umum CBT
 $passingGrade = (float)($session['passing_grade'] ?? 70.0);
-$passCount = 0;
-$failCount = 0;
-$totalScore = 0.0;
-foreach ($attempts as $a) {
-    $sc = (float)($a['score'] ?? 0);
-    $totalScore += $sc;
-    if ($sc >= $passingGrade) {
-        $passCount++;
-    } else {
-        $failCount++;
+$now = time();
+
+$cbtFilters = tutorialRplCbtResultFilters($_GET);
+$statusFilter = $cbtFilters['status_filter'];
+$resultFilter = $cbtFilters['result_filter'];
+$searchQuery = $cbtFilters['q'];
+$groupFilter = $cbtFilters['group'];
+$passFilter = $cbtFilters['pass_filter'];
+$page = $cbtFilters['page'];
+$perPage = $cbtFilters['per_page'];
+
+$totalAllAttempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
+$totalAttempts = $totalAllAttempts;
+$totalPkg1Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
+$totalPkg2Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
+$ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+$finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+
+[$whereClause, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
+$passCounts = tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade);
+
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereClause");
+foreach ($params as $k => $v) {
+    $countStmt->bindValue($k, $v);
+}
+$countStmt->execute();
+$totalFiltered = (int)$countStmt->fetchColumn();
+
+$totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+if ($page > $totalPages) {
+    $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+
+$stmt = $pdo->prepare("
+    SELECT a.*,
+           u.nama_lengkap, u.nim, u.program_studi,
+           c.nama_kelompok, c.dosen_nama,
+           s.title AS session_title, s.code AS session_code,
+           p.name AS package_name, p.code AS package_code
+    FROM tutorial_rpl_cbt_attempts a
+    JOIN users u ON a.user_id = u.id
+    JOIN tutorial_rpl_classes c ON a.class_id = c.id
+    LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
+    LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
+    $whereClause
+    ORDER BY a.started_at DESC
+    LIMIT $perPage OFFSET $offset
+");
+foreach ($params as $k => $v) {
+    $stmt->bindValue($k, $v);
+}
+$stmt->execute();
+$attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch item stats for each attempt in current page
+$attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+$itemStatsMap = [];
+if (!empty($attemptIds)) {
+    $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+    $stmtStats = $pdo->prepare("
+        SELECT
+            attempt_id,
+            COUNT(*) AS total_items,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+            SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+        FROM tutorial_rpl_cbt_items
+        WHERE attempt_id IN ($placeholders)
+        GROUP BY attempt_id
+    ");
+    $stmtStats->execute($attemptIds);
+    foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $itemStatsMap[(int)$row['attempt_id']] = $row;
     }
 }
-$avgScore = $totalAttempts > 0 ? round($totalScore / $totalAttempts, 1) : 0.0;
-$passPercent = $totalAttempts > 0 ? round(($passCount / $totalAttempts) * 100, 1) : 0.0;
+
+// Group options for dropdown
+$groupOptions = $pdo->query("SELECT DISTINCT nama_kelompok FROM tutorial_rpl_classes WHERE is_active = 1 ORDER BY nama_kelompok ASC")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+// Metrics for top cards
+$allSubmitted = $pdo->query("SELECT COUNT(*) as cnt, SUM(CASE WHEN score >= $passingGrade THEN 1 ELSE 0 END) as passed, AVG(score) as avg_sc FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL")->fetch(PDO::FETCH_ASSOC);
+$passCount = (int)($allSubmitted['passed'] ?? 0);
+$avgScore = $allSubmitted['avg_sc'] !== null ? round((float)$allSubmitted['avg_sc'], 1) : 0.0;
+$passPercent = !empty($allSubmitted['cnt']) ? round(($passCount / (int)$allSubmitted['cnt']) * 100, 1) : 0.0;
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -382,28 +625,28 @@ include __DIR__ . '/../includes/header.php';
     <div class="bank-hero" style="margin-bottom:20px;">
         <div>
             <div class="bank-eyebrow">LPPAI / CBT TUTORIAL RPL</div>
-            <h2>🧩 Paket Soal &amp; Sesi Ujian Tulis Tutorial RPL</h2>
+            <h2>ًں§© Paket Soal &amp; Sesi Ujian Tulis Tutorial RPL</h2>
             <p>Kelola paket materi soal, sesi ujian 90 menit (passing grade <?= $passingGrade ?>), impor Excel, serta pantau hasil ujian mahasiswa secara real-time.</p>
         </div>
         <div class="bank-actions">
             <button type="button" class="bank-button primary" onclick="openAddModal();">
-                ➕ Tambah Soal
+                â‍• Tambah Soal
             </button>
             <a href="?download=template" class="bank-button ghost">
-                📥 Unduh Template (.xlsx)
+                ًں“¥ Unduh Template (.xlsx)
             </a>
             <a href="?download=bank" class="bank-button ghost">
-                📤 Ekspor Paket Soal (.xlsx)
+                ًں“¤ Ekspor Paket Soal (.xlsx)
             </a>
             <a href="?download=results" class="bank-button ghost">
-                📊 Ekspor Hasil Ujian (.xlsx)
+                ًں“ٹ Ekspor Hasil Ujian (.xlsx)
             </a>
         </div>
     </div>
 
     <?php if ($message): ?>
         <div class="bank-notice <?= $msgType === 'danger' ? 'error' : ($msgType === 'warning' ? 'warning' : '') ?>" style="margin-bottom:20px;">
-            <?= ($msgType === 'success' ? '✅ ' : '⚠️ ') . sanitize($message) ?>
+            <?= ($msgType === 'success' ? 'âœ… ' : 'âڑ ï¸ڈ ') . sanitize($message) ?>
         </div>
     <?php endif; ?>
 
@@ -412,14 +655,14 @@ include __DIR__ . '/../includes/header.php';
         <div class="bank-stat">
             <small>Status Gerbang &amp; Token</small>
             <strong style="color:<?= !empty($session['exam_open']) ? '#15803d' : '#b91c1c' ?>;">
-                <?= !empty($session['exam_open']) ? '🟢 BUKA' : '🔴 TUTUP' ?>
+                <?= !empty($session['exam_open']) ? 'ًںں¢ BUKA' : 'ًں”´ TUTUP' ?>
             </strong>
             <span>Token: <span class="bank-badge token-badge"><?= sanitize($session['token'] ?? 'TUTOR26') ?></span></span>
         </div>
         <div class="bank-stat">
             <small>Total Butir Soal</small>
             <strong style="color:#0f766e;"><?= count($questions) ?> Butir</strong>
-            <span><?= count($packages) ?> Paket Soal · <?= count($categories) ?> Kategori</span>
+            <span><?= count($packages) ?> Paket Soal آ· <?= count($categories) ?> Kategori</span>
         </div>
         <div class="bank-stat">
             <small>Durasi &amp; Standar Kelulusan</small>
@@ -429,29 +672,29 @@ include __DIR__ . '/../includes/header.php';
         <div class="bank-stat">
             <small>Peserta Selesai &amp; Rata-rata</small>
             <strong style="color:#7c3aed;"><?= $totalAttempts ?> Mahasiswa</strong>
-            <span>Lulus: <?= $passCount ?> (<?= $passPercent ?>%) · Rerata: <?= $avgScore ?></span>
+            <span>Lulus: <?= $passCount ?> (<?= $passPercent ?>%) آ· Rerata: <?= $avgScore ?></span>
         </div>
     </div>
 
     <!-- 4 Modern Tabs (Berparitas 100% dengan CBT Pretes) -->
     <div class="bank-tabs">
         <a href="?tab=packages" class="<?= $activeTab === 'packages' ? 'active' : '' ?>">
-            📦 Paket Soal <span class="bank-tab-count"><?= count($packages) ?></span>
+            ًں“¦ Paket Soal <span class="bank-tab-count"><?= count($packages) ?></span>
         </a>
         <a href="?tab=sessions" class="<?= $activeTab === 'sessions' ? 'active' : '' ?>">
-            ⚙️ Sesi Ujian <span class="bank-tab-count"><?= count($sessions) ?></span>
+            âڑ™ï¸ڈ Sesi Ujian <span class="bank-tab-count"><?= count($sessions) ?></span>
         </a>
         <a href="?tab=import" class="<?= $activeTab === 'import' ? 'active' : '' ?>">
-            📥 Impor Excel
+            ًں“¥ Impor Excel
         </a>
         <a href="?tab=results" class="<?= $activeTab === 'results' ? 'active' : '' ?>">
-            📊 Hasil Ujian <span class="bank-tab-count"><?= $totalAttempts ?></span>
+            ًں“ٹ Hasil Ujian <span class="bank-tab-count"><?= $totalAttempts ?></span>
         </a>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════
+    <!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
          TAB 1: PAKET SOAL (Berparitas 100% dengan CBT Pretes)
-         ═══════════════════════════════════════════════════════════════════════ -->
+         â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
     <?php if ($activeTab === 'packages'): ?>
         <!-- Panel 1: Daftar Paket Soal (Muslim & Kristen Protestan) -->
         <div class="bank-panel" style="margin-bottom:24px;">
@@ -464,14 +707,14 @@ include __DIR__ . '/../includes/header.php';
                     <form method="POST" style="margin:0;" onsubmit="return confirm('Tindih seluruh data soal Tutorial RPL dengan butir soal resmi CBT Pretes (177 Muslim + 25 Kristen Protestan = 202 Soal)? Tindakan ini akan menimpa data soal lama.');">
                         <input type="hidden" name="action" value="reset_pretes_parity_packages">
                         <button type="submit" class="bank-button" style="background:#fef3c7; border-color:#fde047; color:#92400e; font-weight:700;">
-                            🔄 Pulihkan &amp; Tindih Soal CBT Pretes
+                            ًں”„ Pulihkan &amp; Tindih Soal CBT Pretes
                         </button>
                     </form>
                     <button type="button" class="bank-button gold" onclick="openPackageModal();" data-action="create-package">
-                        📦 ＋ Buat Paket Baru
+                        ًں“¦ ï¼‹ Buat Paket Baru
                     </button>
                     <button type="button" class="bank-button primary" onclick="openAddModal();" data-action="add-question">
-                        ➕ Tambah Butir Soal
+                        â‍• Tambah Butir Soal
                     </button>
                 </div>
             </div>
@@ -495,7 +738,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php if (empty($packages)): ?>
                             <tr>
                                 <td colspan="8" class="bank-empty">
-                                    Belum ada paket soal dibuat. Klik tombol <strong>＋ Buat Paket Baru</strong> untuk membuat paket soal.
+                                    Belum ada paket soal dibuat. Klik tombol <strong>ï¼‹ Buat Paket Baru</strong> untuk membuat paket soal.
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -519,27 +762,27 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td style="text-align:center;">
                                         <?php if (!empty($pkg['is_active'])): ?>
-                                            <span class="bank-badge active">● SEDANG AKTIF</span>
+                                            <span class="bank-badge active">â—ڈ SEDANG AKTIF</span>
                                         <?php else: ?>
                                             <span class="bank-badge inactive">Tidak Aktif</span>
                                         <?php endif; ?>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
                                         <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= sanitize($pkg['name']) ?>" data-package-code="<?= sanitize($pkg['code']) ?>" title="Lihat &amp; kelola butir pertanyaan paket ini">
-                                            📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)
+                                            ًں“‹ Kelola Soal (<?= (int)$pkg['total_questions'] ?>)
                                         </button>
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" title="Tambah butir soal ke paket ini">
-                                            ＋ Soal
+                                            ï¼‹ Soal
                                         </button>
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditPackageModal(<?= json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-package" title="Edit Paket Soal">
-                                            ✏️ Edit
+                                            âœڈï¸ڈ Edit
                                         </button>
                                         <?php if ((int)$pkg['id'] > 2): ?>
                                             <form method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus paket soal ini beserta seluruh butir soal di dalamnya?');">
                                                 <input type="hidden" name="action" value="delete_package">
                                                 <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
                                                 <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Paket Soal">
-                                                    🗑️
+                                                    ًں—‘ï¸ڈ
                                                 </button>
                                             </form>
                                         <?php endif; ?>
@@ -552,9 +795,9 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
     <?php endif; ?>
-    <!-- ═══════════════════════════════════════════════════════════════════════
+    <!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
          TAB 2: SESI UJIAN (90 MENIT)
-         ═══════════════════════════════════════════════════════════════════════ -->
+         â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
     <?php if ($activeTab === 'sessions'): ?>
         <div class="bank-panel">
             <div class="bank-panel-head">
@@ -564,7 +807,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button type="button" class="bank-button primary" onclick="openSessionModal();" data-action="create-session">
-                        🎯 ＋ Buat Sesi Baru
+                        ًںژ¯ ï¼‹ Buat Sesi Baru
                     </button>
                 </div>
             </div>
@@ -589,7 +832,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php if (empty($sessions)): ?>
                             <tr>
                                 <td colspan="9" class="bank-empty">
-                                    Belum ada sesi ujian dibuat. Klik tombol <strong>🎯 ＋ Buat Sesi Baru</strong> untuk membuat sesi ujian pertama.
+                                    Belum ada sesi ujian dibuat. Klik tombol <strong>ًںژ¯ ï¼‹ Buat Sesi Baru</strong> untuk membuat sesi ujian pertama.
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -614,7 +857,7 @@ include __DIR__ . '/../includes/header.php';
                                         <div style="font-weight:700; color:#0f172a; font-size:13.5px;"><?= sanitize($s['title']) ?></div>
                                     </td>
                                     <td>
-                                        <span class="bank-badge package">📦 <?= sanitize($sPkgDesc) ?></span>
+                                        <span class="bank-badge package">ًں“¦ <?= sanitize($sPkgDesc) ?></span>
                                     </td>
                                     <td style="text-align:center; font-weight:700; color:#0369a1;">
                                         <?= (int)$s['duration_minutes'] ?> Menit
@@ -627,7 +870,7 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td style="text-align:center;">
                                         <span class="bank-badge <?= $sOpen ? 'active' : 'danger-sm' ?>" style="font-weight:800;">
-                                            <?= $sOpen ? '🟢 BUKA' : '🔴 TUTUP' ?>
+                                            <?= $sOpen ? 'ًںں¢ BUKA' : 'ًں”´ TUTUP' ?>
                                         </span>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
@@ -636,22 +879,22 @@ include __DIR__ . '/../includes/header.php';
                                             <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
                                             <?php if ($sOpen): ?>
                                                 <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" onclick="return confirm('Tutup gerbang sesi <?= sanitize($s['title']) ?>?');" title="Tutup Gerbang Ujian">
-                                                    🔒 Tutup
+                                                    ًں”’ Tutup
                                                 </button>
                                             <?php else: ?>
                                                 <button type="submit" class="bank-button" style="padding:4px 8px; font-size:11px; background:#dcfce7; border-color:#86efac; color:#166534; font-weight:700;" onclick="return confirm('Buka gerbang sesi <?= sanitize($s['title']) ?>?');" title="Buka Gerbang Ujian">
-                                                    🚀 Buka
+                                                    ًںڑ€ Buka
                                                 </button>
                                             <?php endif; ?>
                                         </form>
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditSessionModal(<?= json_encode($s, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-session" title="Edit Sesi Ujian Ini">
-                                            ✏️ Edit
+                                            âœڈï¸ڈ Edit
                                         </button>
                                         <form method="POST" style="display:inline; margin:0 0 0 3px;" onsubmit="return confirm('Hapus sesi ujian \'<?= htmlspecialchars(addslashes($s['title']), ENT_QUOTES, 'UTF-8') ?>\'?');">
                                             <input type="hidden" name="action" value="delete_session">
                                             <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
                                             <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Sesi Ujian">
-                                                🗑️ Hapus
+                                                ًں—‘ï¸ڈ Hapus
                                             </button>
                                         </form>
                                     </td>
@@ -664,9 +907,9 @@ include __DIR__ . '/../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════
+    <!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
          TAB 3: IMPOR EXCEL (.XLSX)
-         ═══════════════════════════════════════════════════════════════════════ -->
+         â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
     <?php if ($activeTab === 'import'): ?>
         <div class="bank-panel">
             <div class="bank-panel-head">
@@ -676,7 +919,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div>
                     <a href="?download=template" class="bank-button ghost" style="color:#0f766e; border-color:#0f766e;">
-                        📥 Unduh Template (.xlsx)
+                        ًں“¥ Unduh Template (.xlsx)
                     </a>
                 </div>
             </div>
@@ -690,16 +933,16 @@ include __DIR__ . '/../includes/header.php';
                             <div class="bank-field" style="margin-bottom:18px;">
                                 <label class="bank-label">Pilih Paket Soal Tujuan Impor:</label>
                                 <select name="package_id" class="bank-input" style="font-weight:700;">
-                                    <option value="1">📦 Paket 1: Utama (Ubudiyah / Muslim)</option>
-                                    <option value="2">📦 Paket 2: Kristen Protestan</option>
+                                    <option value="1">ًں“¦ Paket 1: Utama (Ubudiyah / Muslim)</option>
+                                    <option value="2">ًں“¦ Paket 2: Kristen Protestan</option>
                                 </select>
                                 <span class="bank-note">Butir soal dalam berkas Excel akan dimasukkan ke paket yang dipilih.</span>
                             </div>
 
                             <label class="bank-upload" id="uploadDropzone">
-                                <span class="bank-upload-icon">📊</span>
+                                <span class="bank-upload-icon">ًں“ٹ</span>
                                 <strong>Pilih atau Tarik Berkas Excel (.xlsx) ke Sini</strong>
-                                <span>Gunakan format template standar LPPAI dengan header kolom A–I</span>
+                                <span>Gunakan format template standar LPPAI dengan header kolom Aâ€“I</span>
                                 <input type="file" name="question_file" accept=".xlsx" required style="margin-top:16px;">
                             </label>
 
@@ -715,14 +958,14 @@ include __DIR__ . '/../includes/header.php';
 
                             <div style="margin-top:20px;">
                                 <button type="submit" class="bank-button primary" style="width:100%; min-height:44px; font-size:14px;">
-                                    🚀 Unggah &amp; Mulai Impor Bank Soal
+                                    ًںڑ€ Unggah &amp; Mulai Impor Bank Soal
                                 </button>
                             </div>
                         </div>
 
                         <div>
                             <div class="bank-form-aside">
-                                <h4>📋 Petunjuk Susunan Kolom Template:</h4>
+                                <h4>ًں“‹ Petunjuk Susunan Kolom Template:</h4>
                                 <ul class="bank-steps" style="font-size:12px;">
                                     <li><b>A</b> <div><strong>Kode Soal</strong> Cth: <code>TUTOR-RPL-01</code> (opsional, jika kosong dibuat otomatis).</div></li>
                                     <li><b>B</b> <div><strong>Kategori</strong> Cth: <code>Thaharah</code>, <code>Sholat Wajib</code>, <code>Ubudiyah</code>.</div></li>
@@ -742,174 +985,424 @@ include __DIR__ . '/../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         TAB 4: HASIL UJIAN & MONITORING REAL-TIME
-         ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+         TAB 4: HASIL UJIAN & LIVE MONITORING CBT TUTORIAL RPL
+         â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
     <?php if ($activeTab === 'results'): ?>
-        <div class="bank-panel">
+        <section class="bank-panel">
             <div class="bank-panel-head">
                 <div>
-                    <h3>Monitoring Hasil &amp; Riwayat Pengerjaan CBT Mahasiswa RPL</h3>
-                    <p>Pantau skor nilai, review lembar jawaban per mahasiswa, atau reset attempt ujian jika mahasiswa mengalami kendala.</p>
+                    <h3>Hasil Ujian Mahasiswa &amp; Live Monitoring CBT Tutorial RPL</h3>
+                    <p>
+                        <?php if ($statusFilter === 'live'): ?>
+                            <strong>âڑ، Mode Live:</strong> Memantau mahasiswa RPL yang sedang aktif mengerjakan ujian secara real-time.
+                        <?php elseif ($statusFilter === 'finished'): ?>
+                            <strong>âœ“ Mode Selesai:</strong> Riwayat hasil akhir, nilai, dan lembar jawaban mahasiswa RPL yang telah selesai.
+                        <?php else: ?>
+                            Semua sesi pengerjaan CBT Tutorial RPL (berlangsung maupun telah selesai).
+                        <?php endif; ?>
+                        <?= $resultFilter === '1' ? ' (Filter: Paket 1 - Muslim)' : ($resultFilter === '2' ? ' (Filter: Paket 2 - Kristen)' : '') ?>
+                    </p>
                 </div>
-                <div style="display:flex; gap:8px;">
-                    <a href="?download=results" class="bank-button ghost" style="color:#0f766e; border-color:#0f766e;">
-                        📊 Ekspor ke Excel (.xlsx)
-                    </a>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <?php if (!empty($attempts)): ?>
+                        <form method="post" action="<?= buildTutorialRplResultUrl(['tab' => 'results']) ?>" style="margin:0;display:inline;" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus <?= $resultFilter === '1' ? 'SEMUA sesi Paket 1 (Muslim)' : ($resultFilter === '2' ? 'SEMUA sesi Paket 2 (Kristen)' : 'SEMUA sesi CBT Tutorial RPL') ?> mahasiswa?\n\nSemua riwayat pengerjaan, jawaban, dan nilai sesuai filter akan dihapus.')">
+                            <input type="hidden" name="action" value="delete_all_attempts">
+                            <input type="hidden" name="delete_scope" value="<?= sanitize($resultFilter) ?>">
+                            <button type="submit" class="bank-button danger" title="Hapus Semua Hasil CBT mahasiswa sesuai filter">ًں—‘ï¸ڈ Hapus Semua Hasil (<?= $resultFilter === '1' ? 'Paket 1' : ($resultFilter === '2' ? 'Paket 2' : 'Semua') ?>)</button>
+                        </form>
+                    <?php endif; ?>
+                    <?php
+                        $exportQs = http_build_query(array_filter([
+                            'package_id' => $resultFilter !== 'all' ? $resultFilter : '',
+                            'pass_filter' => ($passFilter !== 'all') ? $passFilter : '',
+                            'group' => $groupFilter ?? '',
+                            'q' => $searchQuery ?? '',
+                        ], fn($v) => $v !== ''));
+                        $exportSuffix = $exportQs !== '' ? '&amp;' . htmlspecialchars($exportQs, ENT_QUOTES, 'UTF-8') : '';
+                        $exportNote = $exportQs !== '' ? ' (mengikuti filter aktif: paket/kelulusan/kelompok/pencarian)' : '';
+                    ?>
+                    <a data-no-spa class="bank-button primary" href="?download=results<?= $exportSuffix ?>" title="Ekspor data nilai ujian CBT Tutorial RPL<?= $exportNote ?>">ًں“ٹ Ekspor Hasil (.xlsx)</a>
+                    <?php if ($exportQs !== ''): ?>
+                        <span class="cbt-export-note" id="cbtExportFilterNote">âڑ™ï¸ڈ Ekspor mengikuti filter aktif</span>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <!-- Toolbar Filter Hasil -->
-            <div class="bank-filters" style="grid-template-columns: minmax(180px, 1.5fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(150px, 1fr);">
-                <div>
-                    <input type="text" id="searchAttempt" class="bank-input" placeholder="🔍 Cari nama mahasiswa / NIM..." oninput="filterAttempts();">
+            <div style="padding:14px 24px 0;">
+                <!-- Status Sub-Tabs: Live Monitoring vs Selesai vs Semua -->
+                <div class="cbt-status-tabs" style="display:flex;gap:8px;margin-bottom:14px;border-bottom:2px solid #e2e8f0;padding-bottom:12px;flex-wrap:wrap">
+                    <a href="<?= buildTutorialRplResultUrl(['status_filter' => 'live', 'pass_filter' => 'all', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'live' ? 'active' : '' ?>">
+                        <span>âڑ، Sedang Berlangsung (Live)</span>
+                        <span id="cbtLiveTabBadge" class="cbt-tab-count <?= $ongoingCount > 0 ? 'live' : '' ?>"><?= $ongoingCount ?></span>
+                    </a>
+                    <a href="<?= buildTutorialRplResultUrl(['status_filter' => 'finished', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'finished' ? 'active' : '' ?>">
+                        <span>âœ“ Riwayat Selesai</span>
+                        <span id="cbtFinishedTabBadge" class="cbt-tab-count"><?= $finishedCount ?></span>
+                    </a>
+                    <a href="<?= buildTutorialRplResultUrl(['status_filter' => 'all', 'page' => 1]) ?>" class="cbt-status-tab-btn <?= $statusFilter === 'all' ? 'active' : '' ?>">
+                        <span>ًں“‹ Semua Sesi</span>
+                        <span id="cbtAllTabBadge" class="cbt-tab-count"><?= $totalAttempts ?></span>
+                    </a>
                 </div>
-                <div>
-                    <select id="filterPackageAttempt" class="bank-input" onchange="filterAttempts();">
-                        <option value="">-- Semua Sesi / Paket --</option>
-                        <option value="1">Paket 1 (Muslim)</option>
-                        <option value="2">Paket 2 (Kristen)</option>
-                    </select>
+
+                <!-- Live Monitoring Toolbar -->
+                <div class="cbt-live-toolbar" style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 18px;margin-bottom:14px;flex-wrap:gap:12px;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#0f172a">
+                            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.2)"></span>
+                            Live Monitoring CBT Tutorial RPL
+                        </span>
+                        <span id="cbtLiveOngoingCounter" class="bank-badge" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:11px">
+                            âڑ، <strong id="cbtLiveOngoingNum"><?= $ongoingCount ?></strong> peserta sedang mengerjakan
+                        </span>
+                        <span id="cbtLiveLastUpdated" style="font-size:11.5px;color:#64748b">
+                            Pembaruan: <?= (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('H:i:s') ?> WIB
+                        </span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#334155;cursor:pointer">
+                            <input type="checkbox" id="cbtLiveAutoRefreshToggle" <?= $statusFilter === 'finished' ? '' : 'checked' ?> style="accent-color:#126147;width:16px;height:16px;cursor:pointer">
+                            Auto-refresh
+                        </label>
+                        <select id="cbtLiveRefreshInterval" class="bank-input" style="width:auto;min-height:30px;padding:4px 8px;font-size:11.5px;margin:0">
+                            <option value="5" selected>Tiap 5 Detik</option>
+                            <option value="10">Tiap 10 Detik</option>
+                            <option value="30">Tiap 30 Detik</option>
+                        </select>
+                        <button type="button" id="cbtLiveManualRefreshBtn" class="bank-button" style="min-height:30px;padding:4px 12px;font-size:11.5px" title="Segarkan data sekarang">
+                            ًں”„ Segarkan
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <select id="filterPassStatus" class="bank-input" onchange="filterAttempts();">
-                        <option value="">-- Semua Status Kelulusan --</option>
-                        <option value="lulus">🟢 Lulus (Nilai &ge; <?= $passingGrade ?>)</option>
-                        <option value="tidak_lulus">🔴 Belum Memenuhi (&lt; <?= $passingGrade ?>)</option>
-                    </select>
-                </div>
-                <div>
-                    <select id="filterClassGroup" class="bank-input" onchange="filterAttempts();">
-                        <option value="">-- Semua Kelompok RPL --</option>
-                        <?php
-                        $groupList = [];
-                        foreach ($attempts as $a) {
-                            if (!empty($a['nama_kelompok']) && !in_array($a['nama_kelompok'], $groupList, true)) {
-                                $groupList[] = $a['nama_kelompok'];
-                            }
-                        }
-                        sort($groupList);
-                        foreach ($groupList as $grp):
-                        ?>
-                            <option value="<?= sanitize($grp) ?>"><?= sanitize($grp) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+
+                <!-- Filter Tipe, Paket, Kelulusan & Pencarian -->
+                <?php
+                    $hasExtraFilter = ($searchQuery !== '' || $groupFilter !== '' || $passFilter !== 'all');
+                ?>
+                <div class="cbt-result-filters" id="cbtResultFilters">
+                    <div class="cbt-filter-row">
+                        <span class="cbt-filter-label">Paket</span>
+                        <div class="cbt-filter-chips">
+                            <a href="<?= buildTutorialRplResultUrl(['result_filter' => 'all', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === 'all' ? 'active' : '' ?>">Semua <span><?= $totalAttempts ?></span></a>
+                            <a href="<?= buildTutorialRplResultUrl(['result_filter' => '1', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === '1' ? 'active' : '' ?>">ًں“¦ Paket 1 (Muslim) <span><?= $totalPkg1Attempts ?></span></a>
+                            <a href="<?= buildTutorialRplResultUrl(['result_filter' => '2', 'page' => 1]) ?>" class="cbt-chip <?= $resultFilter === '2' ? 'active' : '' ?>">ًں“¦ Paket 2 (Kristen) <span><?= $totalPkg2Attempts ?></span></a>
+                        </div>
+                    </div>
+                    <div class="cbt-filter-row">
+                        <span class="cbt-filter-label">Hasil</span>
+                        <div class="cbt-filter-chips" id="cbtPassFilterChips">
+                            <a href="<?= buildTutorialRplResultUrl(['pass_filter' => 'all', 'page' => 1]) ?>" class="cbt-chip <?= $passFilter === 'all' ? 'active' : '' ?>" data-pass-filter="all">Semua</a>
+                            <a href="<?= buildTutorialRplResultUrl(['pass_filter' => 'lulus', 'page' => 1]) ?>" class="cbt-chip cbt-chip-pass <?= $passFilter === 'lulus' ? 'active' : '' ?>" data-pass-filter="lulus" title="Sesi selesai dengan nilai &ge; <?= (int)$passingGrade ?>">âœ“ Lulus <span id="cbtPassCountLulus"><?= (int)$passCounts['lulus'] ?></span></a>
+                            <a href="<?= buildTutorialRplResultUrl(['pass_filter' => 'tidak_lulus', 'page' => 1]) ?>" class="cbt-chip cbt-chip-fail <?= $passFilter === 'tidak_lulus' ? 'active' : '' ?>" data-pass-filter="tidak_lulus" title="Sesi selesai dengan nilai &lt; <?= (int)$passingGrade ?>">âœ• Belum Memenuhi <span id="cbtPassCountTidak"><?= (int)$passCounts['tidak_lulus'] ?></span></a>
+                        </div>
+                    </div>
+
+                    <form method="get" action="" class="cbt-filter-form" id="cbtResultSearchForm" data-no-spa role="search">
+                        <input type="hidden" name="tab" value="results">
+                        <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status_filter" value="<?= sanitize($statusFilter) ?>"><?php endif; ?>
+                        <?php if ($resultFilter !== 'all'): ?><input type="hidden" name="result_filter" value="<?= sanitize($resultFilter) ?>"><?php endif; ?>
+                        <?php if ($passFilter !== 'all'): ?><input type="hidden" name="pass_filter" value="<?= sanitize($passFilter) ?>"><?php endif; ?>
+                        <?php if ($perPage !== 25): ?><input type="hidden" name="per_page" value="<?= (int)$perPage ?>"><?php endif; ?>
+                        <label class="cbt-filter-field cbt-filter-day">
+                            <span class="cbt-filter-label">Kelompok</span>
+                            <select name="group" id="cbtGroupFilter" class="bank-input" onchange="this.form.submit()">
+                                <option value="">Semua Kelompok RPL</option>
+                                <?php foreach ($groupOptions as $grp): ?>
+                                    <option value="<?= sanitize($grp) ?>" <?= $grp === $groupFilter ? 'selected' : '' ?>><?= sanitize($grp) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label class="cbt-filter-field cbt-filter-search">
+                            <span class="cbt-filter-label">Cari</span>
+                            <span class="cbt-search-box">
+                                <span class="cbt-search-icon" aria-hidden="true">ًں”چ</span>
+                                <input type="search" name="q" id="cbtResultSearchInput" value="<?= sanitize($searchQuery) ?>" placeholder="Nama, NIM, atau program studiâ€¦" maxlength="100" autocomplete="off" enterkeyhint="search" aria-label="Cari mahasiswa berdasarkan nama, NIM, atau program studi">
+                            </span>
+                        </label>
+                        <div class="cbt-filter-actions">
+                            <button type="submit" class="bank-button primary">Cari</button>
+                            <?php if ($hasExtraFilter): ?>
+                                <a href="<?= buildTutorialRplResultUrl(['q' => '', 'group' => '', 'pass_filter' => 'all', 'page' => 1]) ?>" class="bank-button" id="cbtResultResetFilters" title="Hapus pencarian, filter kelompok, dan filter kelulusan">âœ• Reset</a>
+                            <?php endif; ?>
+                        </div>
+                    </form>
+                    <?php if ($hasExtraFilter): ?>
+                        <div class="cbt-active-filters">
+                            Filter aktif:
+                            <?php if ($groupFilter !== ''): ?><span class="cbt-active-tag">ًں‘¥ <?= sanitize($groupFilter) ?> <a href="<?= buildTutorialRplResultUrl(['group' => '', 'page' => 1]) ?>" aria-label="Hapus filter kelompok">âœ•</a></span><?php endif; ?>
+                            <?php if ($passFilter !== 'all'): ?><span class="cbt-active-tag"><?= $passFilter === 'lulus' ? 'âœ“ Lulus' : 'âœ• Belum Memenuhi' ?> <a href="<?= buildTutorialRplResultUrl(['pass_filter' => 'all', 'page' => 1]) ?>" aria-label="Hapus filter kelulusan">âœ•</a></span><?php endif; ?>
+                            <?php if ($searchQuery !== ''): ?><span class="cbt-active-tag">ًں”چ &ldquo;<?= sanitize($searchQuery) ?>&rdquo; <a href="<?= buildTutorialRplResultUrl(['q' => '', 'page' => 1]) ?>" aria-label="Hapus pencarian">âœ•</a></span><?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
             <div class="bank-table-scroll">
-                <table class="bank-table no-datatable">
+                <table class="bank-table no-datatable" id="cbtLiveResultsTable">
                     <thead>
                         <tr>
-                            <th style="width:35px;">No</th>
-                            <th>Mahasiswa</th>
-                            <th>Sesi &amp; Paket</th>
+                            <th>Peserta</th>
+                            <th>NIM</th>
                             <th>Kelompok &amp; Tutor</th>
-                            <th style="text-align:center;">Mulai &amp; Selesai (WIB)</th>
-                            <th style="text-align:center;">Skor Benar</th>
-                            <th style="text-align:center;">Nilai CBT</th>
-                            <th style="text-align:center;">Status</th>
-                            <th style="text-align:center; width:150px;">Aksi</th>
+                            <th>Paket / Sesi</th>
+                            <th>Waktu &amp; Sisa</th>
+                            <th>Status</th>
+                            <th>Progres Dikerjakan</th>
+                            <th>Benar / Salah</th>
+                            <th>Nilai</th>
+                            <th>Aksi</th>
                         </tr>
                     </thead>
-                    <tbody id="attemptTableBody">
-                        <?php if (empty($attempts)): ?>
+                    <tbody id="cbtLiveResultsTbody">
+                    <?php
+                    $nowTs = time();
+                    foreach ($attempts as $attempt):
+                        $isSubmitted = ($attempt['submitted_at'] !== null);
+                        $deadline = (int)($attempt['deadline_at'] ?? ($attempt['started_at'] + 90 * 60));
+                        $isExpired = (!$isSubmitted && $nowTs >= $deadline);
+                        $isOngoing = (!$isSubmitted && !$isExpired);
+
+                        $attId = (int)$attempt['id'];
+                        $stat = $itemStatsMap[$attId] ?? null;
+                        $totItems = $stat ? (int)$stat['total_items'] : (int)($attempt['total_questions'] ?? 25);
+                        $ansCount = $stat ? (int)$stat['answered_count'] : 0;
+                        $pct = $totItems > 0 ? min(100, round(($ansCount / $totItems) * 100)) : 0;
+                        $flgCount = $stat ? (int)$stat['flagged_count'] : 0;
+
+                        $corCount = $isSubmitted ? (int)($attempt['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
+                        $wrgCount = $isSubmitted ? max(0, $totItems - $corCount) : ($stat ? (int)$stat['live_wrong_count'] : 0);
+                        $unansCount = max(0, $totItems - $ansCount);
+
+                        $pkgId = (int)($attempt['package_id'] ?? 1);
+                        $isPkg2 = ($pkgId === 2);
+                    ?>
+                        <tr id="attemptRow_<?= $attId ?>" data-attempt-id="<?= $attId ?>">
+                            <td>
+                                <div>
+                                    <a class="admin-user-profile-link" data-no-spa href="<?= BASE_URL ?>/admin/profil-pengguna.php?id=<?= (int)$attempt['user_id'] ?>" style="color:inherit;text-decoration:underline;text-underline-offset:3px" title="Lihat profil pengguna">
+                                        <strong><?= sanitize($attempt['nama_lengkap']) ?></strong>
+                                    </a>
+                                </div>
+                                <?php if (!empty(trim((string)($attempt['program_studi'] ?? '')))): ?>
+                                    <div class="cbt-user-prodi" style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.25;"><?= sanitize($attempt['program_studi']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= sanitize($attempt['nim'] ?? '-') ?></td>
+                            <td>
+                                <div style="font-weight:600; color:#0369a1;"><?= sanitize($attempt['nama_kelompok'] ?? '-') ?></div>
+                                <div style="font-size:11px; color:#64748b;">ًں‘¨â€چًںڈ« <?= sanitize($attempt['dosen_nama'] ?? '-') ?></div>
+                            </td>
+                            <td>
+                                <span class="bank-badge" style="<?= $isPkg2 ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857' ?>"><?= $isPkg2 ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)' ?></span>
+                                <?php if (!empty($attempt['session_title'])): ?>
+                                    <div style="margin-top:3px"><span class="bank-badge session" style="font-size:10px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1" title="Sesi: <?= sanitize($attempt['session_title']) ?>">ًںژ¯ <?= sanitize($attempt['session_title']) ?></span></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div><?= (new DateTimeImmutable('@' . $attempt['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') ?></div>
+                                <?php if ($isSubmitted): ?>
+                                    <?php
+                                        $durSeconds = max(0, (int)$attempt['submitted_at'] - (int)$attempt['started_at']);
+                                        $durMins = floor($durSeconds / 60);
+                                        $durSecs = $durSeconds % 60;
+                                    ?>
+                                    <div style="margin-top:3px;font-size:11px;color:#64748b" title="Durasi pengerjaan">
+                                        âڈ±ï¸ڈ <?= $durMins ?>m <?= $durSecs ?>s
+                                    </div>
+                                <?php elseif ($isOngoing): ?>
+                                    <?php
+                                        $remSeconds = max(0, $deadline - $nowTs);
+                                        $remMins = floor($remSeconds / 60);
+                                        $remSecs = $remSeconds % 60;
+                                    ?>
+                                    <div class="live-countdown" data-deadline="<?= $deadline ?>" style="margin-top:3px;font-size:11px;font-weight:700;color:#d97706" title="Sisa waktu pengerjaan">
+                                        âڈ³ <span class="countdown-clock"><?= $remMins ?>m <?= sprintf('%02d', $remSecs) ?>s</span>
+                                    </div>
+                                <?php else: ?>
+                                    <div style="margin-top:3px;font-size:11px;color:#94a3b8">âŒ› Waktu Habis</div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($isSubmitted): ?>
+                                    <span class="bank-badge active">âœ“ Selesai</span>
+                                <?php elseif ($isOngoing): ?>
+                                    <span class="bank-badge live-pulse-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">
+                                        <span class="pulse-dot"></span> Berlangsung
+                                    </span>
+                                <?php else: ?>
+                                    <span class="bank-badge inactive">âŒ› Waktu Habis</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="min-width:130px">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11.5px">
+                                        <span><strong><?= $ansCount ?></strong> / <?= $totItems ?> Soal</span>
+                                        <span style="font-size:10.5px;color:#64748b;font-weight:700"><?= $pct ?>%</span>
+                                    </div>
+                                    <div style="background:#e2e8f0;border-radius:999px;height:6px;width:100%;overflow:hidden;margin-bottom:5px">
+                                        <div style="background:<?= $isSubmitted ? '#10b981' : '#2563eb' ?>;height:100%;width:<?= $pct ?>%;border-radius:999px;transition:width .3s"></div>
+                                    </div>
+                                    <div>
+                                        <?php if ($flgCount > 0): ?>
+                                            <span class="bank-badge" style="background:#fef9c3;color:#854d0e;border:1px solid #fef08a;font-size:10px;padding:2px 6px">
+                                                ًںں¨ <?= $flgCount ?> Ragu
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="font-size:10.5px;color:#94a3b8">0 Ragu</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display:flex;flex-direction:column;gap:2px;font-size:11.5px;min-width:95px">
+                                    <span style="color:#059669;font-weight:700">âœ“ <?= $corCount ?> Benar</span>
+                                    <span style="color:#dc2626;font-weight:700">âœ• <?= $wrgCount ?> Salah</span>
+                                    <?php if (!$isSubmitted && $unansCount > 0): ?>
+                                        <span style="color:#64748b;font-size:10.5px">â‹¯ <?= $unansCount ?> Belum</span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td>
+                                <?php if ($isSubmitted): ?>
+                                    <span class="bank-key" title="Nilai Akhir Ujian"><?= $attempt['score'] !== null ? number_format((float)$attempt['score'], 1) : 'â€”' ?></span>
+                                    <?php $isPass = $attempt['score'] !== null && (float)$attempt['score'] >= $passingGrade; ?>
+                                    <span class="cbt-pass-label <?= $isPass ? 'is-pass' : 'is-fail' ?>"><?= $isPass ? 'Lulus' : 'Belum Memenuhi' ?></span>
+                                <?php else: ?>
+                                    <?php
+                                        $liveScore = $totItems > 0 ? round(($corCount / $totItems) * 100, 1) : 0.0;
+                                    ?>
+                                    <span class="bank-key" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;width:auto;padding:0 7px" title="Estimasi nilai sementara saat ini">
+                                        <?= number_format($liveScore, 1) ?>
+                                        <span style="font-size:9px;font-weight:600;display:block;line-height:1;margin-top:1px;color:#3b82f6">(Live)</span>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align:center">
+                                <div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">
+                                    <button type="button" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" onclick="openReviewModal(<?= $attId ?>);" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">ًں‘پï¸ڈ Review</button>
+                                    <form method="post" action="<?= buildTutorialRplResultUrl() ?>" style="margin:0;display:inline-block;" onsubmit="return confirm('Reset attempt ujian mahasiswa <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nMahasiswa akan diizinkan memulai ujian kembali dari awal.')">
+                                        <input type="hidden" name="action" value="reset_attempt">
+                                        <input type="hidden" name="attempt_id" value="<?= $attId ?>">
+                                        <input type="hidden" name="user_id" value="<?= (int)$attempt['user_id'] ?>">
+                                        <input type="hidden" name="class_id" value="<?= (int)$attempt['class_id'] ?>">
+                                        <button type="submit" class="bank-button" style="padding:4px 8px;font-size:11.5px;" title="Izinkan Ujian Ulang">ًں”„ Reset</button>
+                                    </form>
+                                    <form method="post" action="<?= buildTutorialRplResultUrl() ?>" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan mahasiswa dapat memulai ujian kembali.')">
+                                        <input type="hidden" name="action" value="delete_attempt">
+                                        <input type="hidden" name="attempt_id" value="<?= $attId ?>">
+                                        <button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT mahasiswa ini">ًں—‘ï¸ڈ Hapus</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$attempts): ?>
+                        <?php if ($statusFilter === 'live'): ?>
                             <tr>
-                                <td colspan="9" class="bank-empty">
-                                    Belum ada mahasiswa yang mengikuti atau mengumpulkan ujian CBT Tutorial RPL.
+                                <td colspan="10" class="bank-empty" style="padding:32px 16px">
+                                    <div style="font-size:24px;margin-bottom:6px">âڑ،</div>
+                                    <div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">Tidak ada mahasiswa yang sedang mengerjakan ujian saat ini.</div>
+                                    <div style="font-size:12px;color:#64748b;margin-bottom:12px">Seluruh mahasiswa telah menyelesaikan ujian atau belum ada sesi baru yang dimulai.</div>
+                                    <a href="<?= buildTutorialRplResultUrl(['status_filter' => 'finished', 'page' => 1]) ?>" class="bank-button primary" style="font-size:12px;min-height:30px;padding:4px 14px">Lihat Riwayat Selesai (<?= $finishedCount ?>)</a>
+                                </td>
+                            </tr>
+                        <?php elseif ($hasExtraFilter): ?>
+                            <tr>
+                                <td colspan="10" class="bank-empty" style="padding:28px 16px">
+                                    <div style="font-size:22px;margin-bottom:6px">ًں”چ</div>
+                                    <div style="font-weight:700;color:#0f172a;margin-bottom:4px"><?= $searchQuery !== '' ? 'Tidak ditemukan sesi dengan kata kunci &ldquo;' . sanitize($searchQuery) . '&rdquo; pada filter ini.' : 'Tidak ada sesi yang cocok dengan filter ini.' ?></div>
+                                    <a href="<?= buildTutorialRplResultUrl(['q' => '', 'group' => '', 'pass_filter' => 'all', 'page' => 1]) ?>" class="bank-button" style="font-size:11.5px;min-height:28px;margin-top:8px">Reset Filter</a>
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php foreach ($attempts as $idx => $a):
-                                $score = (float)($a['score'] ?? 0);
-                                $isPass = ($score >= $passingGrade);
-                                $isSubmitted = !empty($a['submitted']);
-                                $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
-                                $submittedWib = !empty($a['submitted_at']) ? (new DateTimeImmutable('@' . $a['submitted_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') : '-';
-                                $aPkgId = (int)($a['package_id'] ?? 1);
-                                $isPkg2 = ($aPkgId === 2);
-                            ?>
-                                <tr class="attempt-row"
-                                    data-search="<?= strtolower(sanitize(($a['nama_lengkap'] ?? '') . ' ' . ($a['nim'] ?? ''))) ?>"
-                                    data-package="<?= $aPkgId ?>"
-                                    data-pass="<?= $isPass ? 'lulus' : 'tidak_lulus' ?>"
-                                    data-group="<?= sanitize($a['nama_kelompok'] ?? '') ?>">
-                                    <td style="font-weight:700; color:#64748b;"><?= $idx + 1 ?></td>
-                                    <td>
-                                        <div style="font-weight:700; color:#0f172a; font-size:13px;"><?= sanitize($a['nama_lengkap']) ?></div>
-                                        <small style="color:#64748b;">NIM: <strong><?= sanitize($a['nim'] ?: '-') ?></strong> · <?= sanitize($a['program_studi'] ?: '') ?></small>
-                                    </td>
-                                    <td>
-                                        <span class="bank-badge" style="font-size:10.5px; font-weight:700; background:<?= $isPkg2 ? '#eff6ff' : '#ecfdf5' ?>; color:<?= $isPkg2 ? '#1d4ed8' : '#047857' ?>; border:1px solid <?= $isPkg2 ? '#bfdbfe' : '#a7f3d0' ?>;">
-                                            <?= $isPkg2 ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)' ?>
-                                        </span>
-                                        <div style="font-size:11px; color:#64748b; margin-top:2px;"><?= sanitize($a['session_title'] ?? ($isPkg2 ? 'Sesi Kristen' : 'Sesi Utama')) ?></div>
-                                    </td>
-                                    <td>
-                                        <div style="font-weight:600; color:#0369a1;"><?= sanitize($a['nama_kelompok'] ?: '-') ?></div>
-                                        <small style="color:#64748b;">👨‍🏫 <?= sanitize($a['dosen_nama'] ?: '-') ?></small>
-                                    </td>
-                                    <td style="text-align:center; font-size:11.5px; color:#475569;">
-                                        <div>Mulai: <?= $startedWib ?></div>
-                                        <div>Selesai: <?= $submittedWib ?></div>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <span class="bank-badge" style="font-size:11px;">
-                                            <?= (int)($a['correct_count'] ?? 0) ?> / <?= (int)($a['total_questions'] ?? 25) ?> Soal
-                                        </span>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <strong style="color:<?= $isPass ? '#15803d' : '#b91c1c' ?>; font-size:16px;">
-                                            <?= $score ?>
-                                        </strong>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <?php if ($isSubmitted): ?>
-                                            <?php if ($isPass): ?>
-                                                <span class="bank-badge active" style="font-weight:800;">🟢 LULUS</span>
-                                            <?php else: ?>
-                                                <span class="bank-badge danger-sm" style="font-weight:800; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; padding:3px 8px; border-radius:6px;">🔴 BELUM MEMENUHI</span>
-                                            <?php endif; ?>
-                                        <?php else: ?>
-                                            <span class="bank-badge" style="background:#fef3c7; color:#b45309;">Sedang Ujian</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <div style="display:inline-flex; gap:6px;">
-                                            <button type="button" class="bank-button" style="padding:4px 8px; min-height:28px; font-size:11px;" onclick="openReviewModal(<?= (int)$a['id'] ?>);" title="Review Lembar Jawaban">
-                                                👁️ Review
-                                            </button>
-                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Reset attempt ujian mahasiswa <?= sanitize($a['nama_lengkap']) ?>? Mahasiswa akan diizinkan memulai ujian kembali dari awal.');">
-                                                <input type="hidden" name="action" value="reset_attempt">
-                                                <input type="hidden" name="user_id" value="<?= (int)$a['user_id'] ?>">
-                                                <input type="hidden" name="class_id" value="<?= (int)$a['class_id'] ?>">
-                                                <button type="submit" class="bank-button danger-sm" title="Izinkan Ujian Ulang">
-                                                    🔄 Reset
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
+                            <tr><td colspan="10" class="bank-empty">Belum ada mahasiswa yang memulai CBT Tutorial RPL.</td></tr>
                         <?php endif; ?>
+                    <?php endif; ?>
                     </tbody>
                 </table>
             </div>
-        </div>
+
+            <!-- Pagination & Footer Bar -->
+            <div class="cbt-pagination-bar" style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid #e2e8f0;background:#fafcfb;flex-wrap:wrap;gap:12px">
+                <div class="cbt-pagination-info" style="font-size:12px;color:#475569">
+                    Menampilkan <strong><?= $totalFiltered > 0 ? ($offset + 1) : 0 ?></strong> &ndash; <strong><?= min($offset + $perPage, $totalFiltered) ?></strong> dari <strong><?= $totalFiltered ?></strong> sesi
+                    <?php if ($totalPages > 1): ?>
+                        <span style="color:#94a3b8;margin-left:6px">(Halaman <strong><?= $page ?></strong> dari <strong><?= $totalPages ?></strong>)</span>
+                    <?php endif; ?>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#64748b">
+                        <label for="cbtPerPageSelect">Per halaman:</label>
+                        <select id="cbtPerPageSelect" class="bank-input" style="min-height:28px;padding:2px 8px;font-size:12px;width:auto;margin:0" onchange="window.location.href = this.value">
+                            <?php foreach ([10, 25, 50, 100] as $pp): ?>
+                                <option value="<?= buildTutorialRplResultUrl(['per_page' => $pp, 'page' => 1]) ?>" <?= $perPage === $pp ? 'selected' : '' ?>><?= $pp ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <?php if ($totalPages > 1): ?>
+                    <nav class="cbt-pagination-nav" aria-label="Navigasi Halaman CBT" style="display:flex;gap:4px;align-items:center">
+                        <?php if ($page > 1): ?>
+                            <a href="<?= buildTutorialRplResultUrl(['page' => 1]) ?>" class="cbt-page-link" title="Halaman Pertama">&laquo;</a>
+                            <a href="<?= buildTutorialRplResultUrl(['page' => $page - 1]) ?>" class="cbt-page-link" title="Halaman Sebelumnya">&lsaquo;</a>
+                        <?php else: ?>
+                            <span class="cbt-page-link disabled">&laquo;</span>
+                            <span class="cbt-page-link disabled">&lsaquo;</span>
+                        <?php endif; ?>
+
+                        <?php
+                        $startP = max(1, $page - 2);
+                        $endP = min($totalPages, $page + 2);
+                        if ($startP > 1) {
+                            echo '<a href="' . buildTutorialRplResultUrl(['page' => 1]) . '" class="cbt-page-link">1</a>';
+                            if ($startP > 2) echo '<span class="cbt-page-ellipsis">&hellip;</span>';
+                        }
+                        for ($p = $startP; $p <= $endP; $p++) {
+                            if ($p === $page) {
+                                echo '<span class="cbt-page-link active" aria-current="page">' . $p . '</span>';
+                            } else {
+                                echo '<a href="' . buildTutorialRplResultUrl(['page' => $p]) . '" class="cbt-page-link">' . $p . '</a>';
+                            }
+                        }
+                        if ($endP < $totalPages) {
+                            if ($endP < $totalPages - 1) echo '<span class="cbt-page-ellipsis">&hellip;</span>';
+                            echo '<a href="' . buildTutorialRplResultUrl(['page' => $totalPages]) . '" class="cbt-page-link">' . $totalPages . '</a>';
+                        }
+                        ?>
+
+                        <?php if ($page < $totalPages): ?>
+                            <a href="<?= buildTutorialRplResultUrl(['page' => $page + 1]) ?>" class="cbt-page-link" title="Halaman Berikutnya">&rsaquo;</a>
+                            <a href="<?= buildTutorialRplResultUrl(['page' => $totalPages]) ?>" class="cbt-page-link" title="Halaman Terakhir">&raquo;</a>
+                        <?php else: ?>
+                            <span class="cbt-page-link disabled">&rsaquo;</span>
+                            <span class="cbt-page-link disabled">&raquo;</span>
+                        <?php endif; ?>
+                    </nav>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="bank-footer">
+                <span>Nilai CBT dan progres pengerjaan disimpan terpisah dari penilaian praktik dan nilai impor lama.</span>
+                <?php if (!empty($attempts)): ?><span>Menampilkan sesi pengerjaan CBT dengan kontrol live monitor &amp; paginasi.</span><?php endif; ?>
+            </div>
+        </section>
     <?php endif; ?>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
+<!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
      MODAL TAMBAH / EDIT SESI UJIAN
-     ═══════════════════════════════════════════════════════════════════════════ -->
+     â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
 <div class="bank-modal-backdrop" id="sessionModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="sessionModalTitle">
     <div class="bank-modal" style="max-width:620px;">
         <div class="bank-modal-head" style="background:#eff6ff;">
             <div>
-                <h3 id="sessionModalTitle" style="color:#1e40af;">🎯 Buat Sesi Ujian Baru</h3>
+                <h3 id="sessionModalTitle" style="color:#1e40af;">ًںژ¯ Buat Sesi Ujian Baru</h3>
                 <div style="font-size:12px; color:#475569; margin-top:2px;">Konfigurasi parameter sesi ujian tulis Tutorial RPL</div>
             </div>
-            <button type="button" class="bank-modal-close" onclick="closeSessionModal();">✕</button>
+            <button type="button" class="bank-modal-close" onclick="closeSessionModal();">âœ•</button>
         </div>
         <form method="POST">
             <input type="hidden" name="action" value="save_session">
@@ -924,7 +1417,7 @@ include __DIR__ . '/../includes/header.php';
                         <label class="bank-label">Paket Soal Terhubung *</label>
                         <select name="package_id" id="sessionModalPackageId" class="bank-input" style="font-weight:700;">
                             <?php foreach ($packages as $pkg): ?>
-                                <option value="<?= (int)$pkg['id'] ?>">📦 <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['duration_minutes'] ?> mnt / <?= (int)$pkg['question_count'] ?> soal)</option>
+                                <option value="<?= (int)$pkg['id'] ?>">ًں“¦ <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['duration_minutes'] ?> mnt / <?= (int)$pkg['question_count'] ?> soal)</option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -951,10 +1444,10 @@ include __DIR__ . '/../includes/header.php';
                     <div class="bank-token-group" style="display:flex; gap:8px;">
                         <input type="text" name="token" id="sessionModalToken" class="bank-input" value="TUTOR26" required style="text-transform:uppercase; font-weight:800; letter-spacing:2px;">
                         <button type="button" class="bank-button" onclick="generateRandomSessionToken();" title="Buat Token Acak">
-                            🎲 Acak
+                            ًںژ² Acak
                         </button>
                         <button type="button" class="bank-button" onclick="copySessionModalToken();" title="Salin Token">
-                            📋 Salin
+                            ًں“‹ Salin
                         </button>
                     </div>
                 </div>
@@ -978,23 +1471,23 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="bank-modal-foot">
                 <button type="button" class="bank-button" onclick="closeSessionModal();">Batal</button>
-                <button type="submit" class="bank-button primary">💾 Simpan Sesi Ujian</button>
+                <button type="submit" class="bank-button primary">ًں’¾ Simpan Sesi Ujian</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
+<!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
      MODAL TAMBAH / EDIT PAKET SOAL
-     ═══════════════════════════════════════════════════════════════════════════ -->
+     â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
 <div class="bank-modal-backdrop" id="packageModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="packageModalTitle">
     <div class="bank-modal" style="max-width:620px;">
         <div class="bank-modal-head" style="background:#eff6ff;">
             <div>
-                <h3 id="packageModalTitle" style="color:#1e40af;">📦 Buat Paket Soal Baru</h3>
+                <h3 id="packageModalTitle" style="color:#1e40af;">ًں“¦ Buat Paket Soal Baru</h3>
                 <div style="font-size:12px; color:#475569; margin-top:2px;">Wadah materi butir soal ujian tulis Tutorial RPL</div>
             </div>
-            <button type="button" class="bank-modal-close" onclick="closePackageModal();">✕</button>
+            <button type="button" class="bank-modal-close" onclick="closePackageModal();">âœ•</button>
         </div>
         <form method="POST">
             <input type="hidden" name="action" value="save_package">
@@ -1034,21 +1527,21 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="bank-modal-foot">
                 <button type="button" class="bank-button" onclick="closePackageModal();">Batal</button>
-                <button type="submit" class="bank-button primary">💾 Simpan Paket Soal</button>
+                <button type="submit" class="bank-button primary">ًں’¾ Simpan Paket Soal</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
+<!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
      MODAL KOLEKSI & KELOLA SOAL PAKET (Identik dengan CBT Pretes)
-     ═══════════════════════════════════════════════════════════════════════════ -->
+     â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
 <div class="bank-modal-backdrop" id="modalPackageQuestions" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
     <div class="bank-modal extra-large" style="max-width:920px; width:95%; max-height:90vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
         <div class="modal-header-banner" style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%); color:#ffffff; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div>
                 <h3 style="margin:0; font-size:17px; color:#ffffff; display:flex; align-items:center; gap:8px;">
-                    📋 Koleksi Soal — <span id="pkgQuestionsTitle">Paket Soal</span>
+                    ًں“‹ Koleksi Soal â€” <span id="pkgQuestionsTitle">Paket Soal</span>
                 </h3>
                 <div style="font-size:12px; opacity:0.95; margin-top:4px; display:flex; align-items:center; gap:8px;">
                     <span id="pkgQuestionsCodeBadge" class="bank-code" style="background:rgba(255,255,255,0.2); color:#ffffff; border-color:rgba(255,255,255,0.3);"></span>
@@ -1057,21 +1550,21 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="bank-button gold" id="btnModalAddQuestion" style="min-height:34px; font-size:12px; font-weight:700;">
-                    ＋ Tambah Soal Baru
+                    ï¼‹ Tambah Soal Baru
                 </button>
                 <a class="bank-button" id="btnModalImportExcel" href="?tab=import" style="min-height:34px; font-size:12px; background:rgba(255,255,255,0.15); color:#ffffff; border-color:rgba(255,255,255,0.3);">
-                    📥 Impor Excel
+                    ًں“¥ Impor Excel
                 </a>
                 <a class="bank-button" id="btnModalExportExcel" href="?download=bank" style="min-height:34px; font-size:12px; background:rgba(255,255,255,0.15); color:#ffffff; border-color:rgba(255,255,255,0.3);">
-                    📤 Ekspor .xlsx
+                    ًں“¤ Ekspor .xlsx
                 </a>
-                <button type="button" class="bank-modal-close" onclick="closePackageQuestionsModal();" aria-label="Tutup" style="color:#ffffff; font-size:20px; margin-left:4px;">✕</button>
+                <button type="button" class="bank-modal-close" onclick="closePackageQuestionsModal();" aria-label="Tutup" style="color:#ffffff; font-size:20px; margin-left:4px;">âœ•</button>
             </div>
         </div>
 
         <div class="modal-q-toolbar" style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div class="modal-q-toolbar-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
-                <input id="modalQSearch" class="bank-input" type="search" placeholder="🔍 Cari butir pertanyaan, kode, kategori…" style="max-width:280px; padding:7px 12px;" oninput="filterModalQuestions();">
+                <input id="modalQSearch" class="bank-input" type="search" placeholder="ًں”چ Cari butir pertanyaan, kode, kategoriâ€¦" style="max-width:280px; padding:7px 12px;" oninput="filterModalQuestions();">
                 <select id="modalQCategory" class="bank-input" style="max-width:180px; padding:7px 12px;" onchange="filterModalQuestions();">
                     <option value="">Semua Kategori</option>
                 </select>
@@ -1090,21 +1583,21 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="bank-modal-foot" style="justify-content:space-between; padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0;">
             <div style="font-size:12px; color:#64748b;">
-                💡 <em>Pilihan jawaban yang berlatar hijau adalah <strong>Kunci Jawaban</strong> yang benar.</em>
+                ًں’، <em>Pilihan jawaban yang berlatar hijau adalah <strong>Kunci Jawaban</strong> yang benar.</em>
             </div>
             <button type="button" class="bank-button" onclick="closePackageQuestionsModal();">Tutup Jendela</button>
         </div>
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
+<!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
      MODAL TAMBAH / EDIT BUTIR SOAL
-     ═══════════════════════════════════════════════════════════════════════════ -->
+     â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
 <div class="bank-modal-backdrop" id="questionModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="bank-modal large">
         <div class="bank-modal-head">
-            <h3 id="modalTitle">➕ Tambah Butir Soal Baru</h3>
-            <button type="button" class="bank-modal-close" onclick="closeQuestionModal();">✕</button>
+            <h3 id="modalTitle">â‍• Tambah Butir Soal Baru</h3>
+            <button type="button" class="bank-modal-close" onclick="closeQuestionModal();">âœ•</button>
         </div>
         <form method="POST" id="questionForm">
             <input type="hidden" name="action" value="save_question">
@@ -1114,8 +1607,8 @@ include __DIR__ . '/../includes/header.php';
                     <div class="bank-field">
                         <label class="bank-label">Paket Soal:</label>
                         <select name="package_id" id="formPackageId" class="bank-input" required style="font-weight:700;">
-                            <option value="1">📦 Paket 1: Utama (Ubudiyah / Muslim)</option>
-                            <option value="2">📦 Paket 2: Kristen Protestan</option>
+                            <option value="1">ًں“¦ Paket 1: Utama (Ubudiyah / Muslim)</option>
+                            <option value="2">ًں“¦ Paket 2: Kristen Protestan</option>
                         </select>
                     </div>
                     <div class="bank-field">
@@ -1165,23 +1658,23 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="bank-modal-foot">
                 <button type="button" class="bank-button" onclick="closeQuestionModal();">Batal</button>
-                <button type="submit" class="bank-button primary">💾 Simpan Butir Soal</button>
+                <button type="submit" class="bank-button primary">ًں’¾ Simpan Butir Soal</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
+<!-- â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
      MODAL REVIEW LEMBAR JAWABAN PESERTA
-     ═══════════════════════════════════════════════════════════════════════════ -->
+     â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ -->
 <div class="bank-modal-backdrop" id="reviewModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
     <div class="bank-modal large" style="max-width:860px;">
         <div class="bank-modal-head" style="background:#f0fdf4;">
             <div>
-                <h3 id="reviewModalTitle" style="color:#166534;">👁️ Lembar Jawaban Peserta CBT</h3>
+                <h3 id="reviewModalTitle" style="color:#166534;">ًں‘پï¸ڈ Lembar Jawaban Peserta CBT</h3>
                 <div id="reviewModalMeta" style="font-size:12px; color:#475569; margin-top:2px;">Memuat rincian ujian...</div>
             </div>
-            <button type="button" class="bank-modal-close" onclick="closeReviewModal();">✕</button>
+            <button type="button" class="bank-modal-close" onclick="closeReviewModal();">âœ•</button>
         </div>
         <div class="bank-modal-body" id="reviewModalContent" style="padding:20px; max-height:75vh; overflow-y:auto;">
             <div style="text-align:center; padding:30px; color:#64748b;">Memuat data butir soal...</div>
@@ -1198,7 +1691,7 @@ const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_APOS | 
 // Modal Sesi Ujian (Create & Edit per record)
 function openSessionModal() {
     const titleEl = document.getElementById('sessionModalTitle');
-    if (titleEl) titleEl.textContent = '🎯 Buat Sesi Ujian Baru';
+    if (titleEl) titleEl.textContent = 'ًںژ¯ Buat Sesi Ujian Baru';
     if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = '0';
     if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = '';
     if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = '';
@@ -1219,7 +1712,7 @@ function openSessionModal() {
 
 function openEditSessionModal(s) {
     const titleEl = document.getElementById('sessionModalTitle');
-    if (titleEl) titleEl.textContent = '✏️ Edit Sesi Ujian (' + (s.code || 'ID: ' + s.id) + ')';
+    if (titleEl) titleEl.textContent = 'âœڈï¸ڈ Edit Sesi Ujian (' + (s.code || 'ID: ' + s.id) + ')';
     if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = s.id;
     if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = s.code || '';
     if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = s.title || '';
@@ -1329,7 +1822,7 @@ function filterAttempts() {
 
 // Modal Paket Soal
 function openPackageModal() {
-    document.getElementById('packageModalTitle').textContent = '📦 Buat Paket Soal Baru';
+    document.getElementById('packageModalTitle').textContent = 'ًں“¦ Buat Paket Soal Baru';
     document.getElementById('pkgModalId').value = '0';
     document.getElementById('pkgModalCode').value = '';
     document.getElementById('pkgModalName').value = '';
@@ -1347,7 +1840,7 @@ function openPackageModal() {
 }
 
 function openEditPackageModal(pkg) {
-    document.getElementById('packageModalTitle').textContent = '✏️ Edit Paket Soal (' + (pkg.code || 'ID: ' + pkg.id) + ')';
+    document.getElementById('packageModalTitle').textContent = 'âœڈï¸ڈ Edit Paket Soal (' + (pkg.code || 'ID: ' + pkg.id) + ')';
     document.getElementById('pkgModalId').value = pkg.id;
     document.getElementById('pkgModalCode').value = pkg.code || '';
     document.getElementById('pkgModalName').value = pkg.name || '';
@@ -1374,7 +1867,7 @@ function closePackageModal() {
     }
 }
 
-// ── Package Questions Manager Modal (Paritas Penuh dengan CBT Pretes) ───
+// â”€â”€ Package Questions Manager Modal (Paritas Penuh dengan CBT Pretes) â”€â”€â”€
 window._currentPackageQuestions = [];
 window._currentPackageId = 0;
 window._currentPackageName = '';
@@ -1392,7 +1885,7 @@ function openPackageQuestionsModal(packageId, packageName, packageCode) {
 
     if (titleEl) titleEl.textContent = window._currentPackageName;
     if (codeBadge) codeBadge.textContent = window._currentPackageCode;
-    if (countBadge) countBadge.textContent = 'Memuat butir soal…';
+    if (countBadge) countBadge.textContent = 'Memuat butir soalâ€¦';
 
     const btnAdd = document.getElementById('btnModalAddQuestion');
     if (btnAdd) {
@@ -1408,7 +1901,7 @@ function openPackageQuestionsModal(packageId, packageName, packageCode) {
     }
 
     if (container) {
-        container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;"><div style="font-size:24px;margin-bottom:8px">⏳</div>Memuat butir pertanyaan…</div>';
+        container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;"><div style="font-size:24px;margin-bottom:8px">âڈ³</div>Memuat butir pertanyaanâ€¦</div>';
     }
 
     const modal = document.getElementById('modalPackageQuestions');
@@ -1494,10 +1987,10 @@ function renderModalQuestions(query, catFilter, statusFilter) {
     if (filtered.length === 0) {
         container.innerHTML = `
             <div style="padding:40px 20px;text-align:center;color:#64748b;background:#f8fafc;border-radius:12px;border:1.5px dashed #cbd5e1;">
-                <div style="font-size:32px;margin-bottom:8px">📭</div>
+                <div style="font-size:32px;margin-bottom:8px">ًں“­</div>
                 <strong style="font-size:15px;color:#334155;display:block;margin-bottom:4px">Tidak Ada Butir Soal Ditemukan</strong>
                 <p style="font-size:13px;margin:0 0 14px 0">Belum ada butir soal atau tidak cocok dengan filter pencarian.</p>
-                <button type="button" class="bank-button primary" onclick="openAddModal(window._currentPackageId)">＋ Tambah Soal ke Paket Ini</button>
+                <button type="button" class="bank-button primary" onclick="openAddModal(window._currentPackageId)">ï¼‹ Tambah Soal ke Paket Ini</button>
             </div>
         `;
         return;
@@ -1519,14 +2012,14 @@ function renderModalQuestions(query, catFilter, statusFilter) {
         html += '<span class="bank-code">' + String(q.code || '').replace(/</g, '&lt;') + '</span>';
         html += '<span class="bank-badge package">' + String(q.category || 'Umum').replace(/</g, '&lt;') + '</span>';
         if (isActive) {
-            html += '<span class="bank-badge active">● Aktif</span>';
+            html += '<span class="bank-badge active">â—ڈ Aktif</span>';
         } else {
             html += '<span class="bank-badge inactive">Nonaktif</span>';
         }
         html += '</div>';
         html += '<div style="display:flex;gap:6px">';
-        html += '<button type="button" class="bank-button" style="min-height:26px;padding:3px 8px;font-size:11px" onclick=\'openEditModal(' + qJson + ')\'>✏️ Edit</button>';
-        html += '<button type="button" class="bank-button danger-sm" style="min-height:26px;padding:3px 8px;font-size:11px" onclick="deleteModalQuestion(' + q.id + ')">🗑️ Hapus</button>';
+        html += '<button type="button" class="bank-button" style="min-height:26px;padding:3px 8px;font-size:11px" onclick=\'openEditModal(' + qJson + ')\'>âœڈï¸ڈ Edit</button>';
+        html += '<button type="button" class="bank-button danger-sm" style="min-height:26px;padding:3px 8px;font-size:11px" onclick="deleteModalQuestion(' + q.id + ')">ًں—‘ï¸ڈ Hapus</button>';
         html += '</div>';
         html += '</div>';
 
@@ -1541,7 +2034,7 @@ function renderModalQuestions(query, catFilter, statusFilter) {
             html += '<span class="bank-qcard-opt-letter">' + letter + '</span>';
             html += '<span style="flex:1">' + String(optText).replace(/</g, '&lt;') + '</span>';
             if (isCorrect) {
-                html += '<span style="font-size:11px;font-weight:700;color:#059669;margin-left:auto">✓ Kunci</span>';
+                html += '<span style="font-size:11px;font-weight:700;color:#059669;margin-left:auto">âœ“ Kunci</span>';
             }
             html += '</div>';
         });
@@ -1592,7 +2085,7 @@ function focusPackageQuestions(pkgId, pkgName) {
 
 // Modal Tambah & Edit Soal
 function openAddModal(defaultPkgId) {
-    document.getElementById('modalTitle').textContent = '➕ Tambah Butir Soal Baru';
+    document.getElementById('modalTitle').textContent = 'â‍• Tambah Butir Soal Baru';
     document.getElementById('formQuestionId').value = '0';
     const filterPkg = document.getElementById('filterPackage') ? document.getElementById('filterPackage').value : '';
     document.getElementById('formPackageId').value = defaultPkgId ? String(defaultPkgId) : (filterPkg || '1');
@@ -1614,7 +2107,7 @@ function openAddModal(defaultPkgId) {
 }
 
 function openEditModal(q) {
-    document.getElementById('modalTitle').textContent = '✏️ Edit Butir Soal (' + (q.code || 'ID: ' + q.id) + ')';
+    document.getElementById('modalTitle').textContent = 'âœڈï¸ڈ Edit Butir Soal (' + (q.code || 'ID: ' + q.id) + ')';
     document.getElementById('formQuestionId').value = q.id;
     document.getElementById('formPackageId').value = q.package_id || '1';
     document.getElementById('formCategory').value = q.category || '';
@@ -1698,7 +2191,7 @@ function openReviewModal(attemptId) {
             const att = res.attempt;
             const items = res.items;
 
-            meta.innerHTML = `<strong>${att.nama_lengkap}</strong> (${att.nim || '-'}) · Kelompok: <strong>${att.nama_kelompok || '-'}</strong> · Nilai: <strong style="font-size:14px; color:${att.score >= 70 ? '#15803d' : '#b91c1c'};">${att.score}</strong> (${att.correct_count || 0}/${att.total_questions || items.length} Benar)`;
+            meta.innerHTML = `<strong>${att.nama_lengkap}</strong> (${att.nim || '-'}) آ· Kelompok: <strong>${att.nama_kelompok || '-'}</strong> آ· Nilai: <strong style="font-size:14px; color:${att.score >= 70 ? '#15803d' : '#b91c1c'};">${att.score}</strong> (${att.correct_count || 0}/${att.total_questions || items.length} Benar)`;
 
             let html = '<div style="display:flex; flex-direction:column; gap:16px;">';
             items.forEach((it, idx) => {
@@ -1706,8 +2199,8 @@ function openReviewModal(attemptId) {
                 const studentAns = it.student_answer || '-';
                 const correctAns = it.correct_answer;
                 const statusBadge = isCorrect
-                    ? '<span class="bank-badge active">✓ BENAR</span>'
-                    : '<span class="bank-badge danger-sm" style="background:#fee2e2; color:#b91c1c;">✗ SALAH</span>';
+                    ? '<span class="bank-badge active">âœ“ BENAR</span>'
+                    : '<span class="bank-badge danger-sm" style="background:#fee2e2; color:#b91c1c;">âœ— SALAH</span>';
 
                 html += `
                     <div style="border:1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}; border-radius:10px; padding:14px; background:${isCorrect ? '#f0fdf4' : '#fef2f2'};">
@@ -1763,6 +2256,344 @@ function closeReviewModal() {
         backdrop.style.pointerEvents = 'none';
         backdrop.style.visibility = 'hidden';
     }
+}
+
+// â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+// LIVE MONITORING CBT TUTORIAL RPL (100% PARITAS DENGAN CBT PRETES)
+// â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
+window.CBT_RESULT_FILTER = <?= json_encode($resultFilter) ?>;
+window.CBT_STATUS_FILTER = <?= json_encode($statusFilter ?? 'all') ?>;
+window.CBT_SEARCH_QUERY = <?= json_encode($searchQuery ?? '') ?>;
+window.CBT_GROUP_FILTER = <?= json_encode($groupFilter ?? '') ?>;
+window.CBT_PASS_FILTER = <?= json_encode($passFilter ?? 'all') ?>;
+window.CBT_PASS_MIN_SCORE = <?= json_encode((float)($passingGrade ?? 70.0)) ?>;
+window.CBT_PAGE = <?= (int)($page ?? 1) ?>;
+window.CBT_PER_PAGE = <?= (int)($perPage ?? 25) ?>;
+window.CBT_BASE_URL = <?= json_encode(BASE_URL) ?>;
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function initCbtLiveMonitor() {
+    const table = document.getElementById('cbtLiveResultsTable');
+    if (!table) return;
+
+    const tbody = document.getElementById('cbtLiveResultsTbody');
+    const ongoingNumEl = document.getElementById('cbtLiveOngoingNum');
+    const lastUpdatedEl = document.getElementById('cbtLiveLastUpdated');
+    const autoRefreshToggle = document.getElementById('cbtLiveAutoRefreshToggle');
+    const refreshIntervalSelect = document.getElementById('cbtLiveRefreshInterval');
+    const manualRefreshBtn = document.getElementById('cbtLiveManualRefreshBtn');
+
+    const bankUrl = window.location.pathname;
+    const currentFilter = window.CBT_RESULT_FILTER || 'all';
+    const currentStatus = window.CBT_STATUS_FILTER || 'all';
+    const currentSearch = window.CBT_SEARCH_QUERY || '';
+    const currentGroup = window.CBT_GROUP_FILTER || '';
+    const currentPass = window.CBT_PASS_FILTER || 'all';
+    const passMinScore = Number(window.CBT_PASS_MIN_SCORE) || 70.0;
+    const currentPage = Number(window.CBT_PAGE) || 1;
+    const currentPerPage = Number(window.CBT_PER_PAGE) || 25;
+    const hasExtraFilter = !!(currentSearch || currentGroup || (currentPass && currentPass !== 'all'));
+
+    let timerId = null;
+    let isFetching = false;
+
+    // 1. Countdown Ticker (1 Detik)
+    setInterval(function() {
+        const now = Math.floor(Date.now() / 1000);
+        document.querySelectorAll('.live-countdown[data-deadline]').forEach(function(el) {
+            const deadline = parseInt(el.dataset.deadline, 10);
+            if (isNaN(deadline)) return;
+            const diff = deadline - now;
+            const clockEl = el.querySelector('.countdown-clock');
+            if (diff <= 0) {
+                el.innerHTML = '<span style="color:#94a3b8;font-weight:normal">âŒ› Waktu Habis</span>';
+                el.removeAttribute('data-deadline');
+            } else if (clockEl) {
+                const mins = Math.floor(diff / 60);
+                const secs = diff % 60;
+                clockEl.textContent = mins + 'm ' + String(secs).padStart(2, '0') + 's';
+            }
+        });
+    }, 1000);
+
+    // 2. Render Single Row HTML
+    function renderAttemptRow(att) {
+        const isSubmitted = !!att.is_submitted;
+        const isOngoing = !!att.is_ongoing;
+        const now = Math.floor(Date.now() / 1000);
+        const deadline = Number(att.deadline_at) || 0;
+
+        let timeCellHtml = '<div>' + escapeHtml(att.started_at_wib) + '</div>';
+        if (isSubmitted) {
+            const dur = Math.max(0, Number(att.duration_seconds) || 0);
+            const durM = Math.floor(dur / 60);
+            const durS = dur % 60;
+            timeCellHtml += '<div style="margin-top:3px;font-size:11px;color:#64748b" title="Durasi pengerjaan">âڈ±ï¸ڈ ' + durM + 'm ' + durS + 's</div>';
+        } else if (isOngoing) {
+            const rem = Math.max(0, deadline - now);
+            const remM = Math.floor(rem / 60);
+            const remS = rem % 60;
+            timeCellHtml += '<div class="live-countdown" data-deadline="' + deadline + '" style="margin-top:3px;font-size:11px;font-weight:700;color:#d97706" title="Sisa waktu pengerjaan">' +
+                'âڈ³ <span class="countdown-clock">' + remM + 'm ' + String(remS).padStart(2, '0') + 's</span></div>';
+        } else {
+            timeCellHtml += '<div style="margin-top:3px;font-size:11px;color:#94a3b8">âŒ› Waktu Habis</div>';
+        }
+
+        let statusCellHtml = '';
+        if (isSubmitted) {
+            statusCellHtml = '<span class="bank-badge active">âœ“ Selesai</span>';
+        } else if (isOngoing) {
+            statusCellHtml = '<span class="bank-badge live-pulse-badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a"><span class="pulse-dot"></span> Berlangsung</span>';
+        } else {
+            statusCellHtml = '<span class="bank-badge inactive">âŒ› Waktu Habis</span>';
+        }
+
+        const totItems = Number(att.total_items) || 25;
+        const ansCount = Number(att.answered_count) || 0;
+        const pct = totItems > 0 ? Math.min(100, Math.round((ansCount / totItems) * 100)) : 0;
+        const flgCount = Number(att.flagged_count) || 0;
+
+        const flagBadgeHtml = flgCount > 0
+            ? '<span class="bank-badge" style="background:#fef9c3;color:#854d0e;border:1px solid #fef08a;font-size:10px;padding:2px 6px">ًںں¨ ' + flgCount + ' Ragu</span>'
+            : '<span style="font-size:10.5px;color:#94a3b8">0 Ragu</span>';
+
+        const progressCellHtml =
+            '<div style="min-width:130px">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:11.5px">' +
+                    '<span><strong>' + ansCount + '</strong> / ' + totItems + ' Soal</span>' +
+                    '<span style="font-size:10.5px;color:#64748b;font-weight:700">' + pct + '%</span>' +
+                '</div>' +
+                '<div style="background:#e2e8f0;border-radius:999px;height:6px;width:100%;overflow:hidden;margin-bottom:5px">' +
+                    '<div style="background:' + (isSubmitted ? '#10b981' : '#2563eb') + ';height:100%;width:' + pct + '%;border-radius:999px;transition:width .3s"></div>' +
+                '</div>' +
+                '<div>' + flagBadgeHtml + '</div>' +
+            '</div>';
+
+        const corCount = Number(att.correct_count) || 0;
+        const wrgCount = Number(att.wrong_count) || 0;
+        const unansCount = Number(att.unanswered_count) || 0;
+
+        let detailCellHtml =
+            '<div style="display:flex;flex-direction:column;gap:2px;font-size:11.5px;min-width:95px">' +
+                '<span style="color:#059669;font-weight:700">âœ“ ' + corCount + ' Benar</span>' +
+                '<span style="color:#dc2626;font-weight:700">âœ• ' + wrgCount + ' Salah</span>';
+        if (!isSubmitted && unansCount > 0) {
+            detailCellHtml += '<span style="color:#64748b;font-size:10.5px">â‹¯ ' + unansCount + ' Belum</span>';
+        }
+        detailCellHtml += '</div>';
+
+        let scoreCellHtml = '';
+        if (isSubmitted) {
+            const sc = att.score !== null ? Number(att.score).toFixed(1) : 'â€”';
+            const isPass = att.score !== null && Number(att.score) >= passMinScore;
+            scoreCellHtml =
+                '<span class="bank-key" title="Nilai Akhir Ujian">' + sc + '</span>' +
+                '<span class="cbt-pass-label ' + (isPass ? 'is-pass' : 'is-fail') + '">' + (isPass ? 'Lulus' : 'Belum Memenuhi') + '</span>';
+        } else {
+            const sc = att.score !== null ? Number(att.score).toFixed(1) : '0.0';
+            scoreCellHtml =
+                '<span class="bank-key" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;width:auto;padding:0 7px" title="Estimasi nilai sementara saat ini">' +
+                    sc + '<span style="font-size:9px;font-weight:600;display:block;line-height:1;margin-top:1px;color:#3b82f6">(Live)</span>' +
+                '</span>';
+        }
+
+        const isPkg2 = (Number(att.package_id) === 2);
+        const pkgStyle = isPkg2 ? 'background:#dbeafe;color:#1e3a8a' : 'background:#ecfdf5;color:#047857';
+        const pkgText = isPkg2 ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)';
+        const safeName = escapeHtml(att.nama_lengkap);
+        const safeNim = escapeHtml(att.nim);
+        const prodiText = (att.program_studi || '').trim();
+        const prodiHtml = prodiText ? '<div class="cbt-user-prodi" style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.25;">' + escapeHtml(prodiText) + '</div>' : '';
+
+        const profileUserId = Number(att.user_id);
+        const profileNameHtml = (Number.isInteger(profileUserId) && profileUserId > 0)
+            ? '<a class="admin-user-profile-link" data-no-spa href="' + escapeHtml(window.CBT_BASE_URL + '/admin/profil-pengguna.php?id=' + profileUserId) + '" style="color:inherit;text-decoration:underline;text-underline-offset:3px" title="Lihat profil pengguna"><strong>' + safeName + '</strong></a>'
+            : '<strong>' + safeName + '</strong>';
+
+        const actionCellHtml =
+            '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">' +
+                '<button type="button" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" onclick="openReviewModal(' + att.id + ');" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">ًں‘پï¸ڈ Review</button>' +
+                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Reset attempt ujian mahasiswa ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nMahasiswa akan diizinkan memulai ujian kembali dari awal.\')">' +
+                    '<input type="hidden" name="action" value="reset_attempt">' +
+                    '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
+                    '<input type="hidden" name="user_id" value="' + att.user_id + '">' +
+                    '<input type="hidden" name="class_id" value="' + att.class_id + '">' +
+                    '<button type="submit" class="bank-button" style="padding:4px 8px;font-size:11.5px;" title="Izinkan Ujian Ulang">ًں”„ Reset</button>' +
+                '</form>' +
+                '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Yakin ingin menghapus sesi CBT ' + safeName.replace(/'/g, "\\'") + ' (NIM: ' + safeNim + ')?\\n\\nData jawaban dan nilai akan dihapus, dan mahasiswa dapat memulai ujian kembali.\')">' +
+                    '<input type="hidden" name="action" value="delete_attempt">' +
+                    '<input type="hidden" name="attempt_id" value="' + att.id + '">' +
+                    '<button type="submit" class="bank-button danger-sm" title="Hapus sesi CBT mahasiswa ini">ًں—‘ï¸ڈ Hapus</button>' +
+                '</form>' +
+            '</div>';
+
+        return '<tr id="attemptRow_' + att.id + '" data-attempt-id="' + att.id + '">' +
+            '<td><div>' + profileNameHtml + '</div>' + prodiHtml + '</td>' +
+            '<td>' + safeNim + '</td>' +
+            '<td><div style="font-weight:600; color:#0369a1;">' + escapeHtml(att.nama_kelompok || '-') + '</div><div style="font-size:11px; color:#64748b;">ًں‘¨â€چًںڈ« ' + escapeHtml(att.dosen_nama || '-') + '</div></td>' +
+            '<td><span class="bank-badge" style="' + pkgStyle + '">' + pkgText + '</span>' +
+                (att.session_title ? '<div style="margin-top:3px"><span class="bank-badge session" style="font-size:10px;background:#f1f5f9;color:#334155;border:1px solid #cbd5e1" title="Sesi: ' + escapeHtml(att.session_title) + '">ًںژ¯ ' + escapeHtml(att.session_title) + '</span></div>' : '') +
+            '</td>' +
+            '<td>' + timeCellHtml + '</td>' +
+            '<td>' + statusCellHtml + '</td>' +
+            '<td>' + progressCellHtml + '</td>' +
+            '<td>' + detailCellHtml + '</td>' +
+            '<td>' + scoreCellHtml + '</td>' +
+            '<td style="text-align:center">' + actionCellHtml + '</td>' +
+        '</tr>';
+    }
+
+    // 3. Update Table Rows Dom Diff
+    function updateTableRows(data) {
+        if (!tbody) return;
+        if (!data.length) {
+            if (currentStatus === 'live') {
+                tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:32px 16px"><div style="font-size:24px;margin-bottom:6px">âڑ،</div><div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:4px">Tidak ada mahasiswa yang sedang mengerjakan ujian saat ini.</div><div style="font-size:12px;color:#64748b">Seluruh mahasiswa telah menyelesaikan ujian atau belum ada sesi baru yang dimulai.</div></td></tr>';
+            } else if (hasExtraFilter) {
+                const msg = currentSearch
+                    ? 'Tidak ditemukan sesi dengan kata kunci &ldquo;' + escapeHtml(currentSearch) + '&rdquo; pada filter ini.'
+                    : 'Tidak ada sesi yang cocok dengan filter ini.';
+                tbody.innerHTML = '<tr><td colspan="10" class="bank-empty" style="padding:28px 16px"><div style="font-size:22px;margin-bottom:6px">ًں”چ</div><div style="font-weight:700;color:#0f172a;margin-bottom:4px">' + msg + '</div></td></tr>';
+            } else {
+                tbody.innerHTML = '<tr><td colspan="10" class="bank-empty">Belum ada mahasiswa yang memulai CBT Tutorial RPL.</td></tr>';
+            }
+            return;
+        }
+
+        const newIds = new Set(data.map(d => String(d.id)));
+
+        // Remove rows that no longer exist
+        Array.from(tbody.querySelectorAll('tr[data-attempt-id]')).forEach(tr => {
+            if (!newIds.has(tr.dataset.attemptId)) {
+                tr.parentNode.removeChild(tr);
+            }
+        });
+
+        // Update or insert rows
+        data.forEach((att, index) => {
+            const existingRow = document.getElementById('attemptRow_' + att.id);
+            const rendered = renderAttemptRow(att);
+            if (existingRow) {
+                const tempDiv = document.createElement('tbody');
+                tempDiv.innerHTML = rendered;
+                const newRow = tempDiv.firstElementChild;
+                if (newRow) {
+                    for (let c = 2; c <= 8; c++) {
+                        if (existingRow.cells[c] && newRow.cells[c] && existingRow.cells[c].innerHTML !== newRow.cells[c].innerHTML) {
+                            existingRow.cells[c].innerHTML = newRow.cells[c].innerHTML;
+                        }
+                    }
+                }
+            } else {
+                const tempDiv = document.createElement('tbody');
+                tempDiv.innerHTML = rendered;
+                const newRow = tempDiv.firstElementChild;
+                if (newRow) {
+                    newRow.classList.add('cbt-row-flash');
+                    const refRow = tbody.children[index] || null;
+                    tbody.insertBefore(newRow, refRow);
+                }
+            }
+        });
+    }
+
+    // 4. Fetch Live Data via AJAX
+    function fetchLiveResults(manual) {
+        if (isFetching) return;
+        if (!manual && document.hidden) return;
+        isFetching = true;
+        if (manualRefreshBtn && manual) {
+            manualRefreshBtn.disabled = true;
+            manualRefreshBtn.textContent = 'âڈ³ Memuatâ€¦';
+        }
+
+        let url = bankUrl + '?tab=results&ajax=live_results' +
+            '&result_filter=' + encodeURIComponent(currentFilter) +
+            '&status_filter=' + encodeURIComponent(currentStatus) +
+            '&page=' + encodeURIComponent(currentPage) +
+            '&per_page=' + encodeURIComponent(currentPerPage);
+        if (currentSearch) url += '&q=' + encodeURIComponent(currentSearch);
+        if (currentGroup) url += '&group=' + encodeURIComponent(currentGroup);
+        if (currentPass && currentPass !== 'all') url += '&pass_filter=' + encodeURIComponent(currentPass);
+
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (!res || !res.success) return;
+            if (ongoingNumEl && res.ongoing_count !== undefined) {
+                ongoingNumEl.textContent = res.ongoing_count;
+            }
+            const liveBadge = document.getElementById('cbtLiveTabBadge');
+            if (liveBadge && res.ongoing_count !== undefined) {
+                liveBadge.textContent = res.ongoing_count;
+                if (res.ongoing_count > 0) {
+                    liveBadge.classList.add('live');
+                } else {
+                    liveBadge.classList.remove('live');
+                }
+            }
+            const finishedBadge = document.getElementById('cbtFinishedTabBadge');
+            if (finishedBadge && res.finished_count !== undefined) {
+                finishedBadge.textContent = res.finished_count;
+            }
+            const allBadge = document.getElementById('cbtAllTabBadge');
+            if (allBadge && res.total_all !== undefined) {
+                allBadge.textContent = res.total_all;
+            }
+            if (res.pass_counts) {
+                const lulusEl = document.getElementById('cbtPassCountLulus');
+                const tidakEl = document.getElementById('cbtPassCountTidak');
+                if (lulusEl) lulusEl.textContent = res.pass_counts.lulus;
+                if (tidakEl) tidakEl.textContent = res.pass_counts.tidak_lulus;
+            }
+            if (lastUpdatedEl && res.timestamp_wib) {
+                lastUpdatedEl.textContent = 'Pembaruan: ' + res.timestamp_wib;
+            }
+            if (tbody && Array.isArray(res.data)) {
+                updateTableRows(res.data);
+            }
+        })
+        .catch(err => {
+            console.warn('CBT Live fetch error:', err);
+        })
+        .finally(() => {
+            isFetching = false;
+            if (manualRefreshBtn) {
+                manualRefreshBtn.disabled = false;
+                manualRefreshBtn.textContent = 'ًں”„ Segarkan';
+            }
+        });
+    }
+
+    function resetAutoRefresh() {
+        if (timerId) clearInterval(timerId);
+        if (!autoRefreshToggle || !autoRefreshToggle.checked) return;
+        const sec = parseInt(refreshIntervalSelect ? refreshIntervalSelect.value : '5', 10) || 5;
+        timerId = setInterval(() => fetchLiveResults(false), sec * 1000);
+    }
+
+    if (autoRefreshToggle) autoRefreshToggle.addEventListener('change', resetAutoRefresh);
+    if (refreshIntervalSelect) refreshIntervalSelect.addEventListener('change', resetAutoRefresh);
+    if (manualRefreshBtn) manualRefreshBtn.addEventListener('click', () => fetchLiveResults(true));
+
+    resetAutoRefresh();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCbtLiveMonitor);
+} else {
+    initCbtLiveMonitor();
 }
 
 // Sanitasi backdrop: pindahkan ke document.body agar tidak terpengaruh CSS transform parent (.content-area)
@@ -1822,7 +2653,7 @@ document.addEventListener('click', function(e) {
         return;
     }
 
-    // Tombol Tutup Modal (via data-close-modal atau tombol silang ✕)
+    // Tombol Tutup Modal (via data-close-modal atau tombol silang âœ•)
     const btnClose = e.target.closest('[data-close-modal], .bank-modal-close');
     if (btnClose) {
         e.preventDefault();

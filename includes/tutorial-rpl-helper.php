@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * LPPAI Corner - Helper & Skema Basis Data Tutorial RPL Online
  *
@@ -1100,7 +1100,7 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
                 INSERT INTO tutorial_rpl_cbt_sessions (id, code, title, package_ids_json, duration_minutes, passing_grade, token, exam_open, is_active)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([2, 'SESI-TUTORIAL-PROTESTAN-2026', 'Sesi Ujian Tulis Tutorial RPL – Kristen Protestan', '[2]', 90, 70.00, 'TUTOR26', 1, 1]);
+            $stmt->execute([2, 'SESI-TUTORIAL-PROTESTAN-2026', 'Sesi Ujian Tulis Tutorial RPL â€“ Kristen Protestan', '[2]', 90, 70.00, 'TUTOR26', 1, 1]);
         } elseif ($force) {
             $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET package_ids_json = ?, duration_minutes = 90, passing_grade = 70.00 WHERE id = ?")->execute(['[2]', $ses2Id]);
         }
@@ -1116,7 +1116,7 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
         if ($force || $totalQuestions === 0 || $hasDummy || $hasOld40Seed) {
             $pdo->exec("DELETE FROM tutorial_rpl_cbt_questions");
 
-            // 3a. Soal Muslim / Ubudiyah (Paket 1) — Salin 177 butir soal resmi CBT Pretes
+            // 3a. Soal Muslim / Ubudiyah (Paket 1) â€” Salin 177 butir soal resmi CBT Pretes
             $seededIslam = false;
 
             // Prioritas 1: Jika tabel pretes_cbt_questions di database sudah terisi >= 100 butir soal
@@ -1711,6 +1711,192 @@ if (!function_exists('tutorialRplCbtResetAttempt')) {
             ")->execute([$nilaiPraktik, $memberId]);
         }
         return true;
+    }
+}
+
+/**
+ * Menghapus / me-reset satu attempt ujian CBT Tutorial RPL berdasarkan ID attempt.
+ */
+if (!function_exists('tutorialRplCbtDeleteAttempt')) {
+    function tutorialRplCbtDeleteAttempt(PDO $pdo, int $attemptId): bool {
+        if ($attemptId <= 0) return false;
+        ensureTutorialRplCbtTables($pdo);
+
+        $stmt = $pdo->prepare("SELECT user_id, class_id FROM tutorial_rpl_cbt_attempts WHERE id = ?");
+        $stmt->execute([$attemptId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return false;
+
+        return tutorialRplCbtResetAttempt($pdo, (int)$row['user_id'], (int)$row['class_id']);
+    }
+}
+
+/**
+ * Menghapus seluruh / kelompok attempt ujian CBT Tutorial RPL sesuai filter scope.
+ */
+if (!function_exists('tutorialRplCbtDeleteAllAttempts')) {
+    function tutorialRplCbtDeleteAllAttempts(PDO $pdo, ?string $scope = 'all'): int {
+        ensureTutorialRplCbtTables($pdo);
+        $where = '';
+        if ($scope === '1' || $scope === 'muslim') {
+            $where = 'WHERE package_id = 1';
+        } elseif ($scope === '2' || $scope === 'kristen') {
+            $where = 'WHERE package_id = 2';
+        } elseif ($scope === 'finished') {
+            $where = 'WHERE submitted_at IS NOT NULL';
+        } elseif ($scope === 'live') {
+            $where = 'WHERE submitted_at IS NULL AND deadline_at > ' . time();
+        }
+
+        $attempts = $pdo->query("SELECT id, user_id, class_id FROM tutorial_rpl_cbt_attempts $where")->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($attempts)) return 0;
+
+        $count = 0;
+        foreach ($attempts as $a) {
+            if (tutorialRplCbtResetAttempt($pdo, (int)$a['user_id'], (int)$a['class_id'])) {
+                $count++;
+            }
+        }
+        return $count;
+    }
+}
+
+/**
+ * Filter tab "Hasil Ujian" CBT Tutorial RPL (dipakai halaman dan AJAX live_results).
+ */
+if (!function_exists('tutorialRplCbtResultFilters')) {
+    function tutorialRplCbtResultFilters(array $src): array {
+        $status = trim((string)($src['status_filter'] ?? 'all'));
+        if (!in_array($status, ['all', 'live', 'finished'], true)) $status = 'all';
+
+        $result = trim((string)($src['result_filter'] ?? 'all'));
+        if (!in_array($result, ['all', '1', '2'], true)) $result = 'all';
+
+        $q = preg_replace('/\s+/u', ' ', trim((string)($src['q'] ?? ''))) ?? '';
+        if (function_exists('mb_substr')) $q = mb_substr($q, 0, 100); else $q = substr($q, 0, 100);
+
+        $group = trim((string)($src['group'] ?? ''));
+
+        $pass = trim((string)($src['pass_filter'] ?? 'all'));
+        if (!in_array($pass, ['all', 'lulus', 'tidak_lulus'], true)) $pass = 'all';
+
+        if ($pass !== 'all' && $status === 'live') $status = 'finished';
+
+        $perPage = (int)($src['per_page'] ?? 25);
+        if (!in_array($perPage, [10, 25, 50, 100], true)) $perPage = 25;
+
+        return [
+            'status_filter' => $status,
+            'result_filter' => $result,
+            'q' => $q,
+            'group' => $group,
+            'pass_filter' => $pass,
+            'page' => max(1, (int)($src['page'] ?? 1)),
+            'per_page' => $perPage,
+        ];
+    }
+}
+
+/**
+ * Bangun WHERE untuk daftar hasil CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtResultWhere')) {
+    function tutorialRplCbtResultWhere(array $f, int $now, float $passingGrade, bool $withPass = true): array {
+        $conds = [];
+        $params = [];
+
+        if ($f['status_filter'] === 'live') {
+            $conds[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
+            $params[':now_ts'] = $now;
+        } elseif ($f['status_filter'] === 'finished') {
+            $conds[] = '(a.submitted_at IS NOT NULL OR a.deadline_at <= :now_ts)';
+            $params[':now_ts'] = $now;
+        }
+
+        if ($f['result_filter'] === '1') {
+            $conds[] = 'a.package_id = 1';
+        } elseif ($f['result_filter'] === '2') {
+            $conds[] = 'a.package_id = 2';
+        }
+
+        if (!empty($f['group'])) {
+            $conds[] = 'c.nama_kelompok = :group_name';
+            $params[':group_name'] = $f['group'];
+        }
+
+        if ($withPass && $f['pass_filter'] === 'lulus') {
+            $conds[] = '(a.submitted_at IS NOT NULL AND a.score >= :pass_min)';
+            $params[':pass_min'] = $passingGrade;
+        } elseif ($withPass && $f['pass_filter'] === 'tidak_lulus') {
+            $conds[] = '(a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pass_min))';
+            $params[':pass_min'] = $passingGrade;
+        }
+
+        if (!empty($f['q'])) {
+            $kw = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $f['q']) . '%';
+            $conds[] = "(u.nama_lengkap LIKE :kw_nama ESCAPE '!' OR u.nim LIKE :kw_nim ESCAPE '!' OR u.program_studi LIKE :kw_prodi ESCAPE '!' OR c.nama_kelompok LIKE :kw_grp ESCAPE '!')";
+            $params[':kw_nama'] = $kw;
+            $params[':kw_nim'] = $kw;
+            $params[':kw_prodi'] = $kw;
+            $params[':kw_grp'] = $kw;
+        }
+
+        return [$conds ? ('WHERE ' . implode(' AND ', $conds)) : '', $params];
+    }
+}
+
+/**
+ * Jumlah sesi selesai lulus / tidak lulus untuk filter aktif Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtResultPassCounts')) {
+    function tutorialRplCbtResultPassCounts(PDO $pdo, array $f, int $now, float $passingGrade): array {
+        if (($f['status_filter'] ?? 'all') === 'live') $f['status_filter'] = 'finished';
+        [$where, $params] = tutorialRplCbtResultWhere($f, $now, $passingGrade, false);
+        $params[':pc_min1'] = $passingGrade;
+        $params[':pc_min2'] = $passingGrade;
+        $sql = "SELECT
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pc_min1 THEN 1 ELSE 0 END) AS lulus,
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pc_min2) THEN 1 ELSE 0 END) AS tidak_lulus
+            FROM tutorial_rpl_cbt_attempts a
+            JOIN users u ON u.id = a.user_id
+            JOIN tutorial_rpl_classes c ON c.id = a.class_id
+            $where";
+        try {
+            $st = $pdo->prepare($sql);
+            foreach ($params as $k => $v) $st->bindValue($k, $v);
+            $st->execute();
+            $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            $row = [];
+        }
+        return ['lulus' => (int)($row['lulus'] ?? 0), 'tidak_lulus' => (int)($row['tidak_lulus'] ?? 0)];
+    }
+}
+
+/**
+ * Bangun URL link filter hasil Tutorial RPL CBT.
+ */
+if (!function_exists('buildTutorialRplResultUrl')) {
+    function buildTutorialRplResultUrl(array $overrides = []): string {
+        global $cbtFilters;
+        $status = $overrides['status_filter'] ?? ($cbtFilters['status_filter'] ?? 'all');
+        $result = $overrides['result_filter'] ?? ($cbtFilters['result_filter'] ?? 'all');
+        $pass = $overrides['pass_filter'] ?? ($cbtFilters['pass_filter'] ?? 'all');
+        $group = array_key_exists('group', $overrides) ? (string)$overrides['group'] : (string)($cbtFilters['group'] ?? '');
+        $q = array_key_exists('q', $overrides) ? (string)$overrides['q'] : (string)($cbtFilters['q'] ?? '');
+        $page = $overrides['page'] ?? ($cbtFilters['page'] ?? 1);
+        $perPage = $overrides['per_page'] ?? ($cbtFilters['per_page'] ?? 25);
+
+        $params = ['tab' => 'results'];
+        if ($status !== 'all') $params['status_filter'] = $status;
+        if ($result !== 'all') $params['result_filter'] = $result;
+        if ($pass !== 'all') $params['pass_filter'] = $pass;
+        if ($group !== '') $params['group'] = $group;
+        if ($q !== '') $params['q'] = $q;
+        if ($perPage !== 25) $params['per_page'] = $perPage;
+        if ($page > 1) $params['page'] = $page;
+
+        return '?' . http_build_query($params);
     }
 }
 
