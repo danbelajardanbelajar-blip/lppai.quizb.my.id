@@ -1,3 +1,35 @@
+## 2026-11-24 17:30:00 +0700 — Perbaikan Total Tombol Tidak Berfungsi: Eliminasi Syntax Error JS, Sanitasi Modal Backdrop, dan Penambahan Class no-datatable pada CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-CLICKABLE-BUTTONS-FIX · **Parent Git:** `00c6370069db439b0f84530a19ea1537f607497e`.
+
+**Permintaan dan dasar perbaikan:** Merespons laporan pengguna bahwa seluruh tombol aksi pada halaman `admin/tutorial-rpl-cbt.php` ("📋 Kelola Soal", "＋ Soal", "✏️ Edit", "📦 ＋ Buat Paket Baru", "➕ Tambah Butir Soal") tidak dapat diklik meskipun halaman sudah di-pull dan hard reload:
+1. **Akar Masalah (Root Causes)**:
+   - **Syntax Error JavaScript Fatal**: Pada generator review modal, terdapat nested single quotes pada template string (`${l === studentAns ? ' <span style="color:${isCorrect ? '#15803d' : '#b91c1c'}; font-weight:800;">...</span>' : ''}`). Hal ini menyebabkan browser melempar `SyntaxError: Invalid or unexpected token` saat parsing blok `<script>`, yang secara fatal menghentikan eksekusi seluruh skrip halaman sehingga fungsi-fungsi global modal (`openPackageModal`, `openPackageQuestionsModal`, `openAddModal`, `openEditPackageModal`, `openReviewModal`) tidak terdefinisi (`undefined`).
+   - **Interferensi Global DataTables**: Tabel paket soal, butir soal, sesi, dan riwayat attempt tidak memiliki kelas `no-datatable`. Akibatnya, `app.js` secara otomatis menginisialisasi plugin DataTables yang membungkus tabel ("Tampilkan 10 data", "Cari:"), meredraw DOM, dan berpotensi memutus penanganan event klik.
+   - **Modal Backdrop Tanpa Inline Style Guard**: Keempat modal backdrop (`#packageModalBackdrop`, `#modalPackageQuestions`, `#questionModalBackdrop`, `#reviewModalBackdrop`) belum memiliki inline style guard `display:none;pointer-events:none;visibility:hidden` dan berada di dalam `.content-area` yang memiliki animasi CSS `transform`.
+2. **Solusi & Implementasi**:
+   - **Perbaikan Sintaks JavaScript**: Mengeliminasi kutip bersarang dan menggunakan template string modern `${l === studentAns ? `<span style="color:${ansColor}; font-weight:800;">[Pilihan Mahasiswa]</span>` : ''}` sehingga script lolos validasi sintaks 100%.
+   - **Kelas `no-datatable`**: Menambahkan kelas `no-datatable` pada seluruh 4 tabel CBT (`<table class="bank-table no-datatable">`) untuk menyamakan dengan standar CBT Pretes dan mencegah manipulasi layout oleh DataTables.
+   - **Inline Style Guard & Sanitasi Backdrop**: Menambahkan inline `style="display:none;pointer-events:none;visibility:hidden"` pada seluruh modal backdrop, memindahkan backdrop ke `document.body` via `sanitizeBackdrops()`, dan memanipulasi display/pointer-events/visibility secara eksplisit saat open/close.
+   - **Event Delegation Robust**: Menambahkan atribut `data-action` (`manage-questions`, `add-question`, `create-package`, `edit-package`) dan listener delegasi `document.addEventListener('click', ...)` serta penutup tombol `Escape`.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 17:28:15 | `admin/tutorial-rpl-cbt.php` | 453-470, 510-525, 580-590, 668-675, 930-940, 1035-1235, 1307-1335, 1390-1440, 1570-1730 | Perbaikan syntax error JS baris 1665, penambahan `no-datatable` ke 4 tabel, inline style guard modal backdrop, fungsi `sanitizeBackdrops()`, explicit open/close handler, dan click event delegation. |
+
+**Verifikasi:**
+- Validasi sintaks JavaScript menggunakan Node.js VM engine (`test-js-syntax.js`) menghasilkan status 100% valid tanpa satupun error sintaks token.
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php`) lulus 100% tanpa error sintaks (`No syntax errors detected`).
+- `git diff --check` bersih tanpa konflik atau trailing whitespace.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap ALL PASS).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% (4/4 test ALL PASS).
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+
 ## 2026-11-24 17:08:00 +0700 — Implementasi Modal Koleksi & Kelola Soal Paket pada Tombol "Kelola Soal" Berparitas Penuh dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-MANAGE-QUESTIONS-MODAL · **Parent Git:** `b76cde97605f580932954ea27b5b9a9d3aa827f2`.

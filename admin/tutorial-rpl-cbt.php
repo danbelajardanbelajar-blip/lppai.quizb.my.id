@@ -450,10 +450,10 @@ include __DIR__ . '/../includes/header.php';
                             🔄 Pulihkan &amp; Tindih Soal CBT Pretes
                         </button>
                     </form>
-                    <button type="button" class="bank-button gold" onclick="openPackageModal();">
+                    <button type="button" class="bank-button gold" onclick="openPackageModal();" data-action="create-package">
                         📦 ＋ Buat Paket Baru
                     </button>
-                    <button type="button" class="bank-button primary" onclick="openAddModal();">
+                    <button type="button" class="bank-button primary" onclick="openAddModal();" data-action="add-question">
                         ➕ Tambah Butir Soal
                     </button>
                 </div>
@@ -461,7 +461,7 @@ include __DIR__ . '/../includes/header.php';
 
             <!-- Tabel Daftar Paket Soal -->
             <div class="bank-table-scroll">
-                <table class="bank-table">
+                <table class="bank-table no-datatable">
                     <thead>
                         <tr>
                             <th style="width:40px;">No.</th>
@@ -508,13 +508,13 @@ include __DIR__ . '/../includes/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
-                                        <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);" title="Lihat &amp; kelola butir pertanyaan paket ini">
+                                        <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);" data-action="manage-questions" data-package-id="<?= (int)$pkg['id'] ?>" data-package-name="<?= sanitize($pkg['name']) ?>" data-package-code="<?= sanitize($pkg['code']) ?>" title="Lihat &amp; kelola butir pertanyaan paket ini">
                                             📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)
                                         </button>
-                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" title="Tambah butir soal ke paket ini">
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" data-action="add-question" data-package-id="<?= (int)$pkg['id'] ?>" title="Tambah butir soal ke paket ini">
                                             ＋ Soal
                                         </button>
-                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditPackageModal(<?= json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' title="Edit Paket Soal">
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditPackageModal(<?= json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-package" title="Edit Paket Soal">
                                             ✏️ Edit
                                         </button>
                                         <?php if ((int)$pkg['id'] > 2): ?>
@@ -578,7 +578,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div class="bank-table-scroll">
-                <table class="bank-table">
+                <table class="bank-table no-datatable">
                     <thead>
                         <tr>
                             <th style="width:40px;">No</th>
@@ -667,7 +667,7 @@ include __DIR__ . '/../includes/header.php';
 
             <!-- Tabel Ringkasan Sesi Ujian -->
             <div class="bank-table-scroll" style="margin-bottom:24px;">
-                <table class="bank-table">
+                <table class="bank-table no-datatable">
                     <thead>
                         <tr>
                             <th style="width:40px;">ID</th>
@@ -931,7 +931,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div class="bank-table-scroll">
-                <table class="bank-table">
+                <table class="bank-table no-datatable">
                     <thead>
                         <tr>
                             <th style="width:35px;">No</th>
@@ -1035,7 +1035,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL TAMBAH / EDIT PAKET SOAL
      ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="packageModalBackdrop">
+<div class="bank-modal-backdrop" id="packageModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="packageModalTitle">
     <div class="bank-modal" style="max-width:620px;">
         <div class="bank-modal-head" style="background:#eff6ff;">
             <div>
@@ -1091,7 +1091,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL KOLEKSI & KELOLA SOAL PAKET (Identik dengan CBT Pretes)
      ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="modalPackageQuestions" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
+<div class="bank-modal-backdrop" id="modalPackageQuestions" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
     <div class="bank-modal extra-large" style="max-width:920px; width:95%; max-height:90vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
         <div class="modal-header-banner" style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%); color:#ffffff; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <div>
@@ -1148,7 +1148,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL TAMBAH / EDIT BUTIR SOAL
      ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="questionModalBackdrop">
+<div class="bank-modal-backdrop" id="questionModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="bank-modal large">
         <div class="bank-modal-head">
             <h3 id="modalTitle">➕ Tambah Butir Soal Baru</h3>
@@ -1222,7 +1222,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL REVIEW LEMBAR JAWABAN PESERTA
      ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="reviewModalBackdrop">
+<div class="bank-modal-backdrop" id="reviewModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
     <div class="bank-modal large" style="max-width:860px;">
         <div class="bank-modal-head" style="background:#f0fdf4;">
             <div>
@@ -1314,7 +1314,13 @@ function openPackageModal() {
     document.getElementById('pkgModalDuration').value = '90';
     document.getElementById('pkgModalQuestionCount').value = '25';
     document.getElementById('pkgModalIsActive').checked = true;
-    document.getElementById('packageModalBackdrop').classList.add('open');
+    const el = document.getElementById('packageModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
 }
 
 function openEditPackageModal(pkg) {
@@ -1326,11 +1332,23 @@ function openEditPackageModal(pkg) {
     document.getElementById('pkgModalDuration').value = pkg.duration_minutes || 90;
     document.getElementById('pkgModalQuestionCount').value = pkg.question_count || 25;
     document.getElementById('pkgModalIsActive').checked = (parseInt(pkg.is_active, 10) === 1);
-    document.getElementById('packageModalBackdrop').classList.add('open');
+    const el = document.getElementById('packageModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
 }
 
 function closePackageModal() {
-    document.getElementById('packageModalBackdrop').classList.remove('open');
+    const el = document.getElementById('packageModalBackdrop');
+    if (el) {
+        el.classList.remove('open');
+        el.style.display = 'none';
+        el.style.pointerEvents = 'none';
+        el.style.visibility = 'hidden';
+    }
 }
 
 // ── Package Questions Manager Modal (Paritas Penuh dengan CBT Pretes) ───
@@ -1371,7 +1389,12 @@ function openPackageQuestionsModal(packageId, packageName, packageCode) {
     }
 
     const modal = document.getElementById('modalPackageQuestions');
-    if (modal) modal.classList.add('open');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.pointerEvents = 'auto';
+        modal.style.visibility = 'visible';
+        modal.classList.add('open');
+    }
 
     // Sinkronkan filter di tabel halaman utama
     const select = document.getElementById('filterPackage');
@@ -1413,7 +1436,12 @@ function openPackageQuestionsModal(packageId, packageName, packageCode) {
 
 function closePackageQuestionsModal() {
     const modal = document.getElementById('modalPackageQuestions');
-    if (modal) modal.classList.remove('open');
+    if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+        modal.style.pointerEvents = 'none';
+        modal.style.visibility = 'hidden';
+    }
 }
 
 function renderModalQuestions(query, catFilter, statusFilter) {
@@ -1553,7 +1581,13 @@ function openAddModal(defaultPkgId) {
     document.getElementById('formOptD').value = '';
     document.getElementById('formOptE').value = '';
     document.getElementById('formCorrectAnswer').value = 'A';
-    document.getElementById('questionModalBackdrop').classList.add('open');
+    const el = document.getElementById('questionModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
 }
 
 function openEditModal(q) {
@@ -1572,11 +1606,23 @@ function openEditModal(q) {
     document.getElementById('formOptD').value = opts[3] || opts['D'] || '';
     document.getElementById('formOptE').value = opts[4] || opts['E'] || '';
     document.getElementById('formCorrectAnswer').value = q.correct_answer || 'A';
-    document.getElementById('questionModalBackdrop').classList.add('open');
+    const el = document.getElementById('questionModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
 }
 
 function closeQuestionModal() {
-    document.getElementById('questionModalBackdrop').classList.remove('open');
+    const el = document.getElementById('questionModalBackdrop');
+    if (el) {
+        el.classList.remove('open');
+        el.style.display = 'none';
+        el.style.pointerEvents = 'none';
+        el.style.visibility = 'hidden';
+    }
 }
 
 // Generator Token Acak
@@ -1611,7 +1657,12 @@ function openReviewModal(attemptId) {
     const content = document.getElementById('reviewModalContent');
     const meta = document.getElementById('reviewModalMeta');
 
-    backdrop.classList.add('open');
+    if (backdrop) {
+        backdrop.style.display = 'flex';
+        backdrop.style.pointerEvents = 'auto';
+        backdrop.style.visibility = 'visible';
+        backdrop.classList.add('open');
+    }
     content.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">Memuat data lembar jawaban...</div>';
 
     fetch('?ajax=review_attempt&id=' + attemptId)
@@ -1658,11 +1709,12 @@ function openReviewModal(attemptId) {
                     if (l === studentAns && l !== correctAns) {
                         optStyle = 'padding:6px 10px; border-radius:6px; border:1.5px solid #dc2626; background:#fee2e2; color:#991b1b; font-weight:700;';
                     }
+                    const ansColor = isCorrect ? '#15803d' : '#b91c1c';
                     html += `
                         <div style="${optStyle}">
                             <strong>${l}.</strong> ${optText}
                             ${l === correctAns ? ' <span style="color:#15803d;">(Kunci)</span>' : ''}
-                            ${l === studentAns ? ' <span style="color:${isCorrect ? '#15803d' : '#b91c1c'}; font-weight:800;">[Pilihan Mahasiswa]</span>' : ''}
+                            ${l === studentAns ? `<span style="color:${ansColor}; font-weight:800;">[Pilihan Mahasiswa]</span>` : ''}
                         </div>
                     `;
                 });
@@ -1681,20 +1733,100 @@ function openReviewModal(attemptId) {
 }
 
 function closeReviewModal() {
-    document.getElementById('reviewModalBackdrop').classList.remove('open');
+    const backdrop = document.getElementById('reviewModalBackdrop');
+    if (backdrop) {
+        backdrop.classList.remove('open');
+        backdrop.style.display = 'none';
+        backdrop.style.pointerEvents = 'none';
+        backdrop.style.visibility = 'hidden';
+    }
 }
 
-// Global modal closer via backdrop click & Escape key
+// Sanitasi backdrop: pindahkan ke document.body agar tidak terpengaruh CSS transform parent (.content-area)
+function sanitizeBackdrops() {
+    document.querySelectorAll('.bank-modal-backdrop').forEach(function(el) {
+        if (el.parentElement !== document.body) {
+            document.body.appendChild(el);
+        }
+        if (!el.classList.contains('open')) {
+            el.style.display = 'none';
+            el.style.pointerEvents = 'none';
+            el.style.visibility = 'hidden';
+        }
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', sanitizeBackdrops);
+} else {
+    sanitizeBackdrops();
+}
+
+// Global event delegation untuk seluruh aksi tombol
 document.addEventListener('click', function(e) {
+    // Tombol Kelola Soal Paket
+    const btnManage = e.target.closest('[data-action="manage-questions"]');
+    if (btnManage) {
+        e.preventDefault();
+        const pId = parseInt(btnManage.getAttribute('data-package-id') || '0', 10);
+        const pName = btnManage.getAttribute('data-package-name') || '';
+        const pCode = btnManage.getAttribute('data-package-code') || '';
+        openPackageQuestionsModal(pId, pName, pCode);
+        return;
+    }
+
+    // Tombol Tambah Soal Paket
+    const btnAddQ = e.target.closest('[data-action="add-question"]');
+    if (btnAddQ) {
+        e.preventDefault();
+        const pId = parseInt(btnAddQ.getAttribute('data-package-id') || '0', 10);
+        openAddModal(pId);
+        return;
+    }
+
+    // Tombol Buat Paket Baru
+    const btnCreatePkg = e.target.closest('[data-action="create-package"]');
+    if (btnCreatePkg) {
+        e.preventDefault();
+        openPackageModal();
+        return;
+    }
+
+    // Tombol Tutup Modal (via data-close-modal atau tombol silang ✕)
+    const btnClose = e.target.closest('[data-close-modal], .bank-modal-close');
+    if (btnClose) {
+        e.preventDefault();
+        const backdrop = btnClose.closest('.bank-modal-backdrop');
+        if (backdrop) {
+            backdrop.classList.remove('open');
+            backdrop.style.display = 'none';
+            backdrop.style.pointerEvents = 'none';
+            backdrop.style.visibility = 'hidden';
+            document.body.style.overflow = '';
+        }
+        return;
+    }
+
+    // Klik backdrop luar untuk menutup modal
     if (e.target && e.target.classList.contains('bank-modal-backdrop') && e.target.classList.contains('open')) {
         e.target.classList.remove('open');
+        e.target.style.display = 'none';
+        e.target.style.pointerEvents = 'none';
+        e.target.style.visibility = 'hidden';
+        document.body.style.overflow = '';
     }
 });
 
+// Tutup modal aktif dengan tombol Escape
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         const openBackdrop = document.querySelector('.bank-modal-backdrop.open');
-        if (openBackdrop) openBackdrop.classList.remove('open');
+        if (openBackdrop) {
+            openBackdrop.classList.remove('open');
+            openBackdrop.style.display = 'none';
+            openBackdrop.style.pointerEvents = 'none';
+            openBackdrop.style.visibility = 'hidden';
+            document.body.style.overflow = '';
+        }
     }
 });
 </script>
