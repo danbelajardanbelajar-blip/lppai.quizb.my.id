@@ -1,3 +1,48 @@
+## 2026-11-24 16:53:00 +0700 — Penyelarasan Tab "Paket Soal" dan Arsitektur Paritas Penuh Admin CBT Tutorial RPL dengan CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-TAB-PAKET-SOAL-PARITY · **Parent Git:** `8acc2b030f3572f6106ace021602cf06ccfd3ded`.
+
+**Permintaan dan dasar perbaikan:** Merespons koreksi dan pertanyaan pengguna mengenai keberadaan tab "Bank Soal" yang seharusnya bernama **"Paket Soal"** agar berparitas penuh dengan CBT Pretes RPL (`includes/pretes-cbt-admin-view.php`):
+1. **Penyelarasan Nama dan Struktur 4 Tab Utama (`admin/tutorial-rpl-cbt.php`)**:
+   - Tab 1: Resmi bernama **"📦 Paket Soal"** (`tab=packages`, counter: `count($packages)`), dengan backward-compatibility alias `tab=questions`.
+   - Tab 2: Resmi bernama **"⚙️ Sesi Ujian"** (`tab=sessions`, counter: `count($sessions)`), dengan backward-compatibility alias `tab=session`.
+   - Tab 3: Resmi bernama **"📥 Impor Excel"** (`tab=import`).
+   - Tab 4: Resmi bernama **"📊 Hasil Ujian"** (`tab=results`, counter: `$totalAttempts`), dengan backward-compatibility alias `tab=attempts`.
+2. **Arsitektur Panel Tab 1 ("Paket Soal") Identik dengan CBT Pretes**:
+   - **Tabel Daftar Paket Soal**: Menampilkan daftar seluruh paket soal (Paket 1: Muslim & Paket 2: Kristen Protestan) dengan kolom No, Kode, Nama Paket & Deskripsi, Durasi, Target Soal, Soal Terdaftar (`actual` aktif dari `total`), Status (`● SEDANG AKTIF`), serta tombol aksi:
+     - `📋 Kelola Soal (N)`: Memfilter dan memfokuskan daftar butir pertanyaan untuk paket tersebut.
+     - `＋ Soal`: Membuka modal tambah butir pertanyaan dengan paket tujuan terpilih.
+     - `✏️ Edit Paket`: Membuka modal interaktif untuk mengedit kode, nama, deskripsi, durasi, target soal, dan status aktif paket.
+     - `🗑️ Hapus`: Menghapus paket non-inti (paket inti 1 dan 2 dilindungi dari penghapusan demi keamanan integritas).
+   - **Tombol Aksi Header**: Tombol `🔄 Pulihkan & Tindih Soal CBT Pretes`, tombol `📦 ＋ Buat Paket Baru`, dan `➕ Tambah Butir Soal`.
+   - **Daftar Butir Soal per Paket**: Ditempatkan di bagian bawah tabel paket soal dengan dropdown filter Paket Soal, dropdown Kategori Materi, input pencarian instan, dan tabel butir pertanyaan lengkap dengan penanda Kunci Jawaban, tombol edit butir soal, dan hapus soal.
+3. **Helper Manajemen Paket (`includes/tutorial-rpl-helper.php`)**:
+   - Ditambahkan `tutorialRplCbtSavePackage(PDO $pdo, array $data): int` untuk membuat atau memperbarui paket soal.
+   - Ditambahkan `tutorialRplCbtActivatePackage(PDO $pdo, int $id): bool` untuk mengaktifkan paket soal.
+   - Ditambahkan `tutorialRplCbtDeletePackage(PDO $pdo, int $id): bool` dengan proteksi paket inti (ID 1 & 2).
+4. **Pengujian Paritas Komprehensif (`tests/tutorial-rpl-cbt-parity-test.php`)**:
+   - Menambahkan pengujian CRUD paket soal (`tutorialRplCbtSavePackage`, `tutorialRplCbtGetPackage`, `tutorialRplCbtDeletePackage` & proteksi paket inti).
+   - Memverifikasi paritas tab `tab=packages`, label `Paket Soal`, `tab=sessions`, `tab=import`, `tab=results`, modal paket, dan filter kelola butir soal.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 16:46:58 | `includes/tutorial-rpl-helper.php` | 1190-1259 | Penambahan fungsi helper paket: `tutorialRplCbtSavePackage()`, `tutorialRplCbtActivatePackage()`, dan `tutorialRplCbtDeletePackage()`. |
+| 2026-11-24 16:50:38 | `admin/tutorial-rpl-cbt.php` | 1-15, 105-245, 343-635, 638, 860, 1014-1070, 1229-1285 | Penyelarasan nama tab menjadi "Paket Soal" (`tab=packages`), penambahan tabel paket soal dengan tombol kelola/edit, modal buat/edit paket soal, penyesuaian tab sesi, impor, dan hasil. |
+| 2026-11-24 16:51:31 | `tests/tutorial-rpl-cbt-parity-test.php` | 53-75, 228-245 | Pengujian CRUD paket soal tambahan, proteksi paket inti, dan asersi antarmuka tab Paket Soal, Sesi Ujian, Impor Excel, Hasil Ujian. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada berkas `includes/tutorial-rpl-helper.php`, `admin/tutorial-rpl-cbt.php`, dan `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% tanpa syntax error.
+- `git diff --check` bersih tanpa konflik atau whitespace issues.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap PASS).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% PASS.
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% PASS.
+- Test pendukung `tests/pretes-cbt-test.php` lulus 100% PASS.
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+
 ## 2026-11-24 16:30:00 +0700 — Penyelarasan Paket Soal, Sesi Ujian, dan Penindihan Data Soal CBT Tutorial RPL Berparitas Penuh dengan CBT Pretes RPL
 
 **ID:** TUTORIAL-RPL-CBT-PACKAGES-SESSIONS-SYNC · **Parent Git:** `9331121d07451d023b3355094f12823704c714c5`.

@@ -60,7 +60,24 @@ assert((float)$sessions[0]['passing_grade'] === 70.00, 'Passing grade sesi 1 har
 assert((float)$sessions[1]['passing_grade'] === 70.00, 'Passing grade sesi 2 harus 70.00');
 assert($sessions[0]['token'] === 'TUTOR26', 'Token default sesi 1 harus TUTOR26');
 assert($sessions[1]['token'] === 'TUTOR26', 'Token default sesi 2 harus TUTOR26');
-echo "[PASS] Paritas Paket Soal & Sesi Ujian terverifikasi.\n";
+
+// Uji CRUD Paket Soal Tambahan
+$customPkgId = tutorialRplCbtSavePackage($pdo, [
+    'code' => 'PKT-TUTOR-TEST',
+    'name' => 'Paket Uji Coba Tambahan',
+    'description' => 'Paket pengujian tambahan',
+    'duration_minutes' => 60,
+    'question_count' => 15,
+    'is_active' => 1
+]);
+assert($customPkgId > 0, 'Tambah paket soal baru harus berhasil');
+$customPkg = tutorialRplCbtGetPackage($pdo, $customPkgId);
+assert($customPkg['name'] === 'Paket Uji Coba Tambahan', 'Nama paket tersimpan sesuai');
+$deletedPkg = tutorialRplCbtDeletePackage($pdo, $customPkgId);
+assert($deletedPkg === true, 'Hapus paket tambahan harus berhasil');
+$cannotDeleteCore = tutorialRplCbtDeletePackage($pdo, 1);
+assert($cannotDeleteCore === false, 'Paket inti 1 dilindungi dari penghapusan');
+echo "[PASS] Paritas Paket Soal & Sesi Ujian serta CRUD Paket terverifikasi.\n";
 
 // 3. Bank Soal & Penindihan Data Soal Resmi CBT Pretes
 echo "\n--- 3. Bank Soal & Penindihan Data Soal CBT Pretes ---\n";
@@ -211,10 +228,13 @@ echo "[PASS] Ekspor bank soal dan hasil ujian dengan kolom Sesi & Paket terverif
 // 9. Paritas File Antarmuka (Admin & Mahasiswa)
 echo "\n--- 9. Paritas Antarmuka Admin & Mahasiswa ---\n";
 $adminContent = file_get_contents(__DIR__ . '/../admin/tutorial-rpl-cbt.php');
-assert(str_contains($adminContent, 'tab=questions'), 'Admin memuat tab Bank Soal');
-assert(str_contains($adminContent, 'tab=session'), 'Admin memuat tab Sesi Ujian');
+assert(str_contains($adminContent, 'tab=packages'), 'Admin memuat tab Paket Soal');
+assert(str_contains($adminContent, 'Paket Soal'), 'Label tab pertama adalah Paket Soal');
+assert(str_contains($adminContent, 'tab=sessions'), 'Admin memuat tab Sesi Ujian');
 assert(str_contains($adminContent, 'tab=import'), 'Admin memuat tab Impor Excel');
-assert(str_contains($adminContent, 'tab=attempts'), 'Admin memuat tab Hasil & Monitoring');
+assert(str_contains($adminContent, 'tab=results'), 'Admin memuat tab Hasil Ujian');
+assert(str_contains($adminContent, 'openPackageModal'), 'Admin memuat modal buat/edit paket soal');
+assert(str_contains($adminContent, 'focusPackageQuestions'), 'Admin memuat tombol kelola butir soal per paket');
 assert(str_contains($adminContent, 'filterPackage'), 'Admin memuat filter Paket Soal');
 assert(str_contains($adminContent, 'reset_pretes_parity_packages'), 'Admin memuat aksi reset & tindih soal CBT Pretes');
 assert(str_contains($adminContent, 'generateRandomToken'), 'Admin memuat generator token acak');

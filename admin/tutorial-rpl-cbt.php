@@ -1,9 +1,9 @@
 <?php
 /**
- * LPPAI Corner - Admin: Pengaturan Sesi & Bank Soal Ujian Tulis Tutorial RPL (CBT)
- * Arsitektur modern berparitas dengan CBT Pretes: 4 Tab (Bank Soal, Sesi Ujian, Impor Excel, Hasil & Monitoring).
+ * LPPAI Corner - Admin: Pengaturan Sesi & Paket Soal Ujian Tulis Tutorial RPL (CBT)
+ * Arsitektur modern berparitas dengan CBT Pretes: 4 Tab (Paket Soal, Sesi Ujian, Impor Excel, Hasil Ujian).
  */
-define('PAGE_TITLE', 'Bank Soal & Sesi CBT Tutorial RPL');
+define('PAGE_TITLE', 'Paket Soal & Sesi CBT Tutorial RPL');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
@@ -105,17 +105,72 @@ if (isset($_GET['ajax'])) {
 $message = '';
 $msgType = '';
 
-$allowedTabs = ['questions', 'session', 'import', 'attempts'];
-$activeTab = $_GET['tab'] ?? 'questions';
+$allowedTabs = ['packages', 'sessions', 'import', 'results'];
+$activeTab = $_GET['tab'] ?? 'packages';
+if ($activeTab === 'questions') {
+    $activeTab = 'packages';
+} elseif ($activeTab === 'session') {
+    $activeTab = 'sessions';
+} elseif ($activeTab === 'attempts') {
+    $activeTab = 'results';
+}
 if (!in_array($activeTab, $allowedTabs, true)) {
-    $activeTab = 'questions';
+    $activeTab = 'packages';
 }
 
 // ── Handle POST Actions ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'update_session') {
+    if ($action === 'save_package') {
+        $pkgId = (int)($_POST['package_id'] ?? 0);
+        $code = trim($_POST['code'] ?? '');
+        $name = trim($_POST['name'] ?? '');
+        $desc = trim($_POST['description'] ?? '');
+        $duration = (int)($_POST['duration_minutes'] ?? 90);
+        $questionCount = (int)($_POST['question_count'] ?? 25);
+        $isActive = isset($_POST['is_active']) ? 1 : 0;
+
+        if ($name === '') {
+            $message = 'Nama paket soal wajib diisi.';
+            $msgType = 'danger';
+        } else {
+            try {
+                tutorialRplCbtSavePackage($pdo, [
+                    'id' => $pkgId,
+                    'code' => $code,
+                    'name' => $name,
+                    'description' => $desc,
+                    'duration_minutes' => $duration,
+                    'question_count' => $questionCount,
+                    'is_active' => $isActive
+                ]);
+                $message = ($pkgId > 0) ? 'Paket soal berhasil diperbarui.' : 'Paket soal baru berhasil dibuat.';
+                $msgType = 'success';
+            } catch (Exception $e) {
+                $message = 'Error: ' . $e->getMessage();
+                $msgType = 'danger';
+            }
+        }
+        $activeTab = 'packages';
+    } elseif ($action === 'activate_package') {
+        $pkgId = (int)($_POST['package_id'] ?? 0);
+        if ($pkgId > 0 && tutorialRplCbtActivatePackage($pdo, $pkgId)) {
+            $message = "Paket soal #{$pkgId} berhasil diaktifkan.";
+            $msgType = 'success';
+        }
+        $activeTab = 'packages';
+    } elseif ($action === 'delete_package') {
+        $pkgId = (int)($_POST['package_id'] ?? 0);
+        if ($pkgId > 2 && tutorialRplCbtDeletePackage($pdo, $pkgId)) {
+            $message = "Paket soal #{$pkgId} berhasil dihapus.";
+            $msgType = 'success';
+        } else {
+            $message = 'Paket inti utama tidak dapat dihapus demi integritas data ujian.';
+            $msgType = 'danger';
+        }
+        $activeTab = 'packages';
+    } elseif ($action === 'update_session') {
         $sesId = (int)($_POST['session_id'] ?? 1);
         $title = trim($_POST['title'] ?? '');
         $duration = (int)($_POST['duration_minutes'] ?? 90);
@@ -141,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Gagal menyimpan pengaturan sesi.';
             $msgType = 'danger';
         }
-        $activeTab = 'session';
+        $activeTab = 'sessions';
     } elseif ($action === 'toggle_exam') {
         $sesId = (int)($_POST['session_id'] ?? 1);
         $sessionToToggle = tutorialRplCbtGetSession($pdo, $sesId);
@@ -150,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $statusLabel = $newStatus ? '🟢 DIBUKA' : '🔴 DITUTUP';
         $message = "Gerbang {$sessionToToggle['title']} berhasil {$statusLabel}.";
         $msgType = 'success';
-        $activeTab = 'session';
+        $activeTab = 'sessions';
     } elseif ($action === 'save_question') {
         $qId = (int)($_POST['question_id'] ?? 0);
         $packageId = max(1, (int)($_POST['package_id'] ?? 1));
@@ -178,29 +233,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'options' => $options,
                     'correct_answer' => $correct
                 ]);
-                $message = ($qId > 0) ? 'Butir soal berhasil diperbarui.' : 'Butir soal baru berhasil ditambahkan ke bank soal.';
+                $message = ($qId > 0) ? 'Butir soal berhasil diperbarui.' : 'Butir soal baru berhasil ditambahkan ke paket soal.';
                 $msgType = 'success';
             } catch (Exception $e) {
                 $message = 'Error: ' . $e->getMessage();
                 $msgType = 'danger';
             }
         }
-        $activeTab = 'questions';
+        $activeTab = 'packages';
     } elseif ($action === 'delete_question') {
         $qId = (int)($_POST['question_id'] ?? 0);
         if ($qId > 0 && tutorialRplCbtDeleteQuestion($pdo, $qId)) {
-            $message = 'Butir soal berhasil dihapus dari bank soal.';
+            $message = 'Butir soal berhasil dihapus dari paket soal.';
             $msgType = 'success';
         } else {
             $message = 'Gagal menghapus butir soal.';
             $msgType = 'danger';
         }
-        $activeTab = 'questions';
+        $activeTab = 'packages';
     } elseif ($action === 'reset_default_questions' || $action === 'reset_pretes_parity_packages') {
         $res = tutorialRplCbtSeedPackagesAndQuestions($pdo, true);
-        $message = "Bank soal dan sesi CBT Tutorial RPL berhasil disinkronkan & ditindih dengan paket soal CBT Pretes ({$res['total_questions']} butir soal: {$res['questions_islam']} Muslim + {$res['questions_kristen']} Kristen Protestan).";
+        $message = "Paket soal dan sesi CBT Tutorial RPL berhasil disinkronkan & ditindih dengan paket soal CBT Pretes ({$res['total_questions']} butir soal: {$res['questions_islam']} Muslim + {$res['questions_kristen']} Kristen Protestan).";
         $msgType = 'success';
-        $activeTab = 'questions';
+        $activeTab = 'packages';
     } elseif ($action === 'import_xlsx') {
         $activeTab = 'import';
         $packageId = max(1, (int)($_POST['package_id'] ?? 1));
@@ -222,7 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $message = "Sukses mengimpor bank soal ke Paket {$packageId}: {$res['added']} butir soal baru ditambahkan, {$res['updated']} diperbarui.";
                     $msgType = 'success';
-                    $activeTab = 'questions';
+                    $activeTab = 'packages';
                 }
             } catch (Exception $e) {
                 $message = 'Error impor Excel: ' . $e->getMessage();
@@ -239,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Gagal me-reset attempt ujian peserta.';
             $msgType = 'danger';
         }
-        $activeTab = 'attempts';
+        $activeTab = 'results';
     }
 }
 
@@ -289,8 +344,8 @@ include __DIR__ . '/../includes/header.php';
     <div class="bank-hero" style="margin-bottom:20px;">
         <div>
             <div class="bank-eyebrow">LPPAI / CBT TUTORIAL RPL</div>
-            <h2>🧩 Bank Soal &amp; Sesi Ujian Tulis Tutorial RPL</h2>
-            <p>Kelola butir soal, sesi ujian 90 menit (passing grade <?= $passingGrade ?>), impor Excel, serta pantau pengerjaan mahasiswa secara real-time.</p>
+            <h2>🧩 Paket Soal &amp; Sesi Ujian Tulis Tutorial RPL</h2>
+            <p>Kelola paket materi soal, sesi ujian 90 menit (passing grade <?= $passingGrade ?>), impor Excel, serta pantau hasil ujian mahasiswa secara real-time.</p>
         </div>
         <div class="bank-actions">
             <button type="button" class="bank-button primary" onclick="openAddModal();">
@@ -300,7 +355,7 @@ include __DIR__ . '/../includes/header.php';
                 📥 Unduh Template (.xlsx)
             </a>
             <a href="?download=bank" class="bank-button ghost">
-                📤 Ekspor Bank Soal (.xlsx)
+                📤 Ekspor Paket Soal (.xlsx)
             </a>
             <a href="?download=results" class="bank-button ghost">
                 📊 Ekspor Hasil Ujian (.xlsx)
@@ -324,9 +379,9 @@ include __DIR__ . '/../includes/header.php';
             <span>Token: <span class="bank-badge token-badge"><?= sanitize($session['token'] ?? 'TUTOR26') ?></span></span>
         </div>
         <div class="bank-stat">
-            <small>Bank Soal Aktif</small>
-            <strong style="color:#0f766e;"><?= count($questions) ?> Butir Soal</strong>
-            <span><?= count($categories) ?> Kategori Materi</span>
+            <small>Total Butir Soal</small>
+            <strong style="color:#0f766e;"><?= count($questions) ?> Butir</strong>
+            <span><?= count($packages) ?> Paket Soal · <?= count($categories) ?> Kategori</span>
         </div>
         <div class="bank-stat">
             <small>Durasi &amp; Standar Kelulusan</small>
@@ -340,39 +395,136 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <!-- 4 Modern Tabs -->
+    <!-- 4 Modern Tabs (Berparitas 100% dengan CBT Pretes) -->
     <div class="bank-tabs">
-        <a href="?tab=questions" class="<?= $activeTab === 'questions' ? 'active' : '' ?>">
-            📚 Bank Soal <span class="bank-tab-count"><?= count($questions) ?></span>
+        <a href="?tab=packages" class="<?= $activeTab === 'packages' ? 'active' : '' ?>">
+            📦 Paket Soal <span class="bank-tab-count"><?= count($packages) ?></span>
         </a>
-        <a href="?tab=session" class="<?= $activeTab === 'session' ? 'active' : '' ?>">
-            ⚙️ Sesi Ujian (90 Menit)
+        <a href="?tab=sessions" class="<?= $activeTab === 'sessions' ? 'active' : '' ?>">
+            ⚙️ Sesi Ujian <span class="bank-tab-count"><?= count($sessions) ?></span>
         </a>
         <a href="?tab=import" class="<?= $activeTab === 'import' ? 'active' : '' ?>">
-            📥 Impor Excel (.xlsx)
+            📥 Impor Excel
         </a>
-        <a href="?tab=attempts" class="<?= $activeTab === 'attempts' ? 'active' : '' ?>">
-            📊 Hasil &amp; Monitoring <span class="bank-tab-count"><?= $totalAttempts ?></span>
+        <a href="?tab=results" class="<?= $activeTab === 'results' ? 'active' : '' ?>">
+            📊 Hasil Ujian <span class="bank-tab-count"><?= $totalAttempts ?></span>
         </a>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════════
-         TAB 1: BANK SOAL
+         TAB 1: PAKET SOAL (Berparitas 100% dengan CBT Pretes)
          ═══════════════════════════════════════════════════════════════════════ -->
-    <?php if ($activeTab === 'questions'): ?>
-        <div class="bank-panel">
+    <?php if ($activeTab === 'packages'): ?>
+        <!-- Panel 1: Daftar Paket Soal (Muslim & Kristen Protestan) -->
+        <div class="bank-panel" style="margin-bottom:24px;">
             <div class="bank-panel-head">
                 <div>
-                    <h3>Daftar Butir Soal Ujian Tulis Tutorial RPL</h3>
-                    <p>Total <?= count($questions) ?> butir soal (disamakan dengan CBT Pretes: Paket 1 Muslim &amp; Paket 2 Kristen Protestan).</p>
+                    <h3>Daftar Paket Soal CBT Tutorial RPL</h3>
+                    <p>Kelola wadah materi soal ujian. Paket 1 Utama (Muslim) &amp; Paket 2 Kristen Protestan.</p>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <form method="POST" style="margin:0;" onsubmit="return confirm('Tindih seluruh bank soal Tutorial RPL dengan butir soal resmi CBT Pretes (40 Muslim + 25 Kristen Protestan)? Tindakan ini akan menimpa data soal lama.');">
+                    <form method="POST" style="margin:0;" onsubmit="return confirm('Tindih seluruh data soal Tutorial RPL dengan butir soal resmi CBT Pretes (40 Muslim + 25 Kristen Protestan)? Tindakan ini akan menimpa data soal lama.');">
                         <input type="hidden" name="action" value="reset_pretes_parity_packages">
                         <button type="submit" class="bank-button" style="background:#fef3c7; border-color:#fde047; color:#92400e; font-weight:700;">
                             🔄 Pulihkan &amp; Tindih Soal CBT Pretes
                         </button>
                     </form>
+                    <button type="button" class="bank-button gold" onclick="openPackageModal();">
+                        📦 ＋ Buat Paket Baru
+                    </button>
+                    <button type="button" class="bank-button primary" onclick="openAddModal();">
+                        ➕ Tambah Butir Soal
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabel Daftar Paket Soal -->
+            <div class="bank-table-scroll">
+                <table class="bank-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">No.</th>
+                            <th style="width:130px;">Kode</th>
+                            <th>Nama Paket &amp; Deskripsi</th>
+                            <th style="text-align:center; width:100px;">Durasi</th>
+                            <th style="text-align:center; width:110px;">Target Soal</th>
+                            <th style="text-align:center; width:140px;">Soal Terdaftar</th>
+                            <th style="text-align:center; width:130px;">Status</th>
+                            <th style="text-align:right; width:220px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($packages)): ?>
+                            <tr>
+                                <td colspan="8" class="bank-empty">
+                                    Belum ada paket soal dibuat. Klik tombol <strong>＋ Buat Paket Baru</strong> untuk membuat paket soal.
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($packages as $pIdx => $pkg):
+                                $isP2 = ((int)$pkg['id'] === 2);
+                            ?>
+                                <tr>
+                                    <td style="color:#64748b; font-weight:700;"><?= $pIdx + 1 ?></td>
+                                    <td><span class="bank-code"><?= sanitize($pkg['code']) ?></span></td>
+                                    <td>
+                                        <strong style="color:#0f172a; font-size:13.5px;"><?= sanitize($pkg['name']) ?></strong>
+                                        <?php if (!empty($pkg['description'])): ?>
+                                            <div style="font-size:12px; color:#64748b; margin-top:3px;"><?= sanitize($pkg['description']) ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:center;"><span class="bank-badge"><?= (int)$pkg['duration_minutes'] ?> Menit</span></td>
+                                    <td style="text-align:center;"><span class="bank-badge"><?= (int)$pkg['question_count'] ?> Butir</span></td>
+                                    <td style="text-align:center;">
+                                        <strong style="color:#047857;"><?= (int)$pkg['question_count_actual'] ?></strong> aktif
+                                        <span style="color:#64748b; font-size:11px;">(dari <?= (int)$pkg['total_questions'] ?> total)</span>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <?php if (!empty($pkg['is_active'])): ?>
+                                            <span class="bank-badge active">● SEDANG AKTIF</span>
+                                        <?php else: ?>
+                                            <span class="bank-badge inactive">Tidak Aktif</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="focusPackageQuestions(<?= (int)$pkg['id'] ?>, '<?= sanitize(addslashes($pkg['name'])) ?>');" title="Lihat &amp; kelola butir pertanyaan paket ini">
+                                            📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)
+                                        </button>
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" title="Tambah butir soal ke paket ini">
+                                            ＋ Soal
+                                        </button>
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditPackageModal(<?= json_encode($pkg, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' title="Edit Paket Soal">
+                                            ✏️ Edit
+                                        </button>
+                                        <?php if ((int)$pkg['id'] > 2): ?>
+                                            <form method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus paket soal ini beserta seluruh butir soal di dalamnya?');">
+                                                <input type="hidden" name="action" value="delete_package">
+                                                <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
+                                                <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Paket Soal">
+                                                    🗑️
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Panel 2: Daftar Butir Soal per Paket -->
+        <div class="bank-panel" id="questionsSection">
+            <div class="bank-panel-head">
+                <div>
+                    <h3 id="panelQuestionsTitle">Daftar Butir Soal CBT: Semua Paket</h3>
+                    <p>Total <?= count($questions) ?> butir soal terdaftar. Telusuri, saring per kategori/paket, atau tambahkan butir pertanyaan baru.</p>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <a href="?download=bank" id="exportBankBtn" class="bank-button ghost" style="color:#0f766e; border-color:#0f766e;">
+                        📤 Ekspor Butir Soal (.xlsx)
+                    </a>
                     <button type="button" class="bank-button primary" onclick="openAddModal();">
                         ➕ Tambah Soal
                     </button>
@@ -384,8 +536,11 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <select id="filterPackage" class="bank-input" onchange="filterQuestions();">
                         <option value="">-- Semua Paket Soal (<?= count($questions) ?> Soal) --</option>
-                        <option value="1">📦 Paket 1: Utama (Ubudiyah / Muslim)</option>
-                        <option value="2">📦 Paket 2: Kristen Protestan</option>
+                        <?php foreach ($packages as $pkg): ?>
+                            <option value="<?= (int)$pkg['id'] ?>" <?= ($selectedPackageId === (int)$pkg['id']) ? 'selected' : '' ?>>
+                                📦 <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['total_questions'] ?> Soal)
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
@@ -416,7 +571,7 @@ include __DIR__ . '/../includes/header.php';
                         <?php if (empty($questions)): ?>
                             <tr>
                                 <td colspan="5" class="bank-empty">
-                                    Bank soal masih kosong. Klik "Pulihkan &amp; Tindih Soal CBT Pretes" atau "Tambah Soal" untuk mengisi bank soal.
+                                    Butir soal masih kosong. Klik "Pulihkan &amp; Tindih Soal CBT Pretes" atau "Tambah Soal" untuk mengisi bank soal.
                                 </td>
                             </tr>
                         <?php else: ?>
@@ -460,7 +615,7 @@ include __DIR__ . '/../includes/header.php';
                                             <button type="button" class="bank-button" style="padding:4px 8px; min-height:30px;" onclick='openEditModal(<?= json_encode($q, JSON_HEX_APOS | JSON_HEX_QUOT) ?>);' title="Edit Soal">
                                                 ✏️
                                             </button>
-                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Hapus butir soal ini dari bank soal?');">
+                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Hapus butir soal ini dari paket soal?');">
                                                 <input type="hidden" name="action" value="delete_question">
                                                 <input type="hidden" name="question_id" value="<?= (int)$q['id'] ?>">
                                                 <button type="submit" class="bank-button danger-sm" title="Hapus Soal">
@@ -480,7 +635,7 @@ include __DIR__ . '/../includes/header.php';
     <!-- ═══════════════════════════════════════════════════════════════════════
          TAB 2: SESI UJIAN (90 MENIT)
          ═══════════════════════════════════════════════════════════════════════ -->
-    <?php if ($activeTab === 'session'): ?>
+    <?php if ($activeTab === 'sessions'): ?>
         <div class="bank-panel">
             <div class="bank-panel-head">
                 <div>
@@ -702,7 +857,7 @@ include __DIR__ . '/../includes/header.php';
     <!-- ═══════════════════════════════════════════════════════════════════════
          TAB 4: HASIL UJIAN & MONITORING REAL-TIME
          ═══════════════════════════════════════════════════════════════════════ -->
-    <?php if ($activeTab === 'attempts'): ?>
+    <?php if ($activeTab === 'results'): ?>
         <div class="bank-panel">
             <div class="bank-panel-head">
                 <div>
@@ -854,6 +1009,62 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
     <?php endif; ?>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL TAMBAH / EDIT PAKET SOAL
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="packageModalBackdrop">
+    <div class="bank-modal" style="max-width:620px;">
+        <div class="bank-modal-head" style="background:#eff6ff;">
+            <div>
+                <h3 id="packageModalTitle" style="color:#1e40af;">📦 Buat Paket Soal Baru</h3>
+                <div style="font-size:12px; color:#475569; margin-top:2px;">Wadah materi butir soal ujian tulis Tutorial RPL</div>
+            </div>
+            <button type="button" class="bank-modal-close" onclick="closePackageModal();">✕</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="save_package">
+            <input type="hidden" name="package_id" id="pkgModalId" value="0">
+            <div class="bank-modal-body" style="padding:20px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div class="bank-field">
+                        <label class="bank-label">Kode Paket *</label>
+                        <input type="text" name="code" id="pkgModalCode" class="bank-input" placeholder="Cth: PKT-TUTOR-UTAMA" required>
+                    </div>
+                    <div class="bank-field">
+                        <label class="bank-label">Nama Paket Soal *</label>
+                        <input type="text" name="name" id="pkgModalName" class="bank-input" placeholder="Cth: Paket 1 - Utama (Muslim)" required>
+                    </div>
+                </div>
+                <div class="bank-field" style="margin-bottom:14px;">
+                    <label class="bank-label">Deskripsi Materi Paket</label>
+                    <textarea name="description" id="pkgModalDesc" class="bank-input" rows="2" placeholder="Cth: Materi Fiqih, Ubudiyah, Thaharah, Sholat Wajib..."></textarea>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div class="bank-field">
+                        <label class="bank-label">Durasi Paket (Menit) *</label>
+                        <input type="number" name="duration_minutes" id="pkgModalDuration" class="bank-input" value="90" min="5" max="300" required>
+                    </div>
+                    <div class="bank-field">
+                        <label class="bank-label">Target Butir Soal *</label>
+                        <input type="number" name="question_count" id="pkgModalQuestionCount" class="bank-input" value="25" min="1" max="200" required>
+                    </div>
+                </div>
+                <label class="bank-toggle" style="cursor:pointer; margin-top:8px;">
+                    <input type="checkbox" name="is_active" id="pkgModalIsActive" value="1" checked>
+                    <div>
+                        <strong>Aktifkan Paket Soal Ini</strong>
+                        <div class="bank-note">Paket aktif dapat dipilih dan digunakan pada sesi ujian tutorial.</div>
+                    </div>
+                </label>
+            </div>
+            <div class="bank-modal-foot">
+                <button type="button" class="bank-button" onclick="closePackageModal();">Batal</button>
+                <button type="submit" class="bank-button primary">💾 Simpan Paket Soal</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
@@ -1015,11 +1226,61 @@ function filterAttempts() {
     });
 }
 
+// Modal Paket Soal
+function openPackageModal() {
+    document.getElementById('packageModalTitle').textContent = '📦 Buat Paket Soal Baru';
+    document.getElementById('pkgModalId').value = '0';
+    document.getElementById('pkgModalCode').value = '';
+    document.getElementById('pkgModalName').value = '';
+    document.getElementById('pkgModalDesc').value = '';
+    document.getElementById('pkgModalDuration').value = '90';
+    document.getElementById('pkgModalQuestionCount').value = '25';
+    document.getElementById('pkgModalIsActive').checked = true;
+    document.getElementById('packageModalBackdrop').classList.add('open');
+}
+
+function openEditPackageModal(pkg) {
+    document.getElementById('packageModalTitle').textContent = '✏️ Edit Paket Soal (' + (pkg.code || 'ID: ' + pkg.id) + ')';
+    document.getElementById('pkgModalId').value = pkg.id;
+    document.getElementById('pkgModalCode').value = pkg.code || '';
+    document.getElementById('pkgModalName').value = pkg.name || '';
+    document.getElementById('pkgModalDesc').value = pkg.description || '';
+    document.getElementById('pkgModalDuration').value = pkg.duration_minutes || 90;
+    document.getElementById('pkgModalQuestionCount').value = pkg.question_count || 25;
+    document.getElementById('pkgModalIsActive').checked = (parseInt(pkg.is_active, 10) === 1);
+    document.getElementById('packageModalBackdrop').classList.add('open');
+}
+
+function closePackageModal() {
+    document.getElementById('packageModalBackdrop').classList.remove('open');
+}
+
+function focusPackageQuestions(pkgId, pkgName) {
+    const select = document.getElementById('filterPackage');
+    if (select) {
+        select.value = String(pkgId);
+        filterQuestions();
+    }
+    const label = document.getElementById('panelQuestionsTitle');
+    if (label) {
+        label.textContent = 'Daftar Butir Soal CBT: ' + pkgName;
+    }
+    const exportBtn = document.getElementById('exportBankBtn');
+    if (exportBtn) {
+        exportBtn.href = '?download=bank&package_id=' + pkgId;
+    }
+    const qSec = document.getElementById('questionsSection');
+    if (qSec) {
+        qSec.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
 // Modal Tambah & Edit Soal
-function openAddModal() {
+function openAddModal(defaultPkgId) {
     document.getElementById('modalTitle').textContent = '➕ Tambah Butir Soal Baru';
     document.getElementById('formQuestionId').value = '0';
-    document.getElementById('formPackageId').value = '1';
+    const filterPkg = document.getElementById('filterPackage') ? document.getElementById('filterPackage').value : '';
+    document.getElementById('formPackageId').value = defaultPkgId ? String(defaultPkgId) : (filterPkg || '1');
     document.getElementById('formCategory').value = 'Sholat Wajib';
     document.getElementById('formQuestionText').value = '';
     document.getElementById('formOptA').value = '';

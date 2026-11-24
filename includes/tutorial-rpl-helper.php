@@ -1198,6 +1198,75 @@ if (!function_exists('tutorialRplCbtGetPackage')) {
 }
 
 /**
+ * Menyimpan / memperbarui paket soal CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtSavePackage')) {
+    function tutorialRplCbtSavePackage(PDO $pdo, array $data): int {
+        ensureTutorialRplCbtTables($pdo);
+        $id = (int)($data['id'] ?? ($data['package_id'] ?? 0));
+        $code = trim((string)($data['code'] ?? ''));
+        $name = trim((string)($data['name'] ?? ''));
+        $desc = trim((string)($data['description'] ?? ''));
+        $duration = max(5, min(300, (int)($data['duration_minutes'] ?? 90)));
+        $questionCount = max(1, (int)($data['question_count'] ?? 25));
+        $isActive = !empty($data['is_active']) ? 1 : 0;
+
+        if ($code === '') {
+            $code = 'PKT-TUTOR-' . date('YmdHis');
+        }
+
+        if ($id > 0) {
+            $stmt = $pdo->prepare("
+                UPDATE tutorial_rpl_cbt_packages SET
+                    code = ?,
+                    name = ?,
+                    description = ?,
+                    duration_minutes = ?,
+                    question_count = ?,
+                    is_active = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$code, $name, $desc, $duration, $questionCount, $isActive, $id]);
+            return $id;
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO tutorial_rpl_cbt_packages (code, name, description, duration_minutes, question_count, is_active)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$code, $name, $desc, $duration, $questionCount, $isActive]);
+            return (int)$pdo->lastInsertId();
+        }
+    }
+}
+
+/**
+ * Mengaktifkan paket soal CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtActivatePackage')) {
+    function tutorialRplCbtActivatePackage(PDO $pdo, int $id): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $stmt = $pdo->prepare("UPDATE tutorial_rpl_cbt_packages SET is_active = CASE WHEN id = ? THEN 1 ELSE is_active END WHERE id = ?");
+        return $stmt->execute([$id, $id]);
+    }
+}
+
+/**
+ * Menghapus paket soal CBT Tutorial RPL beserta butir pertanyaannya.
+ */
+if (!function_exists('tutorialRplCbtDeletePackage')) {
+    function tutorialRplCbtDeletePackage(PDO $pdo, int $id): bool {
+        ensureTutorialRplCbtTables($pdo);
+        if ($id <= 2) {
+            // Lindungi Paket Inti 1 (Muslim) dan 2 (Kristen) dari penghapusan total
+            return false;
+        }
+        $pdo->prepare("DELETE FROM tutorial_rpl_cbt_questions WHERE package_id = ?")->execute([$id]);
+        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_packages WHERE id = ?");
+        return $stmt->execute([$id]);
+    }
+}
+
+/**
  * Mengambil daftar sesi ujian CBT Tutorial RPL.
  */
 if (!function_exists('tutorialRplCbtGetSessions')) {
