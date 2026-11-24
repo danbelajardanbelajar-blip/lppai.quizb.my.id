@@ -1,25 +1,115 @@
 <?php
 /**
  * LPPAI Corner - Admin: Pengaturan Sesi & Bank Soal Ujian Tulis Tutorial RPL (CBT)
+ * Arsitektur modern berparitas dengan CBT Pretes: 4 Tab (Bank Soal, Sesi Ujian, Impor Excel, Hasil & Monitoring).
  */
-define('PAGE_TITLE', 'Ujian Tulis Tutorial RPL (CBT)');
+define('PAGE_TITLE', 'Bank Soal & Sesi CBT Tutorial RPL');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
+require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
 requireAdmin();
 
 $pdo = getDBConnection();
 ensureTutorialRplTables($pdo);
 ensureTutorialRplCbtTables($pdo);
 
+// ── Penanganan Unduhan Berkas Excel ──────────────────────────────────────────
+if (isset($_GET['download'])) {
+    $dl = $_GET['download'];
+    if ($dl === 'template') {
+        $tplPath = __DIR__ . '/../downloads/template-bank-soal-cbt.xlsx';
+        if (file_exists($tplPath)) {
+            cbtSendXlsx($tplPath, 'template-bank-soal-tutorial-rpl.xlsx');
+        } else {
+            // Bangun template Excel secara on-the-fly
+            $rows = [
+                ['Kode Soal', 'Kategori', 'Pertanyaan', 'Pilihan A', 'Pilihan B', 'Pilihan C', 'Pilihan D', 'Pilihan E', 'Kunci', 'Status'],
+                ['TUTOR-RPL-01', 'Thaharah', 'Rukun wudhu yang pertama sesuai syariat Islam adalah...', 'Niat', 'Membasuh muka', 'Membasuh kedua tangan', 'Mengusap kepala', 'Tertib', 'A', 'Aktif'],
+                ['TUTOR-RPL-02', 'Sholat Wajib', 'Membaca Surat Al-Fatihah dalam setiap rakaat sholat fardhu termasuk...', 'Syarat sah sholat', 'Rukun sholat', 'Sunnah ab\'adh', 'Sunnah hai\'ah', 'Syarat wajib', 'B', 'Aktif']
+            ];
+            $gen = (function() use ($rows) { foreach ($rows as $r) yield $r; })();
+            cbtSendXlsx(cbtWriteXlsx($gen, 'Template Bank Soal', [16, 20, 48, 24, 24, 24, 24, 24, 10, 12]), 'template-bank-soal-tutorial-rpl.xlsx', true);
+        }
+        exit;
+    } elseif ($dl === 'bank') {
+        $rows = tutorialRplCbtExportQuestions($pdo);
+        $gen = (function() use ($rows) { foreach ($rows as $r) yield $r; })();
+        cbtSendXlsx(cbtWriteXlsx($gen, 'Bank Soal RPL', [16, 20, 50, 24, 24, 24, 24, 24, 10, 12]), 'bank-soal-tutorial-rpl-' . date('Ymd') . '.xlsx', true);
+        exit;
+    } elseif ($dl === 'results') {
+        $rows = tutorialRplCbtExportResults($pdo);
+        $gen = (function() use ($rows) { foreach ($rows as $r) yield $r; })();
+        cbtSendXlsx(cbtWriteXlsx($gen, 'Hasil CBT RPL', [14, 26, 22, 22, 22, 18, 18, 16, 14, 12, 12, 22]), 'hasil-cbt-tutorial-rpl-' . date('Ymd') . '.xlsx', true);
+        exit;
+    }
+}
+
+// ── Endpoint AJAX Responsif ──────────────────────────────────────────────────
+if (isset($_GET['ajax'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_GET['ajax'] === 'generate_token') {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $newToken = '';
+        for ($i = 0; $i < 6; $i++) {
+            $newToken .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        echo json_encode(['token' => $newToken]);
+        exit;
+    }
+    if ($_GET['ajax'] === 'get_question') {
+        $qId = (int)($_GET['id'] ?? 0);
+        $q = tutorialRplCbtGetQuestion($pdo, $qId);
+        if ($q) {
+            $q['options'] = json_decode((string)$q['options_json'], true) ?: [];
+            echo json_encode(['success' => true, 'question' => $q]);
+        } else {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Soal tidak ditemukan.']);
+        }
+        exit;
+    }
+    if ($_GET['ajax'] === 'review_attempt') {
+        $attId = (int)($_GET['id'] ?? 0);
+        $att = tutorialRplCbtGetAttempt($pdo, $attId);
+        if (!$att) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Attempt tidak ditemukan.']);
+            exit;
+        }
+        $items = tutorialRplCbtGetAttemptItems($pdo, $attId);
+        $formatted = [];
+        foreach ($items as $it) {
+            $opts = json_decode((string)$it['options_json'], true) ?: [];
+            $formatted[] = [
+                'position' => (int)$it['position'],
+                'category' => $it['category'],
+                'question_text' => $it['question_text'],
+                'options' => $opts,
+                'correct_answer' => $it['correct_answer'],
+                'student_answer' => $it['answer'],
+                'is_correct' => ($it['answer'] !== null && strtoupper($it['answer']) === strtoupper($it['correct_answer'])),
+                'flagged' => (int)$it['flagged']
+            ];
+        }
+        echo json_encode([
+            'success' => true,
+            'attempt' => $att,
+            'items' => $formatted
+        ]);
+        exit;
+    }
+}
+
 $message = '';
 $msgType = '';
 
-$activeTab = $_GET['tab'] ?? 'session';
-if (!in_array($activeTab, ['session', 'questions', 'attempts'], true)) {
-    $activeTab = 'session';
+$allowedTabs = ['questions', 'session', 'import', 'attempts'];
+$activeTab = $_GET['tab'] ?? 'questions';
+if (!in_array($activeTab, $allowedTabs, true)) {
+    $activeTab = 'questions';
 }
 
-// Handle POST actions
+// ── Handle POST Actions ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -50,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $session = tutorialRplCbtGetSession($pdo);
         $newStatus = empty($session['exam_open']) ? 1 : 0;
         tutorialRplCbtUpdateSession($pdo, array_merge($session, ['exam_open' => $newStatus]));
-        $message = $newStatus ? 'Sesi Ujian Tulis Tutorial RPL berhasil DIBUKA.' : 'Sesi Ujian Tulis Tutorial RPL berhasil DITUTUP.';
+        $message = $newStatus ? '🟢 Gerbang Ujian Tulis Tutorial RPL berhasil DIBUKA.' : '🔴 Gerbang Ujian Tulis Tutorial RPL berhasil DITUTUP.';
         $msgType = 'success';
         $activeTab = 'session';
     } elseif ($action === 'save_question') {
@@ -101,11 +191,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = "Bank soal berhasil di-reset ke standar kurikulum LPPAI ({$inserted} butir soal).";
         $msgType = 'success';
         $activeTab = 'questions';
+    } elseif ($action === 'import_xlsx') {
+        $activeTab = 'import';
+        $file = $_FILES['question_file'] ?? null;
+        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+            $message = 'Gagal mengunggah file. Pastikan ukuran file tidak melebihi batas server.';
+            $msgType = 'danger';
+        } elseif (strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)) !== 'xlsx' || !is_uploaded_file($file['tmp_name'])) {
+            $message = 'Gunakan berkas format Excel (.xlsx) sesuai template bank soal.';
+            $msgType = 'danger';
+        } else {
+            try {
+                $rows = cbtReadQuestionXlsx($file['tmp_name']);
+                $updateExisting = isset($_POST['update_existing']);
+                $res = tutorialRplCbtImportQuestions($pdo, $rows, $updateExisting);
+                if (!empty($res['errors'])) {
+                    $message = "Impor selesai dengan catatan: {$res['added']} ditambah, {$res['updated']} diperbarui. Terdapat " . count($res['errors']) . " baris bermasalah.";
+                    $msgType = 'warning';
+                } else {
+                    $message = "Sukses mengimpor bank soal: {$res['added']} butir soal baru ditambahkan, {$res['updated']} diperbarui.";
+                    $msgType = 'success';
+                    $activeTab = 'questions';
+                }
+            } catch (Exception $e) {
+                $message = 'Error impor Excel: ' . $e->getMessage();
+                $msgType = 'danger';
+            }
+        }
     } elseif ($action === 'reset_attempt') {
         $userId = (int)($_POST['user_id'] ?? 0);
         $classId = (int)($_POST['class_id'] ?? 0);
         if ($userId > 0 && $classId > 0 && tutorialRplCbtResetAttempt($pdo, $userId, $classId)) {
-            $message = 'Attempt ujian peserta berhasil di-reset. Peserta kini dapat mengikuti ujian kembali.';
+            $message = 'Attempt ujian peserta berhasil di-reset. Peserta kini dapat mengulang ujian kembali.';
             $msgType = 'success';
         } else {
             $message = 'Gagal me-reset attempt ujian peserta.';
@@ -128,240 +245,194 @@ foreach ($questions as $q) {
 }
 sort($categories);
 
+// Statistik Hasil Ujian
+$totalAttempts = count($attempts);
+$passingGrade = (float)($session['passing_grade'] ?? 70.0);
+$passCount = 0;
+$failCount = 0;
+$totalScore = 0.0;
+foreach ($attempts as $a) {
+    $sc = (float)($a['score'] ?? 0);
+    $totalScore += $sc;
+    if ($sc >= $passingGrade) {
+        $passCount++;
+    } else {
+        $failCount++;
+    }
+}
+$avgScore = $totalAttempts > 0 ? round($totalScore / $totalAttempts, 1) : 0.0;
+$passPercent = $totalAttempts > 0 ? round(($passCount / $totalAttempts) * 100, 1) : 0.0;
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
-    <div>
-        <h2 style="margin:0 0 4px 0; font-size:22px; font-weight:800; color:var(--text-dark);">
-            🧩 Ujian Tulis Tutorial RPL Online (CBT)
-        </h2>
-        <p style="margin:0; font-size:13.5px; color:#64748b;">
-            Pengaturan sesi, manajemen bank soal, serta pemantauan dan reset attempt pengerjaan ujian daring tutorial mahasiswa RPL.
-        </p>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/pretes-cbt-admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/pretes-cbt-admin.css') ?>">
+
+<div class="bank-app">
+    <!-- Hero Header -->
+    <div class="bank-hero" style="margin-bottom:20px;">
+        <div>
+            <div class="bank-eyebrow">LPPAI / CBT TUTORIAL RPL</div>
+            <h2>🧩 Bank Soal &amp; Sesi Ujian Tulis Tutorial RPL</h2>
+            <p>Kelola butir soal, sesi ujian 90 menit (passing grade <?= $passingGrade ?>), impor Excel, serta pantau pengerjaan mahasiswa secara real-time.</p>
+        </div>
+        <div class="bank-actions">
+            <button type="button" class="bank-button primary" onclick="openAddModal();">
+                ➕ Tambah Soal
+            </button>
+            <a href="?download=template" class="bank-button ghost">
+                📥 Unduh Template (.xlsx)
+            </a>
+            <a href="?download=bank" class="bank-button ghost">
+                📤 Ekspor Bank Soal (.xlsx)
+            </a>
+            <a href="?download=results" class="bank-button ghost">
+                📊 Ekspor Hasil Ujian (.xlsx)
+            </a>
+        </div>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <form method="POST" style="margin:0;">
-            <input type="hidden" name="action" value="toggle_exam">
-            <?php if (!empty($session['exam_open'])): ?>
-                <button type="submit" class="btn btn-danger" onclick="return confirm('Tutup akses ujian CBT Tutorial RPL sekarang?');">
-                    🔒 Tutup Akses Ujian
-                </button>
-            <?php else: ?>
-                <button type="submit" class="btn btn-success" onclick="return confirm('Buka akses ujian CBT Tutorial RPL sekarang?');">
-                    🚀 Buka Akses Ujian
-                </button>
-            <?php endif; ?>
-        </form>
-        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-nilai.php" class="btn btn-secondary">
-            🎓 Rekap Nilai Akhir
+
+    <?php if ($message): ?>
+        <div class="bank-notice <?= $msgType === 'danger' ? 'error' : ($msgType === 'warning' ? 'warning' : '') ?>" style="margin-bottom:20px;">
+            <?= ($msgType === 'success' ? '✅ ' : '⚠️ ') . sanitize($message) ?>
+        </div>
+    <?php endif; ?>
+
+    <!-- 4 Quick Metric Cards -->
+    <div class="bank-stats">
+        <div class="bank-stat">
+            <small>Status Gerbang &amp; Token</small>
+            <strong style="color:<?= !empty($session['exam_open']) ? '#15803d' : '#b91c1c' ?>;">
+                <?= !empty($session['exam_open']) ? '🟢 BUKA' : '🔴 TUTUP' ?>
+            </strong>
+            <span>Token: <span class="bank-badge token-badge"><?= sanitize($session['token'] ?? 'TUTOR26') ?></span></span>
+        </div>
+        <div class="bank-stat">
+            <small>Bank Soal Aktif</small>
+            <strong style="color:#0f766e;"><?= count($questions) ?> Butir Soal</strong>
+            <span><?= count($categories) ?> Kategori Materi</span>
+        </div>
+        <div class="bank-stat">
+            <small>Durasi &amp; Standar Kelulusan</small>
+            <strong style="color:#0369a1;"><?= (int)$session['duration_minutes'] ?> Menit</strong>
+            <span>Passing Grade: <strong><?= $passingGrade ?></strong></span>
+        </div>
+        <div class="bank-stat">
+            <small>Peserta Selesai &amp; Rata-rata</small>
+            <strong style="color:#7c3aed;"><?= $totalAttempts ?> Mahasiswa</strong>
+            <span>Lulus: <?= $passCount ?> (<?= $passPercent ?>%) · Rerata: <?= $avgScore ?></span>
+        </div>
+    </div>
+
+    <!-- 4 Modern Tabs -->
+    <div class="bank-tabs">
+        <a href="?tab=questions" class="<?= $activeTab === 'questions' ? 'active' : '' ?>">
+            📚 Bank Soal <span class="bank-tab-count"><?= count($questions) ?></span>
+        </a>
+        <a href="?tab=session" class="<?= $activeTab === 'session' ? 'active' : '' ?>">
+            ⚙️ Sesi Ujian (90 Menit)
+        </a>
+        <a href="?tab=import" class="<?= $activeTab === 'import' ? 'active' : '' ?>">
+            📥 Impor Excel (.xlsx)
+        </a>
+        <a href="?tab=attempts" class="<?= $activeTab === 'attempts' ? 'active' : '' ?>">
+            📊 Hasil &amp; Monitoring <span class="bank-tab-count"><?= $totalAttempts ?></span>
         </a>
     </div>
-</div>
 
-<?php if ($message): ?>
-    <div class="alert alert-<?= $msgType ?>" style="margin-bottom:20px; border-radius:10px; font-size:14px;">
-        <?= ($msgType === 'success' ? '✅ ' : '⚠️ ') . sanitize($message) ?>
-    </div>
-<?php endif; ?>
-
-<!-- Summary Cards -->
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:24px;">
-    <div class="card" style="margin:0; border-radius:12px; border-left:4px solid <?= !empty($session['exam_open']) ? '#10b981' : '#ef4444' ?>;">
-        <div class="card-body" style="padding:16px 20px;">
-            <span style="font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;">Status Gerbang Ujian</span>
-            <div style="font-size:20px; font-weight:800; color:<?= !empty($session['exam_open']) ? '#15803d' : '#b91c1c' ?>; margin-top:4px;">
-                <?= !empty($session['exam_open']) ? '🟢 UJIAN DIBUKA' : '🔴 UJIAN DITUTUP' ?>
-            </div>
-            <small style="color:#64748b;">Token: <code style="background:#e2e8f0; padding:2px 6px; border-radius:4px; font-weight:700; color:#0f172a;"><?= sanitize($session['token'] ?? 'TUTOR26') ?></code></small>
-        </div>
-    </div>
-    <div class="card" style="margin:0; border-radius:12px; border-left:4px solid #6366f1;">
-        <div class="card-body" style="padding:16px 20px;">
-            <span style="font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;">Bank Soal Aktif</span>
-            <div style="font-size:20px; font-weight:800; color:#4338ca; margin-top:4px;">
-                <?= count($questions) ?> Butir Soal
-            </div>
-            <small style="color:#64748b;">Materi Ubudiyah &amp; Sholat Praktis</small>
-        </div>
-    </div>
-    <div class="card" style="margin:0; border-radius:12px; border-left:4px solid #f59e0b;">
-        <div class="card-body" style="padding:16px 20px;">
-            <span style="font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;">Durasi &amp; Passing Grade</span>
-            <div style="font-size:20px; font-weight:800; color:#b45309; margin-top:4px;">
-                <?= (int)$session['duration_minutes'] ?> Menit · <?= (float)$session['passing_grade'] ?>
-            </div>
-            <small style="color:#64748b;">Bobot 50% Nilai Akhir RPL</small>
-        </div>
-    </div>
-    <div class="card" style="margin:0; border-radius:12px; border-left:4px solid #06b6d4;">
-        <div class="card-body" style="padding:16px 20px;">
-            <span style="font-size:12px; color:#64748b; font-weight:700; text-transform:uppercase;">Peserta Selesai CBT</span>
-            <div style="font-size:20px; font-weight:800; color:#0e7490; margin-top:4px;">
-                <?= count($attempts) ?> Mahasiswa
-            </div>
-            <small style="color:#64748b;">Riwayat attempt tersimpan</small>
-        </div>
-    </div>
-</div>
-
-<!-- Tab Navigasi -->
-<div style="display:flex; border-bottom:2px solid #e2e8f0; margin-bottom:20px; gap:8px;">
-    <a href="?tab=session" style="padding:10px 18px; font-size:14px; font-weight:700; text-decoration:none; border-bottom:3px solid <?= $activeTab === 'session' ? 'var(--primary, #0284c7)' : 'transparent' ?>; color:<?= $activeTab === 'session' ? 'var(--primary, #0284c7)' : '#64748b' ?>; display:flex; align-items:center; gap:8px;">
-        ⚙️ Pengaturan Sesi
-    </a>
-    <a href="?tab=questions" style="padding:10px 18px; font-size:14px; font-weight:700; text-decoration:none; border-bottom:3px solid <?= $activeTab === 'questions' ? 'var(--primary, #0284c7)' : 'transparent' ?>; color:<?= $activeTab === 'questions' ? 'var(--primary, #0284c7)' : '#64748b' ?>; display:flex; align-items:center; gap:8px;">
-        📚 Bank Soal (<?= count($questions) ?>)
-    </a>
-    <a href="?tab=attempts" style="padding:10px 18px; font-size:14px; font-weight:700; text-decoration:none; border-bottom:3px solid <?= $activeTab === 'attempts' ? 'var(--primary, #0284c7)' : 'transparent' ?>; color:<?= $activeTab === 'attempts' ? 'var(--primary, #0284c7)' : '#64748b' ?>; display:flex; align-items:center; gap:8px;">
-        📊 Riwayat Attempt &amp; Reset (<?= count($attempts) ?>)
-    </a>
-</div>
-
-<?php if ($activeTab === 'session'): ?>
-    <!-- TAB 1: PENGATURAN SESI -->
-    <div class="card" style="box-shadow:var(--shadow); border-radius:12px; margin-bottom:24px;">
-        <div class="card-header" style="background:#f8fafc; font-weight:700; color:var(--text-dark);">
-            ⚙️ Konfigurasi Parameter Ujian Tulis Tutorial RPL
-        </div>
-        <div class="card-body" style="padding:24px;">
-            <form method="POST">
-                <input type="hidden" name="action" value="update_session">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:20px;">
-                    <div>
-                        <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
-                            Judul Sesi Ujian:
-                        </label>
-                        <input type="text" name="title" class="form-control" value="<?= sanitize($session['title'] ?? 'Ujian Tulis Tutorial RPL') ?>" required>
-                        <small style="color:#64748b;">Ditampilkan pada lembar kerja ujian mahasiswa RPL.</small>
-                    </div>
-                    <div>
-                        <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
-                            Token Masuk Ujian:
-                        </label>
-                        <input type="text" name="token" class="form-control" value="<?= sanitize($session['token'] ?? 'TUTOR26') ?>" required style="text-transform:uppercase; font-weight:700; letter-spacing:1px;">
-                        <small style="color:#64748b;">Kode token verifikasi yang dibagikan kepada peserta.</small>
-                    </div>
-                    <div>
-                        <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
-                            Durasi Pengerjaan (Menit):
-                        </label>
-                        <input type="number" name="duration_minutes" class="form-control" value="<?= (int)($session['duration_minutes'] ?? 90) ?>" min="5" max="180" required>
-                        <small style="color:#64748b;">Timer hitung mundur otomatis di browser mahasiswa (Standar: 90 Menit).</small>
-                    </div>
-                    <div>
-                        <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
-                            Passing Grade (Batas Kelulusan):
-                        </label>
-                        <input type="number" step="0.1" name="passing_grade" class="form-control" value="<?= (float)($session['passing_grade'] ?? 70.0) ?>" min="0" max="100" required>
-                        <small style="color:#64748b;">Standar kelulusan LPPAI (Rekomendasi: 70.00).</small>
-                    </div>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         TAB 1: BANK SOAL
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <?php if ($activeTab === 'questions'): ?>
+        <div class="bank-panel">
+            <div class="bank-panel-head">
+                <div>
+                    <h3>Daftar Butir Soal Ujian Tulis Tutorial RPL</h3>
+                    <p>Total <?= count($questions) ?> butir soal terdistribusi dalam kurikulum ubudiyah dan ibadah praktis.</p>
                 </div>
-
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-bottom:24px;">
-                    <label style="display:flex; align-items:center; gap:12px; cursor:pointer; margin:0;">
-                        <input type="checkbox" name="exam_open" value="1" <?= !empty($session['exam_open']) ? 'checked' : '' ?> style="width:18px; height:18px;">
-                        <div>
-                            <span style="font-size:14.5px; font-weight:700; color:#1e293b;">Buka Akses Pengerjaan Ujian (Live)</span>
-                            <div style="font-size:12.5px; color:#64748b;">Jika dicentang, peserta tutorial RPL yang sah dapat memasukkan token dan mengerjakan soal ujian.</div>
-                        </div>
-                    </label>
-                </div>
-
-                <div style="text-align:right;">
-                    <button type="submit" class="btn btn-primary" style="padding:10px 24px;">
-                        💾 Simpan Pengaturan Sesi
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <form method="POST" style="margin:0;" onsubmit="return confirm('Kembalikan bank soal ke paket standar 10 butir soal kurikulum LPPAI? Semua butir soal custom akan di-reset.');">
+                        <input type="hidden" name="action" value="reset_default_questions">
+                        <button type="submit" class="bank-button">
+                            🔄 Pulihkan Soal Standar LPPAI
+                        </button>
+                    </form>
+                    <button type="button" class="bank-button primary" onclick="openAddModal();">
+                        ➕ Tambah Soal
                     </button>
                 </div>
-            </form>
-        </div>
-    </div>
+            </div>
 
-<?php elseif ($activeTab === 'questions'): ?>
-    <!-- TAB 2: BANK SOAL -->
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <label style="font-size:13.5px; font-weight:600; color:#334155;">Filter Kategori:</label>
-            <select id="filterCategory" class="form-control" onchange="filterQuestions(this.value);" style="min-width:200px;">
-                <option value="">-- Semua Kategori (<?= count($questions) ?> Soal) --</option>
-                <?php foreach ($categories as $cat): ?>
-                    <option value="<?= sanitize($cat) ?>"><?= sanitize($cat) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div style="display:flex; gap:10px;">
-            <form method="POST" style="margin:0;" onsubmit="return confirm('Kembalikan bank soal ke paket standar 10 butir soal kurikulum LPPAI? Semua butir soal custom akan di-reset.');">
-                <input type="hidden" name="action" value="reset_default_questions">
-                <button type="submit" class="btn btn-secondary btn-sm">
-                    🔄 Pulihkan Soal Standar
-                </button>
-            </form>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openAddModal();">
-                ➕ Tambah Butir Soal
-            </button>
-        </div>
-    </div>
-
-    <div class="card" style="box-shadow:var(--shadow); border-radius:12px; overflow:hidden;">
-        <div class="card-body" style="padding:0;">
-            <?php if (empty($questions)): ?>
-                <div style="text-align:center; padding:40px 20px; color:#64748b;">
-                    <div style="font-size:36px; margin-bottom:8px;">📚</div>
-                    <h4 style="margin:0 0 4px 0; color:#334155;">Bank Soal Masih Kosong</h4>
-                    <p style="margin:0; font-size:13.5px;">Klik tombol "Pulihkan Soal Standar" atau "Tambah Butir Soal" di atas untuk mengisi materi.</p>
+            <!-- Toolbar Filter -->
+            <div class="bank-filters" style="grid-template-columns: minmax(200px, 1fr) minmax(200px, 1.5fr);">
+                <div>
+                    <select id="filterCategory" class="bank-input" onchange="filterQuestions();">
+                        <option value="">-- Semua Kategori (<?= count($questions) ?> Soal) --</option>
+                        <?php foreach ($categories as $cat): ?>
+                            <option value="<?= sanitize($cat) ?>"><?= sanitize($cat) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table" style="margin:0; width:100%;">
-                        <thead>
-                            <tr style="background:#f1f5f9; text-align:left; font-size:12.5px; color:#475569;">
-                                <th style="padding:12px 16px; width:40px;">No</th>
-                                <th style="padding:12px 16px; width:150px;">Kategori</th>
-                                <th style="padding:12px 16px;">Teks Pertanyaan &amp; Opsi Pilihan</th>
-                                <th style="padding:12px 16px; width:90px; text-align:center;">Kunci</th>
-                                <th style="padding:12px 16px; width:120px; text-align:center;">Aksi</th>
+                <div>
+                    <input type="text" id="searchQuestion" class="bank-input" placeholder="🔍 Cari teks pertanyaan atau kata kunci..." oninput="filterQuestions();">
+                </div>
+            </div>
+
+            <div class="bank-table-scroll">
+                <table class="bank-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">No</th>
+                            <th style="width:140px;">Kategori</th>
+                            <th>Teks Pertanyaan &amp; Opsi Pilihan</th>
+                            <th style="width:60px; text-align:center;">Kunci</th>
+                            <th style="width:110px; text-align:center;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="questionTableBody">
+                        <?php if (empty($questions)): ?>
+                            <tr>
+                                <td colspan="5" class="bank-empty">
+                                    Bank soal masih kosong. Klik "Pulihkan Soal Standar LPPAI" atau "Tambah Soal" untuk mengisi bank soal.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
+                        <?php else: ?>
                             <?php foreach ($questions as $idx => $q):
-                                $opts = json_decode($q['options_json'], true) ?: [];
+                                $opts = json_decode((string)$q['options_json'], true) ?: [];
                                 $labels = ['A', 'B', 'C', 'D', 'E'];
                             ?>
-                                <tr class="question-row" data-category="<?= sanitize($q['category']) ?>" style="border-bottom:1px solid #e2e8f0; font-size:13.5px;">
-                                    <td style="padding:14px 16px; color:#64748b; vertical-align:top; font-weight:700;"><?= $idx + 1 ?></td>
-                                    <td style="padding:14px 16px; vertical-align:top;">
-                                        <span class="badge badge-primary" style="font-size:11.5px;"><?= sanitize($q['category']) ?></span>
+                                <tr class="question-row" data-category="<?= sanitize($q['category']) ?>" data-text="<?= strtolower(sanitize($q['question_text'])) ?>">
+                                    <td style="font-weight:700; color:#64748b;"><?= $idx + 1 ?></td>
+                                    <td>
+                                        <span class="bank-badge package"><?= sanitize($q['category']) ?></span>
+                                        <span class="bank-code"><?= sanitize($q['code']) ?></span>
                                     </td>
-                                    <td style="padding:14px 16px; vertical-align:top;">
-                                        <div style="font-weight:700; color:#0f172a; margin-bottom:8px; line-height:1.5;">
-                                            <?= nl2br(sanitize($q['question_text'])) ?>
-                                        </div>
-                                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; font-size:12.5px;">
+                                    <td>
+                                        <div class="bank-question"><?= nl2br(sanitize($q['question_text'])) ?></div>
+                                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; margin-top:8px;">
                                             <?php foreach ($labels as $li => $lbl):
                                                 if (!isset($opts[$li]) || $opts[$li] === '') continue;
                                                 $isCorrect = ($q['correct_answer'] === $lbl);
                                             ?>
-                                                <div style="padding:5px 8px; border-radius:6px; border:1px solid <?= $isCorrect ? '#86efac' : '#e2e8f0' ?>; background:<?= $isCorrect ? '#f0fdf4' : '#f8fafc' ?>; color:<?= $isCorrect ? '#166534' : '#475569' ?>;">
-                                                    <strong style="color:<?= $isCorrect ? '#15803d' : '#0f172a' ?>;"><?= $lbl ?>.</strong> <?= sanitize($opts[$li]) ?>
-                                                    <?= $isCorrect ? ' <span style="font-weight:700; color:#15803d;">(Kunci)</span>' : '' ?>
+                                                <div class="bank-choice <?= $isCorrect ? 'correct' : '' ?>">
+                                                    <strong><?= $lbl ?>.</strong> <?= sanitize($opts[$li]) ?>
+                                                    <?= $isCorrect ? ' <span style="font-weight:700; color:#15803d;">✓ Kunci</span>' : '' ?>
                                                 </div>
                                             <?php endforeach; ?>
                                         </div>
                                     </td>
-                                    <td style="padding:14px 16px; vertical-align:top; text-align:center;">
-                                        <span class="badge badge-emerald" style="font-size:14px; font-weight:800; padding:6px 12px;">
-                                            <?= sanitize($q['correct_answer']) ?>
-                                        </span>
+                                    <td style="text-align:center;">
+                                        <span class="bank-key"><?= sanitize($q['correct_answer']) ?></span>
                                     </td>
-                                    <td style="padding:14px 16px; vertical-align:top; text-align:center;">
-                                        <div style="display:flex; justify-content:center; gap:6px;">
-                                            <button type="button" class="btn btn-secondary btn-sm" onclick='openEditModal(<?= json_encode($q, JSON_HEX_APOS | JSON_HEX_QUOT) ?>);' title="Edit Soal">
+                                    <td style="text-align:center;">
+                                        <div style="display:inline-flex; gap:6px;">
+                                            <button type="button" class="bank-button" style="padding:4px 8px; min-height:30px;" onclick='openEditModal(<?= json_encode($q, JSON_HEX_APOS | JSON_HEX_QUOT) ?>);' title="Edit Soal">
                                                 ✏️
                                             </button>
-                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Hapus butir soal ini?');">
+                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Hapus butir soal ini dari bank soal?');">
                                                 <input type="hidden" name="action" value="delete_question">
                                                 <input type="hidden" name="question_id" value="<?= (int)$q['id'] ?>">
-                                                <button type="submit" class="btn btn-danger btn-sm" title="Hapus Soal">
+                                                <button type="submit" class="bank-button danger-sm" title="Hapus Soal">
                                                     🗑️
                                                 </button>
                                             </form>
@@ -369,60 +440,351 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Modal Tambah/Edit Soal -->
-    <div id="questionModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center;">
-        <div style="background:#ffffff; border-radius:12px; width:95%; max-width:680px; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-lg); padding:24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <h3 id="modalTitle" style="margin:0; font-size:18px; font-weight:800; color:#0f172a;">➕ Tambah Butir Soal Baru</h3>
-                <button type="button" onclick="closeModal();" style="border:none; background:transparent; font-size:20px; cursor:pointer; color:#64748b;">✕</button>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-            <form method="POST" id="questionForm">
-                <input type="hidden" name="action" value="save_question">
-                <input type="hidden" name="question_id" id="formQuestionId" value="0">
+        </div>
+    <?php endif; ?>
 
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Kategori Materi:</label>
-                    <input type="text" name="category" id="formCategory" class="form-control" placeholder="Contoh: Thaharah, Sholat Wajib, Zikir & Doa" required>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         TAB 2: SESI UJIAN (90 MENIT)
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <?php if ($activeTab === 'session'): ?>
+        <div class="bank-panel">
+            <div class="bank-panel-head">
+                <div>
+                    <h3>Konfigurasi Sesi Ujian Tulis Tutorial RPL</h3>
+                    <p>Atur durasi resmi 90 menit, passing grade 70.00, token pengerjaan, dan sakelar gerbang ujian.</p>
+                </div>
+                <div>
+                    <form method="POST" style="margin:0;">
+                        <input type="hidden" name="action" value="toggle_exam">
+                        <?php if (!empty($session['exam_open'])): ?>
+                            <button type="submit" class="bank-button danger" onclick="return confirm('Tutup gerbang ujian CBT Tutorial RPL sekarang? Peserta tidak akan bisa memulai ujian baru.');">
+                                🔒 Tutup Gerbang Ujian
+                            </button>
+                        <?php else: ?>
+                            <button type="submit" class="bank-button primary" onclick="return confirm('Buka gerbang ujian CBT Tutorial RPL sekarang? Peserta dapat memasukkan token dan memulai ujian.');">
+                                🚀 Buka Gerbang Ujian
+                            </button>
+                        <?php endif; ?>
+                    </form>
+                </div>
+            </div>
+
+            <div class="bank-panel-body">
+                <form method="POST">
+                    <input type="hidden" name="action" value="update_session">
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-bottom:20px;">
+                        <div class="bank-field">
+                            <label class="bank-label">Judul Sesi Ujian:</label>
+                            <input type="text" name="title" class="bank-input" value="<?= sanitize($session['title'] ?? 'Ujian Tulis Tutorial RPL 2026/2027') ?>" required>
+                            <span class="bank-note">Ditampilkan di header ruang pengerjaan mahasiswa.</span>
+                        </div>
+                        <div class="bank-field">
+                            <label class="bank-label">Token Masuk Ujian:</label>
+                            <div class="bank-token-group">
+                                <input type="text" id="sessionTokenInput" name="token" class="bank-input" value="<?= sanitize($session['token'] ?? 'TUTOR26') ?>" required style="text-transform:uppercase; font-weight:800; letter-spacing:2px;">
+                                <button type="button" class="bank-button" onclick="generateRandomToken();" title="Buat Token Acak">
+                                    🎲 Acak
+                                </button>
+                                <button type="button" class="bank-button" onclick="copyTokenToClipboard();" title="Salin Token">
+                                    📋 Salin
+                                </button>
+                            </div>
+                            <span class="bank-note">Bagikan token ini kepada mahasiswa RPL yang dijadwalkan ujian.</span>
+                        </div>
+                        <div class="bank-field">
+                            <label class="bank-label">Durasi Pengerjaan (Menit):</label>
+                            <input type="number" name="duration_minutes" class="bank-input" value="<?= (int)($session['duration_minutes'] ?? 90) ?>" min="5" max="180" required>
+                            <span class="bank-note">Timer server berjalan otomatis (Standar resmi: <strong>90 Menit</strong>).</span>
+                        </div>
+                        <div class="bank-field">
+                            <label class="bank-label">Passing Grade (Batas Kelulusan):</label>
+                            <input type="number" step="0.1" name="passing_grade" class="bank-input" value="<?= (float)($session['passing_grade'] ?? 70.0) ?>" min="0" max="100" required>
+                            <span class="bank-note">Kriteria minimal pemenuhan standar kelulusan (Standar: <strong>70.00</strong>).</span>
+                        </div>
+                    </div>
+
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px; margin-bottom:24px;">
+                        <label class="bank-toggle" style="cursor:pointer;">
+                            <input type="checkbox" name="exam_open" value="1" <?= !empty($session['exam_open']) ? 'checked' : '' ?> style="width:20px; height:20px;">
+                            <div>
+                                <strong style="font-size:14px; color:#0f172a;">Buka Gerbang Pengerjaan CBT Tutorial RPL (Live)</strong>
+                                <div class="bank-note">Saat dicentang, mahasiswa RPL yang terdaftar dapat memasukkan token dan memulai pengerjaan soal ujian.</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button type="submit" class="bank-button primary" style="padding:12px 28px; font-size:14px;">
+                            💾 Simpan Konfigurasi Sesi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         TAB 3: IMPOR EXCEL (.XLSX)
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <?php if ($activeTab === 'import'): ?>
+        <div class="bank-panel">
+            <div class="bank-panel-head">
+                <div>
+                    <h3>Impor Bank Soal dari Berkas Excel (.xlsx)</h3>
+                    <p>Unggah file Excel berformat template LPPAI untuk menambahkan atau memperbarui butir soal secara massal.</p>
+                </div>
+                <div>
+                    <a href="?download=template" class="bank-button ghost" style="color:#0f766e; border-color:#0f766e;">
+                        📥 Unduh Template (.xlsx)
+                    </a>
+                </div>
+            </div>
+
+            <div class="bank-panel-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="import_xlsx">
+
+                    <div class="bank-import-grid">
+                        <div>
+                            <label class="bank-upload" id="uploadDropzone">
+                                <span class="bank-upload-icon">📊</span>
+                                <strong>Pilih atau Tarik Berkas Excel (.xlsx) ke Sini</strong>
+                                <span>Gunakan format template standar LPPAI dengan header kolom A–I</span>
+                                <input type="file" name="question_file" accept=".xlsx" required style="margin-top:16px;">
+                            </label>
+
+                            <div style="margin-top:16px;">
+                                <label class="bank-toggle" style="cursor:pointer;">
+                                    <input type="checkbox" name="update_existing" value="1" checked>
+                                    <div>
+                                        <strong>Perbarui butir soal jika Kode Soal sudah ada di sistem (Update Existing)</strong>
+                                        <div class="bank-note">Jika kode soal cocok, teks pertanyaan dan pilihan jawaban akan diperbarui. Jika kode belum ada, akan ditambahkan sebagai soal baru.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div style="margin-top:20px;">
+                                <button type="submit" class="bank-button primary" style="width:100%; min-height:44px; font-size:14px;">
+                                    🚀 Unggah &amp; Mulai Impor Bank Soal
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="bank-form-aside">
+                                <h4>📋 Petunjuk Susunan Kolom Template:</h4>
+                                <ul class="bank-steps" style="font-size:12px;">
+                                    <li><b>A</b> <div><strong>Kode Soal</strong> Cth: <code>TUTOR-RPL-01</code> (opsional, jika kosong dibuat otomatis).</div></li>
+                                    <li><b>B</b> <div><strong>Kategori</strong> Cth: <code>Thaharah</code>, <code>Sholat Wajib</code>, <code>Ubudiyah</code>.</div></li>
+                                    <li><b>C</b> <div><strong>Teks Pertanyaan</strong> Pertanyaan lengkap butir soal.</div></li>
+                                    <li><b>D</b> <div><strong>Pilihan A</strong> Teks opsi A.</div></li>
+                                    <li><b>E</b> <div><strong>Pilihan B</strong> Teks opsi B.</div></li>
+                                    <li><b>F</b> <div><strong>Pilihan C</strong> Teks opsi C (opsional).</div></li>
+                                    <li><b>G</b> <div><strong>Pilihan D</strong> Teks opsi D (opsional).</div></li>
+                                    <li><b>H</b> <div><strong>Pilihan E</strong> Teks opsi E (opsional).</div></li>
+                                    <li><b>I</b> <div><strong>Kunci Jawaban</strong> Huruf kapital <code>A</code>, <code>B</code>, <code>C</code>, <code>D</code>, atau <code>E</code>.</div></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         TAB 4: HASIL UJIAN & MONITORING REAL-TIME
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <?php if ($activeTab === 'attempts'): ?>
+        <div class="bank-panel">
+            <div class="bank-panel-head">
+                <div>
+                    <h3>Monitoring Hasil &amp; Riwayat Pengerjaan CBT Mahasiswa RPL</h3>
+                    <p>Pantau skor nilai, review lembar jawaban per mahasiswa, atau reset attempt ujian jika mahasiswa mengalami kendala.</p>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <a href="?download=results" class="bank-button ghost" style="color:#0f766e; border-color:#0f766e;">
+                        📊 Ekspor ke Excel (.xlsx)
+                    </a>
+                </div>
+            </div>
+
+            <!-- Toolbar Filter Hasil -->
+            <div class="bank-filters" style="grid-template-columns: minmax(180px, 1.5fr) minmax(160px, 1fr) minmax(160px, 1fr);">
+                <div>
+                    <input type="text" id="searchAttempt" class="bank-input" placeholder="🔍 Cari nama mahasiswa / NIM..." oninput="filterAttempts();">
+                </div>
+                <div>
+                    <select id="filterPassStatus" class="bank-input" onchange="filterAttempts();">
+                        <option value="">-- Semua Status Kelulusan --</option>
+                        <option value="lulus">🟢 Lulus (Nilai &ge; <?= $passingGrade ?>)</option>
+                        <option value="tidak_lulus">🔴 Belum Memenuhi (&lt; <?= $passingGrade ?>)</option>
+                    </select>
+                </div>
+                <div>
+                    <select id="filterClassGroup" class="bank-input" onchange="filterAttempts();">
+                        <option value="">-- Semua Kelompok RPL --</option>
+                        <?php
+                        $groupList = [];
+                        foreach ($attempts as $a) {
+                            if (!empty($a['nama_kelompok']) && !in_array($a['nama_kelompok'], $groupList, true)) {
+                                $groupList[] = $a['nama_kelompok'];
+                            }
+                        }
+                        sort($groupList);
+                        foreach ($groupList as $grp):
+                        ?>
+                            <option value="<?= sanitize($grp) ?>"><?= sanitize($grp) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bank-table-scroll">
+                <table class="bank-table">
+                    <thead>
+                        <tr>
+                            <th style="width:35px;">No</th>
+                            <th>Mahasiswa</th>
+                            <th>Kelompok &amp; Tutor</th>
+                            <th style="text-align:center;">Mulai &amp; Selesai (WIB)</th>
+                            <th style="text-align:center;">Skor Benar</th>
+                            <th style="text-align:center;">Nilai CBT</th>
+                            <th style="text-align:center;">Status</th>
+                            <th style="text-align:center; width:150px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attemptTableBody">
+                        <?php if (empty($attempts)): ?>
+                            <tr>
+                                <td colspan="8" class="bank-empty">
+                                    Belum ada mahasiswa yang mengikuti atau mengumpulkan ujian CBT Tutorial RPL.
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($attempts as $idx => $a):
+                                $score = (float)($a['score'] ?? 0);
+                                $isPass = ($score >= $passingGrade);
+                                $isSubmitted = !empty($a['submitted']);
+                                $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+                                $submittedWib = !empty($a['submitted_at']) ? (new DateTimeImmutable('@' . $a['submitted_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') : '-';
+                            ?>
+                                <tr class="attempt-row"
+                                    data-search="<?= strtolower(sanitize(($a['nama_lengkap'] ?? '') . ' ' . ($a['nim'] ?? ''))) ?>"
+                                    data-pass="<?= $isPass ? 'lulus' : 'tidak_lulus' ?>"
+                                    data-group="<?= sanitize($a['nama_kelompok'] ?? '') ?>">
+                                    <td style="font-weight:700; color:#64748b;"><?= $idx + 1 ?></td>
+                                    <td>
+                                        <div style="font-weight:700; color:#0f172a; font-size:13px;"><?= sanitize($a['nama_lengkap']) ?></div>
+                                        <small style="color:#64748b;">NIM: <strong><?= sanitize($a['nim'] ?: '-') ?></strong> · <?= sanitize($a['program_studi'] ?: '') ?></small>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight:600; color:#0369a1;"><?= sanitize($a['nama_kelompok'] ?: '-') ?></div>
+                                        <small style="color:#64748b;">👨‍🏫 <?= sanitize($a['dosen_nama'] ?: '-') ?></small>
+                                    </td>
+                                    <td style="text-align:center; font-size:11.5px; color:#475569;">
+                                        <div>Mulai: <?= $startedWib ?></div>
+                                        <div>Selesai: <?= $submittedWib ?></div>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span class="bank-badge" style="font-size:11px;">
+                                            <?= (int)($a['correct_count'] ?? 0) ?> / <?= (int)($a['total_questions'] ?? 25) ?> Soal
+                                        </span>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <strong style="color:<?= $isPass ? '#15803d' : '#b91c1c' ?>; font-size:16px;">
+                                            <?= $score ?>
+                                        </strong>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <?php if ($isSubmitted): ?>
+                                            <?php if ($isPass): ?>
+                                                <span class="bank-badge active" style="font-weight:800;">🟢 LULUS</span>
+                                            <?php else: ?>
+                                                <span class="bank-badge danger-sm" style="font-weight:800; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; padding:3px 8px; border-radius:6px;">🔴 BELUM MEMENUHI</span>
+                                            <?php endif; ?>
+                                        <?php else: ?>
+                                            <span class="bank-badge" style="background:#fef3c7; color:#b45309;">Sedang Ujian</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <div style="display:inline-flex; gap:6px;">
+                                            <button type="button" class="bank-button" style="padding:4px 8px; min-height:28px; font-size:11px;" onclick="openReviewModal(<?= (int)$a['id'] ?>);" title="Review Lembar Jawaban">
+                                                👁️ Review
+                                            </button>
+                                            <form method="POST" style="margin:0;" onsubmit="return confirm('Reset attempt ujian mahasiswa <?= sanitize($a['nama_lengkap']) ?>? Mahasiswa akan diizinkan memulai ujian kembali dari awal.');">
+                                                <input type="hidden" name="action" value="reset_attempt">
+                                                <input type="hidden" name="user_id" value="<?= (int)$a['user_id'] ?>">
+                                                <input type="hidden" name="class_id" value="<?= (int)$a['class_id'] ?>">
+                                                <button type="submit" class="bank-button danger-sm" title="Izinkan Ujian Ulang">
+                                                    🔄 Reset
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL TAMBAH / EDIT BUTIR SOAL
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="questionModalBackdrop">
+    <div class="bank-modal large">
+        <div class="bank-modal-head">
+            <h3 id="modalTitle">➕ Tambah Butir Soal Baru</h3>
+            <button type="button" class="bank-modal-close" onclick="closeQuestionModal();">✕</button>
+        </div>
+        <form method="POST" id="questionForm">
+            <input type="hidden" name="action" value="save_question">
+            <input type="hidden" name="question_id" id="formQuestionId" value="0">
+            <div class="bank-modal-body">
+                <div class="bank-field">
+                    <label class="bank-label">Kategori Materi:</label>
+                    <input type="text" name="category" id="formCategory" class="bank-input" placeholder="Contoh: Thaharah, Sholat Wajib, Ubudiyah Praktis" required>
                 </div>
 
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Teks Pertanyaan Soal:</label>
-                    <textarea name="question_text" id="formQuestionText" class="form-control" rows="3" placeholder="Tuliskan butir soal pertanyaan di sini..." required></textarea>
+                <div class="bank-field">
+                    <label class="bank-label">Teks Pertanyaan Soal:</label>
+                    <textarea name="question_text" id="formQuestionText" class="bank-input" rows="4" placeholder="Tuliskan pertanyaan butir soal di sini..." required style="resize:vertical;"></textarea>
                 </div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                <div class="bank-options">
                     <div>
-                        <label style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Opsi A:</label>
-                        <input type="text" name="opt_a" id="formOptA" class="form-control" required>
+                        <label class="bank-option-label"><span class="bank-letter">A</span> Pilihan A *</label>
+                        <input type="text" name="opt_a" id="formOptA" class="bank-input" placeholder="Pilihan jawaban A" required>
                     </div>
                     <div>
-                        <label style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Opsi B:</label>
-                        <input type="text" name="opt_b" id="formOptB" class="form-control" required>
+                        <label class="bank-option-label"><span class="bank-letter">B</span> Pilihan B *</label>
+                        <input type="text" name="opt_b" id="formOptB" class="bank-input" placeholder="Pilihan jawaban B" required>
                     </div>
                     <div>
-                        <label style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Opsi C:</label>
-                        <input type="text" name="opt_c" id="formOptC" class="form-control">
+                        <label class="bank-option-label"><span class="bank-letter">C</span> Pilihan C</label>
+                        <input type="text" name="opt_c" id="formOptC" class="bank-input" placeholder="Pilihan jawaban C">
                     </div>
                     <div>
-                        <label style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Opsi D:</label>
-                        <input type="text" name="opt_d" id="formOptD" class="form-control">
+                        <label class="bank-option-label"><span class="bank-letter">D</span> Pilihan D</label>
+                        <input type="text" name="opt_d" id="formOptD" class="bank-input" placeholder="Pilihan jawaban D">
                     </div>
-                    <div style="grid-column:1 / -1;">
-                        <label style="font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Opsi E:</label>
-                        <input type="text" name="opt_e" id="formOptE" class="form-control">
+                    <div style="grid-column: 1 / -1;">
+                        <label class="bank-option-label"><span class="bank-letter">E</span> Pilihan E</label>
+                        <input type="text" name="opt_e" id="formOptE" class="bank-input" placeholder="Pilihan jawaban E">
                     </div>
                 </div>
 
-                <div style="margin-bottom:20px;">
-                    <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Kunci Jawaban Benar:</label>
-                    <select name="correct_answer" id="formCorrectAnswer" class="form-control" required style="font-weight:700;">
+                <div class="bank-field" style="margin-top:16px;">
+                    <label class="bank-label">Kunci Jawaban Benar:</label>
+                    <select name="correct_answer" id="formCorrectAnswer" class="bank-input" required style="font-weight:800; max-width:200px;">
                         <option value="A">A</option>
                         <option value="B">B</option>
                         <option value="C">C</option>
@@ -430,140 +792,213 @@ include __DIR__ . '/../includes/header.php';
                         <option value="E">E</option>
                     </select>
                 </div>
+            </div>
+            <div class="bank-modal-foot">
+                <button type="button" class="bank-button" onclick="closeQuestionModal();">Batal</button>
+                <button type="submit" class="bank-button primary">💾 Simpan Butir Soal</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-                <div style="display:flex; justify-content:flex-end; gap:10px;">
-                    <button type="button" onclick="closeModal();" class="btn btn-secondary">Batal</button>
-                    <button type="submit" class="btn btn-primary">💾 Simpan Butir Soal</button>
-                </div>
-            </form>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL REVIEW LEMBAR JAWABAN PESERTA
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="reviewModalBackdrop">
+    <div class="bank-modal large" style="max-width:860px;">
+        <div class="bank-modal-head" style="background:#f0fdf4;">
+            <div>
+                <h3 id="reviewModalTitle" style="color:#166534;">👁️ Lembar Jawaban Peserta CBT</h3>
+                <div id="reviewModalMeta" style="font-size:12px; color:#475569; margin-top:2px;">Memuat rincian ujian...</div>
+            </div>
+            <button type="button" class="bank-modal-close" onclick="closeReviewModal();">✕</button>
+        </div>
+        <div class="bank-modal-body" id="reviewModalContent" style="padding:20px; max-height:75vh; overflow-y:auto;">
+            <div style="text-align:center; padding:30px; color:#64748b;">Memuat data butir soal...</div>
+        </div>
+        <div class="bank-modal-foot">
+            <button type="button" class="bank-button" onclick="closeReviewModal();">Tutup</button>
         </div>
     </div>
+</div>
 
-    <script>
-    function filterQuestions(cat) {
-        const rows = document.querySelectorAll('.question-row');
-        rows.forEach(r => {
-            if (!cat || r.getAttribute('data-category') === cat) {
-                r.style.display = '';
-            } else {
-                r.style.display = 'none';
+<script>
+// Filter Bank Soal
+function filterQuestions() {
+    const cat = document.getElementById('filterCategory') ? document.getElementById('filterCategory').value : '';
+    const q = document.getElementById('searchQuestion') ? document.getElementById('searchQuestion').value.toLowerCase().trim() : '';
+    const rows = document.querySelectorAll('.question-row');
+
+    rows.forEach(r => {
+        const rowCat = r.getAttribute('data-category') || '';
+        const rowText = r.getAttribute('data-text') || '';
+        const matchCat = (!cat || rowCat === cat);
+        const matchQ = (!q || rowText.includes(q));
+        r.style.display = (matchCat && matchQ) ? '' : 'none';
+    });
+}
+
+// Filter Riwayat Attempt
+function filterAttempts() {
+    const search = document.getElementById('searchAttempt') ? document.getElementById('searchAttempt').value.toLowerCase().trim() : '';
+    const pass = document.getElementById('filterPassStatus') ? document.getElementById('filterPassStatus').value : '';
+    const grp = document.getElementById('filterClassGroup') ? document.getElementById('filterClassGroup').value : '';
+    const rows = document.querySelectorAll('.attempt-row');
+
+    rows.forEach(r => {
+        const s = r.getAttribute('data-search') || '';
+        const p = r.getAttribute('data-pass') || '';
+        const g = r.getAttribute('data-group') || '';
+
+        const matchS = (!search || s.includes(search));
+        const matchP = (!pass || p === pass);
+        const matchG = (!grp || g === grp);
+
+        r.style.display = (matchS && matchP && matchG) ? '' : 'none';
+    });
+}
+
+// Modal Tambah & Edit Soal
+function openAddModal() {
+    document.getElementById('modalTitle').textContent = '➕ Tambah Butir Soal Baru';
+    document.getElementById('formQuestionId').value = '0';
+    document.getElementById('formCategory').value = 'Sholat Wajib';
+    document.getElementById('formQuestionText').value = '';
+    document.getElementById('formOptA').value = '';
+    document.getElementById('formOptB').value = '';
+    document.getElementById('formOptC').value = '';
+    document.getElementById('formOptD').value = '';
+    document.getElementById('formOptE').value = '';
+    document.getElementById('formCorrectAnswer').value = 'A';
+    document.getElementById('questionModalBackdrop').classList.add('open');
+}
+
+function openEditModal(q) {
+    document.getElementById('modalTitle').textContent = '✏️ Edit Butir Soal (' + (q.code || 'ID: ' + q.id) + ')';
+    document.getElementById('formQuestionId').value = q.id;
+    document.getElementById('formCategory').value = q.category || '';
+    document.getElementById('formQuestionText').value = q.question_text || '';
+    let opts = [];
+    try {
+        opts = JSON.parse(q.options_json) || [];
+    } catch(e) {}
+    document.getElementById('formOptA').value = opts[0] || '';
+    document.getElementById('formOptB').value = opts[1] || '';
+    document.getElementById('formOptC').value = opts[2] || '';
+    document.getElementById('formOptD').value = opts[3] || '';
+    document.getElementById('formOptE').value = opts[4] || '';
+    document.getElementById('formCorrectAnswer').value = q.correct_answer || 'A';
+    document.getElementById('questionModalBackdrop').classList.add('open');
+}
+
+function closeQuestionModal() {
+    document.getElementById('questionModalBackdrop').classList.remove('open');
+}
+
+// Generator Token Acak
+function generateRandomToken() {
+    fetch('?ajax=generate_token')
+        .then(r => r.json())
+        .then(data => {
+            if (data.token) {
+                document.getElementById('sessionTokenInput').value = data.token;
             }
+        })
+        .catch(() => {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let t = '';
+            for (let i = 0; i < 6; i++) t += chars.charAt(Math.floor(Math.random() * chars.length));
+            document.getElementById('sessionTokenInput').value = t;
         });
-    }
+}
 
-    function openAddModal() {
-        document.getElementById('modalTitle').textContent = '➕ Tambah Butir Soal Baru';
-        document.getElementById('formQuestionId').value = '0';
-        document.getElementById('formCategory').value = 'Sholat Wajib';
-        document.getElementById('formQuestionText').value = '';
-        document.getElementById('formOptA').value = '';
-        document.getElementById('formOptB').value = '';
-        document.getElementById('formOptC').value = '';
-        document.getElementById('formOptD').value = '';
-        document.getElementById('formOptE').value = '';
-        document.getElementById('formCorrectAnswer').value = 'A';
-        const modal = document.getElementById('questionModal');
-        modal.style.display = 'flex';
-    }
+function copyTokenToClipboard() {
+    const el = document.getElementById('sessionTokenInput');
+    if (!el) return;
+    el.select();
+    navigator.clipboard.writeText(el.value).then(() => {
+        alert('Token ' + el.value + ' berhasil disalin ke clipboard!');
+    });
+}
 
-    function openEditModal(q) {
-        document.getElementById('modalTitle').textContent = '✏️ Edit Butir Soal';
-        document.getElementById('formQuestionId').value = q.id;
-        document.getElementById('formCategory').value = q.category || '';
-        document.getElementById('formQuestionText').value = q.question_text || '';
-        let opts = [];
-        try {
-            opts = JSON.parse(q.options_json) || [];
-        } catch(e) {}
-        document.getElementById('formOptA').value = opts[0] || '';
-        document.getElementById('formOptB').value = opts[1] || '';
-        document.getElementById('formOptC').value = opts[2] || '';
-        document.getElementById('formOptD').value = opts[3] || '';
-        document.getElementById('formOptE').value = opts[4] || '';
-        document.getElementById('formCorrectAnswer').value = q.correct_answer || 'A';
-        const modal = document.getElementById('questionModal');
-        modal.style.display = 'flex';
-    }
+// Modal Review Lembar Jawaban
+function openReviewModal(attemptId) {
+    const backdrop = document.getElementById('reviewModalBackdrop');
+    const content = document.getElementById('reviewModalContent');
+    const meta = document.getElementById('reviewModalMeta');
 
-    function closeModal() {
-        document.getElementById('questionModal').style.display = 'none';
-    }
-    </script>
+    backdrop.classList.add('open');
+    content.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">Memuat data lembar jawaban...</div>';
 
-<?php elseif ($activeTab === 'attempts'): ?>
-    <!-- TAB 3: RIWAYAT ATTEMPT & RESET -->
-    <div class="card" style="box-shadow:var(--shadow); border-radius:12px; overflow:hidden;">
-        <div class="card-header" style="background:#f8fafc; font-weight:700; color:var(--text-dark); display:flex; justify-content:space-between; align-items:center;">
-            <span>📊 Riwayat Pengerjaan CBT Peserta Tutorial RPL</span>
-            <small style="color:#64748b;">Total: <?= count($attempts) ?> Attempt</small>
-        </div>
-        <div class="card-body" style="padding:0;">
-            <?php if (empty($attempts)): ?>
-                <div style="text-align:center; padding:40px 20px; color:#64748b;">
-                    <div style="font-size:36px; margin-bottom:8px;">📝</div>
-                    <h4 style="margin:0 0 4px 0; color:#334155;">Belum Ada Riwayat Ujian</h4>
-                    <p style="margin:0; font-size:13.5px;">Peserta yang telah mengumpulkan lembar jawaban CBT tutorial akan otomatis tercatat di sini.</p>
-                </div>
-            <?php else: ?>
-                <div class="table-responsive">
-                    <table class="table" style="margin:0; width:100%;">
-                        <thead>
-                            <tr style="background:#f1f5f9; text-align:left; font-size:12.5px; color:#475569;">
-                                <th style="padding:12px 16px; width:40px;">No</th>
-                                <th style="padding:12px 16px;">Mahasiswa</th>
-                                <th style="padding:12px 16px;">Kelompok / Tutor</th>
-                                <th style="padding:12px 16px; text-align:center;">Skor Benar</th>
-                                <th style="padding:12px 16px; text-align:center;">Nilai CBT</th>
-                                <th style="padding:12px 16px; text-align:center;">Waktu Kumpul</th>
-                                <th style="padding:12px 16px; text-align:center;">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($attempts as $idx => $a):
-                                $score = (float)($a['score'] ?? 0);
-                                $isPass = ($score >= (float)($session['passing_grade'] ?? 80.0));
-                            ?>
-                                <tr style="border-bottom:1px solid #e2e8f0; font-size:13.5px;">
-                                    <td style="padding:14px 16px; color:#64748b; vertical-align:middle;"><?= $idx + 1 ?></td>
-                                    <td style="padding:14px 16px; vertical-align:middle;">
-                                        <div style="font-weight:700; color:#0f172a;"><?= sanitize($a['nama_lengkap']) ?></div>
-                                        <small style="color:#64748b;">NIM: <?= sanitize($a['nim'] ?: '-') ?> · <?= sanitize($a['program_studi'] ?: '') ?></small>
-                                    </td>
-                                    <td style="padding:14px 16px; vertical-align:middle;">
-                                        <div style="font-weight:600; color:#0369a1;"><?= sanitize($a['nama_kelompok']) ?></div>
-                                        <small style="color:#64748b;">👨‍🏫 <?= sanitize($a['dosen_nama'] ?: '-') ?></small>
-                                    </td>
-                                    <td style="padding:14px 16px; text-align:center; vertical-align:middle;">
-                                        <span class="badge badge-secondary" style="font-size:12px;">
-                                            <?= (int)($a['correct_count'] ?? 0) ?> / <?= (int)($a['total_questions'] ?? 25) ?> Soal
-                                        </span>
-                                    </td>
-                                    <td style="padding:14px 16px; text-align:center; vertical-align:middle;">
-                                        <strong style="color:<?= $isPass ? '#15803d' : '#b91c1c' ?>; font-size:16px;">
-                                            <?= $score ?>
-                                        </strong>
-                                    </td>
-                                    <td style="padding:14px 16px; text-align:center; vertical-align:middle; color:#64748b; font-size:12.5px;">
-                                        <?= !empty($a['submitted_at']) ? date('d M Y, H:i', (int)$a['submitted_at']) . ' WIB' : '-' ?>
-                                    </td>
-                                    <td style="padding:14px 16px; text-align:center; vertical-align:middle;">
-                                        <form method="POST" style="margin:0;" onsubmit="return confirm('Apakah Anda yakin ingin me-reset attempt ujian peserta ini? Nilai CBT tutorial mahasiswa akan dihapus dan mahasiswa diizinkan mengerjakan ulang.');">
-                                            <input type="hidden" name="action" value="reset_attempt">
-                                            <input type="hidden" name="user_id" value="<?= (int)$a['user_id'] ?>">
-                                            <input type="hidden" name="class_id" value="<?= (int)$a['class_id'] ?>">
-                                            <button type="submit" class="btn btn-warning btn-sm" style="display:inline-flex; align-items:center; gap:4px; font-weight:700;">
-                                                <span>🔄</span> Izin Ulang
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-<?php endif; ?>
+    fetch('?ajax=review_attempt&id=' + attemptId)
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success) {
+                content.innerHTML = '<div class="bank-notice error">' + (res.message || 'Gagal memuat.') + '</div>';
+                return;
+            }
+            const att = res.attempt;
+            const items = res.items;
+
+            meta.innerHTML = `<strong>${att.nama_lengkap}</strong> (${att.nim || '-'}) · Kelompok: <strong>${att.nama_kelompok || '-'}</strong> · Nilai: <strong style="font-size:14px; color:${att.score >= 70 ? '#15803d' : '#b91c1c'};">${att.score}</strong> (${att.correct_count || 0}/${att.total_questions || items.length} Benar)`;
+
+            let html = '<div style="display:flex; flex-direction:column; gap:16px;">';
+            items.forEach((it, idx) => {
+                const isCorrect = it.is_correct;
+                const studentAns = it.student_answer || '-';
+                const correctAns = it.correct_answer;
+                const statusBadge = isCorrect
+                    ? '<span class="bank-badge active">✓ BENAR</span>'
+                    : '<span class="bank-badge danger-sm" style="background:#fee2e2; color:#b91c1c;">✗ SALAH</span>';
+
+                html += `
+                    <div style="border:1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}; border-radius:10px; padding:14px; background:${isCorrect ? '#f0fdf4' : '#fef2f2'};">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span style="font-weight:700; font-size:13px; color:#0f172a;">No. ${it.position} [${it.category}]</span>
+                            <div>${statusBadge}</div>
+                        </div>
+                        <div style="font-size:13.5px; font-weight:600; color:#1e293b; margin-bottom:10px; line-height:1.5;">
+                            ${it.question_text.replace(/\n/g, '<br>')}
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; font-size:12px;">
+                `;
+
+                const letters = ['A', 'B', 'C', 'D', 'E'];
+                letters.forEach((l, lIdx) => {
+                    const optText = it.options[lIdx] || '';
+                    if (!optText) return;
+                    let optStyle = 'padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; background:#ffffff; color:#334155;';
+                    if (l === correctAns) {
+                        optStyle = 'padding:6px 10px; border-radius:6px; border:1.5px solid #16a34a; background:#dcfce7; color:#14532d; font-weight:700;';
+                    }
+                    if (l === studentAns && l !== correctAns) {
+                        optStyle = 'padding:6px 10px; border-radius:6px; border:1.5px solid #dc2626; background:#fee2e2; color:#991b1b; font-weight:700;';
+                    }
+                    html += `
+                        <div style="${optStyle}">
+                            <strong>${l}.</strong> ${optText}
+                            ${l === correctAns ? ' <span style="color:#15803d;">(Kunci)</span>' : ''}
+                            ${l === studentAns ? ' <span style="color:${isCorrect ? '#15803d' : '#b91c1c'}; font-weight:800;">[Pilihan Mahasiswa]</span>' : ''}
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+        })
+        .catch(err => {
+            content.innerHTML = '<div class="bank-notice error">Error memuat data: ' + err.message + '</div>';
+        });
+}
+
+function closeReviewModal() {
+    document.getElementById('reviewModalBackdrop').classList.remove('open');
+}
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

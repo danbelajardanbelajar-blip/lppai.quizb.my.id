@@ -1,3 +1,50 @@
+## 2026-11-24 16:00:00 +0700 — Penyelarasan Paritas Penuh CBT Ujian Tulis Tutorial RPL dengan CBT Pretes (Sisi Admin & Sisi Mahasiswa)
+
+**ID:** TUTORIAL-RPL-CBT-PARITY-ADMIN-MAHASISWA · **Parent Git:** `5db5e86`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk meniru CBT Tutorial RPL (`admin/tutorial-rpl-cbt.php` dan `pages/tutorial-rpl-cbt.php`) agar sama dan berparitas penuh dengan CBT Pretes (`admin/pretes-bank-soal.php` yang dimuat via `pretes-ujian.php?cbt_bank=1` dan ruang ujian `pages/pretes-ujian.php` / `includes/pretes-cbt-view.php`):
+1. **Sisi Admin (`admin/tutorial-rpl-cbt.php`)**:
+   - Menyelaraskan arsitektur panel admin ke 4 tab modern: Tab 1 (Bank Soal), Tab 2 (Sesi Ujian 90 Menit & Passing Grade 70.00), Tab 3 (Impor Excel .xlsx), Tab 4 (Monitoring Real-Time & Hasil Ujian).
+   - Menambahkan 4 metric cards di bagian atas: Status Gerbang & Token CBT, Bank Soal Aktif & Kategori, Durasi (90 Menit) & Passing Grade (70.00), serta Peserta Selesai CBT & Rata-rata Nilai.
+   - Fitur Bank Soal: Filter kategori materi, pencarian teks butir soal, modal interaktif tambah/edit butir soal (opsi A–E dan kunci jawaban), hapus soal, reset default kurikulum LPPAI, unduh bank soal (.xlsx), dan unduh template (.xlsx).
+   - Fitur Sesi Ujian: Form konfigurasi sesi 90 menit, passing grade 70.00, token masuk ujian dengan generator token acak (`🎲 Acak`) dan tombol salin clipboard (`📋 Salin`), serta sakelar toggle live buka/tutup pengerjaan ujian.
+   - Fitur Impor Excel: Unggah berkas `.xlsx` dengan template standar LPPAI melalui `cbtReadQuestionXlsx()`, opsi centang *Update Existing* (jika kode soal sudah ada), dan panduan susunan kolom A–I.
+   - Fitur Hasil & Monitoring: Filter pencarian (Nama Mahasiswa / NIM), filter status kelulusan (Semua, Lulus $\ge 70$, Belum Memenuhi $< 70$), filter kelompok RPL, tabel riwayat ujian lengkap dengan waktu mulai/selesai WIB, skor benar/salah, nilai CBT, badge status kelulusan, modal interaktif *Review Lembar Jawaban* per nomor (menampilkan opsi dipilih mahasiswa vs kunci jawaban), tombol *Reset Attempt* yang aman, dan tombol ekspor hasil ujian ke Excel (.xlsx).
+2. **Sisi Mahasiswa (`pages/tutorial-rpl-cbt.php` / URL `tutorial-rpl-cbt.php`)**:
+   - Menyelaraskan alur pengerjaan dengan CBT engine interaktif modern 2 kolom (`pretes-cbt-view.php` / `pretes-cbt-exam.css`):
+   - Layar Intro: Info sesi ujian (durasi 90 menit server, passing grade 70.00), petunjuk resmi, verifikasi token (default `TUTOR26`), dan tombol mulai pengerjaan.
+   - Ruang Ujian Interaktif 2 Kolom:
+     - Header bar sticky dengan countdown timer 90 menit tersinkronisasi server (`deadline_at`), info kelompok, dan bar progres butir soal terjawab secara visual.
+     - Kolom Kiri: Nomor posisi soal, badge kategori, teks pertanyaan berformat nyaman, pilihan kartu interaktif A–E yang dapat diklik seluruh areanya dengan highlight terpilih, checkbox bendera ragu-ragu (*Tandai untuk diperiksa kembali*), dan tombol navigasi *Sebelumnya*, *Berikutnya*, serta *Kosongkan Jawaban*.
+     - Kolom Kanan (Sidebar Navigasi): Grid nomor soal interaktif (abu-abu: belum dijawab, hijau: sudah dijawab, kuning: ragu-ragu, border tebal: soal aktif), keterangan legenda warna, dan tombol tebal *Kumpulkan Ujian*.
+     - Auto-save real-time: Setiap kali mahasiswa mengklik opsi pilihan jawaban atau mengubah status ragu-ragu, jawaban otomatis terkirim dan tersimpan aman di server via AJAX tanpa reload halaman.
+     - Dialog konfirmasi modal sebelum submit akhir yang menampilkan ringkasan terjawab, ragu-ragu, dan belum dijawab.
+     - Auto-submit otomatis jika waktu hitung mundur 90 menit habis.
+   - Layar Hasil Akhir (Scorecard): Kartu elegan nilai akhir CBT, badge kelulusan resmi (LULUS $\ge 70.00$ atau BELUM MEMENUHI STANDAR), rincian soal benar/total, dan otomatis tersinkronisasi ke nilai tutorial RPL (`tutorial_rpl_members.nilai_ujian_tulis`) serta penghitungan nilai akhir kelompok.
+3. **Penyempurnaan Backend & Skema Basis Data (`includes/tutorial-rpl-helper.php`)**:
+   - Menambahkan tabel `tutorial_rpl_cbt_items` untuk menyimpan state butir soal, jawaban mahasiswa, dan flag ragu-ragu per attempt secara presisi.
+   - Menambahkan kolom `deadline_at` pada tabel `tutorial_rpl_cbt_attempts`.
+   - Menambahkan fungsi helper: `tutorialRplCbtGetOrCreateAttempt()`, `tutorialRplCbtGetAttempt()`, `tutorialRplCbtGetStudentAttempt()`, `tutorialRplCbtGetAttemptItems()`, `tutorialRplCbtSaveAnswer()`, `tutorialRplCbtSaveFlag()`, `tutorialRplCbtFinishAttempt()`, `tutorialRplCbtGetQuestion()`, `tutorialRplCbtImportQuestions()`, `tutorialRplCbtExportQuestions()`, dan `tutorialRplCbtExportResults()`.
+   - Memperbarui `tutorialRplCbtResetAttempt()` agar membersihkan attempt beserta item lembar jawabannya sekaligus.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 15:50:58 | `includes/tutorial-rpl-helper.php` | 967-1002, 1272-1678 | Skema `tutorial_rpl_cbt_items`, kolom `deadline_at`, fungsi attempt, auto-save jawaban/flag, scoring, reset, impor XLSX, dan ekspor. |
+| 2026-11-24 15:53:18 | `admin/tutorial-rpl-cbt.php` | 1-720 | Antarmuka panel admin modern 4 tab (Bank Soal, Sesi Ujian, Impor Excel, Hasil & Monitoring), modal add/edit question, review attempt, token generator. |
+| 2026-11-24 15:54:53 | `pages/tutorial-rpl-cbt.php` | 1-620 | Modern CBT engine 2 kolom mahasiswa: countdown timer 90 menit, option cards A-E, auto-save AJAX, sidebar grid nomor, modal submit konfirmasi, scorecard. |
+| 2026-11-24 15:56:01 | `tests/tutorial-rpl-cbt-parity-test.php` | 1-240 | Test suite otomatis paritas CBT Tutorial RPL admin & mahasiswa (skema 4 tabel, sesi 90m, auto-save, finishing, reset, import/export, UI check). |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada seluruh berkas yang dimodifikasi dan dibuat (`includes/tutorial-rpl-helper.php`, `admin/tutorial-rpl-cbt.php`, `pages/tutorial-rpl-cbt.php`, `tests/tutorial-rpl-cbt-parity-test.php`) lulus 100% tanpa error sintaks.
+- `git diff --check` bersih tanpa konflik atau whitespace issues.
+- Test suite baru `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% PASS (seluruh 9 bagian pengujian sukses).
+- Seluruh rangkaian test pendukung Tutorial RPL (`tutorial-rpl-cbt-nilai-test.php`, `tutorial-rpl-student-hub-test.php`, `tutorial-rpl-structure-test.php`, `tutorial-rpl-student-status-test.php`) lulus 100% PASS tanpa regresi.
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+
 ## 2026-11-24 14:00:00 +0700 — Implementasi Pemetaan Nilai Pretes CBT Mahasiswa RPL Berbasis Kategori Soal (Muslim & Non-Muslim) ke Hasil Pretes, Kelola Nilai (Sertifikat), dan Sertifikat Adaptif
 
 **ID:** PRETES-RPL-CATEGORY-MAPPING-SYNC-KELOLA-NILAI · **Parent Git:** `479a3cb`.
