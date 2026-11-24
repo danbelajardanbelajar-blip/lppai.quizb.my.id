@@ -25,8 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_session') {
         $title = trim($_POST['title'] ?? '');
-        $duration = (int)($_POST['duration_minutes'] ?? 30);
-        $passingGrade = (float)($_POST['passing_grade'] ?? 80.0);
+        $duration = (int)($_POST['duration_minutes'] ?? 90);
+        $passingGrade = (float)($_POST['passing_grade'] ?? 70.0);
         $token = strtoupper(trim($_POST['token'] ?? 'TUTOR26'));
         $examOpen = isset($_POST['exam_open']) ? 1 : 0;
 
@@ -246,15 +246,15 @@ include __DIR__ . '/../includes/header.php';
                         <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
                             Durasi Pengerjaan (Menit):
                         </label>
-                        <input type="number" name="duration_minutes" class="form-control" value="<?= (int)($session['duration_minutes'] ?? 30) ?>" min="5" max="180" required>
-                        <small style="color:#64748b;">Timer hitung mundur otomatis di browser mahasiswa.</small>
+                        <input type="number" name="duration_minutes" class="form-control" value="<?= (int)($session['duration_minutes'] ?? 90) ?>" min="5" max="180" required>
+                        <small style="color:#64748b;">Timer hitung mundur otomatis di browser mahasiswa (Standar: 90 Menit).</small>
                     </div>
                     <div>
                         <label style="font-size:13.5px; font-weight:600; color:#334155; margin-bottom:6px; display:block;">
                             Passing Grade (Batas Kelulusan):
                         </label>
-                        <input type="number" step="0.1" name="passing_grade" class="form-control" value="<?= (float)($session['passing_grade'] ?? 80.0) ?>" min="0" max="100" required>
-                        <small style="color:#64748b;">Standar kelulusan LPPAI (Rekomendasi: 80.00).</small>
+                        <input type="number" step="0.1" name="passing_grade" class="form-control" value="<?= (float)($session['passing_grade'] ?? 70.0) ?>" min="0" max="100" required>
+                        <small style="color:#64748b;">Standar kelulusan LPPAI (Rekomendasi: 70.00).</small>
                     </div>
                 </div>
 

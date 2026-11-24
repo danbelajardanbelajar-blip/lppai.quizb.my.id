@@ -1,3 +1,40 @@
+## 2026-11-24 09:05:14 +0700 — Penyesuaian Durasi CBT Menjadi 90 Menit dan Perbaikan Tombol Konfirmasi Unggah Tugas Drive agar Teks Terbaca Penuh
+
+**ID:** TUTORIAL-RPL-CBT-90MIN-AND-CONFIRM-BUTTON-FIX · **Parent Git:** `34dc22a`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk melakukan perbaikan pada halaman `tutorial-rpl.php`: (1) CBT Tutorial RPL diberi alokasi waktu 90 menit (sebelumnya default 30 menit), dan (2) Memperbaiki tombol konfirmasi unggah tugas ke Google Drive yang sebelumnya terpotong teksnya di sisi kiri-kanan pada resolusi kartu sempit agar mahasiswa dapat membacanya dengan jelas dan utuh.
+
+**Perubahan dan alasan:**
+1. **Penetapan Durasi CBT 90 Menit (`includes/tutorial-rpl-helper.php` & `admin/tutorial-rpl-cbt.php`):**
+   - Mengubah skema default `duration_minutes` pada tabel `tutorial_rpl_cbt_sessions` dari 30 menjadi 90 menit serta passing grade kelulusan menjadi 70.00.
+   - Menambahkan migrasi otomatis pada `ensureTutorialRplCbtTables()` untuk memperbarui sesi aktif yang masih berdurasi 30 menit menjadi 90 menit.
+   - Memperbarui form dan nilai default pada panel admin CBT (`admin/tutorial-rpl-cbt.php`) menjadi 90 menit.
+   - Memperbarui label durasi pada kartu Opsi A (`pages/tutorial-rpl.php`) menjadi 90 menit.
+2. **Perbaikan Tampilan & Keterbacaan Tombol Konfirmasi Tugas (`pages/tutorial-rpl.php`):**
+   - Mengatasi masalah CSS `white-space: nowrap` bawaan class `.btn` / `.btn-sm` yang menyebabkan teks panjang `✓ Konfirmasi Saya Sudah Mengunggah Tugas ke Drive` terpotong di kiri dan kanan pada kotak sempit kartu Opsi C.
+   - Menetapkan inline style eksplisit: `white-space: normal !important; word-wrap: break-word; line-height: 1.4; height: auto !important; padding: 10px 14px; font-size: 12.5px; text-align: center; border-radius: 8px; box-sizing: border-box;` agar teks membungkus rapi ke dua baris secara proporsional tanpa ada huruf yang terpotong.
+   - Memperbarui juga tombol Google Drive dan tombol-tombol pada Opsi A dan Opsi B dengan style wrapping responsif serupa agar tidak mengalami pemotongan teks pada berbagai ukuran layar.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 09:04:14 | `includes/tutorial-rpl-helper.php` | 944-1045 | Default durasi CBT 90 menit, passing grade 70.00, migrasi otomatis sesi lama 30 mnt -> 90 mnt, dan fallback helper. |
+| 2026-11-24 09:04:28 | `admin/tutorial-rpl-cbt.php` | 27-40, 245-260 | Form dan parameter update durasi default 90 menit dan passing grade 70.00 pada admin CBT RPL. |
+| 2026-11-24 09:05:14 | `pages/tutorial-rpl.php` | 280-380 | Label durasi CBT 90 menit dan perbaikan CSS wrapping tombol konfirmasi tugas Drive (Opsi C) & tombol Opsi A-B. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `pages/tutorial-rpl.php`, `admin/tutorial-rpl-cbt.php`, dan `includes/tutorial-rpl-helper.php` lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Seluruh 13 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa kegagalan.
+- Pengujian regresi alur pretes RPL dan periode hasil pretes (`tests/pretes-rpl-flow-test.php`, `tests/pretes-hasil-active-period-test.php`) lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
+---
+
 ## 2026-11-24 08:57:33 +0700 — Penyelarasan Total Tampilan Mahasiswa RPL: Pembersihan Menu Pendaftaran di Sidebar dan Penggantian Layout Kaku dengan Panel 3 Opsi Pilihan Bebas
 
 **ID:** TUTORIAL-RPL-SIDEBAR-CLEANUP-AND-UNIFIED-3-OPTIONS-VIEW · **Parent Git:** `9dd7ea5`.

@@ -279,22 +279,22 @@ include __DIR__ . '/../includes/header.php';
                                         </div>
                                     <?php else: ?>
                                         <div style="font-size:12px; color:#64748b; margin-bottom:12px;">
-                                            Durasi: <?= (int)($sessionCbt['duration_minutes'] ?? 30) ?> Menit · Syarat Kelulusan: Nilai ≥ 70.0
+                                            Durasi: <?= (int)($sessionCbt['duration_minutes'] ?? 90) ?> Menit · Syarat Kelulusan: Nilai ≥ 70.0
                                         </div>
                                     <?php endif; ?>
                                 </div>
 
                                 <div style="margin-top:12px;">
                                     <?php if (!empty($membership['exam_submitted'])): ?>
-                                        <a href="<?= BASE_URL ?>/tutorial-rpl-cbt.php" class="btn btn-secondary btn-sm" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-block; text-decoration:none;">
+                                        <a href="<?= BASE_URL ?>/tutorial-rpl-cbt.php" class="btn btn-secondary btn-sm" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-block; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
                                             📊 Lihat Lembar Nilai CBT
                                         </a>
                                     <?php elseif (!empty($sessionCbt['exam_open'])): ?>
-                                        <a href="<?= BASE_URL ?>/tutorial-rpl-cbt.php" class="btn btn-primary" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;">
+                                        <a href="<?= BASE_URL ?>/tutorial-rpl-cbt.php" class="btn btn-primary" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
                                             <span>🚀</span> Masuk Pengerjaan CBT ↗
                                         </a>
                                     <?php else: ?>
-                                        <span class="badge badge-secondary" style="display:block; text-align:center; padding:8px; font-size:12px;">🔒 Gerbang CBT Sedang Ditutup</span>
+                                        <span class="badge badge-secondary" style="display:block; text-align:center; padding:10px; font-size:12px; white-space:normal !important; line-height:1.4; border-radius:8px;">🔒 Gerbang CBT Sedang Ditutup</span>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -320,11 +320,11 @@ include __DIR__ . '/../includes/header.php';
 
                                 <div style="margin-top:12px;">
                                     <?php if (!empty($membership['dosen_wa'])): ?>
-                                        <a href="https://wa.me/<?= preg_replace('/\D/', '', $membership['dosen_wa']) ?>?text=<?= rawurlencode('Assalamu\'alaikum Bapak/Ibu Dosen ' . ($membership['dosen_nama'] ?? '') . ', saya mahasiswa RPL ' . ($actor['nama_lengkap'] ?? '') . ' (NIM: ' . ($actor['nim'] ?? '') . ') ingin berkonsultasi mengenai jadwal ujian tatap muka 6 poin tugas ibadah Tutorial RPL.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;">
+                                        <a href="https://wa.me/<?= preg_replace('/\D/', '', $membership['dosen_wa']) ?>?text=<?= rawurlencode('Assalamu\'alaikum Bapak/Ibu Dosen ' . ($membership['dosen_nama'] ?? '') . ', saya mahasiswa RPL ' . ($actor['nama_lengkap'] ?? '') . ' (NIM: ' . ($actor['nim'] ?? '') . ') ingin berkonsultasi mengenai jadwal ujian tatap muka 6 poin tugas ibadah Tutorial RPL.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
                                             <span>💬</span> Chat WhatsApp Dosen
                                         </a>
                                     <?php else: ?>
-                                        <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:9px;">
+                                        <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:10px 14px; white-space:normal !important; line-height:1.4; height:auto !important; text-align:center; box-sizing:border-box; border-radius:8px;">
                                             Kontak Dosen Belum Tersedia
                                         </button>
                                     <?php endif; ?>
@@ -354,11 +354,11 @@ include __DIR__ . '/../includes/header.php';
 
                                 <div style="margin-top:12px; display:flex; flex-direction:column; gap:8px;">
                                     <?php if (!empty($membership['drive_url'])): ?>
-                                        <a href="<?= $escape($membership['drive_url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;">
+                                        <a href="<?= $escape($membership['drive_url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
                                             <span>📁</span> Buka Folder Drive Kelas ↗
                                         </a>
                                     <?php else: ?>
-                                        <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:9px;">
+                                        <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:10px 14px; white-space:normal !important; line-height:1.4; height:auto !important; text-align:center; box-sizing:border-box; border-radius:8px;">
                                             Folder Drive Sedang Disiapkan
                                         </button>
                                     <?php endif; ?>
@@ -367,7 +367,7 @@ include __DIR__ . '/../includes/header.php';
                                         <form method="POST" style="margin:0;">
                                             <input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>">
                                             <input type="hidden" name="action" value="confirm_drive">
-                                            <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Pastikan Anda telah mengunggah video rekaman 6 poin tugas ke folder Google Drive kelompok sebelum konfirmasi. Lanjutkan?');" style="width:100%; font-weight:700; padding:8px;">
+                                            <button type="submit" class="btn btn-success" onclick="return confirm('Pastikan Anda telah mengunggah video rekaman 6 poin tugas ke folder Google Drive kelompok sebelum konfirmasi. Lanjutkan?');" style="width:100%; font-weight:700; font-size:12.5px; padding:10px 14px; white-space:normal !important; word-wrap:break-word; word-break:normal; line-height:1.4; height:auto !important; text-align:center; box-sizing:border-box; border-radius:8px; display:block; cursor:pointer;">
                                                 ✓ Konfirmasi Saya Sudah Mengunggah Tugas ke Drive
                                             </button>
                                         </form>

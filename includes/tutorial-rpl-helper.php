@@ -945,8 +945,8 @@ if (!function_exists('ensureTutorialRplCbtTables')) {
             id $idType,
             code VARCHAR(64) NOT NULL UNIQUE,
             title VARCHAR(150) NOT NULL,
-            duration_minutes INT NOT NULL DEFAULT 30,
-            passing_grade DECIMAL(5,2) NOT NULL DEFAULT 80.00,
+            duration_minutes INT NOT NULL DEFAULT 90,
+            passing_grade DECIMAL(5,2) NOT NULL DEFAULT 70.00,
             token VARCHAR(32) DEFAULT 'TUTOR26',
             exam_open INT NOT NULL DEFAULT 1,
             is_active INT NOT NULL DEFAULT 1,
@@ -977,13 +977,19 @@ if (!function_exists('ensureTutorialRplCbtTables')) {
             UNIQUE(user_id, class_id)
         )$engine");
 
-        // Pastikan sesi default tersedia
+        // Pastikan sesi default tersedia dengan durasi 90 menit
         $stmt = $pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions");
         if ((int)$stmt->fetchColumn() === 0) {
             $pdo->prepare("
                 INSERT INTO tutorial_rpl_cbt_sessions (code, title, duration_minutes, passing_grade, token, exam_open, is_active)
-                VALUES ('SESI-TUTORIAL-RPL-2026', 'Ujian Tulis Tutorial RPL 2026/2027', 30, 80.00, 'TUTOR26', 1, 1)
+                VALUES ('SESI-TUTORIAL-RPL-2026', 'Ujian Tulis Tutorial RPL 2026/2027', 90, 70.00, 'TUTOR26', 1, 1)
             ")->execute();
+        } else {
+            // Update durasi sesi jika sebelumnya masih default lama 30 menit
+            try {
+                $pdo->exec("UPDATE tutorial_rpl_cbt_sessions SET duration_minutes = 90 WHERE duration_minutes = 30 OR duration_minutes IS NULL");
+                $pdo->exec("UPDATE tutorial_rpl_cbt_sessions SET passing_grade = 70.00 WHERE passing_grade = 80.00 OR passing_grade = 60.00");
+            } catch (Throwable $e) {}
         }
     }
 }
@@ -1000,8 +1006,8 @@ if (!function_exists('tutorialRplCbtGetSession')) {
                 'id' => 1,
                 'code' => 'SESI-TUTORIAL-RPL-2026',
                 'title' => 'Ujian Tulis Tutorial RPL 2026/2027',
-                'duration_minutes' => 30,
-                'passing_grade' => 80.00,
+                'duration_minutes' => 90,
+                'passing_grade' => 70.00,
                 'token' => 'TUTOR26',
                 'exam_open' => 1,
                 'is_active' => 1
@@ -1031,8 +1037,8 @@ if (!function_exists('tutorialRplCbtUpdateSession')) {
         ");
         return $stmt->execute([
             trim((string)($data['title'] ?? 'Ujian Tulis Tutorial RPL')),
-            max(5, min(180, (int)($data['duration_minutes'] ?? 30))),
-            max(0, min(100, (float)($data['passing_grade'] ?? 80.0))),
+            max(5, min(180, (int)($data['duration_minutes'] ?? 90))),
+            max(0, min(100, (float)($data['passing_grade'] ?? 70.0))),
             trim((string)($data['token'] ?? 'TUTOR26')),
             !empty($data['exam_open']) ? 1 : 0,
             $sesId
