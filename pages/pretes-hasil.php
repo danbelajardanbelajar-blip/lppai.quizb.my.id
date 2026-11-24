@@ -498,10 +498,10 @@ include __DIR__ . '/../includes/header.php';
                         <span>Bagi Mahasiswa yang Dinyatakan TIDAK LULUS Pretes:</span>
                     </h4>
                     <p style="margin:0 0 10px 0; font-size:13px; color:#4c0519; line-height:1.5;">
-                        Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial LPPAI Gelombang 1</strong>.
+                        Bagi mahasiswa yang belum memenuhi standar kelulusan pretes, tidak ada opsi remedial. Anda dapat langsung mendaftarkan diri kembali pada <strong>Pendaftaran Pretes</strong>.
                     </p>
-                    <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-sm btn-danger" style="text-decoration:none; font-weight:700;">
-                        📝 Daftar Tutorial Gelombang 1 ➔
+                    <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-sm btn-danger" style="text-decoration:none; font-weight:700;">
+                        📝 Daftar Pretes ➔
                     </a>
                 </div>
             </div>
@@ -759,23 +759,27 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
 
-                    <!-- Kotak Tindak Lanjut Pendaftaran Tutorial -->
+                    <!-- Kotak Tindak Lanjut Pendaftaran Pretes / Tutorial -->
                     <div style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:12px; padding:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
                         <div style="max-width:640px;">
                             <div style="display:inline-flex; align-items:center; gap:6px; background:#fee2e2; color:#b91c1c; font-size:11.5px; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:8px; text-transform:uppercase;">
-                                📌 Tindak Lanjut Wajib Mahasiswa
+                                📌 Tindak Lanjut Mahasiswa
                             </div>
                             <h4 style="margin:0 0 6px 0; font-size:16px; font-weight:800; color:#881337;">
-                                Pendaftaran Program Pembinaan Tutorial LPPAI Gelombang 1
+                                Pendaftaran Kembali Program Pretes LPPAI
                             </h4>
                             <p style="margin:0; font-size:13.5px; color:#4c0519; line-height:1.55;">
-                                Bagi mahasiswa yang dinyatakan tidak lulus pretes, Anda <strong>diwajibkan untuk mendaftarkan diri pada program Tutorial Gelombang 1</strong> guna mengikuti pembinaan materi agama Islam dan memenuhi syarat kelulusan sertifikasi LPPAI.
+                                Bagi mahasiswa yang dinyatakan tidak lulus pretes, tidak ada opsi remedial. Anda dipersilakan untuk langsung mendaftarkan diri kembali pada periode pretes berikutnya melalui formulir pendaftaran pretes resmi.
                             </p>
                         </div>
-                        <div>
-                            <a href="<?= sanitize($tutorialCtaUrl) ?>" class="btn btn-danger" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 22px; font-weight:700; font-size:14px; border-radius:10px; box-shadow:0 4px 14px rgba(225,29,72,0.25); white-space:nowrap;">
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                            <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-danger" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 22px; font-weight:700; font-size:14px; border-radius:10px; box-shadow:0 4px 14px rgba(225,29,72,0.25); white-space:nowrap;">
+                                <span>✍️</span>
+                                <span>Daftar Pretes Kembali ➔</span>
+                            </a>
+                            <a href="<?= sanitize($tutorialCtaUrl) ?>" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:12px 18px; font-weight:600; font-size:13.5px; border-radius:10px; white-space:nowrap;">
                                 <span>📝</span>
-                                <span>Daftar Tutorial Gelombang 1 Sekarang ➔</span>
+                                <span>Opsi Tutorial ➔</span>
                             </a>
                         </div>
                     </div>

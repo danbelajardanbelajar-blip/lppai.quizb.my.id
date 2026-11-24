@@ -21,6 +21,12 @@ try {
             if (!is_string($day) || !in_array($day, TUTORIAL_RPL_DAYS, true)) {
                 throw new DomainException('Pilih hari tutorial yang tersedia terlebih dahulu.');
             }
+            if (file_exists(__DIR__ . '/../includes/tutorial-rpl-helper.php')) {
+                require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
+            }
+            if (function_exists('tutorialRplIsUserLulus') && tutorialRplIsUserLulus($pdo, (int)$actor['id'])) {
+                throw new DomainException('Anda telah dinyatakan LULUS Tutorial RPL Online. Tidak perlu melakukan pendaftaran ulang.');
+            }
             $result = tutorialRplRegister($pdo, $periodId, (int)$actor['id'], $actor, 'mandiri', null, $day);
             $_SESSION['rpl_registration_notice'] = !empty($result['day_selected'])
                 ? 'Pendaftaran dan pilihan hari Tutorial RPL berhasil disimpan. Anda menunggu pembagian kelas.'
@@ -52,6 +58,10 @@ try {
             }
             unset($capacity);
         }
+        if (file_exists(__DIR__ . '/../includes/tutorial-rpl-helper.php')) {
+            require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
+        }
+        $student['already_passed_rpl'] = (function_exists('tutorialRplIsUserLulus')) ? tutorialRplIsUserLulus($pdo, (int)$student['id']) : false;
         $decision = tutorialRplRegistrationDecision($student, $student, 'mandiri', tutorialRplPretesEvidence($pdo, (int)$student['id']), null, tutorialRplPeriodPolicy($period));
     }
 } catch (DomainException $e) {

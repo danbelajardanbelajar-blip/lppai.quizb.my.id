@@ -140,6 +140,7 @@ function tutorialRplRegistrationCount(PDO $pdo, int $periodId): int
 function tutorialRplRegistrationReason(string $reason): string
 {
     return ['passed_pretes'=>'Anda dibebaskan dari tutorial karena sudah lulus pretes resmi.',
+        'already_passed_tutorial_rpl'=>'Anda telah dinyatakan LULUS Tutorial RPL Online. Tidak perlu melakukan pendaftaran ulang.',
         'not_rpl_student'=>'Pendaftaran ini khusus akun mahasiswa RPL.', 'forbidden'=>'Anda tidak berhak mendaftarkan akun ini.',
         'invalid_channel'=>'Jalur pendaftaran tidak valid.', 'not_open_yet'=>'Pendaftaran belum dibuka.',
         'registration_closed'=>'Pendaftaran sudah ditutup.', 'no_active_period'=>'Belum ada periode pendaftaran aktif.',
@@ -162,6 +163,9 @@ function tutorialRplRegister(PDO $pdo, int $periodId, int $studentId, array $act
         $freshActor = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         $stmt->execute([$studentId]);
         $student = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        if (function_exists('tutorialRplIsUserLulus') && tutorialRplIsUserLulus($pdo, $studentId)) {
+            $student['already_passed_rpl'] = true;
+        }
         $policy = tutorialRplPeriodPolicy($period);
         $access = tutorialRplRegistrationDecision($student, $freshActor, $channel, null, $now, $policy);
         if (in_array($access['reason'], ['forbidden','invalid_channel','not_rpl_student'], true)) throw new DomainException(tutorialRplRegistrationReason($access['reason']));

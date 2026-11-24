@@ -230,6 +230,23 @@ if (!function_exists('tutorialRplGetStudentMembership')) {
 }
 
 /**
+ * Periksa apakah mahasiswa telah dinyatakan LULUS pada Tutorial RPL.
+ */
+if (!function_exists('tutorialRplIsUserLulus')) {
+    function tutorialRplIsUserLulus(PDO $pdo, int $userId): bool {
+        if ($userId <= 0) return false;
+        ensureTutorialRplTables($pdo);
+        try {
+            $stmt = $pdo->prepare("SELECT 1 FROM tutorial_rpl_members WHERE user_id = ? AND status_lulus = 'lulus' LIMIT 1");
+            $stmt->execute([$userId]);
+            return (bool)$stmt->fetchColumn();
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+}
+
+/**
  * Konfirmasi pengunggahan tugas video ke Google Drive oleh mahasiswa.
  */
 if (!function_exists('tutorialRplConfirmDriveSubmission')) {

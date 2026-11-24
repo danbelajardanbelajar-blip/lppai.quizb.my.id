@@ -102,7 +102,28 @@ include __DIR__ . '/../includes/header.php';
         <!-- ═══════════════════════════════════════════════════════════════
              RUANG KELAS & STATUS BIMBINGAN MAHASISWA RPL YANG TERPLOT
              ═══════════════════════════════════════════════════════════════ -->
-        <?php $isHadirSah = (!empty($membership['drive_verified']) && !empty($membership['exam_submitted'])); ?>
+        <?php
+        $isHadirSah = (!empty($membership['drive_verified']) && !empty($membership['exam_submitted']));
+        $statusLulusVal = strtolower(trim((string)($membership['status_lulus'] ?? 'proses')));
+        ?>
+
+        <?php if ($statusLulusVal === 'lulus'): ?>
+            <!-- Banner Selebrasi Kelulusan Resmi -->
+            <div class="card" style="margin-bottom:20px; background:linear-gradient(135deg,#f0fdf4 0%,#dcfce7 100%); border:2px solid #86efac; border-radius:14px; padding:22px; box-shadow:0 6px 20px rgba(22,163,74,0.12);">
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <div style="font-size:46px; line-height:1; flex-shrink:0;">🎉</div>
+                    <div style="flex:1; min-width:240px;">
+                        <h3 style="margin:0 0 6px; font-size:19px; font-weight:800; color:#14532d;">
+                            Alhamdulillah! Anda Dinyatakan LULUS Tutorial RPL Online
+                        </h3>
+                        <p style="margin:0; font-size:14px; color:#166534; line-height:1.6;">
+                            Selamat! Anda telah menyelesaikan seluruh rangkaian tugas praktik video dan ujian tulis CBT Tutorial RPL Online dengan predikat <strong>LULUS</strong> (Nilai Akhir: <strong><?= $membership['nilai_akhir'] !== null ? (float)$membership['nilai_akhir'] : '-' ?></strong>). Anda telah memenuhi seluruh syarat kelulusan dan tidak perlu melakukan pendaftaran ulang.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <div class="card" style="margin-bottom:24px; border-left:4px solid var(--primary);">
             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <span style="font-weight:700; color:var(--text-dark);">
@@ -133,9 +154,15 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                     <div>
                         <div style="font-size:12px; font-weight:700; color:var(--text-muted, #64748b); text-transform:uppercase;">Nilai Akhir Tutorial</div>
-                        <div style="font-size:15px; font-weight:700; color:var(--text-dark); margin-top:2px;">
-                            <?= $membership['nilai_akhir'] !== null ? (float)$membership['nilai_akhir'] : '-' ?>
-                            <small style="color:#64748b; font-weight:normal;">(Status: <?= ucfirst($membership['status_lulus']) ?>)</small>
+                        <div style="font-size:15px; font-weight:700; color:var(--text-dark); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span><?= $membership['nilai_akhir'] !== null ? (float)$membership['nilai_akhir'] : '-' ?></span>
+                            <?php if ($statusLulusVal === 'lulus'): ?>
+                                <span class="badge badge-success" style="font-size:12px; padding:3px 10px; font-weight:700;">✅ LULUS</span>
+                            <?php elseif ($statusLulusVal === 'tidak_lulus'): ?>
+                                <span class="badge badge-danger" style="font-size:12px; padding:3px 10px; font-weight:700;">❌ TIDAK LULUS</span>
+                            <?php else: ?>
+                                <span class="badge badge-warning" style="font-size:12px; padding:3px 10px; font-weight:700;">⏳ PROSES</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -248,12 +275,18 @@ include __DIR__ . '/../includes/header.php';
                 <!-- Bagian 3: Kesimpulan Presensi Sah -->
                 <div style="border-top:1px solid #e2e8f0; padding-top:18px; margin-top:20px;">
                     <?php if ($isHadirSah): ?>
-                        <div class="alert alert-success" style="margin:0; font-size:14px; line-height:1.6;">
-                            🎉 <strong>Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban Tutorial RPL Online (Verifikasi Video Drive &amp; Ujian Tulis CBT) telah berhasil Anda penuhi.
-                        </div>
+                        <?php if ($statusLulusVal === 'tidak_lulus'): ?>
+                            <div class="alert alert-warning" style="margin:0; font-size:13.5px; line-height:1.6;">
+                                ⚠️ <strong>Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban tugas video Google Drive dan Ujian Tulis CBT telah Anda serahkan. Namun akumulasi Nilai Akhir Anda belum mencapai standar kelulusan (passing grade 80.0). Silakan hubungi admin LPPAI atau tutor bimbingan Anda terkait informasi pembukaan periode pendaftaran berikutnya.
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-success" style="margin:0; font-size:14px; line-height:1.6;">
+                                🎉 <strong>Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban Tutorial RPL Online (Verifikasi Video Drive &amp; Ujian Tulis CBT) telah berhasil Anda penuhi.
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="alert alert-warning" style="margin:0; font-size:13.5px; line-height:1.6;">
-                            ⚠️ <strong>Presensi Belum Lengkap:</strong> Untuk dinyatakan <em>Hadir Sah</em> pada Tutorial RPL Online, Anda wajib menyelesaikan kedua komponen: (1) Tugas video Google Drive terverifikasi sah oleh dosen, dan (2) Menyelesaikan Ujian Tulis CBT.
+                            ⏳ <strong>Presensi Belum Lengkap:</strong> Untuk dinyatakan <em>Hadir Sah</em> pada Tutorial RPL Online, Anda wajib menyelesaikan kedua komponen: (1) Tugas video Google Drive terverifikasi sah oleh dosen, dan (2) Menyelesaikan Ujian Tulis CBT.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -261,33 +294,41 @@ include __DIR__ . '/../includes/header.php';
         </div>
     <?php endif; ?>
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         PANDUAN & STATUS PERIODE PENDAFTARAN (KOMPATIBILITAS PENUH)
-         ═══════════════════════════════════════════════════════════════ -->
-    <?php include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php'; ?>
+    <?php $isLulusTutorialRpl = ($membership && ($statusLulusVal ?? '') === 'lulus'); ?>
+    <?php if (!$isLulusTutorialRpl): ?>
+        <!-- ═══════════════════════════════════════════════════════════════
+             PANDUAN & STATUS PERIODE PENDAFTARAN (KOMPATIBILITAS PENUH)
+             ═══════════════════════════════════════════════════════════════ -->
+        <?php include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php'; ?>
 
-    <div class="card" style="margin-top:20px;">
-        <div class="card-header">
-            <span>Status Pendaftaran Tutorial RPL</span>
-        </div>
-        <div class="card-body">
-            <h3 style="margin-top:0;font-size:17.5px;font-weight:700;color:var(--text-dark);"><?= $unavailable ? 'Jadwal belum dapat dimuat' : $escape($labels[$status]) ?></h3>
-            <?php if ($unavailable): ?>
-                <p>Silakan coba kembali atau hubungi admin LPPAI.</p>
-            <?php elseif ($status === 'open'): ?>
-                <p>Mahasiswa RPL yang belum pretes atau belum lulus dapat mendaftar. Kelulusan dan kuota diperiksa saat pendaftaran.</p>
-                <a class="btn btn-primary" href="<?= BASE_URL ?>/tutorial-rpl-daftar.php">Daftar Tutorial RPL</a>
-            <?php elseif ($status === 'soon'): ?>
-                <p>Silakan kembali sesuai waktu buka yang tercantum di atas.</p>
-            <?php else: ?>
-                <p>Silakan hubungi admin LPPAI untuk informasi pendaftaran berikutnya.</p>
-            <?php endif; ?>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
-                <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-secondary">← Kembali ke Halaman Pretes</a>
-                <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">Dashboard</a>
+        <div class="card" style="margin-top:20px;">
+            <div class="card-header">
+                <span>Status Pendaftaran Tutorial RPL</span>
+            </div>
+            <div class="card-body">
+                <h3 style="margin-top:0;font-size:17.5px;font-weight:700;color:var(--text-dark);"><?= $unavailable ? 'Jadwal belum dapat dimuat' : $escape($labels[$status]) ?></h3>
+                <?php if ($unavailable): ?>
+                    <p>Silakan coba kembali atau hubungi admin LPPAI.</p>
+                <?php elseif ($status === 'open'): ?>
+                    <p>Mahasiswa RPL yang belum pretes atau belum lulus dapat mendaftar. Kelulusan dan kuota diperiksa saat pendaftaran.</p>
+                    <a class="btn btn-primary" href="<?= BASE_URL ?>/tutorial-rpl-daftar.php">Daftar Tutorial RPL</a>
+                <?php elseif ($status === 'soon'): ?>
+                    <p>Silakan kembali sesuai waktu buka yang tercantum di atas.</p>
+                <?php else: ?>
+                    <p>Silakan hubungi admin LPPAI untuk informasi pendaftaran berikutnya.</p>
+                <?php endif; ?>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                    <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-secondary">← Kembali ke Halaman Pretes</a>
+                    <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">Dashboard</a>
+                </div>
             </div>
         </div>
-    </div>
+    <?php else: ?>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
+            <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">🏠 Kembali ke Dashboard</a>
+            <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-secondary">📋 Halaman Pretes</a>
+        </div>
+    <?php endif; ?>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

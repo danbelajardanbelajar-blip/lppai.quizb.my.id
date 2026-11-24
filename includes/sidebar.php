@@ -405,7 +405,8 @@ if (!function_exists('isNavGroupActive')) {
             $isLulusPretes = ($currentUser && $db && function_exists('isUserLulusPretes'))
                 ? isUserLulusPretes($db, (int)($currentUser['id'] ?? 0))
                 : false;
-            $showTutorialMenus = !$isMahasiswaPretesAktif && ($hasTutorialReg || ($hasPretesReg && !$isLulusPretes));
+            $isRplStudent = strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL';
+            $showTutorialMenus = !$isRplStudent && !$isMahasiswaPretesAktif && ($hasTutorialReg || ($hasPretesReg && !$isLulusPretes));
             // Sudah lulus pretes: tidak perlu mendaftar pretes lagi
             if ($isLulusPretes) $showDaftarPretesMenu = false;
             // Menu sertifikat bagi yang lulus pretes (bila menu tutorial yang memuatnya tidak tampil).
@@ -455,14 +456,22 @@ if (!function_exists('isNavGroupActive')) {
             <?php endif; ?>
             <?php endif; ?>
 
-            <?php if (strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL'): ?>
+            <?php if ($isRplStudent): ?>
+            <?php
+            require_once __DIR__ . '/tutorial-rpl-helper.php';
+            $isRplLulus = ($db && function_exists('tutorialRplIsUserLulus'))
+                ? tutorialRplIsUserLulus($db, (int)($currentUser['id'] ?? 0))
+                : false;
+            ?>
             <div class="menu-label">Tutorial RPL</div>
             <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
                 <span class="icon">🌐</span><span class="nav-text">Info &amp; Kelas RPL</span>
             </a>
+            <?php if (!$isRplLulus): ?>
             <a href="<?= BASE_URL ?>/tutorial-rpl-daftar.php" class="page-nav <?= menuActive('tutorial-rpl-daftar.php') ?>">
                 <span class="icon">📝</span><span class="nav-text">Daftar Tutorial RPL</span>
             </a>
+            <?php endif; ?>
             <?php endif; ?>
             <?php if ($showTutorialMenus): ?>
             <div class="menu-label">Tutorial</div>

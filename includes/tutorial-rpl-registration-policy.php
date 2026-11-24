@@ -44,6 +44,9 @@ function tutorialRplRegistrationDecision(array $student, array $actor, string $c
         ? (($actor['role'] ?? '') === 'admin' && (int)($actor['id'] ?? 0) > 0)
         : (($actor['role'] ?? '') === 'mahasiswa' && (int)($actor['id'] ?? 0) === (int)$student['id']);
     if (!$authorized) return $result + ['reason' => 'forbidden'];
+    if (!empty($student['already_passed_rpl'])) {
+        return array_replace($result, ['exempt' => true, 'allowed' => false, 'eligible' => false, 'reason' => 'already_passed_tutorial_rpl']);
+    }
     // Historical official pass records may predate numeric score storage.
     if ($pretes && !empty($pretes['official']) && !empty($pretes['submitted']) && !empty($pretes['legacy_pass'])) {
         return array_replace($result, ['exempt' => true, 'reason' => 'passed_pretes']);

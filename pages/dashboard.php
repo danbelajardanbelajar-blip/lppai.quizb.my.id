@@ -330,7 +330,21 @@ include __DIR__ . '/../includes/header.php';
     <div class="stat-card">
         <div class="stat-icon orange">📚</div>
         <div class="stat-info">
-            <?php if (!empty($tutorialRegs)): ?>
+            <?php
+            $isRplStudentUser = (strtoupper(trim((string)($user['jenis_program'] ?? ''))) === 'RPL');
+            $rplMembershipInfo = null;
+            if ($isRplStudentUser && file_exists(__DIR__ . '/../includes/tutorial-rpl-helper.php')) {
+                require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
+                $rplMembershipInfo = tutorialRplGetStudentMembership($pdo, (int)$user['id']);
+            }
+            ?>
+            <?php if ($rplMembershipInfo): ?>
+                <?php $rplStatusLulus = strtolower(trim((string)($rplMembershipInfo['status_lulus'] ?? 'proses'))); ?>
+                <h3 style="font-size:16px; font-weight:700; color:<?= $rplStatusLulus === 'lulus' ? '#16a34a' : ($rplStatusLulus === 'tidak_lulus' ? '#dc2626' : 'var(--primary)') ?>;">
+                    <?= $rplStatusLulus === 'lulus' ? '✅ Lulus' : ($rplStatusLulus === 'tidak_lulus' ? '❌ Belum Lulus' : sanitize($rplMembershipInfo['nama_kelompok'])) ?>
+                </h3>
+                <p><?= sanitize($rplMembershipInfo['nama_kelompok']) ?></p>
+            <?php elseif (!empty($tutorialRegs)): ?>
                 <?php
                 $firstTutor = $tutorialRegs[0];
                 $hariPilihanTutor = !empty($firstTutor['hari_pilihan']) ? $firstTutor['hari_pilihan'] : (!empty($firstTutor['kelas_hari']) ? $firstTutor['kelas_hari'] : '');
@@ -341,7 +355,7 @@ include __DIR__ . '/../includes/header.php';
                 <p>Pilihan Hari Tutorial</p>
             <?php else: ?>
                 <h3>0</h3>
-                <p>Kelas Tutorial</p>
+                <p><?= $isRplStudentUser ? 'Tutorial RPL' : 'Kelas Tutorial' ?></p>
             <?php endif; ?>
         </div>
     </div>
@@ -350,7 +364,8 @@ include __DIR__ . '/../includes/header.php';
 <!-- Jadwal Majlis Dzikir Al Khidmah (peserta tutorial aktif; wajib sekali sesuai jadwal) -->
 <?php
 require_once __DIR__ . '/../includes/alkhidmah-schedule.php';
-$alkJadwal = (($user['role'] ?? '') === 'mahasiswa') ? alkhidmahScheduleForUser($pdo, (int)$user['id']) : null;
+$isRplUser = (strtoupper(trim((string)($user['jenis_program'] ?? ''))) === 'RPL');
+$alkJadwal = (($user['role'] ?? '') === 'mahasiswa' && !$isRplUser) ? alkhidmahScheduleForUser($pdo, (int)$user['id']) : null;
 if ($alkJadwal):
     $alkToday = (new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')))->format('Y-m-d');
     $alkHadir = false;
@@ -647,7 +662,7 @@ if ($alkJadwal):
                 <p style="margin:0; font-size:13.5px; color:#64748b; line-height:1.4;">
                     Status Akhir: <strong style="color:<?= $isPretesLulus ? '#16a34a' : '#dc2626' ?>;"><?= $isPretesLulus ? '✅ LULUS' : '❌ TIDAK LULUS' ?></strong>
                     <?php if (!$isPretesLulus): ?>
-                        &bull; Anda diwajibkan untuk mendaftar dan mengikuti program <strong>Tutorial LPPAI</strong>.
+                        &bull; Tidak ada opsi remedial. Anda dipersilakan untuk melakukan <strong>Pendaftaran Pretes</strong> kembali.
                     <?php endif; ?>
                 </p>
             </div>
@@ -657,8 +672,8 @@ if ($alkJadwal):
                 📊 Lihat Nilai & Hasil Pretes
             </a>
             <?php if (!$isPretesLulus): ?>
-                <a href="<?= BASE_URL ?>/tutorial-pendaftaran.php" class="btn btn-danger" style="text-decoration:none; padding:8px 18px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px; background:#dc2626; border-color:#dc2626;">
-                    📝 Daftar Tutorial ➔
+                <a href="<?= BASE_URL ?>/pretes-daftar.php" class="btn btn-danger" style="text-decoration:none; padding:8px 18px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; gap:6px; background:#dc2626; border-color:#dc2626;">
+                    📝 Daftar Pretes ➔
                 </a>
             <?php endif; ?>
         </div>

@@ -5,6 +5,62 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-24 08:28:03 +0700 — Penyempurnaan Tampilan Role Mahasiswa RPL (Status Lulus/Tidak Lulus) dan Pengalihan Langsung Pendaftaran Pretes Tanpa Opsi Remedial
+
+**ID:** TUTORIAL-RPL-STUDENT-STATUS-AND-PRETES-FLOW · **Parent Git:** `283e4cf`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk memperbaiki kejanggalan antarmuka role mahasiswa terkait status kelulusan Tutorial RPL Online (lulus vs tidak lulus), dan instruksi tegas bahwa bagi mahasiswa yang tidak lulus pretes tidak boleh diberikan opsi remedial melainkan langsung diarahkan ke pendaftaran pretes.
+
+**Perubahan dan alasan:**
+1. **Banner Kelulusan & Perapian Status Nilai (`pages/tutorial-rpl.php`):**
+   - Menambahkan banner selebrasi kelulusan resmi: `Alhamdulillah! Anda Dinyatakan LULUS Tutorial RPL Online` lengkap dengan nilai akhir bagi mahasiswa yang berstatus `lulus`.
+   - Mengubah status nilai kelulusan dari format string mentah `ucfirst($membership['status_lulus'])` (yang sebelumnya menghasilkan `Tidak_lulus`) menjadi badge visual tegas: `✅ LULUS`, `❌ TIDAK LULUS`, atau `⏳ PROSES`.
+   - Menambahkan penegasan pembeda antara status presensi daring tugas/CBT dan status kelulusan nilai akademik pada Bagian 3, sehingga mahasiswa yang presensinya lengkap namun nilainya tidak lulus tidak bingung.
+   - Menyembunyikan form dan tombol pendaftaran ulang Tutorial RPL di bagian bawah bagi mahasiswa yang telah berstatus lulus.
+2. **Helper Status Kelulusan RPL (`includes/tutorial-rpl-helper.php`):**
+   - Menambahkan fungsi helper `tutorialRplIsUserLulus(PDO $pdo, int $userId): bool` untuk memeriksa status kelulusan anggota di tabel `tutorial_rpl_members`.
+3. **Kebijakan Pendaftaran Terpadu (`includes/tutorial-rpl-registration-policy.php` & `includes/tutorial-rpl-registration.php`):**
+   - Menambahkan aturan pencegahan pendaftaran ulang jika mahasiswa telah lulus Tutorial RPL (`already_passed_tutorial_rpl`), melarang submit pendaftaran mandiri/admin dan menampilkan pesan alasan yang jelas.
+4. **Halaman Pendaftaran Mandiri (`pages/tutorial-rpl-daftar.php`):**
+   - Mengintegrasikan pengecekan `tutorialRplIsUserLulus()`, menampilkan notifikasi kelulusan dan menolak pendaftaran baru jika mahasiswa sudah lulus.
+5. **Pembersihan Navigasi Sidebar (`includes/sidebar.php`):**
+   - Mengecualikan mahasiswa RPL (`jenis_program === 'RPL'`) dari menu Tutorial Reguler agar tidak muncul menu ganda kosong/tidak relevan.
+   - Menyembunyikan tautan menu `Daftar Tutorial RPL` jika mahasiswa RPL telah berstatus lulus.
+6. **Sinkronisasi Dashboard Mahasiswa (`pages/dashboard.php`):**
+   - Menyelaraskan kartu statistik tutorial untuk mendeteksi kelompok bimbingan Tutorial RPL mahasiswa (`tutorialRplGetStudentMembership()`) sehingga tidak lagi menampilkan `0 Kelas Tutorial`.
+   - Menyembunyikan jadwal kegiatan majlis Al-Khidmah tatap muka untuk mahasiswa program daring RPL.
+   - Memperbarui banner status pretes selesai ketika mahasiswa tidak lulus: menegaskan tidak ada opsi remedial dan mengarahkan langsung ke `pretes-daftar.php` (`📝 Daftar Pretes ➔`).
+7. **Pengalihan Pretes Tanpa Remedial (`pages/pretes-hasil.php`):**
+   - Menghapus opsi/asumsi remedial dan mengarahkan mahasiswa yang tidak lulus pretes langsung ke `pretes-daftar.php` (`📝 Daftar Pretes Kembali ➔`).
+8. **Suite Pengujian Terpadu (`tests/tutorial-rpl-student-status-test.php`):**
+   - Menambahkan suite pengujian terpadu (5 blok pengujian) untuk memastikan seluruh skenario status lulus, tidak lulus, sidebar, kebijakan pendaftaran, dan pengalihan pretes berjalan tepat (100% PASS).
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 08:21:19 | `includes/tutorial-rpl-helper.php` | 231-248 | Menambahkan helper tutorialRplIsUserLulus(). |
+| 2026-11-24 08:21:35 | `includes/tutorial-rpl-registration-policy.php` | 46-50 | Pengecekan already_passed_rpl pada tutorialRplRegistrationDecision(). |
+| 2026-11-24 08:22:00 | `includes/tutorial-rpl-registration.php` | 140-170 | Menambahkan alasan already_passed_tutorial_rpl dan validasi di tutorialRplRegister(). |
+| 2026-11-24 08:23:22 | `pages/tutorial-rpl.php` | 105-325 | Banner selebrasi kelulusan, badge status lulus/tidak lulus, klarifikasi presensi, dan penyembunyian form daftar bagi yang lulus. |
+| 2026-11-24 08:27:07 | `pages/tutorial-rpl-daftar.php` | 24-68 | Validasi pencegahan daftar ulang dan pesan kelulusan Tutorial RPL. |
+| 2026-11-24 08:23:46 | `includes/sidebar.php` | 405-475 | Pengecualian menu tutorial reguler untuk RPL dan penyembunyian menu Daftar Tutorial RPL jika sudah lulus. |
+| 2026-11-24 08:24:30 | `pages/dashboard.php` | 330-675 | Tampilan kelompok RPL di widget tutorial, isolasi Al-Khidmah, dan pengalihan pretes tidak lulus ke pretes-daftar.php tanpa remedial. |
+| 2026-11-24 08:25:46 | `pages/pretes-hasil.php` | 494-785 | Penegasan tidak ada opsi remedial dan pengalihan tombol langsung ke pendaftaran pretes (pretes-daftar.php). |
+| 2026-11-24 08:28:03 | `tests/tutorial-rpl-student-status-test.php` | 1-135 | Suite pengujian terpadu validasi tampilan mahasiswa RPL dan pengalihan pretes tanpa remedial. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada seluruh berkas yang berubah lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Seluruh 13 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa kegagalan.
+- Pengujian regresi alur pretes RPL dan periode hasil pretes (`tests/pretes-rpl-flow-test.php`, `tests/pretes-hasil-active-period-test.php`, `tests/pretes-hasil-periode-berakhir-test.php`) lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
+---
+
 ## 2026-11-24 07:53:42 +0700 — Penghapusan total halaman admin/tutorial-rpl-peserta.php dan pembersihan relasi navigasi
 
 **ID:** TUTORIAL-RPL-PESERTA-PAGE-REMOVAL · **Parent Git:** `961c85f`.
