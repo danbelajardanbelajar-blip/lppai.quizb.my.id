@@ -1015,6 +1015,22 @@ if (!function_exists('ensureTutorialRplCbtTables')) {
         try {
             $pdo->exec("ALTER TABLE tutorial_rpl_cbt_sessions ADD COLUMN package_ids_json TEXT DEFAULT NULL");
         } catch (Throwable $e) {}
+        foreach ([
+            ['description', 'TEXT DEFAULT NULL'],
+            ['category_quotas_json', 'TEXT DEFAULT NULL'],
+            ['camera_mode', "VARCHAR(20) NOT NULL DEFAULT 'tidak_aktif'"],
+            ['scoring_method', "VARCHAR(30) NOT NULL DEFAULT 'standar'"],
+            ['start_time', 'VARCHAR(30) DEFAULT NULL'],
+            ['end_time', 'VARCHAR(30) DEFAULT NULL'],
+            ['token_required', 'INT NOT NULL DEFAULT 0'],
+            ['shuffle_on_violation', 'INT NOT NULL DEFAULT 1'],
+            ['mode', "VARCHAR(20) NOT NULL DEFAULT 'resmi'"],
+            ['max_attempts', 'INT NOT NULL DEFAULT 1']
+        ] as [$col, $def]) {
+            try {
+                $pdo->exec("ALTER TABLE tutorial_rpl_cbt_sessions ADD COLUMN $col $def");
+            } catch (Throwable $e) {}
+        }
         try {
             $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN deadline_at INT DEFAULT NULL");
         } catch (Throwable $e) {}
@@ -1351,12 +1367,56 @@ if (!function_exists('tutorialRplCbtDeletePackage')) {
 }
 
 /**
- * Mengambil daftar sesi ujian CBT Tutorial RPL.
+ * Mengambil daftar sesi ujian CBT Tutorial RPL lengkap dengan relasi paket dan kuota kategori.
  */
 if (!function_exists('tutorialRplCbtGetSessions')) {
     function tutorialRplCbtGetSessions(PDO $pdo): array {
         ensureTutorialRplCbtTables($pdo);
-        return $pdo->query("SELECT * FROM tutorial_rpl_cbt_sessions ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $sessions = $pdo->query("SELECT * FROM tutorial_rpl_cbt_sessions ORDER BY is_active DESC, id ASC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            $sessions = [];
+        }
+        $packages = tutorialRplCbtGetPackages($pdo);
+        $pkgMap = [];
+        foreach ($packages as $pkg) {
+            $pkgMap[(int)$pkg['id']] = $pkg;
+        }
+
+        foreach ($sessions as &$ses) {
+            $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
+            $ses['package_ids'] = array_map('intval', $pkgIds);
+            $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
+
+            $packageNames = [];
+            $totalQuestions = 0;
+            $activeQuestions = 0;
+            foreach ($ses['package_ids'] as $pid) {
+                if (isset($pkgMap[$pid])) {
+                    $packageNames[] = $pkgMap[$pid]['name'];
+                    $totalQuestions += (int)($pkgMap[$pid]['total_questions'] ?? 0);
+                    $activeQuestions += (int)($pkgMap[$pid]['question_count_actual'] ?? 0);
+                }
+            }
+            $ses['package_names'] = $packageNames;
+            $ses['total_available_questions'] = $totalQuestions;
+            $ses['active_available_questions'] = $activeQuestions;
+            $ses['shuffle_on_violation'] = isset($ses['shuffle_on_violation']) ? (int)$ses['shuffle_on_violation'] : 1;
+            $ses['camera_mode'] = !empty($ses['camera_mode']) ? $ses['camera_mode'] : 'tidak_aktif';
+            $ses['scoring_method'] = !empty($ses['scoring_method']) ? $ses['scoring_method'] : 'standar';
+            $ses['mode'] = !empty($ses['mode']) ? $ses['mode'] : 'resmi';
+            $ses['max_attempts'] = (int)($ses['max_attempts'] ?? 1);
+            $ses['token_required'] = (int)($ses['token_required'] ?? (!empty($ses['token']) ? 1 : 0));
+
+            if (!empty($ses['category_quotas'])) {
+                $ses['target_questions'] = array_sum($ses['category_quotas']);
+            } else {
+                $firstPid = $ses['package_ids'][0] ?? 0;
+                $ses['target_questions'] = isset($pkgMap[$firstPid]) ? (int)$pkgMap[$firstPid]['question_count'] : 25;
+            }
+        }
+        unset($ses);
+        return $sessions;
     }
 }
 
@@ -1370,7 +1430,11 @@ if (!function_exists('tutorialRplCbtGetSession')) {
             $stmt = $pdo->prepare("SELECT * FROM tutorial_rpl_cbt_sessions WHERE id = ?");
             $stmt->execute([$id]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row) return $row;
+            if ($row) {
+                $row['package_ids'] = json_decode((string)($row['package_ids_json'] ?? '[]'), true) ?: [];
+                $row['category_quotas'] = json_decode((string)($row['category_quotas_json'] ?? '[]'), true) ?: [];
+                return $row;
+            }
         }
         $ses = $pdo->query("SELECT * FROM tutorial_rpl_cbt_sessions WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
         if (!$ses) {
@@ -1378,96 +1442,301 @@ if (!function_exists('tutorialRplCbtGetSession')) {
                 'id' => 1,
                 'code' => 'SESI-TUTORIAL-RPL-2026',
                 'title' => 'Sesi Ujian Tulis Tutorial RPL 2026/2027 (Utama / Muslim)',
+                'description' => null,
                 'package_ids_json' => '[1]',
+                'package_ids' => [1],
+                'category_quotas_json' => null,
+                'category_quotas' => [],
+                'camera_mode' => 'tidak_aktif',
                 'duration_minutes' => 90,
+                'scoring_method' => 'standar',
                 'passing_grade' => 70.00,
                 'token' => 'TUTOR26',
+                'token_required' => 1,
+                'shuffle_on_violation' => 1,
                 'exam_open' => 1,
-                'is_active' => 1
+                'is_active' => 1,
+                'mode' => 'resmi',
+                'max_attempts' => 1
             ];
         }
+        $ses['package_ids'] = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
+        $ses['category_quotas'] = json_decode((string)($ses['category_quotas_json'] ?? '[]'), true) ?: [];
         return $ses;
     }
 }
 
 /**
- * Menyimpan atau memperbarui data sesi ujian CBT Tutorial RPL.
+ * Memeriksa status pembukaan gerbang ujian CBT Tutorial RPL (berparitas penuh dengan pretesCbtExamStatus).
+ */
+if (!function_exists('tutorialRplCbtExamStatus')) {
+    function tutorialRplCbtExamStatus(PDO $pdo, ?int $now = null): array {
+        $now ??= time();
+        $sessions = tutorialRplCbtGetSessions($pdo);
+        $activeSessions = array_values(array_filter($sessions, fn($s) => !empty($s['is_active']) && ($s['mode'] ?? 'resmi') === 'resmi'));
+        if (empty($activeSessions)) {
+            return [
+                'open' => false,
+                'reason' => 'no_session',
+                'session' => null,
+                'notice' => 'Belum ada sesi ujian CBT Tutorial RPL resmi yang aktif. Silakan tunggu informasi dari admin LPPAI.'
+            ];
+        }
+
+        $fmt = static fn(int $ts) => (new DateTimeImmutable('@' . $ts))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+
+        $anyOpen = false;
+        $bestSession = null;
+        $firstNotice = '';
+
+        foreach ($activeSessions as $session) {
+            $isOpen = (int)($session['exam_open'] ?? 1) === 1;
+            if (!empty($session['start_time']) && ($ts = strtotime($session['start_time'])) !== false && $now < $ts) {
+                $isOpen = false;
+                if (!$firstNotice) $firstNotice = "Ujian CBT '{$session['title']}' dapat dimulai pada {$fmt($ts)} WIB.";
+            }
+            if (!empty($session['end_time']) && ($ts = strtotime($session['end_time'])) !== false && $now > $ts) {
+                $isOpen = false;
+                if (!$firstNotice) $firstNotice = "Sesi ujian CBT telah ditutup sejak {$fmt($ts)} WIB.";
+            }
+
+            if ($isOpen) {
+                $anyOpen = true;
+                $bestSession = $session;
+                break;
+            }
+        }
+
+        if ($anyOpen) {
+            return ['open' => true, 'reason' => 'open', 'session' => $bestSession, 'notice' => 'Pengerjaan ujian CBT Tutorial RPL telah dibuka.'];
+        }
+
+        $fallbackSession = $activeSessions[0];
+        if ((int)($fallbackSession['exam_open'] ?? 1) !== 1) {
+            return [
+                'open' => false,
+                'reason' => 'closed',
+                'session' => $fallbackSession,
+                'notice' => 'Pengerjaan ujian CBT Tutorial RPL belum dibuka / sedang ditutup oleh admin. Silakan persiapkan diri dan tunggu informasi pembukaan ujian.'
+            ];
+        }
+
+        return ['open' => false, 'reason' => 'schedule', 'session' => $fallbackSession, 'notice' => $firstNotice ?: 'Jadwal pengerjaan ujian belum/sudah tidak aktif.'];
+    }
+}
+
+/**
+ * Menyimpan atau memperbarui data sesi ujian CBT Tutorial RPL (berparitas penuh dengan pretesCbtSaveSession).
  */
 if (!function_exists('tutorialRplCbtSaveSession')) {
-    function tutorialRplCbtSaveSession(PDO $pdo, array $data): int {
+    function tutorialRplCbtSaveSession(PDO $pdo, array $input): int {
         ensureTutorialRplCbtTables($pdo);
-        $sesId = (int)($data['id'] ?? ($data['session_id'] ?? 0));
-        $code = trim((string)($data['code'] ?? ''));
-        $title = trim((string)($data['title'] ?? ''));
+        $title = trim((string)($input['title'] ?? ''));
         if ($title === '') {
-            $title = 'Sesi Ujian Tulis Tutorial RPL';
+            throw new InvalidArgumentException('Nama sesi ujian wajib diisi.');
+        }
+        if (function_exists('mb_strlen') ? mb_strlen($title, 'UTF-8') > 150 : strlen($title) > 150) {
+            throw new InvalidArgumentException('Nama sesi ujian maksimal 150 karakter.');
         }
 
-        $packageIds = $data['package_ids'] ?? ($data['package_ids_json'] ?? null);
-        if (is_array($packageIds)) {
-            $packageIds = json_encode(array_values(array_map('intval', $packageIds)));
-        } elseif (empty($packageIds)) {
-            $pkgId = (int)($data['package_id'] ?? ($sesId === 2 ? 2 : 1));
-            $packageIds = json_encode([$pkgId]);
-        } elseif (!is_string($packageIds)) {
-            $packageIds = json_encode([1]);
-        }
+        $description = trim((string)($input['description'] ?? ''));
 
-        $duration = max(5, min(300, (int)($data['duration_minutes'] ?? 90)));
-        $passingGrade = max(0, min(100, (float)($data['passing_grade'] ?? 70.0)));
-        $token = strtoupper(trim((string)($data['token'] ?? 'TUTOR26')));
-        if ($token === '') $token = 'TUTOR26';
-        $examOpen = !empty($data['exam_open']) ? 1 : 0;
-        $isActive = isset($data['is_active']) ? (!empty($data['is_active']) ? 1 : 0) : 1;
-
-        if ($sesId > 0) {
-            if ($code !== '') {
-                $stmt = $pdo->prepare("
-                    UPDATE tutorial_rpl_cbt_sessions SET
-                        code = ?,
-                        title = ?,
-                        package_ids_json = ?,
-                        duration_minutes = ?,
-                        passing_grade = ?,
-                        token = ?,
-                        exam_open = ?,
-                        is_active = ?
-                    WHERE id = ?
-                ");
-                $stmt->execute([$code, $title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive, $sesId]);
-            } else {
-                $stmt = $pdo->prepare("
-                    UPDATE tutorial_rpl_cbt_sessions SET
-                        title = ?,
-                        package_ids_json = ?,
-                        duration_minutes = ?,
-                        passing_grade = ?,
-                        token = ?,
-                        exam_open = ?,
-                        is_active = ?
-                    WHERE id = ?
-                ");
-                $stmt->execute([$title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive, $sesId]);
+        // Paket Soal yang Digunakan (bisa array atau single)
+        $pkgIds = [];
+        if (!empty($input['package_ids'])) {
+            $raw = is_array($input['package_ids']) ? $input['package_ids'] : [$input['package_ids']];
+            foreach ($raw as $val) {
+                $val = (int)$val;
+                if ($val > 0) $pkgIds[] = $val;
             }
-            return $sesId;
+        } elseif (!empty($input['package_id'])) {
+            $pkgIds[] = (int)$input['package_id'];
+        } elseif (!empty($input['package_ids_json'])) {
+            $raw = json_decode((string)$input['package_ids_json'], true) ?: [];
+            foreach ($raw as $val) {
+                $val = (int)$val;
+                if ($val > 0) $pkgIds[] = $val;
+            }
+        }
+        if (empty($pkgIds)) {
+            $pkgIds = [1];
+        }
+        $packageIdsJson = json_encode(array_values(array_unique($pkgIds)));
+
+        // Kadar / Kuota per Kategori
+        $categoryQuotasJson = null;
+        if (!empty($input['category_quotas']) && is_array($input['category_quotas'])) {
+            $cleanQuotas = [];
+            foreach ($input['category_quotas'] as $cat => $quota) {
+                $cat = trim((string)$cat);
+                $quota = (int)$quota;
+                if ($cat !== '' && $quota > 0) {
+                    $cleanQuotas[$cat] = $quota;
+                }
+            }
+            if (!empty($cleanQuotas)) {
+                $categoryQuotasJson = json_encode($cleanQuotas, JSON_UNESCAPED_UNICODE);
+            }
+        }
+
+        // Kewajiban Kamera
+        $cameraMode = trim((string)($input['camera_mode'] ?? 'tidak_aktif'));
+        if (!in_array($cameraMode, ['wajib', 'opsional', 'tidak_aktif'], true)) {
+            $cameraMode = 'tidak_aktif';
+        }
+
+        // Waktu (Durasi Menit)
+        $duration = max(5, min(360, (int)($input['duration_minutes'] ?? 90)));
+
+        // Cara Menilai
+        $scoringMethod = trim((string)($input['scoring_method'] ?? 'standar'));
+        if (!in_array($scoringMethod, ['standar', 'penalti'], true)) {
+            $scoringMethod = 'standar';
+        }
+        $passingGrade = max(0.0, min(100.0, (float)($input['passing_grade'] ?? 70.0)));
+
+        // Waktu Mulai & Waktu Selesai (Window)
+        $startTime = trim((string)($input['start_time'] ?? ''));
+        if ($startTime !== '') {
+            $ts = strtotime($startTime);
+            if ($ts === false) throw new InvalidArgumentException('Format waktu mulai ujian tidak valid.');
+            $startTime = date('Y-m-d H:i', $ts);
         } else {
-            if ($code === '') {
-                $code = 'SESI-TUTOR-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+            $startTime = null;
+        }
+
+        $endTime = trim((string)($input['end_time'] ?? ''));
+        if ($endTime !== '') {
+            $ts = strtotime($endTime);
+            if ($ts === false) throw new InvalidArgumentException('Format waktu akhir ujian tidak valid.');
+            $endTime = date('Y-m-d H:i', $ts);
+        } else {
+            $endTime = null;
+        }
+
+        if ($startTime && $endTime && strtotime($startTime) >= strtotime($endTime)) {
+            throw new InvalidArgumentException('Waktu mulai harus lebih awal daripada waktu batas akhir ujian.');
+        }
+
+        // Token Ujian
+        $token = strtoupper(trim((string)($input['token'] ?? '')));
+        if ($token === '') {
+            $token = 'TUTOR26';
+        }
+        $tokenRequired = isset($input['token_required']) && (int)$input['token_required'] === 1 ? 1 : 0;
+        $shuffleOnViolation = isset($input['shuffle_on_violation']) ? (int)$input['shuffle_on_violation'] : 1;
+        if ($shuffleOnViolation !== 0) {
+            $shuffleOnViolation = 1;
+        }
+        $sessionId = (int)($input['id'] ?? ($input['session_id'] ?? 0));
+        if ($sessionId > 0 && !array_key_exists('is_active', $input)) {
+            $stmtAct = $pdo->prepare('SELECT is_active FROM tutorial_rpl_cbt_sessions WHERE id = ?');
+            $stmtAct->execute([$sessionId]);
+            $existingActive = $stmtAct->fetchColumn();
+            $isActive = ($existingActive !== false && $existingActive !== null) ? (int)$existingActive : 1;
+        } else {
+            $isActive = isset($input['is_active']) && (int)$input['is_active'] === 1 ? 1 : 0;
+        }
+        $mode = (($input['mode'] ?? 'resmi') === 'tryout') ? 'tryout' : 'resmi';
+        if ($mode === 'resmi' && $isActive === 0) {
+            $stmtOther = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE id != ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
+            $stmtOther->execute([$sessionId]);
+            $otherCount = (int)$stmtOther->fetchColumn();
+            if ($otherCount === 0) {
+                $isActive = 1;
             }
-            $stmt = $pdo->prepare("
-                INSERT INTO tutorial_rpl_cbt_sessions
-                    (code, title, package_ids_json, duration_minutes, passing_grade, token, exam_open, is_active)
-                VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([$code, $title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive]);
+        }
+        $maxAttempts = $mode === 'tryout' ? max(0, min(99, (int)($input['max_attempts'] ?? 0))) : 1;
+        $examOpen = array_key_exists('exam_open', $input) ? ((int)$input['exam_open'] === 1 ? 1 : 0) : null;
+        if ($mode === 'tryout') $examOpen = 1;
+
+        if ($sessionId > 0) {
+            $code = trim((string)($input['code'] ?? ''));
+            $sql = "UPDATE tutorial_rpl_cbt_sessions SET
+                title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?,
+                camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?,
+                start_time = ?, end_time = ?, token = ?, token_required = ?,
+                shuffle_on_violation = ?, is_active = ?, mode = ?, max_attempts = ?";
+            $params = [
+                $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
+                $cameraMode, $duration, $scoringMethod, $passingGrade,
+                $startTime, $endTime, $token, $tokenRequired,
+                $shuffleOnViolation, $isActive, $mode, $maxAttempts
+            ];
+            if ($code !== '') {
+                $sql .= ", code = ?";
+                $params[] = $code;
+            }
+            if ($examOpen !== null) {
+                $sql .= ", exam_open = ?";
+                $params[] = $examOpen;
+            }
+            $sql .= " WHERE id = ?";
+            $params[] = $sessionId;
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            return $sessionId;
+        } else {
+            $code = trim((string)($input['code'] ?? ''));
+            if ($code === '') {
+                $code = 'SESI-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+            }
+            $stmt = $pdo->prepare("INSERT INTO tutorial_rpl_cbt_sessions
+                (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, mode, max_attempts, exam_open)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
+                $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
+                $token, $tokenRequired, $shuffleOnViolation, $isActive, $mode, $maxAttempts, $examOpen ?? 1
+            ]);
             return (int)$pdo->lastInsertId();
         }
     }
 }
 
 /**
- * Menghapus sesi ujian CBT Tutorial RPL.
+ * Sakelar buka / tutup pengerjaan ujian CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtSetExamOpen')) {
+    function tutorialRplCbtSetExamOpen(PDO $pdo, int $sessionId, bool $open): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $stmt = $pdo->prepare('UPDATE tutorial_rpl_cbt_sessions SET exam_open = ? WHERE id = ?');
+        return $stmt->execute([$open ? 1 : 0, $sessionId]);
+    }
+}
+
+/**
+ * Mengaktifkan sesi ujian CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtActivateSession')) {
+    function tutorialRplCbtActivateSession(PDO $pdo, int $sessionId, bool $exclusive = false): bool {
+        ensureTutorialRplCbtTables($pdo);
+        if ($exclusive) {
+            $pdo->exec("UPDATE tutorial_rpl_cbt_sessions SET is_active = 0 WHERE (mode IS NULL OR mode = '' OR mode = 'resmi')");
+        }
+        $stmt = $pdo->prepare('UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?');
+        return $stmt->execute([$sessionId]);
+    }
+}
+
+/**
+ * Menonaktifkan sesi ujian CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtDeactivateSession')) {
+    function tutorialRplCbtDeactivateSession(PDO $pdo, int $sessionId): bool {
+        ensureTutorialRplCbtTables($pdo);
+        $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
+        if ($activeCount <= 1) {
+            return false;
+        }
+        $stmt = $pdo->prepare('UPDATE tutorial_rpl_cbt_sessions SET is_active = 0 WHERE id = ?');
+        return $stmt->execute([$sessionId]);
+    }
+}
+
+/**
+ * Menghapus satu sesi ujian CBT Tutorial RPL.
  */
 if (!function_exists('tutorialRplCbtDeleteSession')) {
     function tutorialRplCbtDeleteSession(PDO $pdo, int $sessionId): bool {
@@ -1493,6 +1762,37 @@ if (!function_exists('tutorialRplCbtDeleteSession')) {
             return true;
         }
         return false;
+    }
+}
+
+/**
+ * Menghapus beberapa sesi ujian CBT Tutorial RPL secara massal.
+ */
+if (!function_exists('tutorialRplCbtDeleteSessions')) {
+    function tutorialRplCbtDeleteSessions(PDO $pdo, array $sessionIds): int {
+        ensureTutorialRplCbtTables($pdo);
+        $ids = array_values(array_filter(array_map('intval', $sessionIds), fn($id) => $id > 0));
+        if (empty($ids)) return 0;
+
+        $total = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions")->fetchColumn();
+        if (count($ids) >= $total) {
+            // Sisakan minimal 1 sesi jika semua dipilih
+            array_pop($ids);
+            if (empty($ids)) return 0;
+        }
+
+        $in = implode(',', $ids);
+        $count = $pdo->exec("DELETE FROM tutorial_rpl_cbt_sessions WHERE id IN ($in)");
+        if ($count > 0) {
+            $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1")->fetchColumn();
+            if ($activeCount === 0) {
+                $firstId = $pdo->query("SELECT id FROM tutorial_rpl_cbt_sessions ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($firstId) {
+                    $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?")->execute([(int)$firstId]);
+                }
+            }
+        }
+        return (int)$count;
     }
 }
 

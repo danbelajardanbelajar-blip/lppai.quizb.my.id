@@ -1,3 +1,64 @@
+## 2026-11-24 21:07:00 +0700 — Penyelarasan Total Tab Sesi Ujian CBT Tutorial RPL Berparitas Penuh dengan CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-SESSION-TAB-TOTAL-PARITY · **Parent Git:** `b152c43b8b09a23baf4afc171dc74c528811b061`.
+
+**Permintaan dan dasar perbaikan:** Merespons instruksi pengguna ("ambil halaman https://lppai.quizb.my.id/pretes-ujian.php?cbt_bank=1&tab=sessions untuk diletakkan di halaman ini https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=sessions secara total"):
+1. **Penyelarasan Antarmuka Tab Sesi Ujian (`admin/tutorial-rpl-cbt.php?tab=sessions`)**:
+   - **Header & Action Buttons**: Mengadopsi header panel "Pengatur Sesi Ujian CBT Tutorial RPL" dengan tombol `🎯 ＋ Buat Sesi Baru` dan `📝 ＋ Buat Tryout`.
+   - **Sakelar Buka/Tutup Ujian Live (`.bank-exam-switch`)**: Menghubungkan banner sakelar status pengerjaan ujian secara dinamis menggunakan `tutorialRplCbtExamStatus($pdo)` dengan styling `.is-open` (latar hijau) / `.is-closed` (latar merah), deskripsi sesi resmi aktif, notice jadwal, dan tombol `🟢 Buka Ujian` / `🔴 Tutup Ujian`.
+   - **Bulk Delete Toolbar**: Menyediakan checkbox massal pada header tabel (`data-bulk-select-all="sessions"`), checkbox tiap baris sesi (`data-bulk-select-item="sessions"`), toolbar interaktif (`data-bulk-toolbar="sessions"`), counter jumlah sesi terpilih (`data-bulk-count="sessions"`), serta tombol `🗑️ Hapus Terpilih` dengan konfirmasi peringatan aman.
+   - **Tabel 11 Kolom Lengkap**:
+     1. Checkbox pilih sesi massal.
+     2. Nomor urut.
+     3. Kode Sesi (`.bank-code`).
+     4. Nama Sesi & Paket Terpilih (dilengkapi deskripsi dan badge paket `📦`).
+     5. Kadar Kategori (accordion interaktif `<details>` menampilkan rincian butir soal per kategori materi, atau badge fallback acak penuh paket).
+     6. Kamera (`📷 WAJIB`, `🚫 TANPA KAMERA`, `📷 OPSIONAL`).
+     7. Waktu & Nilai (durasi pengerjaan, metode scoring standar skala 100 / minus UTBK, KKM, dan badge anti-contek proteksi pelanggaran).
+     8. Jadwal Pelaksanaan (waktu buka/mulai dan batas akhir pengerjaan).
+     9. Token (badge token jika diwajibkan atau badge tanpa token).
+     10. Status (badge `● AKTIF` / `Tidak Aktif`, tipe `🎓 RESMI` / `📝 TRYOUT`, dan status buka/tutup ujian).
+     11. Aksi per record:
+         - Tombol `🟢 Aktifkan` / `🔴 Nonaktifkan` untuk mengontrol sesi ujian yang aktif.
+         - Tombol `🔴 Tutup Ujian` / `🟢 Buka Ujian` langsung per baris sesi resmi.
+         - Tombol `✏️ Edit` untuk memunculkan modal konfigurasi lengkap dengan seluruh nilai terisi otomatis.
+         - Tombol `🗑️ Hapus` per baris dengan dialog konfirmasi.
+2. **Modal 2 Sesi Ujian Lengkap (`modalSessionForm` / Large Modal)**:
+   - Menggantikan modal kecil lama dengan Modal 2 berarsitektur large modal tanpa pindah halaman yang mencakup 9 seksi konfigurasi:
+     1. Identitas Sesi: Nama Sesi & Kode Sesi.
+     1b. Jenis Sesi: Pilihan Resmi / Tryout disertai input batas pengerjaan tryout (0 = tanpa batas).
+     2. Paket Soal yang Digunakan: Checkbox pilihan multi-paket soal terhubung beserta jumlah soal aktif.
+     3. Kadar / Kuota per Kategori Materi: Tabel dinamis input kuota butir soal per kategori dengan live badge hitungan total kuota target soal.
+     4. Pengaturan Kamera & Waktu: Kewajiban kamera/proctoring dan durasi waktu ujian (menit).
+     5. Cara Menilai & Nilai KKM: Metode scoring (standar skala 100 / penalti UTBK) dan input passing grade (KKM).
+     6. Jadwal Pelaksanaan: Input waktu mulai (jadwal buka) dan waktu batas pengerjaan (jadwal tutup) dengan `datetime-local`.
+     7. Token Akses Ujian: Input token, tombol acak token 6-karakter `🎲 Acak Token`, dan checkbox wajibkan token ujian.
+     8. Proteksi Anti-Contek & Pertukaran Soal: Dropdown pemilihan tindakan sistem saat peserta melakukan pelanggaran (ganti bank soal cadangan & acak abjad opsi atau hanya acak abjad).
+     9. Deskripsi sesi, checkbox jadikan sesi aktif, dan sakelar buka pengerjaan ujian.
+3. **Backend Helper & Migrasi Data (`includes/tutorial-rpl-helper.php`)**:
+   - Memperluas skema tabel `tutorial_rpl_cbt_sessions` melalui migrasi otomatis pada `ensureTutorialRplCbtTables` untuk mendukung seluruh kolom: `description`, `category_quotas_json`, `camera_mode`, `scoring_method`, `start_time`, `end_time`, `token_required`, `shuffle_on_violation`, `mode`, `max_attempts`.
+   - Mengimplementasikan helper fungsional lengkap: `tutorialRplCbtExamStatus`, `tutorialRplCbtSetExamOpen`, `tutorialRplCbtActivateSession`, `tutorialRplCbtDeactivateSession`, `tutorialRplCbtDeleteSessions`, serta memperbarui `tutorialRplCbtSaveSession` dan `tutorialRplCbtGetSessions` agar memperkaya setiap sesi dengan decoding `package_ids`, `category_quotas`, hitungan soal aktif, dan nama paket.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 21:02:54 | `admin/tutorial-rpl-cbt.php` | 349-430, 565-576, 874-981, 1471-1551, 1764-1854 | Penyelarasan total Tab 2 Sesi Ujian (11 kolom), sakelar gerbang live, bulk delete toolbar, Modal 2 large modal 9 seksi, map kategori paket, dan integrasi JavaScript controller. |
+| 2026-11-24 21:05:06 | `includes/tutorial-rpl-helper.php` | 1378-1425, 1430-1466, 1473-1526, 1532-1680, 1686-1795 | Migrasi kolom sesi, implementasi `tutorialRplCbtExamStatus`, `tutorialRplCbtSetExamOpen`, `tutorialRplCbtActivateSession`, `tutorialRplCbtDeactivateSession`, `tutorialRplCbtDeleteSessions`, dan pengamanan `tutorialRplCbtSaveSession`. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php` dan `php.exe -l includes/tutorial-rpl-helper.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- Ketiadaan BOM (`BOM: False`) dan ketiadaan mojibake (`mojibake count: 0`) terverifikasi pada kedua berkas.
+- `git diff --check` bersih 100% tanpa whitespace warning atau encoding conflict.
+- Seluruh 4 test suites lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (4/4 tahap ALL PASS).
+  - `tests/tutorial-rpl-student-hub-test.php` (4/4 test ALL PASS).
+  - `tests/tutorial-rpl-pages-500-fix-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian fungsional berjalan pada runtime PHP 8.3 CLI lokal. Push Git memperbarui repositori sumber; verifikasi deployment hosting dilakukan terpisah di server produksi.
+
 ## 2026-11-24 20:26:00 +0700 — Perbaikan HTTP 500 dan Pengamanan Kueri PDO MySQL pada CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-FIX-HTTP-500 · **Parent Git:** `d744d4b735d61d3c663821656d0f150fcfe84f41`.

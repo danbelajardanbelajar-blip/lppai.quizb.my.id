@@ -347,33 +347,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $activeTab = 'packages';
     } elseif ($action === 'save_session' || $action === 'update_session') {
+        try {
+            $sesId = tutorialRplCbtSaveSession($pdo, $_POST);
+            $message = 'Sesi ujian berhasil disimpan.';
+            $msgType = 'success';
+        } catch (Exception $e) {
+            $message = 'Error: ' . $e->getMessage();
+            $msgType = 'danger';
+        }
+        $activeTab = 'sessions';
+    } elseif ($action === 'set_exam_open') {
         $sesId = (int)($_POST['session_id'] ?? 0);
-        $title = trim($_POST['title'] ?? '');
-        $code = trim($_POST['code'] ?? '');
-        $duration = (int)($_POST['duration_minutes'] ?? 90);
-        $passingGrade = (float)($_POST['passing_grade'] ?? 70.0);
-        $token = strtoupper(trim($_POST['token'] ?? 'TUTOR26'));
-        $examOpen = isset($_POST['exam_open']) ? 1 : 0;
-        $isActive = isset($_POST['is_active']) ? 1 : 0;
-        $pkgId = (int)($_POST['package_id'] ?? ($sesId === 2 ? 2 : 1));
-
-        $savedId = tutorialRplCbtSaveSession($pdo, [
-            'id' => $sesId,
-            'code' => $code,
-            'title' => $title,
-            'package_ids_json' => json_encode([$pkgId]),
-            'duration_minutes' => $duration,
-            'passing_grade' => $passingGrade,
-            'token' => $token,
-            'exam_open' => $examOpen,
-            'is_active' => $isActive
-        ]);
-
-        if ($savedId > 0) {
-            $message = "Sesi ujian #{$savedId} (" . sanitize($title ?: 'Tutorial RPL') . ") berhasil disimpan.";
+        $open = (int)($_POST['open'] ?? 0) === 1;
+        if ($sesId > 0 && tutorialRplCbtSetExamOpen($pdo, $sesId, $open)) {
+            $message = $open
+                ? '🟢 Pengerjaan ujian CBT Tutorial RPL DIBUKA. Peserta dapat memulai ujian.'
+                : '🔴 Pengerjaan ujian CBT Tutorial RPL DITUTUP. Peserta tidak dapat memulai ujian baru.';
             $msgType = 'success';
         } else {
-            $message = 'Gagal menyimpan konfigurasi sesi ujian.';
+            $message = 'Gagal mengubah status gerbang pengerjaan ujian.';
+            $msgType = 'danger';
+        }
+        $activeTab = 'sessions';
+    } elseif ($action === 'activate_session') {
+        $sesId = (int)($_POST['session_id'] ?? 0);
+        if ($sesId > 0 && tutorialRplCbtActivateSession($pdo, $sesId, false)) {
+            $message = 'Sesi ujian berhasil diaktifkan.';
+            $msgType = 'success';
+        } else {
+            $message = 'Gagal mengaktifkan sesi ujian.';
+            $msgType = 'danger';
+        }
+        $activeTab = 'sessions';
+    } elseif ($action === 'deactivate_session') {
+        $sesId = (int)($_POST['session_id'] ?? 0);
+        if ($sesId > 0 && tutorialRplCbtDeactivateSession($pdo, $sesId)) {
+            $message = 'Sesi ujian berhasil dinonaktifkan.';
+            $msgType = 'success';
+        } else {
+            $message = 'Gagal menonaktifkan sesi ujian. Minimal harus ada 1 sesi ujian yang aktif.';
             $msgType = 'danger';
         }
         $activeTab = 'sessions';
@@ -390,14 +402,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgType = 'danger';
         }
         $activeTab = 'sessions';
+    } elseif ($action === 'delete_sessions') {
+        $rawIds = $_POST['session_ids'] ?? [];
+        if (!is_array($rawIds) || empty($rawIds)) {
+            $message = 'Pilih minimal satu sesi ujian yang ingin dihapus.';
+            $msgType = 'danger';
+        } else {
+            $deleted = tutorialRplCbtDeleteSessions($pdo, $rawIds);
+            if ($deleted > 0) {
+                $message = "{$deleted} sesi ujian berhasil dihapus. Riwayat pengerjaan peserta tetap tersimpan.";
+                $msgType = 'success';
+            } else {
+                $message = 'Tidak ada sesi terpilih yang dihapus.';
+                $msgType = 'danger';
+            }
+        }
+        $activeTab = 'sessions';
     } elseif ($action === 'toggle_exam') {
         $sesId = (int)($_POST['session_id'] ?? 1);
         $sessionToToggle = tutorialRplCbtGetSession($pdo, $sesId);
         $newStatus = empty($sessionToToggle['exam_open']) ? 1 : 0;
-        tutorialRplCbtUpdateSession($pdo, array_merge($sessionToToggle, ['exam_open' => $newStatus]));
+        tutorialRplCbtSetExamOpen($pdo, $sesId, $newStatus === 1);
         $statusLabel = $newStatus ? '🟢 DIBUKA' : '🔴 DITUTUP';
         $message = "Gerbang {$sessionToToggle['title']} berhasil {$statusLabel}.";
         $msgType = 'success';
+        $activeTab = 'sessions';
         $activeTab = 'sessions';
     } elseif ($action === 'save_question') {
         $qId = (int)($_POST['question_id'] ?? 0);
@@ -532,6 +561,18 @@ foreach ($questions as $q) {
     }
 }
 sort($categories);
+
+// Pengelompokan kategori dan hitungan soal per kategori per paket untuk modal sesi
+$packageCategoriesMap = [];
+foreach ($packages as $pkg) {
+    try {
+        $stmt = $pdo->prepare("SELECT category, COUNT(*) as total, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count FROM tutorial_rpl_cbt_questions WHERE package_id = ? GROUP BY category ORDER BY category ASC");
+        $stmt->execute([(int)$pkg['id']]);
+        $packageCategoriesMap[(int)$pkg['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        $packageCategoriesMap[(int)$pkg['id']] = [];
+    }
+}
 
 // Statistik Umum CBT
 $passingGrade = (float)($session['passing_grade'] ?? 70.0);
@@ -827,116 +868,209 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
     <?php endif; ?>
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         TAB 2: SESI UJIAN (90 MENIT)
+        <!-- ═══════════════════════════════════════════════════════════════════════
+         TAB 2: SESI UJIAN (PENGATUR SESI CBT)
          ═══════════════════════════════════════════════════════════════════════ -->
     <?php if ($activeTab === 'sessions'): ?>
-        <div class="bank-panel">
-            <div class="bank-panel-head">
-                <div>
-                    <h3>Daftar &amp; Konfigurasi Sesi Ujian Tulis Tutorial RPL</h3>
-                    <p>Atur sesi ujian tulis: paket soal terhubung, durasi, passing grade, token masuk, serta status gerbang pengerjaan.</p>
-                </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button type="button" class="bank-button primary" onclick="openSessionModal();" data-action="create-session">
-                        🎯 ＋ Buat Sesi Baru
-                    </button>
-                </div>
+    <section class="bank-panel">
+        <div class="bank-panel-head">
+            <div>
+                <h3>Pengatur Sesi Ujian CBT Tutorial RPL</h3>
+                <p>Atur paket soal yang ditampilkan, kadar kuota masing-masing kategori, kewajiban kamera, waktu, penilaian, jadwal mulai/selesai, dan token ujian.</p>
             </div>
-
-            <!-- Tabel Ringkasan Sesi Ujian -->
-            <div class="bank-table-scroll">
-                <table class="bank-table no-datatable">
-                    <thead>
-                        <tr>
-                            <th style="width:40px;">No.</th>
-                            <th style="width:130px;">Kode</th>
-                            <th>Nama Sesi Ujian</th>
-                            <th>Paket Terhubung</th>
-                            <th style="text-align:center; width:95px;">Durasi</th>
-                            <th style="text-align:center; width:110px;">Passing Grade</th>
-                            <th style="text-align:center; width:120px;">Token Masuk</th>
-                            <th style="text-align:center; width:130px;">Status Gerbang</th>
-                            <th style="text-align:right; width:220px;">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (empty($sessions)): ?>
-                            <tr>
-                                <td colspan="9" class="bank-empty">
-                                    Belum ada sesi ujian dibuat. Klik tombol <strong>🎯 ＋ Buat Sesi Baru</strong> untuk membuat sesi ujian pertama.
-                                </td>
-                            </tr>
-                        <?php else: ?>
-                            <?php foreach ($sessions as $sIdx => $s):
-                                $sOpen = !empty($s['exam_open']);
-                                $sPkgIds = json_decode((string)($s['package_ids_json'] ?? '[]'), true) ?: [1];
-                                $sPkgNames = [];
-                                foreach ($sPkgIds as $pId) {
-                                    foreach ($packages as $pkg) {
-                                        if ((int)$pkg['id'] === (int)$pId) {
-                                            $sPkgNames[] = $pkg['name'];
-                                            break;
-                                        }
-                                    }
-                                }
-                                $sPkgDesc = !empty($sPkgNames) ? implode(', ', $sPkgNames) : ((in_array(2, $sPkgIds, true) || str_contains($s['code'], 'PROTESTAN')) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)');
-                            ?>
-                                <tr>
-                                    <td style="font-weight:700; color:#64748b;"><?= $sIdx + 1 ?></td>
-                                    <td><span class="bank-code"><?= sanitize($s['code']) ?></span></td>
-                                    <td>
-                                        <div style="font-weight:700; color:#0f172a; font-size:13.5px;"><?= sanitize($s['title']) ?></div>
-                                    </td>
-                                    <td>
-                                        <span class="bank-badge package">📦 <?= sanitize($sPkgDesc) ?></span>
-                                    </td>
-                                    <td style="text-align:center; font-weight:700; color:#0369a1;">
-                                        <?= (int)$s['duration_minutes'] ?> Menit
-                                    </td>
-                                    <td style="text-align:center; font-weight:700; color:#0f766e;">
-                                        <?= number_format((float)$s['passing_grade'], 1) ?>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <span class="bank-badge token-badge"><?= sanitize($s['token']) ?></span>
-                                    </td>
-                                    <td style="text-align:center;">
-                                        <span class="bank-badge <?= $sOpen ? 'active' : 'danger-sm' ?>" style="font-weight:800;">
-                                            <?= $sOpen ? '🟢 BUKA' : '🔴 TUTUP' ?>
-                                        </span>
-                                    </td>
-                                    <td style="text-align:right; white-space:nowrap;">
-                                        <form method="POST" style="display:inline; margin:0 3px;">
-                                            <input type="hidden" name="action" value="toggle_exam">
-                                            <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
-                                            <?php if ($sOpen): ?>
-                                                <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" onclick="return confirm('Tutup gerbang sesi <?= sanitize($s['title']) ?>?');" title="Tutup Gerbang Ujian">
-                                                    🔒 Tutup
-                                                </button>
-                                            <?php else: ?>
-                                                <button type="submit" class="bank-button" style="padding:4px 8px; font-size:11px; background:#dcfce7; border-color:#86efac; color:#166534; font-weight:700;" onclick="return confirm('Buka gerbang sesi <?= sanitize($s['title']) ?>?');" title="Buka Gerbang Ujian">
-                                                    🚀 Buka
-                                                </button>
-                                            <?php endif; ?>
-                                        </form>
-                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditSessionModal(<?= json_encode($s, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-session" title="Edit Sesi Ujian Ini">
-                                            ✏️ Edit
-                                        </button>
-                                        <form method="POST" style="display:inline; margin:0 0 0 3px;" onsubmit="return confirm('Hapus sesi ujian \'<?= htmlspecialchars(addslashes($s['title']), ENT_QUOTES, 'UTF-8') ?>\'?');">
-                                            <input type="hidden" name="action" value="delete_session">
-                                            <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
-                                            <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Sesi Ujian">
-                                                🗑️ Hapus
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="bank-button primary" data-action="create-session">🎯 ＋ Buat Sesi Baru</button>
+                <button type="button" class="bank-button" data-action="create-tryout" style="background:#eff6ff;color:#1e3a8a;border-color:#bfdbfe">📝 ＋ Buat Tryout</button>
             </div>
         </div>
+        <?php $examStatusAdmin = tutorialRplCbtExamStatus($pdo); $examSes = $examStatusAdmin['session']; $examSwitchOpen = $examSes && (int)($examSes['exam_open'] ?? 0) === 1; ?>
+        <div class="bank-exam-switch <?= $examStatusAdmin['open'] ? 'is-open' : 'is-closed' ?>" id="examOpenSwitch" role="region" aria-label="Status pengerjaan ujian tutorial RPL resmi">
+            <div class="bank-exam-switch-info">
+                <div class="bank-exam-switch-state"><?= $examStatusAdmin['open'] ? '🟢 PENGERJAAN UJIAN CBT DIBUKA' : '🔴 PENGERJAAN UJIAN CBT DITUTUP' ?></div>
+                <div class="bank-exam-switch-desc">
+                    <?php if (!$examSes): ?>
+                        Belum ada sesi resmi yang aktif. Aktifkan salah satu sesi resmi terlebih dahulu.
+                    <?php else: ?>
+                        Sesi resmi aktif: <strong><?= sanitize($examSes['title']) ?></strong>.
+                        <?php if ($examStatusAdmin['open']): ?>
+                            Peserta tutorial aktif dapat menekan <strong>"Mulai Ujian CBT"</strong> dan memulai ujian.
+                        <?php elseif ($examSwitchOpen): ?>
+                            Sakelar sudah <strong>dibuka</strong>, tetapi <?= sanitize($examStatusAdmin['notice']) ?> (atur di Edit Sesi › jadwal).
+                        <?php else: ?>
+                            Peserta melihat link pengerjaan terkunci 🔒 dan tidak dapat memulai ujian.
+                        <?php endif; ?>
+                        <span style="display:block;margin-top:4px;font-size:11.5px;opacity:.85">Menutup ujian tidak menghentikan peserta yang sedang mengerjakan; mereka tetap dapat menyelesaikan sampai waktunya habis.</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php if ($examSes): ?>
+                <form method="post" action="?tab=sessions" data-no-spa style="margin:0"
+                      onsubmit="return confirm(<?= htmlspecialchars(json_encode($examSwitchOpen ? 'TUTUP pengerjaan ujian CBT Tutorial RPL sekarang? Peserta tidak akan bisa memulai ujian baru.' : 'BUKA pengerjaan ujian CBT Tutorial RPL sekarang? Peserta tutorial aktif akan bisa memulai ujian.'), ENT_QUOTES, 'UTF-8') ?>)">
+                    <input type="hidden" name="action" value="set_exam_open">
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="session_id" value="<?= (int)$examSes['id'] ?>">
+                    <input type="hidden" name="open" value="<?= $examSwitchOpen ? 0 : 1 ?>">
+                    <button type="submit" class="bank-button <?= $examSwitchOpen ? 'danger' : 'primary' ?>" id="examOpenToggle" style="min-height:42px;padding:8px 18px;font-weight:800">
+                        <?= $examSwitchOpen ? '🔴 Tutup Ujian' : '🟢 Buka Ujian' ?>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
+        <form id="bulkDeleteSessionsForm" method="post" action="?tab=sessions" data-bulk-delete-form="sessions" data-no-spa>
+            <input type="hidden" name="action" value="delete_sessions">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <div class="bank-panel-head" data-bulk-toolbar="sessions" hidden style="padding-top:10px;padding-bottom:10px">
+                <span data-bulk-count="sessions" aria-live="polite">0 sesi dipilih</span>
+                <button type="submit" class="bank-button danger" data-bulk-delete-button="sessions">🗑️ Hapus Terpilih</button>
+            </div>
+        </form>
+        <div class="bank-table-scroll">
+            <table class="bank-table no-datatable">
+                <thead>
+                    <tr>
+                        <th style="width:38px;text-align:center"><input type="checkbox" aria-label="Pilih semua sesi ujian" data-bulk-select-all="sessions"></th>
+                        <th style="width:35px">No.</th>
+                        <th>Kode Sesi</th>
+                        <th>Nama Sesi &amp; Paket Terpilih</th>
+                        <th>Kadar Kategori</th>
+                        <th>Kamera</th>
+                        <th>Waktu &amp; Nilai</th>
+                        <th>Jadwal Pelaksanaan</th>
+                        <th>Token</th>
+                        <th>Status</th>
+                        <th style="text-align:right">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($sessions)): ?>
+                    <tr><td colspan="11" class="bank-empty">Belum ada sesi ujian dibuat. Klik tombol <strong>＋ Buat Sesi Baru</strong> untuk mengatur sesi ujian pertama.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($sessions as $sIdx => $ses): ?>
+                    <tr>
+                        <td style="text-align:center"><input type="checkbox" name="session_ids[]" value="<?= (int)$ses['id'] ?>" form="bulkDeleteSessionsForm" aria-label="Pilih sesi <?= htmlspecialchars($ses['title'], ENT_QUOTES, 'UTF-8') ?>" data-bulk-select-item="sessions" data-item-label="<?= htmlspecialchars($ses['title'], ENT_QUOTES, 'UTF-8') ?>"></td>
+                        <td style="color:#8b978e"><?= $sIdx + 1 ?></td>
+                        <td><span class="bank-code"><?= sanitize($ses['code']) ?></span></td>
+                        <td>
+                            <strong><?= sanitize($ses['title']) ?></strong>
+                            <?php if (!empty($ses['description'])): ?>
+                                <div style="font-size:11px;color:#6b7972;margin-top:2px"><?= sanitize($ses['description']) ?></div>
+                            <?php endif; ?>
+                            <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+                                <?php foreach ($ses['package_names'] as $pName): ?>
+                                    <span class="bank-badge package">📦 <?= sanitize($pName) ?></span>
+                                <?php endforeach; ?>
+                                <?php if (empty($ses['package_names'])): ?>
+                                    <span class="bank-badge" style="color:#b91c1c;background:#fee2e2">Belum ada paket</span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td>
+                            <?php if (!empty($ses['category_quotas'])): ?>
+                                <details style="margin:0">
+                                    <summary style="font-weight:700;color:#126147;font-size:11.5px"><?= array_sum($ses['category_quotas']) ?> Soal (<?= count($ses['category_quotas']) ?> Kategori)</summary>
+                                    <div style="font-size:11px;margin-top:4px;background:#f8faf8;padding:6px 8px;border-radius:6px;line-height:1.6">
+                                        <?php foreach ($ses['category_quotas'] as $cat => $quota): ?>
+                                            <div>• <strong><?= sanitize($cat) ?></strong>: <?= (int)$quota ?> butir</div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </details>
+                            <?php else: ?>
+                                <span class="bank-badge">Acak Penuh Paket (<?= (int)$ses['target_questions'] ?> butir)</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($ses['camera_mode'] === 'wajib'): ?>
+                                <span class="bank-badge camera-wajib">📷 WAJIB</span>
+                            <?php elseif ($ses['camera_mode'] === 'tidak_aktif'): ?>
+                                <span class="bank-badge camera-bebas">🚫 TANPA KAMERA</span>
+                            <?php else: ?>
+                                <span class="bank-badge camera-opsi">📷 OPSIONAL</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <strong><?= (int)$ses['duration_minutes'] ?> menit</strong>
+                            <div style="font-size:11px;color:#6d7f72;margin-top:3px">
+                                <?= $ses['scoring_method'] === 'penalti' ? 'UTBK (+4, -1, 0)' : 'Skala 100 Proporsional' ?>
+                                (KKM: <?= number_format((float)$ses['passing_grade'], 0) ?>)
+                            </div>
+                            <div style="margin-top:4px">
+                                <?php if (!empty($ses['shuffle_on_violation'])): ?>
+                                    <span class="bank-badge" style="background:#dcfce7;color:#15803d;font-size:10px;padding:2px 6px" title="Soal belum dijawab otomatis ditukar dari bank cadangan & opsi diacak jika terdeteksi pelanggaran">🛡️ Anti-Contek (Tukar Cadangan)</span>
+                                <?php else: ?>
+                                    <span class="bank-badge" style="background:#f1f5f9;color:#64748b;font-size:10px;padding:2px 6px" title="Hanya geser urutan posisi soal tanpa mengambil bank cadangan">Anti-Contek Standar</span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td>
+                            <?php if (!empty($ses['start_time']) || !empty($ses['end_time'])): ?>
+                                <div style="font-size:11.5px">
+                                    <div>🟢 Mulai: <strong><?= !empty($ses['start_time']) ? (new DateTimeImmutable($ses['start_time']))->format('d/m/Y H:i') : 'Langsung' ?></strong></div>
+                                    <div>🔴 Batas: <strong><?= !empty($ses['end_time']) ? (new DateTimeImmutable($ses['end_time']))->format('d/m/Y H:i') : 'Tidak dibatasi' ?></strong></div>
+                                </div>
+                            <?php else: ?>
+                                <span class="bank-badge">Buka Terbuka</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if (!empty($ses['token_required'])): ?>
+                                <span class="bank-badge token-badge" title="Token wajib diisi peserta"><?= sanitize($ses['token']) ?></span>
+                            <?php else: ?>
+                                <span class="bank-badge" style="color:#64748b" title="Token tidak diwajibkan">Tanpa Token</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ($ses['is_active']): ?>
+                                <span class="bank-badge session-active">● AKTIF</span>
+                            <?php else: ?>
+                                <span class="bank-badge session-inactive">Tidak Aktif</span>
+                            <?php endif; ?>
+                            <?php if (($ses['mode'] ?? 'resmi') === 'tryout'): ?>
+                                <div style="margin-top:4px"><span class="bank-badge" style="background:#dbeafe;color:#1e3a8a">📝 TRYOUT · <?= (int)($ses['max_attempts'] ?? 0) === 0 ? 'ulang ∞' : ('maks ' . (int)$ses['max_attempts'] . '×') ?></span></div>
+                            <?php else: ?>
+                                <div style="margin-top:4px"><span class="bank-badge" style="background:#ecfdf5;color:#047857">🎓 RESMI</span></div>
+                                <div style="margin-top:4px"><?php if ((int)($ses['exam_open'] ?? 0) === 1): ?><span class="bank-badge" style="background:#dcfce7;color:#166534">🟢 Ujian dibuka</span><?php else: ?><span class="bank-badge" style="background:#fee2e2;color:#991b1b">🔴 Ujian ditutup</span><?php endif; ?></div>
+                            <?php endif; ?>
+                        </td>
+                        <td style="text-align:right;white-space:nowrap">
+                            <?php if (!$ses['is_active']): ?>
+                                <form method="post" action="?tab=sessions" style="display:inline;margin:0 3px">
+                                    <input type="hidden" name="action" value="activate_session">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                    <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Aktifkan sesi ini untuk ujian mahasiswa">🟢 Aktifkan</button>
+                                </form>
+                            <?php else: ?>
+                                <form method="post" action="?tab=sessions" style="display:inline;margin:0 3px">
+                                    <input type="hidden" name="action" value="deactivate_session">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                    <button type="submit" class="bank-button danger-sm" style="min-height:28px;padding:4px 8px;font-size:11px" title="Nonaktifkan sesi ini">🔴 Nonaktifkan</button>
+                                </form>
+                            <?php endif; ?>
+                            <?php if (($ses['mode'] ?? 'resmi') !== 'tryout'): $rowOpen = (int)($ses['exam_open'] ?? 0) === 1; ?>
+                                <form method="post" action="?tab=sessions" data-no-spa style="display:inline;margin:0 3px">
+                                    <input type="hidden" name="action" value="set_exam_open">
+                                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                    <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                    <input type="hidden" name="open" value="<?= $rowOpen ? 0 : 1 ?>">
+                                    <button type="submit" class="bank-button <?= $rowOpen ? 'danger-sm' : '' ?>" style="min-height:28px;padding:4px 8px;font-size:11px" title="<?= $rowOpen ? 'Tutup pengerjaan ujian untuk sesi ini' : 'Buka pengerjaan ujian untuk sesi ini' ?>"><?= $rowOpen ? '🔴 Tutup Ujian' : '🟢 Buka Ujian' ?></button>
+                                </form>
+                            <?php endif; ?>
+                            <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick='openSessionModal(true, <?= htmlspecialchars(json_encode($ses, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>)'>✏️ Edit</button>
+                            <form method="post" action="?tab=sessions" style="display:inline;margin:0 0 0 3px" onsubmit="return confirm('PERINGATAN: Yakin ingin menghapus Sesi Ujian '<?= htmlspecialchars(addslashes($ses['title']), ENT_QUOTES, 'UTF-8') ?>'?')">
+                                <input type="hidden" name="action" value="delete_session">
+                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                                <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
+                                <button type="submit" class="bank-button danger-sm" title="Hapus sesi ujian">🗑️ Hapus</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
     <?php endif; ?>
 
     <!-- ═══════════════════════════════════════════════════════════════════════
@@ -1424,85 +1558,171 @@ include __DIR__ . '/../includes/header.php';
     <?php endif; ?>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     MODAL TAMBAH / EDIT SESI UJIAN
-     ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="sessionModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="sessionModalTitle">
-    <div class="bank-modal" style="max-width:620px;">
-        <div class="bank-modal-head" style="background:#eff6ff;">
-            <div>
-                <h3 id="sessionModalTitle" style="color:#1e40af;">🎯 Buat Sesi Ujian Baru</h3>
-                <div style="font-size:12px; color:#475569; margin-top:2px;">Konfigurasi parameter sesi ujian tulis Tutorial RPL</div>
-            </div>
-            <button type="button" class="bank-modal-close" onclick="closeSessionModal();">✕</button>
+<!-- ═══════════════════════════════════════════════════════════════════════
+     MODAL 2: PENGATUR SESI UJIAN (LARGE MODAL - TANPA PINDAH HALAMAN)
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="modalSessionForm" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="modalSessionTitle">
+    <div class="bank-modal large">
+        <div class="bank-modal-head">
+            <h3 id="modalSessionTitle">Pengatur Sesi Ujian Baru</h3>
+            <button type="button" class="bank-modal-close" data-close-modal aria-label="Tutup">✕</button>
         </div>
-        <form method="POST">
+        <form method="post" action="?tab=sessions" id="formSessionModal">
             <input type="hidden" name="action" value="save_session">
-            <input type="hidden" name="session_id" id="sessionModalId" value="0">
-            <div class="bank-modal-body" style="padding:20px;">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+            <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+            <input type="hidden" name="id" id="sesModalId" value="0">
+            <div class="bank-modal-body">
+                <!-- 1. Identitas Sesi -->
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
                     <div class="bank-field">
-                        <label class="bank-label">Kode Sesi *</label>
-                        <input type="text" name="code" id="sessionModalCode" class="bank-input" placeholder="Cth: SESI-TUTOR-UTAMA" required>
+                        <label class="bank-label" for="sesModalTitle">Nama Sesi Ujian *</label>
+                        <input id="sesModalTitle" class="bank-input" name="title" maxlength="150" required placeholder="Contoh: Sesi 1 - CBT Tutorial RPL 2026/2027">
                     </div>
                     <div class="bank-field">
-                        <label class="bank-label">Paket Soal Terhubung *</label>
-                        <select name="package_id" id="sessionModalPackageId" class="bank-input" style="font-weight:700;">
-                            <?php foreach ($packages as $pkg): ?>
-                                <option value="<?= (int)$pkg['id'] ?>">📦 <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['duration_minutes'] ?> mnt / <?= (int)$pkg['question_count'] ?> soal)</option>
-                            <?php endforeach; ?>
+                        <label class="bank-label" for="sesModalCode">Kode Sesi</label>
+                        <input id="sesModalCode" class="bank-input" name="code" maxlength="64" placeholder="Otomatis jika kosong">
+                    </div>
+                </div>
+
+                <!-- 1b. Jenis Sesi: Resmi / Tryout -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px">
+                    <div class="bank-field" style="margin:0">
+                        <label class="bank-label" for="sesModalMode" style="color:#1e3a8a">Jenis Sesi *</label>
+                        <select id="sesModalMode" class="bank-input" name="mode">
+                            <option value="resmi">🎓 Ujian Resmi (1× pengerjaan, terdaftar tutorial)</option>
+                            <option value="tryout">📝 Tryout / Latihan (terpisah dari ujian resmi)</option>
+                        </select>
+                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">Tryout tampil di menu latihan mahasiswa, tanpa verifikasi wajah ketat, dan tidak memakan jatah ujian resmi. Beberapa tryout boleh aktif bersamaan dengan sesi resmi.</span>
+                    </div>
+                    <div class="bank-field" id="sesModalMaxAttemptsWrap" style="margin:0">
+                        <label class="bank-label" for="sesModalMaxAttempts" style="color:#1e3a8a">Batas Pengerjaan Tryout</label>
+                        <input type="number" id="sesModalMaxAttempts" class="bank-input" name="max_attempts" min="0" max="99" value="0">
+                        <span style="font-size:11px;color:#1e40af;display:block;margin-top:4px">0 = boleh diulang tanpa batas; 1 = sekali saja.</span>
+                    </div>
+                </div>
+
+                <!-- 2. Paket Soal yang Digunakan -->
+                <div class="bank-field">
+                    <label class="bank-label">Pilih Paket Soal yang Digunakan *</label>
+                    <div style="background:#f8faf8;border:1px solid #dce5df;border-radius:10px;padding:12px;display:flex;gap:14px;flex-wrap:wrap">
+                        <?php foreach ($packages as $pkg): ?>
+                            <label class="bank-toggle" style="background:#fff;padding:6px 12px;border:1px solid #e2e8e2;border-radius:8px">
+                                <input type="checkbox" name="package_ids[]" id="pkgCheckbox_<?= (int)$pkg['id'] ?>" value="<?= (int)$pkg['id'] ?>">
+                                <span><strong><?= sanitize($pkg['name']) ?></strong> (<?= (int)($pkg['question_count_actual'] ?? $pkg['question_count']) ?> soal aktif)</span>
+                            </label>
+                        <?php endforeach; ?>
+                        <?php if (empty($packages)): ?>
+                            <div style="color:#b91c1c;font-size:12px">Belum ada paket soal dibuat. Buat paket terlebih dahulu.</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- 3. Kadar / Kuota per Kategori Materi -->
+                <div class="bank-field" style="background:#f9fbf9;border:1px solid #dae5dc;border-radius:12px;padding:14px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <div>
+                            <label class="bank-label" style="margin:0">Kadar / Kuota pada Masing-Masing Kategori (Proporsi Materi)</label>
+                            <span style="font-size:11px;color:#6d7f72">Tentukan jumlah butir soal yang diacak dari masing-masing kategori untuk tiap peserta.</span>
+                        </div>
+                        <span id="sesModalTotalQuotaBadge" class="bank-badge package" style="font-size:11px;padding:5px 10px">Bebas / Acak Paket</span>
+                    </div>
+                    <div id="sesModalCategoryQuotasContainer">
+                        <div style="padding:12px;color:#8a998f;font-size:12px;text-align:center">Pilih paket soal di atas untuk mengatur kadar kategori.</div>
+                    </div>
+                </div>
+
+                <!-- 4. Pengaturan Kamera & Waktu -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                    <div class="bank-field">
+                        <label class="bank-label" for="sesModalCameraMode">Kewajiban Kamera &amp; Proctoring *</label>
+                        <select id="sesModalCameraMode" class="bank-input" name="camera_mode" required>
+                            <option value="wajib">📷 Wajib Kamera (Verifikasi Scan Wajah + Proctoring 30s)</option>
+                            <option value="tidak_aktif">🚫 Bebas / Tanpa Kamera (Langsung Masuk Lembar Soal)</option>
+                            <option value="opsional">📷 Kamera Opsional (Bisa Ujian Tanpa Kamera)</option>
                         </select>
                     </div>
-                </div>
-
-                <div class="bank-field" style="margin-bottom:14px;">
-                    <label class="bank-label">Judul Sesi Ujian *</label>
-                    <input type="text" name="title" id="sessionModalTitleInput" class="bank-input" placeholder="Cth: Ujian Tulis Tutorial RPL 2026/2027 (Utama / Muslim)" required>
-                </div>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
                     <div class="bank-field">
-                        <label class="bank-label">Durasi Pengerjaan (Menit) *</label>
-                        <input type="number" name="duration_minutes" id="sessionModalDuration" class="bank-input" value="90" min="5" max="300" required>
+                        <label class="bank-label" for="sesModalDuration">Durasi Waktu Ujian (Menit) *</label>
+                        <input id="sesModalDuration" class="bank-input" type="number" name="duration_minutes" min="5" max="360" required value="90">
+                    </div>
+                </div>
+
+                <!-- 5. Cara Menilai & Nilai KKM -->
+                <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:14px">
+                    <div class="bank-field">
+                        <label class="bank-label" for="sesModalScoringMethod">Cara Menilai (Metode Scoring) *</label>
+                        <select id="sesModalScoringMethod" class="bank-input" name="scoring_method" required>
+                            <option value="standar">Standar Skala 100: (Benar / Total) × 100</option>
+                            <option value="penalti">Sistem Minus UTBK: Benar +4, Salah -1, Kosong 0</option>
+                        </select>
                     </div>
                     <div class="bank-field">
-                        <label class="bank-label">Passing Grade (KKM) *</label>
-                        <input type="number" step="0.1" name="passing_grade" id="sessionModalPassingGrade" class="bank-input" value="70.0" min="0" max="100" required>
+                        <label class="bank-label" for="sesModalPassingGrade">Ambang Batas Kelulusan (KKM)</label>
+                        <input id="sesModalPassingGrade" class="bank-input" type="number" step="0.01" name="passing_grade" min="0" max="100" value="70.00">
                     </div>
                 </div>
 
-                <div class="bank-field" style="margin-bottom:14px;">
-                    <label class="bank-label">Token Masuk Ujian *</label>
-                    <div class="bank-token-group" style="display:flex; gap:8px;">
-                        <input type="text" name="token" id="sessionModalToken" class="bank-input" value="TUTOR26" required style="text-transform:uppercase; font-weight:800; letter-spacing:2px;">
-                        <button type="button" class="bank-button" onclick="generateRandomSessionToken();" title="Buat Token Acak">
-                            🎲 Acak
-                        </button>
-                        <button type="button" class="bank-button" onclick="copySessionModalToken();" title="Salin Token">
-                            📋 Salin
-                        </button>
+                <!-- 6. Kapan Ujian Bisa Dimulai & Kapan Tidak Bisa Memulai -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                    <div class="bank-field">
+                        <label class="bank-label" for="sesModalStartTime">Kapan Ujian Bisa Dimulai (Jadwal Buka)</label>
+                        <input id="sesModalStartTime" class="bank-input" type="datetime-local" name="start_time" placeholder="Pilih waktu mulai">
+                        <span style="font-size:10.5px;color:#6b7972;margin-top:3px;display:block">Sebelum waktu ini, peserta belum bisa membuka lembar ujian.</span>
+                    </div>
+                    <div class="bank-field">
+                        <label class="bank-label" for="sesModalEndTime">Kapan Batas Tidak Bisa Memulai (Jadwal Tutup)</label>
+                        <input id="sesModalEndTime" class="bank-input" type="datetime-local" name="end_time" placeholder="Pilih batas akhir">
+                        <span style="font-size:10.5px;color:#6b7972;margin-top:3px;display:block">Setelah waktu ini, pendaftaran ujian sesi ini ditutup bagi peserta baru.</span>
                     </div>
                 </div>
 
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:10px;">
-                    <label class="bank-toggle" style="cursor:pointer; margin-bottom:10px;">
-                        <input type="checkbox" name="exam_open" id="sessionModalExamOpen" value="1" checked style="width:18px; height:18px;">
-                        <div>
-                            <strong style="color:#0f172a; font-size:13.5px;">Buka Gerbang Pengerjaan Sesi Ini (Live)</strong>
-                            <div class="bank-note">Peserta yang terdaftar dapat memasukkan token dan mengerjakan soal sesi ini.</div>
+                <!-- 7. Token Akses Ujian -->
+                <div style="background:#fefce8;border:1px solid #fef08a;border-radius:12px;padding:14px;margin-bottom:14px">
+                    <label class="bank-label" style="color:#854d0e">Token Akses Ujian Peserta</label>
+                    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                        <div class="bank-token-group">
+                            <input id="sesModalToken" class="bank-input" name="token" maxlength="32" placeholder="TOKEN">
+                            <button type="button" class="bank-button" onclick="generateRandomToken()" title="Acak token 6 karakter baru">🎲 Acak Token</button>
                         </div>
-                    </label>
-                    <label class="bank-toggle" style="cursor:pointer; margin:0;">
-                        <input type="checkbox" name="is_active" id="sessionModalIsActive" value="1" checked style="width:18px; height:18px;">
-                        <div>
-                            <strong style="color:#0f172a; font-size:13.5px;">Aktifkan Sesi Ujian Ini</strong>
-                            <div class="bank-note">Sesi aktif akan dapat diakses oleh mahasiswa di portal Tutorial RPL.</div>
-                        </div>
-                    </label>
+                        <label class="bank-toggle" style="margin:0">
+                            <input type="checkbox" name="token_required" id="sesModalTokenRequired" value="1">
+                            <strong>Wajibkan Token Ujian</strong> (Peserta wajib memasukkan token ini sebelum memulai CBT)
+                        </label>
+                    </div>
                 </div>
+
+                <!-- 8. Proteksi Anti-Contek & Pertukaran Soal Pelanggaran -->
+                <div class="bank-field" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px;margin-bottom:14px">
+                    <label class="bank-label" for="sesModalShuffleOnViolation" style="color:#166534;margin-bottom:6px">🛡️ Proteksi Anti-Contek Saat Pelanggaran Terdeteksi</label>
+                    <div style="font-size:11.5px;color:#1e3a2b;margin-bottom:8px;line-height:1.5">
+                        Tindakan sistem ketika peserta melakukan pelanggaran (ganti tab, jendela diminimalkan, wajah hilang/berbeda):
+                    </div>
+                    <select id="sesModalShuffleOnViolation" class="bank-input" name="shuffle_on_violation">
+                        <option value="1">✅ Aktif: Seluruh soal belum dijawab diganti soal baru dari bank cadangan &amp; abjad opsi diacak (Anti-Joki/Bocoran)</option>
+                        <option value="0">❌ Nonaktif: Posisi soal hanya dipindah dan abjad diacak tanpa mengambil soal cadangan</option>
+                    </select>
+                    <span style="font-size:11px;color:#4b6354;margin-top:5px;display:block">
+                        💡 <strong>Sangat Dianjurkan</strong> bila memiliki bank soal cadangan (misal: bank soal 177 soal, dikerjakan 25 soal). Soal yang sudah dijawab peserta tetap aman dan skor tidak berkurang, hanya susunan abjadnya disamarkan ulang.
+                    </span>
+                </div>
+
+                <!-- 9. Deskripsi & Status Aktif -->
+                <div class="bank-field">
+                    <label class="bank-label" for="sesModalDesc">Deskripsi / Petunjuk untuk Peserta Sesi Ini</label>
+                    <textarea id="sesModalDesc" class="bank-input" name="description" rows="2" placeholder="Keterangan pengawas, ruang lab, atau catatan khusus…"></textarea>
+                </div>
+                <label class="bank-toggle">
+                    <input type="checkbox" name="is_active" id="sesModalActive" value="1" checked>
+                    <strong>Jadikan Sesi Aktif Saat Ini</strong> (Peserta tutorial RPL yang login otomatis diarahkan ke sesi ini)
+                </label>
+                <input type="hidden" name="exam_open" value="0">
+                <label class="bank-toggle" id="sesModalExamOpenWrap" style="margin-top:8px">
+                    <input type="checkbox" name="exam_open" id="sesModalExamOpen" value="1">
+                    <strong>Buka Pengerjaan Ujian</strong> (peserta dapat menekan "Mulai Ujian CBT"; tetap mengikuti jadwal mulai/batas di atas). Bisa juga diatur dengan tombol 🟢 Buka / 🔴 Tutup Ujian.
+                </label>
             </div>
             <div class="bank-modal-foot">
-                <button type="button" class="bank-button" onclick="closeSessionModal();">Batal</button>
+                <button type="button" class="bank-button" data-close-modal>Batal</button>
                 <button type="submit" class="bank-button primary">💾 Simpan Sesi Ujian</button>
             </div>
         </form>
@@ -1718,98 +1938,295 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+window.CBT_PACKAGE_CATEGORIES = <?= json_encode($packageCategoriesMap, JSON_UNESCAPED_UNICODE) ?>;
 const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
 
-// Modal Sesi Ujian (Create & Edit per record)
-function openSessionModal() {
-    const titleEl = document.getElementById('sessionModalTitle');
-    if (titleEl) titleEl.textContent = '🎯 Buat Sesi Ujian Baru';
-    if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = '0';
-    if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = '';
-    if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = '';
-    if (document.getElementById('sessionModalDuration')) document.getElementById('sessionModalDuration').value = '90';
-    if (document.getElementById('sessionModalPassingGrade')) document.getElementById('sessionModalPassingGrade').value = '70.0';
-    generateRandomSessionToken();
-    if (document.getElementById('sessionModalExamOpen')) document.getElementById('sessionModalExamOpen').checked = true;
-    if (document.getElementById('sessionModalIsActive')) document.getElementById('sessionModalIsActive').checked = true;
+function get(id) { return document.getElementById(id); }
 
-    const el = document.getElementById('sessionModalBackdrop');
-    if (el) {
-        el.style.display = 'flex';
-        el.style.pointerEvents = 'auto';
-        el.style.visibility = 'visible';
-        el.classList.add('open');
+function cbtOpenModal(id) {
+    const modal = typeof id === 'string' ? get(id) : id;
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.pointerEvents = 'auto';
+        modal.style.visibility = 'visible';
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        const firstInput = modal.querySelector('input:not([type=hidden]), textarea, select');
+        if (firstInput) setTimeout(() => firstInput.focus(), 80);
     }
 }
 
-function openEditSessionModal(s) {
-    const titleEl = document.getElementById('sessionModalTitle');
-    if (titleEl) titleEl.textContent = '✏️ Edit Sesi Ujian (' + (s.code || 'ID: ' + s.id) + ')';
-    if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = s.id;
-    if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = s.code || '';
-    if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = s.title || '';
-    if (document.getElementById('sessionModalDuration')) document.getElementById('sessionModalDuration').value = s.duration_minutes || 90;
-    if (document.getElementById('sessionModalPassingGrade')) document.getElementById('sessionModalPassingGrade').value = s.passing_grade || 70.0;
-    if (document.getElementById('sessionModalToken')) document.getElementById('sessionModalToken').value = s.token || 'TUTOR26';
-    if (document.getElementById('sessionModalExamOpen')) document.getElementById('sessionModalExamOpen').checked = (parseInt(s.exam_open, 10) === 1);
-    if (document.getElementById('sessionModalIsActive')) document.getElementById('sessionModalIsActive').checked = (parseInt(s.is_active !== undefined ? s.is_active : 1, 10) === 1);
-
-    if (document.getElementById('sessionModalPackageId')) {
-        let pkgIds = [1];
-        try {
-            pkgIds = JSON.parse(s.package_ids_json) || [1];
-        } catch(e) {}
-        document.getElementById('sessionModalPackageId').value = pkgIds[0] || (parseInt(s.id, 10) === 2 ? '2' : '1');
-    }
-
-    const el = document.getElementById('sessionModalBackdrop');
-    if (el) {
-        el.style.display = 'flex';
-        el.style.pointerEvents = 'auto';
-        el.style.visibility = 'visible';
-        el.classList.add('open');
+function cbtCloseModal(id) {
+    const modal = typeof id === 'string' ? get(id) : id;
+    if (modal) {
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+        modal.style.pointerEvents = 'none';
+        modal.style.visibility = 'hidden';
+        if (!document.querySelector('.bank-modal-backdrop.open')) {
+            document.body.style.overflow = '';
+        }
     }
 }
+window.cbtOpenModal = cbtOpenModal;
+window.cbtCloseModal = cbtCloseModal;
 
-function closeSessionModal() {
-    const el = document.getElementById('sessionModalBackdrop');
-    if (el) {
-        el.classList.remove('open');
-        el.style.display = 'none';
-        el.style.pointerEvents = 'none';
-        el.style.visibility = 'hidden';
+window.generateRandomToken = function () {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let res = '';
+    for (let i = 0; i < 6; i++) {
+        res += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    document.body.style.overflow = '';
-}
-
-function generateRandomSessionToken() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let token = '';
-    for (let i = 0; i < 7; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    const tokenInput = get('sesModalToken');
+    if (tokenInput) {
+        tokenInput.value = res;
+        tokenInput.focus();
     }
-    const tokenInput = document.getElementById('sessionModalToken') || document.getElementById('sessionTokenInput');
-    if (tokenInput) tokenInput.value = token;
-}
+};
 
-function copySessionModalToken() {
-    const tokenInput = document.getElementById('sessionModalToken') || document.getElementById('sessionTokenInput');
-    if (!tokenInput) return;
-    navigator.clipboard.writeText(tokenInput.value).then(() => {
-        alert('Token ' + tokenInput.value + ' berhasil disalin!');
-    }).catch(() => {
-        tokenInput.select();
-        document.execCommand('copy');
-        alert('Token ' + tokenInput.value + ' berhasil disalin!');
+function recalculateTotalQuota() {
+    const inputs = document.querySelectorAll('.category-quota-input');
+    let total = 0;
+    inputs.forEach(input => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val) && val > 0) total += val;
     });
+    const badge = get('sesModalTotalQuotaBadge');
+    if (badge) {
+        badge.textContent = total > 0 ? (total + ' soal target') : 'Bebas / Acak Paket';
+    }
 }
 
-function loadSessionConfig(sessionId) {
-    sessionId = parseInt(sessionId, 10);
-    const s = SESSIONS_DATA.find(item => parseInt(item.id, 10) === sessionId);
-    if (!s) return;
-    openEditSessionModal(s);
+window.refreshCategoryQuotasForSelectedPackages = function (existingQuotas) {
+    const checkedBoxes = Array.from(document.querySelectorAll('input[name="package_ids[]"]:checked'));
+    const pkgIds = checkedBoxes.map(cb => cb.value);
+    const container = get('sesModalCategoryQuotasContainer');
+    if (!container) return;
+
+    if (pkgIds.length === 0) {
+        container.innerHTML = '<div style="padding:12px;color:#8a998f;font-size:12px;text-align:center;">Pilih minimal 1 paket soal di atas untuk menampilkan daftar kategori materi.</div>';
+        recalculateTotalQuota();
+        return;
+    }
+
+    const map = window.CBT_PACKAGE_CATEGORIES || {};
+    const combinedCategories = {};
+    pkgIds.forEach(id => {
+        const list = map[id] || [];
+        list.forEach(item => {
+            const cat = item.category;
+            if (!combinedCategories[cat]) {
+                combinedCategories[cat] = { active_count: 0, total: 0 };
+            }
+            combinedCategories[cat].active_count += Number(item.active_count || 0);
+            combinedCategories[cat].total += Number(item.total || 0);
+        });
+    });
+
+    const catNames = Object.keys(combinedCategories).sort();
+    if (catNames.length === 0) {
+        container.innerHTML = '<div style="padding:12px;color:#8a998f;font-size:12px;text-align:center;">Belum ada butir soal dalam paket terpilih. Kuota kategori akan menggunakan acak umum.</div>';
+        recalculateTotalQuota();
+        return;
+    }
+
+    let html = '<table class="bank-quota-table"><thead><tr><th>Kategori Materi</th><th style="width:110px">Soal Aktif</th><th style="width:140px">Kadar / Kuota Soal</th></tr></thead><tbody>';
+    catNames.forEach(cat => {
+        const info = combinedCategories[cat];
+        const currentVal = (existingQuotas && existingQuotas[cat] !== undefined) ? existingQuotas[cat] : '';
+        html += '<tr>';
+        html += '<td><strong>' + String(cat).replace(/</g, '&lt;') + '</strong></td>';
+        html += '<td><span class="bank-badge">' + info.active_count + ' soal</span></td>';
+        html += '<td><input type="number" class="bank-input category-quota-input" name="category_quotas[' + String(cat).replace(/"/g, '&quot;') + ']" min="0" max="' + info.active_count + '" placeholder="0" value="' + currentVal + '" style="padding:6px 10px;font-size:12px"></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('.category-quota-input').forEach(inp => {
+        inp.addEventListener('input', recalculateTotalQuota);
+    });
+    recalculateTotalQuota();
+};
+
+function syncSessionModeFields() {
+    const mode = get('sesModalMode') ? get('sesModalMode').value : 'resmi';
+    const wrap = get('sesModalMaxAttemptsWrap');
+    if (wrap) wrap.style.opacity = mode === 'tryout' ? '1' : '0.45';
+    if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').disabled = mode !== 'tryout';
+    const examWrap = get('sesModalExamOpenWrap');
+    if (examWrap) examWrap.style.display = mode === 'tryout' ? 'none' : '';
 }
+
+window.openSessionModal = function (isEdit, data) {
+    const titleEl = get('modalSessionTitle');
+    const form = get('formSessionModal');
+    if (!form) return;
+    form.reset();
+
+    document.querySelectorAll('input[name="package_ids[]"]').forEach(cb => { cb.checked = false; });
+
+    if (isEdit && data) {
+        if (titleEl) titleEl.textContent = 'Edit Sesi Ujian: ' + (data.title || '');
+        if (get('sesModalId')) get('sesModalId').value = data.id || 0;
+        if (get('sesModalCode')) {
+            get('sesModalCode').value = data.code || '';
+            get('sesModalCode').readOnly = true;
+        }
+        if (get('sesModalTitle')) get('sesModalTitle').value = data.title || '';
+        if (get('sesModalDesc')) get('sesModalDesc').value = data.description || '';
+        if (get('sesModalDuration')) get('sesModalDuration').value = data.duration_minutes || 90;
+        if (get('sesModalCameraMode')) get('sesModalCameraMode').value = data.camera_mode || 'wajib';
+        if (get('sesModalScoringMethod')) get('sesModalScoringMethod').value = data.scoring_method || 'standar';
+        if (get('sesModalPassingGrade')) get('sesModalPassingGrade').value = data.passing_grade || '70.00';
+        if (get('sesModalStartTime')) get('sesModalStartTime').value = data.start_time ? data.start_time.replace(' ', 'T') : '';
+        if (get('sesModalEndTime')) get('sesModalEndTime').value = data.end_time ? data.end_time.replace(' ', 'T') : '';
+        if (get('sesModalToken')) get('sesModalToken').value = data.token || '';
+        if (get('sesModalTokenRequired')) get('sesModalTokenRequired').checked = Number(data.token_required) === 1;
+        if (get('sesModalShuffleOnViolation')) {
+            get('sesModalShuffleOnViolation').value = data.shuffle_on_violation !== undefined ? String(data.shuffle_on_violation) : '1';
+        }
+        if (get('sesModalActive')) get('sesModalActive').checked = Number(data.is_active) === 1;
+        if (get('sesModalMode')) get('sesModalMode').value = data.mode === 'tryout' ? 'tryout' : 'resmi';
+        if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = data.mode === 'tryout' ? String(Number(data.max_attempts) || 0) : '0';
+        if (get('sesModalExamOpen')) get('sesModalExamOpen').checked = Number(data.exam_open) === 1;
+        syncSessionModeFields();
+
+        let pkgIds = data.package_ids || [];
+        if (typeof pkgIds === 'string') {
+            try { pkgIds = JSON.parse(pkgIds); } catch(e) { pkgIds = []; }
+        }
+        pkgIds.forEach(id => {
+            const cb = get('pkgCheckbox_' + id);
+            if (cb) cb.checked = true;
+        });
+        window.refreshCategoryQuotasForSelectedPackages(data.category_quotas || {});
+    } else {
+        if (titleEl) titleEl.textContent = 'Buat Sesi Ujian Baru';
+        if (get('sesModalId')) get('sesModalId').value = 0;
+        if (get('sesModalCode')) {
+            get('sesModalCode').value = '';
+            get('sesModalCode').readOnly = false;
+        }
+        if (get('sesModalTitle')) get('sesModalTitle').value = '';
+        if (get('sesModalDesc')) get('sesModalDesc').value = '';
+        if (get('sesModalDuration')) get('sesModalDuration').value = 90;
+        if (get('sesModalCameraMode')) get('sesModalCameraMode').value = 'wajib';
+        if (get('sesModalScoringMethod')) get('sesModalScoringMethod').value = 'standar';
+        if (get('sesModalPassingGrade')) get('sesModalPassingGrade').value = '70.00';
+        if (get('sesModalStartTime')) get('sesModalStartTime').value = '';
+        if (get('sesModalEndTime')) get('sesModalEndTime').value = '';
+        window.generateRandomToken();
+        if (get('sesModalTokenRequired')) get('sesModalTokenRequired').checked = false;
+        if (get('sesModalShuffleOnViolation')) {
+            get('sesModalShuffleOnViolation').value = '1';
+        }
+        if (get('sesModalActive')) get('sesModalActive').checked = true;
+        if (get('sesModalMode')) get('sesModalMode').value = window._cbtNewSessionMode === 'tryout' ? 'tryout' : 'resmi';
+        if (get('sesModalMaxAttempts')) get('sesModalMaxAttempts').value = '0';
+        if (get('sesModalExamOpen')) get('sesModalExamOpen').checked = false;
+        window._cbtNewSessionMode = null;
+        syncSessionModeFields();
+
+        const firstCb = document.querySelector('input[name="package_ids[]"]');
+        if (firstCb) firstCb.checked = true;
+        window.refreshCategoryQuotasForSelectedPackages({});
+    }
+
+    cbtOpenModal('modalSessionForm');
+};
+
+// Backward-compatibility aliases
+function openEditSessionModal(s) { window.openSessionModal(true, s); }
+function closeSessionModal() { cbtCloseModal('modalSessionForm'); }
+function generateRandomSessionToken() { window.generateRandomToken(); }
+
+// Bulk selection handler for sessions
+function bulkItems(kind) {
+    const form = document.querySelector('[data-bulk-delete-form="' + kind + '"]');
+    return form ? Array.from(form.elements).filter(item => item.matches('[data-bulk-select-item="' + kind + '"]') && !item.disabled) : [];
+}
+function refreshBulkSelection(kind) {
+    const items = bulkItems(kind);
+    const checked = items.filter(item => item.checked);
+    const toolbar = document.querySelector('[data-bulk-toolbar="' + kind + '"]');
+    const count = document.querySelector('[data-bulk-count="' + kind + '"]');
+    const selectAll = document.querySelector('[data-bulk-select-all="' + kind + '"]');
+    if (toolbar) toolbar.hidden = checked.length === 0;
+    if (count) count.textContent = checked.length + ' sesi dipilih';
+    if (selectAll) {
+        selectAll.checked = items.length > 0 && checked.length === items.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < items.length;
+    }
+}
+
+document.addEventListener('click', function (e) {
+    const closeBtn = e.target.closest('[data-close-modal]');
+    if (closeBtn) {
+        const backdrop = closeBtn.closest('.bank-modal-backdrop');
+        if (backdrop) cbtCloseModal(backdrop);
+        return;
+    }
+    if (e.target.classList && e.target.classList.contains('bank-modal-backdrop')) {
+        cbtCloseModal(e.target);
+        return;
+    }
+    const btnCreateSes = e.target.closest('[data-action="create-session"]');
+    if (btnCreateSes) {
+        e.preventDefault();
+        window._cbtNewSessionMode = 'resmi';
+        window.openSessionModal(false);
+        return;
+    }
+    const btnCreateTryout = e.target.closest('[data-action="create-tryout"]');
+    if (btnCreateTryout) {
+        e.preventDefault();
+        window._cbtNewSessionMode = 'tryout';
+        window.openSessionModal(false);
+        return;
+    }
+});
+
+document.addEventListener('change', function (event) {
+    const selectAll = event.target.closest('[data-bulk-select-all]');
+    if (selectAll) {
+        const kind = selectAll.dataset.bulkSelectAll;
+        bulkItems(kind).forEach(item => { item.checked = selectAll.checked; });
+        refreshBulkSelection(kind);
+        return;
+    }
+    const item = event.target.closest('[data-bulk-select-item]');
+    if (item) {
+        refreshBulkSelection(item.dataset.bulkSelectItem);
+        return;
+    }
+    if (event.target && event.target.name === 'package_ids[]') {
+        window.refreshCategoryQuotasForSelectedPackages();
+    }
+    if (event.target && event.target.id === 'sesModalMode') {
+        syncSessionModeFields();
+    }
+});
+
+document.addEventListener('submit', function (event) {
+    const form = event.target.closest('[data-bulk-delete-form]');
+    if (!form) return;
+    const kind = form.dataset.bulkDeleteForm;
+    const checked = bulkItems(kind).filter(item => item.checked);
+    if (!checked.length) {
+        event.preventDefault();
+        return;
+    }
+    const labels = checked.map(item => item.dataset.itemLabel || ('#' + item.value)).slice(0, 5).join('
+• ');
+    const more = checked.length > 5 ? ('
+...dan ' + (checked.length - 5) + ' sesi lainnya.') : '';
+    if (!confirm('PERINGATAN: Hapus permanen ' + checked.length + ' sesi ujian terpilih?
+
+• ' + labels + more)) {
+        event.preventDefault();
+    }
+});
 
 // Filter Bank Soal
 function filterQuestions() {
