@@ -161,6 +161,9 @@ include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php';
                 <span>⚡</span> Auto-Distribusi Merata
             </button>
         </form>
+        <a href="<?= BASE_URL ?>/admin/tutorial-rpl-pengaturan-generate.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
+            <span>⚡</span> Pengaturan &amp; Generate
+        </a>
         <a href="<?= BASE_URL ?>/admin/tutorial-rpl-kelas.php" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
             <span>🏫</span> Kelola Kelompok RPL
         </a>

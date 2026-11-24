@@ -5,6 +5,50 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-24 07:11:16 +0700 — Pembuatan halaman Pengaturan Dosen & Kuota serta Generate Plotting Tutorial RPL Online
+
+**ID:** TUTORIAL-RPL-PENGATURAN-GENERATE-PAGE · **Parent Git:** `62257d9`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk membuat halaman setara `https://lppai.quizb.my.id/admin/tutorial-pengaturan-generate.php` khusus untuk Tutorial RPL Online ("Tutorial RL Online"). Pada modul Manajemen Tutorial reguler, halaman `admin/tutorial-pengaturan-generate.php` menyediakan dua fungsi utama: pengaturan penugasan dosen/tutor per hari beserta batas kuotanya, dan mesin generate plotting jadwal otomatis (mendukung mode pemenuhan kuota per kelas `fill_first`, mode pemerataan beban dosen `distribute_evenly`, opsi pengisian kelas lama `fill_existing_classes`, serta penindihan plotting `overwrite_plotting`). Modul Tutorial RPL Online sebelumnya belum memiliki halaman pengaturan kuota dosen dan mesin generate plotting komprehensif semacam ini.
+
+**Perubahan dan alasan:**
+1. **Pembuatan Halaman Admin Baru (`admin/tutorial-rpl-pengaturan-generate.php`):**
+   - Merancang antarmuka profesional berbasis card modern yang selaras dengan `admin/tutorial-pengaturan-generate.php`.
+   - **Kartu Ringkasan KPI RPL:** Menampilkan metrik Total Pendaftar RPL, Jumlah Mahasiswa Terplot, Mahasiswa Menunggu (Belum Terplot), dan Kapasitas Kelompok Aktif beserta sisa kuota.
+   - **Kartu Pengaturan Dosen & Kuota Periode RPL Aktif:** Grid dinamis 7 hari (Senin s.d. Minggu) dengan dropdown dosen/tutor interaktif, tombol tambah baris (+), hapus baris (×), kalkulasi kuota otomatis (`validTutors * 30`), indikator real-time sisa kuota hari (berwarna merah jika penuh / hijau jika tersedia), dan tombol simpan pengaturan (`action = 'update_tutors_kuota'`) yang terintegrasi dengan tabel `tutorial_rpl_period_tutors` dan `tutorial_rpl_registration_periods`.
+   - **Kartu Generate Jadwal & Plotting Kelompok RPL (Card Biru Dashed):** Formulir generate otomatis dengan pilihan mode `distribute_evenly` (pemerataan beban tutor/kelompok) dan `fill_first` (pemenuhan kuota minimal per kelompok), opsi `fill_existing_classes` dengan batas mahasiswa per kelompok, opsi `overwrite_plotting` (reset/tindih plotting dengan konfirmasi keamanan JavaScript), opsi `match_hari_pilihan` (prioritaskan penempatan mahasiswa sesuai hari bimbingan yang dipilih saat mendaftar), dan opsi `auto_create_classes` (otomatis membuat kelompok kelas dari jadwal dosen periode aktif).
+   - **Laporan Hasil Eksekusi Generate:** Banner laporan interaktif yang menyajikan jumlah kandidat diproses, jumlah mahasiswa berhasil diplot, kelompok kelas yang digunakan beserta rincian penempatannya, serta daftar mahasiswa unassigned jika kuota kelompok tidak mencukupi.
+   - **Tabel Kapasitas Kelompok Terkini:** Menampilkan tabel kelompok kelas RPL aktif, tutor pembimbing, kuota, jumlah terisi, sisa kursi, bar progres persentase keterisian, dan tautan langsung ke daftar anggota di `tutorial-rpl-peserta.php`.
+2. **Mesin Plotting Otomatis RPL (`includes/tutorial-rpl-helper.php`):**
+   - Menambahkan fungsi `tutorialRplGenerateSchedule(PDO $pdo, array $options = []): array` yang mendukung mode `distribute_evenly` dan `fill_first`, penanganan `overwrite_plotting`, pencocokan preferensi hari pendaftaran mahasiswa (`match_hari_pilihan`), pembuatan otomatis kelas baru (`auto_create_classes`), dan pengendalian kuota kelompok yang aman dalam transaksi basis data (`beginTransaction` / `commit` / `rollBack`).
+3. **Integrasi Navigasi Sidebar (`includes/sidebar.php`):**
+   - Menambahkan menu `admin/tutorial-rpl-pengaturan-generate.php` ("Pengaturan & Generate RPL") pada grup navigasi `Tutorial RPL Online`.
+   - Memperbarui daftar `$tutorialRplPages` dan menaikkan indikator badge count navigasi dari 7 menjadi 8.
+4. **Tautan Cepat Navigasi (`admin/tutorial-rpl-peserta.php`):**
+   - Menambahkan tombol tautan cepat ke halaman Pengaturan & Generate RPL pada header antarmuka Data Peserta & Plotting.
+5. **Suite Pengujian Unit Komprehensif (`tests/tutorial-rpl-pengaturan-generate-test.php`):**
+   - Menulis 8 skenario pengujian unit & integrasi lengkap yang mencakup mode distribusi merata, mode pemenuhan kuota per kelas, penindihan plotting lama, prioritas hari bimbingan, pembuatan kelas otomatis dari tutor, penanganan kuota penuh/unassigned, penyimpanan konfigurasi dosen & kuota, serta pemeriksaan integritas sintaks dan komponen HTML halaman.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 07:11:16 | `admin/tutorial-rpl-pengaturan-generate.php` | 1-610 | Berkas baru: Antarmuka pengaturan dosen & kuota harian serta formulir generate plotting kelompok tutorial RPL online. |
+| 2026-11-24 07:11:16 | `includes/tutorial-rpl-helper.php` | 405-650 | Penambahan fungsi mesin plotting otomatis tutorialRplGenerateSchedule dengan dukungan berbagai mode dan preferensi hari. |
+| 2026-11-24 07:09:29 | `includes/sidebar.php` | 167-210 | Penambahan halaman Pengaturan & Generate RPL ke daftar $tutorialRplPages, menu navigasi sidebar, dan pembaruan badge count. |
+| 2026-11-24 07:09:59 | `admin/tutorial-rpl-peserta.php` | 155-170 | Penambahan tombol pintasan menuju halaman Pengaturan & Generate RPL pada header halaman peserta. |
+| 2026-11-24 07:11:16 | `tests/tutorial-rpl-pengaturan-generate-test.php` | 1-225 | Berkas baru: Suite pengujian unit & integrasi 8 skenario pengujian fungsionalitas generate plotting dan pengaturan kuota RPL. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada kelima berkas berubah/tambahan lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Pengujian unit `tests/tutorial-rpl-pengaturan-generate-test.php` lulus 100% (8 dari 8 pengujian lulus).
+- Seluruh 12 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa regresi.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
 ## 2026-11-23 21:07:37 +0700 — Perbaikan resolusi dinamis kolom nilai ujian dan relasi anggota tutorial RPL pada halaman Data Pendaftar
 
 **ID:** TUTORIAL-RPL-PENDAFTARAN-EXAM-SCORE-COLUMN-FIX · **Parent Git:** `5d6a0a6`.

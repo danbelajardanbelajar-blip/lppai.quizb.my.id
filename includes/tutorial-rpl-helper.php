@@ -403,6 +403,305 @@ if (!function_exists('tutorialRplAutoDistribute')) {
 }
 
 /**
+ * Generate dan plotting otomatis kelompok kelas tutorial RPL.
+ * Mendukung mode:
+ * - 'fill_first': Utamakan memenuhi kuota per kelompok (minimal min_per_class)
+ * - 'distribute_evenly': Utamakan meratakan jumlah mahasiswa ke seluruh kelompok/dosen
+ * Mendukung opsi:
+ * - fill_existing: Hanya mengisi kelompok yang sudah ada tanpa membuat kelompok baru
+ * - existing_tutor_quota: Batas mahasiswa per kelompok/dosen
+ * - overwrite_plotting: Bersihkan anggota kelompok periode ini lalu plot ulang
+ * - match_hari_pilihan: Cocokkan dengan pilihan hari pendaftaran mahasiswa
+ * - auto_create_classes: Otomatis buat kelompok kelas dari konfigurasi dosen aktif
+ */
+if (!function_exists('tutorialRplGenerateSchedule')) {
+    function tutorialRplGenerateSchedule(PDO $pdo, array $options = []): array {
+        ensureTutorialRplTables($pdo);
+        if (function_exists('ensureTutorialRplPeriodTable')) {
+            ensureTutorialRplPeriodTable($pdo);
+        }
+        if (function_exists('ensureTutorialRplRegistrationTable')) {
+            ensureTutorialRplRegistrationTable($pdo);
+        }
+
+        $generateMode = $options['generate_mode'] ?? 'distribute_evenly';
+        $overwritePlotting = !empty($options['overwrite_plotting']);
+        $fillExisting = !empty($options['fill_existing']);
+        $existingTutorQuota = max(1, (int)($options['existing_tutor_quota'] ?? 30));
+        $minPerClass = max(1, (int)($options['min_per_class'] ?? 30));
+        $matchHariPilihan = !isset($options['match_hari_pilihan']) || !empty($options['match_hari_pilihan']);
+        $autoCreateClasses = !isset($options['auto_create_classes']) || !empty($options['auto_create_classes']);
+
+        // Tentukan periode & gelombang
+        $activePeriod = null;
+        if (function_exists('tutorialRplActivePeriod')) {
+            $activePeriod = tutorialRplActivePeriod($pdo);
+        }
+        $periode = $options['periode'] ?? ($activePeriod['nama'] ?? TUTORIAL_RPL_DEFAULT_PERIODE);
+        $gelombang = $options['gelombang'] ?? ($activePeriod['gelombang'] ?? TUTORIAL_RPL_DEFAULT_GELOMBANG);
+        $periodId = $options['period_id'] ?? ($activePeriod['id'] ?? null);
+
+        $pdo->beginTransaction();
+        try {
+            // 1. Opsi Overwrite Plotting: bersihkan plotting anggota periode ini
+            if ($overwritePlotting) {
+                $stmtClasses = $pdo->prepare("SELECT id FROM tutorial_rpl_classes WHERE periode = ?");
+                $stmtClasses->execute([$periode]);
+                $periodClassIds = $stmtClasses->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($periodClassIds)) {
+                    $inPlaceholders = implode(',', array_fill(0, count($periodClassIds), '?'));
+                    $stmtDel = $pdo->prepare("DELETE FROM tutorial_rpl_members WHERE class_id IN ($inPlaceholders)");
+                    $stmtDel->execute($periodClassIds);
+                }
+            }
+
+            // 2. Opsi Auto Create Classes dari Jadwal Dosen Periode Aktif
+            if ($autoCreateClasses && $periodId && function_exists('tutorialRplPeriodTutors')) {
+                $tutors = tutorialRplPeriodTutors($pdo, (int)$periodId);
+                foreach ($tutors as $t) {
+                    $dosenId = (int)($t['dosen_id'] ?? 0);
+                    $hari = trim((string)($t['hari'] ?? ''));
+                    $quota = max(1, (int)($t['quota'] ?? 30));
+                    $dosenNama = trim((string)($t['dosen_nama'] ?? ''));
+
+                    if ($dosenId > 0) {
+                        // Cek apakah kelas untuk dosen & hari ini sudah ada pada periode ini
+                        $stmtCheck = $pdo->prepare("
+                            SELECT id FROM tutorial_rpl_classes
+                            WHERE periode = ? AND dosen_id = ? AND (catatan LIKE ? OR nama_kelompok LIKE ?)
+                            LIMIT 1
+                        ");
+                        $stmtCheck->execute([$periode, $dosenId, '%' . $hari . '%', '%' . $hari . '%']);
+                        $existingClassId = $stmtCheck->fetchColumn();
+
+                        if (!$existingClassId) {
+                            $stmtUser = $pdo->prepare("SELECT nim, no_hp, no_hp AS whatsapp FROM users WHERE id = ?");
+                            $stmtUser->execute([$dosenId]);
+                            $uInfo = $stmtUser->fetch(PDO::FETCH_ASSOC);
+                            $dosenNim = $uInfo['nim'] ?? null;
+                            $dosenWa = $uInfo['no_hp'] ?? ($uInfo['whatsapp'] ?? null);
+
+                            $namaKelompok = 'Kelompok ' . ($hari ? $hari . ' - ' : '') . ($dosenNama ?: "Dosen $dosenId");
+
+                            $stmtInsClass = $pdo->prepare("
+                                INSERT INTO tutorial_rpl_classes
+                                (nama_kelompok, periode, gelombang, dosen_id, dosen_nim, dosen_nama, dosen_wa, kuota, catatan, is_active)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                            ");
+                            $stmtInsClass->execute([
+                                $namaKelompok,
+                                $periode,
+                                $gelombang,
+                                $dosenId,
+                                $dosenNim,
+                                $dosenNama,
+                                $dosenWa,
+                                $quota,
+                                'Hari: ' . $hari
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // 3. Ambil seluruh kelompok kelas aktif pada periode ini
+            $classes = tutorialRplGetClasses($pdo, $periode);
+            if (empty($classes)) {
+                $classes = tutorialRplGetClasses($pdo, null);
+            }
+            $activeClasses = array_values(array_filter($classes, fn($c) => !empty($c['is_active'])));
+
+            if (empty($activeClasses)) {
+                $pdo->rollBack();
+                return [
+                    'success' => false,
+                    'plotted' => 0,
+                    'classes_used' => 0,
+                    'class_details' => [],
+                    'unassigned' => [],
+                    'message' => 'Tidak ditemukan kelompok kelas aktif pada periode ini. Buat kelompok kelas terlebih dahulu atau aktifkan opsi Buat Kelompok Otomatis.'
+                ];
+            }
+
+            // Sesuaikan kuota jika mode fill_existing aktif
+            foreach ($activeClasses as &$c) {
+                if ($fillExisting) {
+                    $c['kuota'] = min((int)$c['kuota'], $existingTutorQuota);
+                }
+                $c['terisi'] = (int)($c['terisi'] ?? 0);
+                $c['sisa'] = max(0, (int)$c['kuota'] - $c['terisi']);
+            }
+            unset($c);
+
+            // 4. Cari kandidat mahasiswa RPL yang belum memiliki kelompok
+            $hasRegTable = function_exists('tutorialRplTableExists') ? tutorialRplTableExists($pdo, 'tutorial_rpl_registrations') : false;
+            $candidates = [];
+
+            if ($hasRegTable && $periodId) {
+                $stmtCand = $pdo->prepare("
+                    SELECT u.id as user_id, u.nama_lengkap, u.nim, u.program_studi, r.hari_pilihan
+                    FROM tutorial_rpl_registrations r
+                    JOIN users u ON u.id = r.user_id
+                    LEFT JOIN tutorial_rpl_members m ON u.id = m.user_id
+                    WHERE r.period_id = ? AND m.id IS NULL
+                    ORDER BY u.nama_lengkap ASC
+                ");
+                $stmtCand->execute([$periodId]);
+                $candidates = $stmtCand->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            if (empty($candidates)) {
+                $sqlCand = "
+                    SELECT u.id as user_id, u.nama_lengkap, u.nim, u.program_studi,
+                           " . ($hasRegTable ? "(SELECT r.hari_pilihan FROM tutorial_rpl_registrations r WHERE r.user_id = u.id ORDER BY r.id DESC LIMIT 1) AS hari_pilihan" : "NULL AS hari_pilihan") . "
+                    FROM users u
+                    LEFT JOIN tutorial_rpl_members m ON u.id = m.user_id
+                    WHERE u.role = 'mahasiswa'
+                      AND (
+                          UPPER(u.jenis_program) = 'RPL'
+                          OR u.id IN (SELECT user_id FROM pretes_registrations WHERE periode LIKE '%RPL%')
+                          " . ($hasRegTable ? "OR u.id IN (SELECT user_id FROM tutorial_rpl_registrations)" : "") . "
+                      )
+                      AND m.id IS NULL
+                    ORDER BY u.nama_lengkap ASC
+                ";
+                $candidates = $pdo->query($sqlCand)->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            if (empty($candidates)) {
+                $pdo->commit();
+                return [
+                    'success' => true,
+                    'plotted' => 0,
+                    'classes_used' => 0,
+                    'unassigned' => [],
+                    'class_details' => [],
+                    'message' => 'Semua mahasiswa program RPL pada periode ini sudah memiliki kelompok kelas.'
+                ];
+            }
+
+            // 5. Pembagian Mahasiswa
+            $plotted = 0;
+            $classesUsed = [];
+            $unassigned = [];
+            $stmtInsertMember = $pdo->prepare("INSERT INTO tutorial_rpl_members (class_id, user_id, status_lulus) VALUES (?, ?, 'proses')");
+
+            $matchedCandidates = [];
+            $generalCandidates = [];
+
+            if ($matchHariPilihan) {
+                foreach ($candidates as $cand) {
+                    $hp = trim((string)($cand['hari_pilihan'] ?? ''));
+                    if ($hp !== '') {
+                        $matchedCandidates[] = $cand;
+                    } else {
+                        $generalCandidates[] = $cand;
+                    }
+                }
+            } else {
+                $generalCandidates = $candidates;
+            }
+
+            $assignCandidate = function(&$targetClass, $cand) use ($stmtInsertMember, &$plotted, &$classesUsed) {
+                $stmtInsertMember->execute([$targetClass['id'], (int)$cand['user_id']]);
+                $targetClass['terisi']++;
+                $targetClass['sisa']--;
+                if (!isset($classesUsed[$targetClass['id']])) {
+                    $classesUsed[$targetClass['id']] = [
+                        'id' => $targetClass['id'],
+                        'nama_kelompok' => $targetClass['nama_kelompok'],
+                        'dosen_nama' => $targetClass['dosen_nama'] ?? '-',
+                        'added' => 0,
+                        'total' => $targetClass['terisi'],
+                        'kuota' => $targetClass['kuota']
+                    ];
+                }
+                $classesUsed[$targetClass['id']]['added']++;
+                $classesUsed[$targetClass['id']]['total'] = $targetClass['terisi'];
+                $plotted++;
+            };
+
+            // Tahap A: Plot kandidat yang punya hari pilihan
+            if (!empty($matchedCandidates)) {
+                foreach ($matchedCandidates as $cand) {
+                    $hp = strtolower(trim((string)($cand['hari_pilihan'] ?? '')));
+                    $matchedClassIndices = [];
+                    foreach ($activeClasses as $idx => $ac) {
+                        $cHari = strtolower((string)($ac['catatan'] ?? '') . ' ' . (string)($ac['nama_kelompok'] ?? ''));
+                        if (str_contains($cHari, $hp) && $ac['sisa'] > 0) {
+                            $matchedClassIndices[] = $idx;
+                        }
+                    }
+
+                    if (!empty($matchedClassIndices)) {
+                        if ($generateMode === 'fill_first') {
+                            $targetIdx = $matchedClassIndices[0];
+                        } else {
+                            usort($matchedClassIndices, fn($a, $b) => $activeClasses[$a]['terisi'] <=> $activeClasses[$b]['terisi']);
+                            $targetIdx = $matchedClassIndices[0];
+                        }
+                        $assignCandidate($activeClasses[$targetIdx], $cand);
+                    } else {
+                        $generalCandidates[] = $cand;
+                    }
+                }
+            }
+
+            // Tahap B: Plot sisa kandidat ke kelas dengan sisa kuota
+            if (!empty($generalCandidates)) {
+                if ($generateMode === 'fill_first') {
+                    $classIdx = 0;
+                    foreach ($generalCandidates as $cand) {
+                        while ($classIdx < count($activeClasses) && $activeClasses[$classIdx]['sisa'] <= 0) {
+                            $classIdx++;
+                        }
+                        if ($classIdx < count($activeClasses)) {
+                            $assignCandidate($activeClasses[$classIdx], $cand);
+                        } else {
+                            $unassigned[] = $cand;
+                        }
+                    }
+                } else {
+                    foreach ($generalCandidates as $cand) {
+                        $availableIndices = [];
+                        foreach ($activeClasses as $idx => $ac) {
+                            if ($ac['sisa'] > 0) {
+                                $availableIndices[] = $idx;
+                            }
+                        }
+                        if (empty($availableIndices)) {
+                            $unassigned[] = $cand;
+                        } else {
+                            usort($availableIndices, fn($a, $b) => $activeClasses[$a]['terisi'] <=> $activeClasses[$b]['terisi']);
+                            $targetIdx = $availableIndices[0];
+                            $assignCandidate($activeClasses[$targetIdx], $cand);
+                        }
+                    }
+                }
+            }
+
+            $pdo->commit();
+            return [
+                'success' => true,
+                'mode' => $generateMode,
+                'total_candidates' => count($candidates),
+                'plotted' => $plotted,
+                'classes_used' => count($classesUsed),
+                'class_details' => array_values($classesUsed),
+                'unassigned' => $unassigned,
+                'message' => "Berhasil memplot $plotted mahasiswa RPL ke " . count($classesUsed) . " kelompok kelas." . (count($unassigned) > 0 ? " (Sebanyak " . count($unassigned) . " mahasiswa belum kebagian kuota)." : "")
+            ];
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+}
+
+/**
  * Mengambil data mahasiswa program RPL lengkap dengan status plotting dan hasil CBT Pretes.
  */
 if (!function_exists('tutorialRplGetStudentsWithPretes')) {
