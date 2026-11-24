@@ -49,6 +49,21 @@ if (isset($_GET['download'])) {
 // ── Endpoint AJAX Responsif ──────────────────────────────────────────────────
 if (isset($_GET['ajax'])) {
     header('Content-Type: application/json; charset=utf-8');
+    if ($_GET['ajax'] === 'package_questions') {
+        $pkgId = (int)($_GET['package_id'] ?? 0);
+        $pkg = $pkgId > 0 ? tutorialRplCbtGetPackage($pdo, $pkgId) : null;
+        $qList = tutorialRplCbtGetQuestions($pdo, null, $pkgId > 0 ? $pkgId : null);
+        foreach ($qList as &$qItem) {
+            $qItem['options'] = json_decode((string)$qItem['options_json'], true) ?: [];
+        }
+        unset($qItem);
+        echo json_encode([
+            'success' => true,
+            'package' => $pkg,
+            'questions' => $qList
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($_GET['ajax'] === 'generate_token') {
         $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         $newToken = '';
@@ -243,7 +258,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeTab = 'packages';
     } elseif ($action === 'delete_question') {
         $qId = (int)($_POST['question_id'] ?? 0);
-        if ($qId > 0 && tutorialRplCbtDeleteQuestion($pdo, $qId)) {
+        $ok = ($qId > 0 && tutorialRplCbtDeleteQuestion($pdo, $qId));
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['success' => $ok, 'message' => $ok ? 'Butir soal berhasil dihapus.' : 'Gagal menghapus butir soal.']);
+            exit;
+        }
+        if ($ok) {
             $message = 'Butir soal berhasil dihapus dari paket soal.';
             $msgType = 'success';
         } else {
@@ -487,7 +508,7 @@ include __DIR__ . '/../includes/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td style="text-align:right; white-space:nowrap;">
-                                        <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="focusPackageQuestions(<?= (int)$pkg['id'] ?>, '<?= sanitize(addslashes($pkg['name'])) ?>');" title="Lihat &amp; kelola butir pertanyaan paket ini">
+                                        <button type="button" class="bank-button" style="padding:4px 9px; font-size:11px; font-weight:700; background:#f0fdf4; border-color:#86efac; color:#166534;" onclick="openPackageQuestionsModal(<?= (int)$pkg['id'] ?>, <?= htmlspecialchars(json_encode($pkg['name'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>, <?= htmlspecialchars(json_encode($pkg['code'], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>);" title="Lihat &amp; kelola butir pertanyaan paket ini">
                                             📋 Kelola Soal (<?= (int)$pkg['total_questions'] ?>)
                                         </button>
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px; background:#fef3c7; border-color:#fde047; color:#92400e;" onclick="openAddModal(<?= (int)$pkg['id'] ?>);" title="Tambah butir soal ke paket ini">
@@ -1068,6 +1089,63 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL KOLEKSI & KELOLA SOAL PAKET (Identik dengan CBT Pretes)
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="modalPackageQuestions" role="dialog" aria-modal="true" aria-labelledby="pkgQuestionsTitle">
+    <div class="bank-modal extra-large" style="max-width:920px; width:95%; max-height:90vh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+        <div class="modal-header-banner" style="background:linear-gradient(135deg, #0f766e 0%, #115e59 100%); color:#ffffff; padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h3 style="margin:0; font-size:17px; color:#ffffff; display:flex; align-items:center; gap:8px;">
+                    📋 Koleksi Soal — <span id="pkgQuestionsTitle">Paket Soal</span>
+                </h3>
+                <div style="font-size:12px; opacity:0.95; margin-top:4px; display:flex; align-items:center; gap:8px;">
+                    <span id="pkgQuestionsCodeBadge" class="bank-code" style="background:rgba(255,255,255,0.2); color:#ffffff; border-color:rgba(255,255,255,0.3);"></span>
+                    <span id="pkgQuestionsCountBadge" style="font-weight:600;">Memuat butir soal...</span>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="bank-button gold" id="btnModalAddQuestion" style="min-height:34px; font-size:12px; font-weight:700;">
+                    ＋ Tambah Soal Baru
+                </button>
+                <a class="bank-button" id="btnModalImportExcel" href="?tab=import" style="min-height:34px; font-size:12px; background:rgba(255,255,255,0.15); color:#ffffff; border-color:rgba(255,255,255,0.3);">
+                    📥 Impor Excel
+                </a>
+                <a class="bank-button" id="btnModalExportExcel" href="?download=bank" style="min-height:34px; font-size:12px; background:rgba(255,255,255,0.15); color:#ffffff; border-color:rgba(255,255,255,0.3);">
+                    📤 Ekspor .xlsx
+                </a>
+                <button type="button" class="bank-modal-close" onclick="closePackageQuestionsModal();" aria-label="Tutup" style="color:#ffffff; font-size:20px; margin-left:4px;">✕</button>
+            </div>
+        </div>
+
+        <div class="modal-q-toolbar" style="padding:12px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div class="modal-q-toolbar-left" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">
+                <input id="modalQSearch" class="bank-input" type="search" placeholder="🔍 Cari butir pertanyaan, kode, kategori…" style="max-width:280px; padding:7px 12px;" oninput="filterModalQuestions();">
+                <select id="modalQCategory" class="bank-input" style="max-width:180px; padding:7px 12px;" onchange="filterModalQuestions();">
+                    <option value="">Semua Kategori</option>
+                </select>
+                <select id="modalQStatus" class="bank-input" style="max-width:140px; padding:7px 12px;" onchange="filterModalQuestions();">
+                    <option value="">Semua Status</option>
+                    <option value="aktif">Aktif</option>
+                    <option value="nonaktif">Nonaktif</option>
+                </select>
+            </div>
+            <span id="modalQCountBadge" style="font-size:12px; color:#64748b; font-weight:600;"></span>
+        </div>
+
+        <div class="modal-q-list" id="modalQListContainer" style="flex:1; overflow-y:auto; padding:20px; max-height:58vh;">
+            <!-- Dynamic question cards rendered by JS -->
+        </div>
+
+        <div class="bank-modal-foot" style="justify-content:space-between; padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0;">
+            <div style="font-size:12px; color:#64748b;">
+                💡 <em>Pilihan jawaban yang berlatar hijau adalah <strong>Kunci Jawaban</strong> yang benar.</em>
+            </div>
+            <button type="button" class="bank-button" onclick="closePackageQuestionsModal();">Tutup Jendela</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL TAMBAH / EDIT BUTIR SOAL
      ═══════════════════════════════════════════════════════════════════════════ -->
 <div class="bank-modal-backdrop" id="questionModalBackdrop">
@@ -1255,24 +1333,210 @@ function closePackageModal() {
     document.getElementById('packageModalBackdrop').classList.remove('open');
 }
 
-function focusPackageQuestions(pkgId, pkgName) {
+// ── Package Questions Manager Modal (Paritas Penuh dengan CBT Pretes) ───
+window._currentPackageQuestions = [];
+window._currentPackageId = 0;
+window._currentPackageName = '';
+window._currentPackageCode = '';
+
+function openPackageQuestionsModal(packageId, packageName, packageCode) {
+    window._currentPackageId = packageId;
+    window._currentPackageName = packageName || 'Semua Bank Soal';
+    window._currentPackageCode = packageCode || 'SEMUA';
+
+    const titleEl = document.getElementById('pkgQuestionsTitle');
+    const codeBadge = document.getElementById('pkgQuestionsCodeBadge');
+    const countBadge = document.getElementById('pkgQuestionsCountBadge');
+    const container = document.getElementById('modalQListContainer');
+
+    if (titleEl) titleEl.textContent = window._currentPackageName;
+    if (codeBadge) codeBadge.textContent = window._currentPackageCode;
+    if (countBadge) countBadge.textContent = 'Memuat butir soal…';
+
+    const btnAdd = document.getElementById('btnModalAddQuestion');
+    if (btnAdd) {
+        btnAdd.onclick = () => openAddModal(packageId);
+    }
+    const btnExport = document.getElementById('btnModalExportExcel');
+    if (btnExport) {
+        btnExport.href = '?download=bank&package_id=' + packageId;
+    }
+    const btnImport = document.getElementById('btnModalImportExcel');
+    if (btnImport) {
+        btnImport.href = '?tab=import&package_id=' + packageId;
+    }
+
+    if (container) {
+        container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;"><div style="font-size:24px;margin-bottom:8px">⏳</div>Memuat butir pertanyaan…</div>';
+    }
+
+    const modal = document.getElementById('modalPackageQuestions');
+    if (modal) modal.classList.add('open');
+
+    // Sinkronkan filter di tabel halaman utama
     const select = document.getElementById('filterPackage');
     if (select) {
-        select.value = String(pkgId);
+        select.value = String(packageId);
         filterQuestions();
     }
     const label = document.getElementById('panelQuestionsTitle');
     if (label) {
-        label.textContent = 'Daftar Butir Soal CBT: ' + pkgName;
+        label.textContent = 'Daftar Butir Soal CBT: ' + window._currentPackageName;
     }
-    const exportBtn = document.getElementById('exportBankBtn');
-    if (exportBtn) {
-        exportBtn.href = '?download=bank&package_id=' + pkgId;
+
+    fetch('?ajax=package_questions&package_id=' + (packageId || 0))
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.success) {
+                window._currentPackageQuestions = data.questions || [];
+                if (countBadge) {
+                    countBadge.textContent = window._currentPackageQuestions.length + ' butir soal';
+                }
+                const catSelect = document.getElementById('modalQCategory');
+                if (catSelect) {
+                    const cats = Array.from(new Set(window._currentPackageQuestions.map(q => q.category).filter(Boolean))).sort();
+                    let catHtml = '<option value="">Semua Kategori</option>';
+                    cats.forEach(c => {
+                        catHtml += '<option value="' + String(c).replace(/"/g, '&quot;') + '">' + String(c).replace(/</g, '&lt;') + '</option>';
+                    });
+                    catSelect.innerHTML = catHtml;
+                }
+                renderModalQuestions('', '', '');
+            } else {
+                if (container) container.innerHTML = '<div style="padding:30px;color:#b91c1c;text-align:center;">Gagal memuat soal: ' + (data.message || 'Terjadi kesalahan') + '</div>';
+            }
+        })
+        .catch(err => {
+            if (container) container.innerHTML = '<div style="padding:30px;color:#b91c1c;text-align:center;">Gagal memuat soal: ' + err.message + '</div>';
+        });
+}
+
+function closePackageQuestionsModal() {
+    const modal = document.getElementById('modalPackageQuestions');
+    if (modal) modal.classList.remove('open');
+}
+
+function renderModalQuestions(query, catFilter, statusFilter) {
+    const container = document.getElementById('modalQListContainer');
+    const countBadge = document.getElementById('modalQCountBadge');
+    if (!container) return;
+
+    query = (query || '').toLowerCase().trim();
+    catFilter = catFilter || '';
+    statusFilter = statusFilter || '';
+
+    const list = window._currentPackageQuestions || [];
+    const filtered = list.filter(q => {
+        const matchQ = !query ||
+            (q.question_text || '').toLowerCase().includes(query) ||
+            (q.code || '').toLowerCase().includes(query) ||
+            (q.category || '').toLowerCase().includes(query);
+        const matchCat = !catFilter || q.category === catFilter;
+        const matchStat = !statusFilter || (statusFilter === 'aktif' ? Number(q.is_active) === 1 : Number(q.is_active) === 0);
+        return matchQ && matchCat && matchStat;
+    });
+
+    if (countBadge) {
+        countBadge.textContent = filtered.length + ' dari ' + list.length + ' soal';
     }
-    const qSec = document.getElementById('questionsSection');
-    if (qSec) {
-        qSec.scrollIntoView({ behavior: 'smooth' });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="padding:40px 20px;text-align:center;color:#64748b;background:#f8fafc;border-radius:12px;border:1.5px dashed #cbd5e1;">
+                <div style="font-size:32px;margin-bottom:8px">📭</div>
+                <strong style="font-size:15px;color:#334155;display:block;margin-bottom:4px">Tidak Ada Butir Soal Ditemukan</strong>
+                <p style="font-size:13px;margin:0 0 14px 0">Belum ada butir soal atau tidak cocok dengan filter pencarian.</p>
+                <button type="button" class="bank-button primary" onclick="openAddModal(window._currentPackageId)">＋ Tambah Soal ke Paket Ini</button>
+            </div>
+        `;
+        return;
     }
+
+    let html = '';
+    filtered.forEach((q, idx) => {
+        const isActive = Number(q.is_active) === 1;
+        let opts = q.options || [];
+        if (typeof opts === 'string') {
+            try { opts = JSON.parse(opts); } catch(e) { opts = []; }
+        }
+        const qJson = JSON.stringify(q).replace(/"/g, '&quot;');
+
+        html += '<div class="bank-qcard" id="qcard_' + q.id + '">';
+        html += '<div class="bank-qcard-head">';
+        html += '<div class="bank-qcard-meta">';
+        html += '<span class="bank-qcard-num">#' + (idx + 1) + '</span>';
+        html += '<span class="bank-code">' + String(q.code || '').replace(/</g, '&lt;') + '</span>';
+        html += '<span class="bank-badge package">' + String(q.category || 'Umum').replace(/</g, '&lt;') + '</span>';
+        if (isActive) {
+            html += '<span class="bank-badge active">● Aktif</span>';
+        } else {
+            html += '<span class="bank-badge inactive">Nonaktif</span>';
+        }
+        html += '</div>';
+        html += '<div style="display:flex;gap:6px">';
+        html += '<button type="button" class="bank-button" style="min-height:26px;padding:3px 8px;font-size:11px" onclick=\'openEditModal(' + qJson + ')\'>✏️ Edit</button>';
+        html += '<button type="button" class="bank-button danger-sm" style="min-height:26px;padding:3px 8px;font-size:11px" onclick="deleteModalQuestion(' + q.id + ')">🗑️ Hapus</button>';
+        html += '</div>';
+        html += '</div>';
+
+        html += '<div class="bank-qcard-text">' + String(q.question_text || '').replace(/\n/g, '<br>') + '</div>';
+
+        html += '<div class="bank-qcard-options">';
+        ['A', 'B', 'C', 'D', 'E'].forEach((letter, lIdx) => {
+            const optText = (Array.isArray(opts) ? opts[lIdx] : (opts[letter] || opts[lIdx])) || '';
+            if (!optText) return;
+            const isCorrect = (q.correct_answer === letter);
+            html += '<div class="bank-qcard-opt' + (isCorrect ? ' is-key' : '') + '">';
+            html += '<span class="bank-qcard-opt-letter">' + letter + '</span>';
+            html += '<span style="flex:1">' + String(optText).replace(/</g, '&lt;') + '</span>';
+            if (isCorrect) {
+                html += '<span style="font-size:11px;font-weight:700;color:#059669;margin-left:auto">✓ Kunci</span>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+        html += '</div>';
+    });
+
+    container.innerHTML = html;
+}
+
+function filterModalQuestions() {
+    const query = document.getElementById('modalQSearch') ? document.getElementById('modalQSearch').value : '';
+    const cat = document.getElementById('modalQCategory') ? document.getElementById('modalQCategory').value : '';
+    const stat = document.getElementById('modalQStatus') ? document.getElementById('modalQStatus').value : '';
+    renderModalQuestions(query, cat, stat);
+}
+
+function deleteModalQuestion(questionId) {
+    if (!confirm('Yakin ingin menghapus butir soal ini dari paket?')) return;
+    const formData = new FormData();
+    formData.append('action', 'delete_question');
+    formData.append('question_id', String(questionId));
+
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res && res.success) {
+            window._currentPackageQuestions = window._currentPackageQuestions.filter(q => Number(q.id) !== Number(questionId));
+            renderModalQuestions();
+            const card = document.getElementById('qcard_' + questionId);
+            if (card) card.remove();
+        } else {
+            alert('Gagal menghapus soal: ' + (res.message || 'Terjadi kesalahan.'));
+        }
+    })
+    .catch(() => {
+        window.location.reload();
+    });
+}
+
+function focusPackageQuestions(pkgId, pkgName) {
+    openPackageQuestionsModal(pkgId, pkgName, 'PKT-' + pkgId);
 }
 
 // Modal Tambah & Edit Soal
@@ -1419,6 +1683,20 @@ function openReviewModal(attemptId) {
 function closeReviewModal() {
     document.getElementById('reviewModalBackdrop').classList.remove('open');
 }
+
+// Global modal closer via backdrop click & Escape key
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('bank-modal-backdrop') && e.target.classList.contains('open')) {
+        e.target.classList.remove('open');
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const openBackdrop = document.querySelector('.bank-modal-backdrop.open');
+        if (openBackdrop) openBackdrop.classList.remove('open');
+    }
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

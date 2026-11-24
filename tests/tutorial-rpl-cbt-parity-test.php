@@ -234,7 +234,9 @@ assert(str_contains($adminContent, 'tab=sessions'), 'Admin memuat tab Sesi Ujian
 assert(str_contains($adminContent, 'tab=import'), 'Admin memuat tab Impor Excel');
 assert(str_contains($adminContent, 'tab=results'), 'Admin memuat tab Hasil Ujian');
 assert(str_contains($adminContent, 'openPackageModal'), 'Admin memuat modal buat/edit paket soal');
-assert(str_contains($adminContent, 'focusPackageQuestions'), 'Admin memuat tombol kelola butir soal per paket');
+assert(str_contains($adminContent, 'openPackageQuestionsModal'), 'Admin memuat modal kelola & koleksi soal paket (openPackageQuestionsModal)');
+assert(str_contains($adminContent, 'modalPackageQuestions'), 'Admin memuat container modal modalPackageQuestions');
+assert(str_contains($adminContent, 'ajax=package_questions'), 'Admin memuat endpoint AJAX package_questions');
 assert(str_contains($adminContent, 'filterPackage'), 'Admin memuat filter Paket Soal');
 assert(str_contains($adminContent, 'reset_pretes_parity_packages'), 'Admin memuat aksi reset & tindih soal CBT Pretes');
 assert(str_contains($adminContent, 'generateRandomToken'), 'Admin memuat generator token acak');

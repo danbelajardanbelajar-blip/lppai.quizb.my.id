@@ -1,3 +1,39 @@
+## 2026-11-24 17:08:00 +0700 — Implementasi Modal Koleksi & Kelola Soal Paket pada Tombol "Kelola Soal" Berparitas Penuh dengan CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-MANAGE-QUESTIONS-MODAL · **Parent Git:** `b76cde97605f580932954ea27b5b9a9d3aa827f2`.
+
+**Permintaan dan dasar perbaikan:** Merespons laporan pengguna bahwa tombol "📋 Kelola Soal" pada tabel paket soal CBT Tutorial RPL (`admin/tutorial-rpl-cbt.php`) tidak berfungsi atau tidak membuka dialog jendela pengelolaan butir soal seperti yang ada pada CBT Pretes RPL:
+1. **Penyebab Sebelumnya**:
+   - Di CBT Pretes RPL (`includes/pretes-cbt-admin-view.php`), tombol "📋 Kelola Soal" berfungsi membuka jendela modal popup besar (`#modalPackageQuestions`) yang memuat seluruh kartu butir soal pada paket terkait lengkap dengan filter pencarian, filter kategori materi, filter status, tombol tambah soal, ekspor, dan edit/hapus.
+   - Pada implementasi sebelumnya di `admin/tutorial-rpl-cbt.php`, modal `#modalPackageQuestions` dan endpoint `ajax=package_questions` belum diimplementasikan, sehingga tombol hanya memanggil scroll halaman yang tidak memunculkan modal apa pun.
+2. **Solusi & Implementasi Lengkap Berparitas Penuh**:
+   - **Endpoint AJAX `package_questions` (`admin/tutorial-rpl-cbt.php`)**: Menyediakan respons JSON berisi daftar butir pertanyaan paket (`q.*`, `options`, `correct_answer`, `category`) yang dipanggil saat admin mengklik kelola soal.
+   - **Modal Koleksi & Kelola Soal (`#modalPackageQuestions`)**:
+     - Header banner gradien modern dengan judul paket, badge kode, counter butir soal, tombol `＋ Tambah Soal Baru`, `📥 Impor Excel`, `📤 Ekspor .xlsx`, dan tombol tutup `✕`.
+     - Toolbar filter modal: input pencarian instan (`#modalQSearch`), dropdown filter kategori materi (`#modalQCategory`), dan dropdown status (`#modalQStatus`).
+     - Kontainer daftar kartu butir soal (`#modalQListContainer`) dengan kartu `.bank-qcard`: nomor, kode, kategori, badge aktif, teks soal terformat, dan 5 pilihan jawaban (A–E) dengan penanda kunci jawaban hijau (`is-key`).
+     - Tombol aksi per butir soal: `✏️ Edit` (membuka modal edit soal) dan `🗑️ Hapus` (menghapus soal via AJAX dengan konfirmasi).
+   - **Tombol "📋 Kelola Soal (N)"**: Menghubungkan tombol ke `openPackageQuestionsModal(pkgId, pkgName, pkgCode)` dengan argumen JSON aman, serta menyinkronkan filter tabel utama.
+   - **Interaksi Modal yang Ramah Pengguna**: Menambahkan penutupan modal otomatis saat mengklik area backdrop luar jendela modal dan tombol tombol keyboard `Escape`.
+   - **Dukungan Penghapusan AJAX**: Endpoint `action=delete_question` kini mengembalikan respons JSON saat dipanggil via `X-Requested-With: XMLHttpRequest` sehingga kartu langsung hilang tanpa reload halaman penuh.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 17:06:32 | `admin/tutorial-rpl-cbt.php` | 50-70, 259-275, 510-525, 1088-1150, 1336-1550, 1683-1700 | Penambahan endpoint AJAX `package_questions`, modal `#modalPackageQuestions`, fungsi `openPackageQuestionsModal()`, rendering kartu `.bank-qcard`, filter modal, dan AJAX `delete_question`. |
+| 2026-11-24 17:06:49 | `tests/tutorial-rpl-cbt-parity-test.php` | 236-242 | Asersi verifikasi `openPackageQuestionsModal`, container `#modalPackageQuestions`, dan endpoint `ajax=package_questions`. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada berkas `admin/tutorial-rpl-cbt.php` dan `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% tanpa syntax error.
+- `git diff --check` bersih tanpa konflik atau whitespace issues.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap ALL PASS).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% PASS.
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% PASS.
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+
 ## 2026-11-24 16:53:00 +0700 — Penyelarasan Tab "Paket Soal" dan Arsitektur Paritas Penuh Admin CBT Tutorial RPL dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-TAB-PAKET-SOAL-PARITY · **Parent Git:** `8acc2b030f3572f6106ace021602cf06ccfd3ded`.
