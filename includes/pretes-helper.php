@@ -856,10 +856,265 @@ if (!function_exists('mapPretesScoresToCertificate')) {
     }
 }
 
+if (!function_exists('isPretesUserKristen')) {
+    /**
+     * Memeriksa apakah peserta pretes beragama Kristen Protestan / Non-Muslim berdasarkan riwayat CBT.
+     *
+     * @param PDO $pdo
+     * @param int $userId
+     * @return bool
+     */
+    function isPretesUserKristen(PDO $pdo, int $userId): bool {
+        if ($userId <= 0) return false;
+        try {
+            $stmtAtt = $pdo->prepare("
+                SELECT a.id as attempt_id, a.session_id, s.code as session_code, s.title as session_title
+                FROM pretes_cbt_attempts a
+                LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                WHERE a.user_id = ?
+                ORDER BY a.submitted_at DESC, a.id DESC
+                LIMIT 5
+            ");
+            $stmtAtt->execute([$userId]);
+            $attempts = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($attempts as $att) {
+                $sCode = strtoupper((string)($att['session_code'] ?? ''));
+                $sTitle = strtoupper((string)($att['session_title'] ?? ''));
+                if (str_contains($sCode, 'PROTESTAN') || str_contains($sCode, 'KRISTEN') ||
+                    str_contains($sTitle, 'PROTESTAN') || str_contains($sTitle, 'KRISTEN')) {
+                    return true;
+                }
+                $attId = (int)($att['attempt_id'] ?? 0);
+                if ($attId > 0) {
+                    $stmtItems = $pdo->prepare("
+                        SELECT q.code, q.category, p.code as pkg_code
+                        FROM pretes_cbt_items i
+                        LEFT JOIN pretes_cbt_questions q ON q.id = i.question_id
+                        LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id
+                        WHERE i.attempt_id = ?
+                        LIMIT 15
+                    ");
+                    $stmtItems->execute([$attId]);
+                    while ($it = $stmtItems->fetch(PDO::FETCH_ASSOC)) {
+                        $qCode = strtoupper((string)($it['code'] ?? ''));
+                        $pCode = strtoupper((string)($it['pkg_code'] ?? ''));
+                        $cat = trim((string)($it['category'] ?? ''));
+                        if (str_starts_with($qCode, 'PKT2-KP') || str_contains($pCode, 'KRISTEN') || str_contains($pCode, 'PROTESTAN') ||
+                            in_array($cat, ['Kitab Suci', 'Dasar Iman', 'Ibadah & Sakramen', 'Hari Raya & Nilai Kasih', 'Gereja & Denominasi', 'Sejarah & Tokoh'], true)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable $e) {}
+
+        return false;
+    }
+}
+
+if (!function_exists('mapRplCbtScoresToCertificate')) {
+    /**
+     * Memetakan hasil CBT pretes resmi mahasiswa RPL (Muslim maupun Non-Muslim)
+     * ke dalam 6 komponen nilai transkrip sertifikat (tutorial_registrations).
+     *
+     * Opsi 1 (Pemetaan Berbasis Kategori/Grup Soal CBT):
+     * Untuk Muslim:
+     *   1. Thaharah     : % Kategori Thaharah/Bersuci (min 80.0 jika CBT lulus)
+     *   2. Shalat       : % Kategori Shalat/Sholat (min 80.0 jika CBT lulus)
+     *   3. Surat Pendek : % Kategori Al-Qur'an/Surat Pendek/Tajwid (min 80.0 jika CBT lulus)
+     *   4. Amaliyah     : % Kategori Amaliyah/Ubudiyah/Doa/Zikir (min 80.0 jika CBT lulus)
+     *   5. Jenazah      : % Kategori Fiqih Jenazah (min 80.0 jika CBT lulus)
+     *   6. Ujian Tulis  : Skor Total CBT
+     *
+     * Untuk Non-Muslim (Kristen Protestan / Paket 2):
+     *   1. Thaharah     : % Kategori Ibadah & Sakramen (min 80.0 jika CBT lulus)
+     *   2. Shalat       : % Kategori Dasar Iman (min 80.0 jika CBT lulus)
+     *   3. Surat Pendek : % Kategori Kitab Suci (min 80.0 jika CBT lulus)
+     *   4. Amaliyah     : % Kategori Hari Raya & Nilai Kasih (min 80.0 jika CBT lulus)
+     *   5. Jenazah      : % Kategori Gereja & Sejarah (min 80.0 jika CBT lulus)
+     *   6. Ujian Tulis  : Skor Total CBT
+     *
+     * @param PDO $pdo
+     * @param int $registrationId pretes_registrations.id
+     * @param int $userId users.id
+     * @param float|null $fallbackCbtScore Skor cadangan bila attempt tidak ditemukan
+     * @return array
+     */
+    function mapRplCbtScoresToCertificate(PDO $pdo, int $registrationId, int $userId, ?float $fallbackCbtScore = null): array {
+        $cbtAttempt = null;
+        if ($registrationId > 0) {
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT a.*, s.code as session_code, s.title as session_title
+                    FROM pretes_cbt_attempts a
+                    LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                    WHERE a.registration_id = ? AND a.submitted_at IS NOT NULL
+                    ORDER BY a.submitted_at DESC, a.id DESC LIMIT 1
+                ");
+                $stmt->execute([$registrationId]);
+                $cbtAttempt = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {}
+        }
+
+        if (!$cbtAttempt && $userId > 0) {
+            try {
+                $stmt = $pdo->prepare("
+                    SELECT a.*, s.code as session_code, s.title as session_title
+                    FROM pretes_cbt_attempts a
+                    LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                    WHERE a.user_id = ? AND a.registration_id > 0 AND a.submitted_at IS NOT NULL
+                    ORDER BY a.submitted_at DESC, a.id DESC LIMIT 1
+                ");
+                $stmt->execute([$userId]);
+                $cbtAttempt = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (Throwable $e) {}
+        }
+
+        $cbtScore = 0.0;
+        $hasAttempt = false;
+        if ($cbtAttempt && isset($cbtAttempt['score']) && $cbtAttempt['score'] !== null) {
+            $cbtScore = (float)$cbtAttempt['score'];
+            $hasAttempt = true;
+        } elseif ($fallbackCbtScore !== null) {
+            $cbtScore = (float)$fallbackCbtScore;
+            $hasAttempt = true;
+        }
+
+        $isLulus = ($cbtScore >= 80.0);
+        $isKristen = isPretesUserKristen($pdo, $userId);
+
+        $catStats = [
+            'thaharah'     => ['benar' => 0, 'total' => 0],
+            'shalat'       => ['benar' => 0, 'total' => 0],
+            'surat_pendek' => ['benar' => 0, 'total' => 0],
+            'amaliyah'     => ['benar' => 0, 'total' => 0],
+            'jenazah'      => ['benar' => 0, 'total' => 0],
+        ];
+
+        if ($cbtAttempt && !empty($cbtAttempt['id'])) {
+            try {
+                $stmtItems = $pdo->prepare("
+                    SELECT i.answer, i.correct_answer, q.category, q.code as qcode
+                    FROM pretes_cbt_items i
+                    LEFT JOIN pretes_cbt_questions q ON q.id = i.question_id
+                    WHERE i.attempt_id = ?
+                    ORDER BY i.position ASC
+                ");
+                $stmtItems->execute([(int)$cbtAttempt['id']]);
+                while ($row = $stmtItems->fetch(PDO::FETCH_ASSOC)) {
+                    $cat = strtolower(trim((string)($row['category'] ?? '')));
+                    $qCode = strtoupper(trim((string)($row['qcode'] ?? '')));
+                    $ans = strtoupper(trim((string)($row['answer'] ?? '')));
+                    $cor = strtoupper(trim((string)($row['correct_answer'] ?? '')));
+                    $isCorrect = ($ans !== '' && $ans === $cor);
+
+                    if (!$isKristen && str_starts_with($qCode, 'PKT2-KP')) {
+                        $isKristen = true;
+                    }
+
+                    $targetGroup = null;
+                    if ($isKristen) {
+                        // Kategori Kristen Protestan
+                        if (preg_match('/ibadah|sakramen|baptis|perjamuan|kebaktian/i', $cat)) {
+                            $targetGroup = 'thaharah';
+                        } elseif (preg_match('/dasar iman|iman|tritunggal|keselamatan|anugerah/i', $cat)) {
+                            $targetGroup = 'shalat';
+                        } elseif (preg_match('/kitab suci|alkitab|perjanjian/i', $cat)) {
+                            $targetGroup = 'surat_pendek';
+                        } elseif (preg_match('/kasih|hari raya|natal|paskah|etika/i', $cat)) {
+                            $targetGroup = 'amaliyah';
+                        } elseif (preg_match('/gereja|denominasi|sejarah|tokoh|reformasi/i', $cat)) {
+                            $targetGroup = 'jenazah';
+                        }
+                    } else {
+                        // Kategori Muslim
+                        if (preg_match('/thaharah|bersuci|wudhu|wudu|mandi|tayamum|tayammum/i', $cat)) {
+                            $targetGroup = 'thaharah';
+                        } elseif (preg_match('/shalat|sholat|solat|sujud|rukuk|adzan/i', $cat)) {
+                            $targetGroup = 'shalat';
+                        } elseif (preg_match('/qur|surah|surat|tajwid|ayat/i', $cat)) {
+                            $targetGroup = 'surat_pendek';
+                        } elseif (preg_match('/amaliyah|ubudiyah|istighasah|doa|zikir|dzikir|akhlak|puasa|zakat|islam/i', $cat)) {
+                            $targetGroup = 'amaliyah';
+                        } elseif (preg_match('/jenazah|mayit|janazah|kafan/i', $cat)) {
+                            $targetGroup = 'jenazah';
+                        }
+                    }
+
+                    if ($targetGroup && isset($catStats[$targetGroup])) {
+                        $catStats[$targetGroup]['total']++;
+                        if ($isCorrect) {
+                            $catStats[$targetGroup]['benar']++;
+                        }
+                    }
+                }
+            } catch (Throwable $e) {}
+        }
+
+        // Hitung nilai akhir masing-masing komponen
+        $calcComponent = static function (array $stat, float $cbt, bool $lulus): float {
+            if ($stat['total'] > 0) {
+                $pct = round(($stat['benar'] / $stat['total']) * 100, 2);
+                return $lulus ? max(80.0, $pct) : $pct;
+            }
+            // Jika kategori tidak muncul dalam 25 soal acak yang didapat, gunakan nilai total CBT
+            return round($cbt, 2);
+        };
+
+        $thaharah    = $calcComponent($catStats['thaharah'], $cbtScore, $isLulus);
+        $shalat      = $calcComponent($catStats['shalat'], $cbtScore, $isLulus);
+        $suratPendek = $calcComponent($catStats['surat_pendek'], $cbtScore, $isLulus);
+        $amaliyah    = $calcComponent($catStats['amaliyah'], $cbtScore, $isLulus);
+        $jenazah     = $calcComponent($catStats['jenazah'], $cbtScore, $isLulus);
+        $ujianTulis  = round($cbtScore, 2);
+
+        $rataRata = round(($thaharah + $shalat + $suratPendek + $amaliyah + $jenazah + $ujianTulis) / 6, 2);
+
+        return [
+            'thaharah'     => $thaharah,
+            'shalat'       => $shalat,
+            'surat_pendek' => $suratPendek,
+            'amaliyah'     => $amaliyah,
+            'jenazah'      => $jenazah,
+            'ujian_tulis'  => $ujianTulis,
+            'rata_rata'    => $rataRata,
+            'is_kristen'   => $isKristen,
+            'cbt_score'    => $ujianTulis,
+            'has_attempt'  => $hasAttempt,
+        ];
+    }
+}
+
+if (!function_exists('generateRpl12ScoresJson')) {
+    /**
+     * Menghasilkan array 12 komponen nilai pretes_assessments dari pemetaan kategori RPL.
+     *
+     * @param array $mapped Hasil dari mapRplCbtScoresToCertificate()
+     * @return array Associative array 12 komponen pretes
+     */
+    function generateRpl12ScoresJson(array $mapped): array {
+        return [
+            'ujian_tulis'         => (float)($mapped['ujian_tulis'] ?? 0),
+            'praktik_wudlu'       => (float)($mapped['thaharah'] ?? 0),
+            'doa_setelah_wudlu'   => (float)($mapped['thaharah'] ?? 0),
+            'praktik_tayammum'    => (float)($mapped['thaharah'] ?? 0),
+            'niat_mandi_besar'    => (float)($mapped['thaharah'] ?? 0),
+            'niat_jamak_qashar'   => (float)($mapped['shalat'] ?? 0),
+            'bacaan_shalat_subuh' => (float)($mapped['shalat'] ?? 0),
+            'al_bayyinah'         => (float)($mapped['surat_pendek'] ?? 0),
+            'al_alaq'             => (float)($mapped['surat_pendek'] ?? 0),
+            'al_dluha'            => (float)($mapped['surat_pendek'] ?? 0),
+            'istighasah'          => (float)($mapped['amaliyah'] ?? 0),
+            'shalat_jenazah'      => (float)($mapped['jenazah'] ?? 0),
+        ];
+    }
+}
+
 if (!function_exists('syncPretesToKelolaNilai')) {
     /**
      * Mensinkronkan nilai peserta pretes yang LULUS ke tabel tutorial_registrations
      * agar tampil di halaman Kelola Nilai (admin/kelola-nilai.php) dan siap dicetak sertifikatnya.
+     * Mendukung jalur Reguler (12 komponen praktik & tulis) dan jalur RPL (pemetaan kategori CBT).
      *
      * @param PDO $pdo
      * @param string $periodeName Nama periode pretes (misal "2026/2027 RPL")
@@ -915,13 +1170,33 @@ if (!function_exists('syncPretesToKelolaNilai')) {
             $hasNilaiAkhir = false;
         }
 
-        // Ambil semua pendaftar pretes pada periode ini yang memiliki data asesmen
+        // Cek ketersediaan kolom jenis_program di tabel users secara aman
+        $hasJenisProgram = false;
+        try {
+            $driver = strtolower((string)$pdo->getAttribute(PDO::ATTR_DRIVER_NAME));
+            if ($driver === 'sqlite') {
+                $uCols = $pdo->query("PRAGMA table_info(users)")->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($uCols as $uc) {
+                    if (strtolower((string)($uc['name'] ?? '')) === 'jenis_program') {
+                        $hasJenisProgram = true;
+                        break;
+                    }
+                }
+            } else {
+                $cProg = $pdo->query("SHOW COLUMNS FROM users LIKE 'jenis_program'")->fetch();
+                $hasJenisProgram = (bool)$cProg;
+            }
+        } catch (Throwable $e) {}
+
+        $progColSql = $hasJenisProgram ? "u.jenis_program" : "NULL as jenis_program";
+
+        // Ambil semua pendaftar pretes pada periode ini (LEFT JOIN asesmen agar mahasiswa RPL tetap terjaring)
         $stmtCandidates = $pdo->prepare("
             SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json,
-                   u.nama_lengkap, u.nim
+                   u.nama_lengkap, u.nim, {$progColSql}
             FROM pretes_registrations pr
             JOIN users u ON pr.user_id = u.id
-            JOIN pretes_assessments pa ON pa.registration_id = pr.id
+            LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
             WHERE pr.periode = ?
         ");
         $stmtCandidates->execute([$periodeName]);
@@ -985,23 +1260,48 @@ if (!function_exists('syncPretesToKelolaNilai')) {
         $pdo->beginTransaction();
         try {
             foreach ($candidates as $cand) {
-                $scores = json_decode($cand['scores_json'] ?? '{}', true);
-                $statusLulus = getPretesStatusLulus($scores);
-
-                // Syarat mutlak masuk ke Kelola Nilai & Cetak Sertifikat: seluruh 12 komponen lengkap & >= 80 (status LULUS)
-                if ($statusLulus !== 'lulus') {
-                    $skippedCount++;
-                    continue;
-                }
-
-                $mapped = mapPretesScoresToCertificate($scores);
+                $isRpl = (function_exists('pretesProgramKey') && pretesProgramKey($cand['jenis_program'] ?? '') === 'rpl');
                 $userId = (int)$cand['user_id'];
+                $regId = (int)$cand['reg_id'];
+
+                if ($isRpl) {
+                    $rplScores = mapRplCbtScoresToCertificate($pdo, $regId, $userId);
+                    // Syarat kelulusan RPL: CBT resmi >= 80
+                    if (($rplScores['cbt_score'] ?? 0) < 80.0 || empty($rplScores['has_attempt'])) {
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    // Sinkronkan ke pretes_assessments agar 12 komponen lengkap (12/12)
+                    $rpl12 = generateRpl12ScoresJson($rplScores);
+                    $rpl12Json = json_encode($rpl12, JSON_UNESCAPED_UNICODE);
+                    try {
+                        if (!empty($cand['scores_json'])) {
+                            $pdo->prepare("UPDATE pretes_assessments SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE registration_id = ?")->execute([$rpl12Json, $regId]);
+                        } else {
+                            $pdo->prepare("INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by, updated_at) VALUES (?, ?, 0, CURRENT_TIMESTAMP)")->execute([$regId, $rpl12Json]);
+                        }
+                    } catch (Throwable $e) {}
+
+                    $mapped = $rplScores;
+                } else {
+                    $scores = json_decode($cand['scores_json'] ?? '{}', true);
+                    $statusLulus = getPretesStatusLulus($scores);
+
+                    // Syarat mutlak masuk ke Kelola Nilai & Cetak Sertifikat: seluruh 12 komponen lengkap & >= 80 (status LULUS)
+                    if ($statusLulus !== 'lulus') {
+                        $skippedCount++;
+                        continue;
+                    }
+
+                    $mapped = mapPretesScoresToCertificate($scores);
+                }
 
                 $findRegStmt->execute([$userId]);
                 $existingReg = $findRegStmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($existingReg && !empty($existingReg['id'])) {
-                    $regId = (int)$existingReg['id'];
+                    $existingId = (int)$existingReg['id'];
                     if ($hasNilaiAkhir) {
                         $updateStmt->execute([
                             $tahunAjaran,
@@ -1012,7 +1312,7 @@ if (!function_exists('syncPretesToKelolaNilai')) {
                             $mapped['jenazah'],
                             $mapped['ujian_tulis'],
                             $mapped['rata_rata'],
-                            $regId,
+                            $existingId,
                         ]);
                     } else {
                         $updateStmt->execute([
@@ -1023,7 +1323,7 @@ if (!function_exists('syncPretesToKelolaNilai')) {
                             $mapped['amaliyah'],
                             $mapped['jenazah'],
                             $mapped['ujian_tulis'],
-                            $regId,
+                            $existingId,
                         ]);
                     }
                     $updatedCount++;

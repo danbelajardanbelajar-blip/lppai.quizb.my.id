@@ -78,12 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $message = 'Hanya Administrator yang berwenang melakukan sinkronisasi hasil.';
             $msgType = 'danger';
         } else {
-            // Ambil semua peserta di periode terpilih yang memiliki asesmen
+            // Ambil semua peserta di periode terpilih (LEFT JOIN asesmen agar mahasiswa RPL tetap terjaring)
             $stmtSync = $pdo->prepare("
                 SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json, u.jenis_program
                 FROM pretes_registrations pr
-                JOIN pretes_assessments pa ON pa.registration_id = pr.id
-                LEFT JOIN users u ON u.id = pr.user_id
+                JOIN users u ON u.id = pr.user_id
+                LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
                 WHERE pr.periode = ?
             ");
             $stmtSync->execute([$periodeName]);
@@ -127,27 +127,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
             $pdo->beginTransaction();
             foreach ($toSync as $item) {
-                $scores = json_decode($item['scores_json'] ?? '{}', true);
-                $sum = 0;
-                $filled = 0;
-                // Komponen wajib mengikuti program mahasiswa (RPL / Reguler), lihat admin/pretes-tugas.php
                 $itemProgram = pretesProgramKey($item['jenis_program'] ?? '');
-                $itemKeys = array_keys(pretesComponents($itemProgram));
-                $itemTotal = count($itemKeys);
-                foreach ($itemKeys as $ck) {
-                    $val = is_array($scores) ? ($scores[$ck] ?? null) : null;
-                    if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
-                        $sum += (float)$val;
-                        $filled++;
-                    }
-                }
+                if ($itemProgram === 'rpl') {
+                    // Jalur RPL: Pemetaan Nilai Berbasis Kategori CBT
+                    $rplScores = mapRplCbtScoresToCertificate($pdo, (int)$item['reg_id'], (int)$item['user_id']);
+                    $cbtScore = (float)($rplScores['cbt_score'] ?? 0);
+                    $hasCbt = !empty($rplScores['has_attempt']);
 
-                $avg = ($filled > 0) ? round($sum / $itemTotal, 2) : 0.00;
-                $rawStatus = getPretesStatusLulus($scores, $itemProgram);
-                $statusLulus = ($filled === $itemTotal && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
-                
-                $predikat = getPretesPredikat($avg);
-                $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$itemTotal} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
+                    if ($hasCbt && $cbtScore >= 80.0) {
+                        $statusLulus = 'lulus';
+                        $avg = $cbtScore;
+                        $predikat = getPretesPredikat($avg);
+                        $keterangan = "LULUS Jalur RPL - Nilai CBT: {$avg} ({$predikat}). Bebas ujian praktik.";
+
+                        // Tulis / perbarui 12 komponen lengkap di pretes_assessments
+                        $rpl12 = generateRpl12ScoresJson($rplScores);
+                        $rpl12Json = json_encode($rpl12, JSON_UNESCAPED_UNICODE);
+                        try {
+                            if (!empty($item['scores_json'])) {
+                                $pdo->prepare("UPDATE pretes_assessments SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE registration_id = ?")->execute([$rpl12Json, (int)$item['reg_id']]);
+                            } else {
+                                $pdo->prepare("INSERT INTO pretes_assessments (registration_id, scores_json, assessed_by, updated_at) VALUES (?, ?, 0, CURRENT_TIMESTAMP)")->execute([(int)$item['reg_id'], $rpl12Json]);
+                            }
+                        } catch (Throwable $e) {}
+                    } else {
+                        $statusLulus = 'tidak_lulus';
+                        $avg = $hasCbt ? $cbtScore : 0.00;
+                        $predikat = getPretesPredikat($avg);
+                        $keterangan = $hasCbt
+                            ? "TIDAK LULUS - Nilai CBT {$avg} di bawah batas kelulusan minimal (80.0)."
+                            : "Belum mengikuti CBT pretes resmi.";
+                    }
+                } else {
+                    $scores = json_decode($item['scores_json'] ?? '{}', true);
+                    $sum = 0;
+                    $filled = 0;
+                    // Komponen wajib mengikuti program mahasiswa (Reguler: 12 komponen), lihat admin/pretes-tugas.php
+                    $itemKeys = array_keys(pretesComponents($itemProgram));
+                    $itemTotal = count($itemKeys);
+                    foreach ($itemKeys as $ck) {
+                        $val = is_array($scores) ? ($scores[$ck] ?? null) : null;
+                        if ($val !== null && $val !== '' && is_numeric($val) && is_finite((float)$val) && (float)$val >= 0 && (float)$val <= 100) {
+                            $sum += (float)$val;
+                            $filled++;
+                        }
+                    }
+
+                    $avg = ($filled > 0) ? round($sum / $itemTotal, 2) : 0.00;
+                    $rawStatus = getPretesStatusLulus($scores, $itemProgram);
+                    $statusLulus = ($filled === $itemTotal && $rawStatus === 'lulus') ? 'lulus' : 'tidak_lulus';
+
+                    $predikat = getPretesPredikat($avg);
+                    $keterangan = "Nilai Rata-rata: {$avg} ({$predikat}) - {$filled}/{$itemTotal} komponen dinilai. Syarat lulus: seluruh komponen minimal 80.";
+                }
 
                 // Check pretes_results
                 $check = $pdo->prepare("SELECT id FROM pretes_results WHERE user_id = ?");
@@ -300,14 +332,24 @@ foreach ($rawRows as $row) {
     $isHadir = (strtolower($row['status_hadir'] ?? '') === 'hadir' || !empty($row['attended_at']));
     if ($isHadir) $hadirCount++;
 
-    $scores = json_decode($row['scores_json'] ?? '{}', true);
-    $filledScores = [];
-    $sum = 0;
-    $filled = 0;
-    // Komponen wajib mengikuti program mahasiswa; kolom tabel tetap gabungan semua program
     $rowProgram = pretesProgramKey($row['jenis_program'] ?? '');
     $rowComponents = pretesComponents($rowProgram);
     $rowTotal = count($rowComponents);
+
+    $scores = json_decode($row['scores_json'] ?? '{}', true);
+    // Jika mahasiswa RPL belum memiliki 12 komponen lengkap di asesmen, petakan langsung dari kategori CBT
+    if ($rowProgram === 'rpl' && (empty($scores['praktik_wudlu']) || !isset($scores['praktik_wudlu']))) {
+        if (function_exists('mapRplCbtScoresToCertificate') && function_exists('generateRpl12ScoresJson')) {
+            $rplMapped = mapRplCbtScoresToCertificate($pdo, (int)$row['reg_id'], (int)$row['user_id']);
+            if (!empty($rplMapped['has_attempt']) && $rplMapped['cbt_score'] >= 80.0) {
+                $scores = array_merge(generateRpl12ScoresJson($rplMapped), $scores);
+            }
+        }
+    }
+
+    $filledScores = [];
+    $sum = 0;
+    $filled = 0;
 
     foreach ($components as $key => $label) {
         $val = is_array($scores) ? ($scores[$key] ?? null) : null;

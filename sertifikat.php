@@ -861,6 +861,9 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                 $rataAkhir = round(($th + $sh + $sp + $am + $jn) / 5, 2);
                 list($hurufAkhir, $predikatTeks) = hitungPredikatHuruf($rataAkhir);
 
+                require_once __DIR__ . '/includes/pretes-helper.php';
+                $isCertKristen = !empty($cert['user_id']) ? isPretesUserKristen($pdo, (int)$cert['user_id']) : false;
+
                 $ttlLahir = '-';
                 if (!empty($cert['tempat_lahir']) && !empty($cert['tanggal_lahir'])) {
                     $ttlLahir = ucwords(strtolower($cert['tempat_lahir'])) . ', ' . formatTanggalIndo($cert['tanggal_lahir']);
@@ -916,7 +919,11 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                             <span class="badge-lulus">LULUS</span><br>
                             dengan Predikat: <strong><?= $predikatTeks ?> (Nilai <?= $hurufAkhir ?>)</strong><br>
                             <span style="font-size:13.5px; color:#475569;">
-                                dalam Program <em>"Daurah Keislaman"</em> LPPAI UNISDA Lamongan.
+                                <?php if ($isCertKristen): ?>
+                                    dalam Program <em>"Pendidikan Agama Kristen Protestan"</em> LPPAI UNISDA Lamongan.
+                                <?php else: ?>
+                                    dalam Program <em>"Daurah Keislaman"</em> LPPAI UNISDA Lamongan.
+                                <?php endif; ?>
                             </span>
                         </div>
 
@@ -925,11 +932,19 @@ $pageTitle = $cert ? "Sertifikat - " . htmlspecialchars($cert['nama_lengkap']) :
                             <table class="grades-table">
                                 <thead>
                                     <tr>
-                                        <th>Thaharah</th>
-                                        <th>Shalat</th>
-                                        <th>Srt. Pendek</th>
-                                        <th>Amaliyah</th>
-                                        <th>Jenazah</th>
+                                        <?php if ($isCertKristen): ?>
+                                            <th>Ibadah &amp; Sakramen</th>
+                                            <th>Dasar Iman</th>
+                                            <th>Kitab Suci</th>
+                                            <th>Nilai Kasih</th>
+                                            <th>Gereja &amp; Sejarah</th>
+                                        <?php else: ?>
+                                            <th>Thaharah</th>
+                                            <th>Shalat</th>
+                                            <th>Srt. Pendek</th>
+                                            <th>Amaliyah</th>
+                                            <th>Jenazah</th>
+                                        <?php endif; ?>
                                         <th class="highlight-score">Nilai Akhir</th>
                                     </tr>
                                 </thead>

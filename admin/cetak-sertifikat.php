@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-helper.php';
 requireLogin();
 
 // Fitur cetak dikhususkan untuk admin/pengelola
@@ -26,7 +27,7 @@ $whereLulus = "
 
 $sqlBase = "
     SELECT u.nama_lengkap, u.nim, u.program_studi, u.jenis_program, u.tempat_lahir, u.tanggal_lahir,
-           tr.id as reg_id, tr.tahun_ajaran, tr.tipe_nilai,
+           tr.id as reg_id, tr.user_id, tr.tahun_ajaran, tr.tipe_nilai,
            tr.nilai_thaharah, tr.nilai_shalat, tr.nilai_surat_pendek,
            tr.nilai_amaliyah, tr.nilai_jenazah, tr.nilai_ujian_tulis, tr.nomor_sertifikat
     FROM tutorial_registrations tr
@@ -531,6 +532,7 @@ $thnNow = date('Y');
         $ut = (float)$data['nilai_ujian_tulis'];
         
         $akhir = round(($th + $sh + $sp + $am + $jn) / 5, 2);
+        $isCertKristen = !empty($data['user_id']) ? isPretesUserKristen($pdo, (int)$data['user_id']) : false;
         
         $predikat = '';
         if ($akhir >= 80) $predikat = 'Memuaskan';
@@ -585,7 +587,11 @@ $thnNow = date('Y');
                         <span>LULUS</span><br>
                         <div style="font-size: 17px; font-weight: 600; margin-top: 8px; color: #334155;">dengan predikat : <strong><?= $predikat ?></strong></div>
                         <div style="font-size: 14px; font-weight: 400; margin-top: 8px; font-family: 'Poppins', sans-serif; color: #475569; line-height: 1.5;">
-                            dalam Program "Daurah Keislaman" LPPAI UNISDA Lamongan, <br>Semoga ilmu yang diperoleh bermanfaat dan membawa keberkahan
+                            <?php if ($isCertKristen): ?>
+                                dalam Program "Pendidikan Agama Kristen Protestan" LPPAI UNISDA Lamongan, <br>Semoga ilmu yang diperoleh bermanfaat dan membawa berkat kasih
+                            <?php else: ?>
+                                dalam Program "Daurah Keislaman" LPPAI UNISDA Lamongan, <br>Semoga ilmu yang diperoleh bermanfaat dan membawa keberkahan
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -597,11 +603,19 @@ $thnNow = date('Y');
                         </div>
                         <table class="grades-table">
                             <tr>
-                                <th>Thaharah</th>
-                                <th>Shalat</th>
-                                <th>Srt. Pendek</th>
-                                <th>Amaliyah</th>
-                                <th>Jenazah</th>
+                                <?php if ($isCertKristen): ?>
+                                    <th>Ibadah &amp; Sakramen</th>
+                                    <th>Dasar Iman</th>
+                                    <th>Kitab Suci</th>
+                                    <th>Nilai Kasih</th>
+                                    <th>Gereja &amp; Sejarah</th>
+                                <?php else: ?>
+                                    <th>Thaharah</th>
+                                    <th>Shalat</th>
+                                    <th>Srt. Pendek</th>
+                                    <th>Amaliyah</th>
+                                    <th>Jenazah</th>
+                                <?php endif; ?>
                                 <th>Nilai Akhir</th>
                             </tr>
                             <tr>

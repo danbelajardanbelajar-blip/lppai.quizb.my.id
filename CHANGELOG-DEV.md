@@ -1,3 +1,58 @@
+## 2026-11-24 14:00:00 +0700 — Implementasi Pemetaan Nilai Pretes CBT Mahasiswa RPL Berbasis Kategori Soal (Muslim & Non-Muslim) ke Hasil Pretes, Kelola Nilai (Sertifikat), dan Sertifikat Adaptif
+
+**ID:** PRETES-RPL-CATEGORY-MAPPING-SYNC-KELOLA-NILAI · **Parent Git:** `479a3cb`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk menyelesaikan integrasi nilai pretes khusus mahasiswa RPL (Rekognisi Pembelajaran Lampau) di mana ujian praktik telah ditiadakan:
+1. Hasil CBT mahasiswa RPL (baik Muslim maupun Non-Muslim) masuk ke Hasil Pretes (`pretes_results`) dengan status kelulusan (passing grade $\ge 80$).
+2. Nilai CBT mahasiswa RPL masuk ke Kelola Nilai (`tutorial_registrations`) dengan mengisi per kolom komponen nilai secara otomatis (`nilai_thaharah`, `nilai_shalat`, `nilai_surat_pendek`, `nilai_amaliyah`, `nilai_jenazah`, `nilai_ujian_tulis`, `nilai_akhir`).
+3. Menangani mahasiswa Non-Muslim (khususnya Kristen Protestan / Paket 2) secara proporsional dan bermartabat melalui pemetaan kategori soal CBT ke kolom transkrip nilai sertifikat.
+4. Tampilan sertifikat digital (`sertifikat.php`) dan lembar cetak fisik admin (`admin/cetak-sertifikat.php`) otomatis adaptif menyesuaikan agama peserta (Muslim: Program "Daurah Keislaman" dengan kolom materi keislaman; Kristen Protestan: Program "Pendidikan Agama Kristen Protestan" dengan kolom materi kristiani).
+5. Tombol "🔄 Sinkronkan ke Hasil" dan "🎓 Sinkronkan ke Kelola Nilai (Sertifikat)" di `admin/pretes-rekap-nilai.php` memproses mahasiswa RPL secara mulus dan mengisi 12 komponen di `pretes_assessments` sehingga tabel rekapitulasi nilai tampil 12/12 lengkap dan hijau.
+
+**Perubahan dan alasan:**
+1. **Fungsi Deteksi Agama & Pemetaan Kategori CBT RPL (`includes/pretes-helper.php`):**
+   - Menambahkan fungsi `isPretesUserKristen(PDO $pdo, int $userId): bool` untuk mendeteksi apakah peserta beragama Kristen Protestan berdasarkan riwayat paket/sesi CBT (`SESI-RESMI-PROTESTAN%`, `PKT-2-KRISTEN-PROTESTAN`, butir soal `PKT2-KP%`, atau kategori soal kristiani).
+   - Menambahkan fungsi `mapRplCbtScoresToCertificate(PDO $pdo, int $registrationId, int $userId, ?float $fallbackCbtScore = null): array` untuk memetakan capaian butir soal per kategori ke 6 komponen transkrip nilai:
+     - Mahasiswa Muslim: Kategori Thaharah/Bersuci -> `thaharah`, Shalat -> `shalat`, Al-Qur'an/Tajwid -> `surat_pendek`, Amaliyah/Ubudiyah/Doa -> `amaliyah`, Jenazah -> `jenazah`, Total CBT -> `ujian_tulis`.
+     - Mahasiswa Kristen: Ibadah & Sakramen -> `thaharah`, Dasar Iman -> `shalat`, Kitab Suci -> `surat_pendek`, Hari Raya & Nilai Kasih -> `amaliyah`, Gereja & Sejarah -> `jenazah`, Total CBT -> `ujian_tulis`.
+     - Bagi mahasiswa yang lulus CBT ($\ge 80$), setiap komponen transkrip dijamin minimal bernilai 80.0 (atau lebih tinggi jika nilai kategorinya lebih tinggi) sehingga memenuhi syarat pencetakan sertifikat dan transkrip.
+   - Menambahkan fungsi `generateRpl12ScoresJson(array $mapped): array` untuk menginjeksi 12 komponen lengkap pada `pretes_assessments.scores_json` dari pemetaan kategori RPL.
+   - Memperbarui `syncPretesToKelolaNilai()` agar mendeteksi jenis program mahasiswa (`u.jenis_program`), memetakan mahasiswa RPL melalui `mapRplCbtScoresToCertificate()`, menyimpan nilai ke 6 kolom `tutorial_registrations` beserta `nilai_akhir`, dan menginjeksi 12 komponen ke `pretes_assessments`.
+2. **Auto-Fill Komponen saat CBT Selesai Dikumpulkan (`includes/pretes-cbt.php`):**
+   - Memperbarui `pretesCbtWriteUjianTulis()` agar saat mahasiswa RPL mengumpulkan CBT dengan nilai $\ge 80$, sistem otomatis menghasilkan 12 komponen nilai terpetakan pada `pretes_assessments.scores_json`.
+3. **Penyempurnaan Aksi Sinkronisasi & Tampilan Tabel Rekapitulasi (`admin/pretes-rekap-nilai.php`):**
+   - Memperbarui aksi `sync_to_results` agar mahasiswa RPL yang lulus CBT ($\ge 80$) otomatis masuk ke `pretes_results` dengan status `'lulus'` dan nilai skor CBT, serta memperbarui 12 komponen di `pretes_assessments`.
+   - Menyesuaikan pembacaan baris peserta pada tabel rekapitulasi agar bagi mahasiswa RPL yang sudah menyelesaikan CBT langsung menampilkan nilai per kolom kategori secara dinamis.
+4. **Tampilan Sertifikat Adaptif (`sertifikat.php` & `admin/cetak-sertifikat.php`):**
+   - Pada `sertifikat.php`: Menambahkan deteksi `$isCertKristen` via `isPretesUserKristen()`. Pernyataan kelulusan beralih ke *"dalam Program 'Pendidikan Agama Kristen Protestan' LPPAI UNISDA Lamongan"* dan header tabel transkrip beralih ke *Ibadah & Sakramen | Dasar Iman | Kitab Suci | Nilai Kasih | Gereja & Sejarah | Nilai Akhir*. Untuk mahasiswa Muslim tetap menampilkan *"Daurah Keislaman"* dan header *Thaharah | Shalat | Srt. Pendek | Amaliyah | Jenazah | Nilai Akhir*.
+   - Pada `admin/cetak-sertifikat.php`: Mengintegrasikan `isPretesUserKristen()`, menyertakan `tr.user_id` pada query `$sqlBase`, serta mengadaptasi teks program dan header tabel transkrip untuk cetak sertifikat fisik.
+5. **Automated Unit & Integration Test Suite (`tests/pretes-rpl-sync-kelola-nilai-test.php`):**
+   - Membuat test suite komprehensif (42 assertions) yang memverifikasi: pemetaan kategori Muslim, pemetaan kategori Kristen Protestan (Paket 2), eksekusi `syncPretesToKelolaNilai()` ke `tutorial_registrations` per kolom nilai, pencegahan sinkronisasi untuk CBT < 80, serta integritas tampilan adaptif `sertifikat.php` dan `admin/cetak-sertifikat.php`.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 13:50:32 | `includes/pretes-helper.php` | 858-1215 | Fungsi `isPretesUserKristen`, `mapRplCbtScoresToCertificate`, `generateRpl12ScoresJson`, dan penyempurnaan `syncPretesToKelolaNilai`. |
+| 2026-11-24 13:51:08 | `includes/pretes-cbt.php` | 359-385 | Auto-fill 12 komponen `scores_json` untuk mahasiswa RPL lulus CBT pada `pretesCbtWriteUjianTulis`. |
+| 2026-11-24 13:52:21 | `admin/pretes-rekap-nilai.php` | 81-175, 335-350 | Penanganan sinkronisasi RPL pada `sync_to_results` dan pemetaan dinamis baris tabel rekapitulasi. |
+| 2026-11-24 13:53:09 | `sertifikat.php` | 854-870, 915-945 | Tampilan sertifikat digital adaptif untuk program & transkrip Kristen Protestan vs Muslim. |
+| 2026-11-24 13:56:46 | `admin/cetak-sertifikat.php` | 2-4, 28-34, 534-540, 588-615 | Tampilan cetak fisik sertifikat adaptif untuk program & transkrip Kristen Protestan vs Muslim. |
+| 2026-11-24 13:57:39 | `tests/pretes-rpl-sync-kelola-nilai-test.php` | 1-260 | Test suite otomatis end-to-end pemetaan kategori CBT RPL, sinkronisasi DB, dan verifikasi sertifikat. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada seluruh file yang dimodifikasi (`includes/pretes-helper.php`, `includes/pretes-cbt.php`, `admin/pretes-rekap-nilai.php`, `sertifikat.php`, `admin/cetak-sertifikat.php`, `tests/pretes-rpl-sync-kelola-nilai-test.php`) lulus 100% tanpa error sintaks.
+- `git diff --check` bersih tanpa whitespace issues atau konflik.
+- Test suite baru `tests/pretes-rpl-sync-kelola-nilai-test.php` lulus 100% PASS (42/42 assertions lulus).
+- Seluruh rangkaian test pendukung pretes & RPL (`pretes-sync-kelola-nilai-test.php`, `pretes-rekap-cbt-categories-export-test.php`, `pretes-rpl-flow-test.php`, `pretes-components-test.php`) lulus 100% PASS.
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory.
+- Pemetaan kategori CBT membaca attempt resmi (`registration_id > 0`) yang sudah dikumpulkan (`submitted_at IS NOT NULL`).
+- Penerapan ke server hosting produksi dilakukan melalui Git commit, pull rebase, dan push.
+
+---
+
 ## 2026-11-24 12:55:00 +0700 — Penambahan Fitur Export Rekapitulasi Nilai Pretes CBT per Kategori Soal dan Filter Program di Halaman Rekap Nilai
 
 **ID:** PRETES-REKAP-EXPORT-CBT-CATEGORIES · **Parent Git:** `966fa72`.

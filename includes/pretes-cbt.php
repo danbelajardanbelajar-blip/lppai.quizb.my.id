@@ -359,11 +359,32 @@ function pretesCbtFinalize(PDO $pdo, array $attempt, int $now): array {
 function pretesCbtWriteUjianTulis(PDO $pdo, int $registrationId, float $score): bool {
     if ($registrationId <= 0) return false;
     try {
+        require_once __DIR__ . '/pretes-helper.php';
         $stmt = $pdo->prepare('SELECT scores_json FROM pretes_assessments WHERE registration_id = ?');
         $stmt->execute([$registrationId]);
         $raw = $stmt->fetchColumn();
         $scores = $raw !== false ? (json_decode((string)$raw, true) ?: []) : [];
         $scores['ujian_tulis'] = round($score, 2);
+
+        // Jika mahasiswa RPL dan fungsi pemetaan kategori tersedia:
+        if (function_exists('pretesProgramKey') && function_exists('mapRplCbtScoresToCertificate') && function_exists('generateRpl12ScoresJson')) {
+            try {
+                $stmtProg = $pdo->prepare("
+                    SELECT u.id as user_id, u.jenis_program
+                    FROM pretes_registrations pr
+                    JOIN users u ON u.id = pr.user_id
+                    WHERE pr.id = ? LIMIT 1
+                ");
+                $stmtProg->execute([$registrationId]);
+                $userRow = $stmtProg->fetch(PDO::FETCH_ASSOC);
+                if ($userRow && pretesProgramKey($userRow['jenis_program'] ?? '') === 'rpl' && $score >= 80.0) {
+                    $rplMapped = mapRplCbtScoresToCertificate($pdo, $registrationId, (int)$userRow['user_id'], $score);
+                    $rpl12 = generateRpl12ScoresJson($rplMapped);
+                    $scores = array_merge($scores, $rpl12);
+                }
+            } catch (Throwable $e) {}
+        }
+
         $json = json_encode($scores, JSON_UNESCAPED_UNICODE);
         if ($raw !== false) {
             $pdo->prepare('UPDATE pretes_assessments SET scores_json = ?, updated_at = CURRENT_TIMESTAMP WHERE registration_id = ?')->execute([$json, $registrationId]);
