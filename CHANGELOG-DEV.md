@@ -1,3 +1,46 @@
+## 2026-11-24 12:55:00 +0700 — Penambahan Fitur Export Rekapitulasi Nilai Pretes CBT per Kategori Soal dan Filter Program di Halaman Rekap Nilai
+
+**ID:** PRETES-REKAP-EXPORT-CBT-CATEGORIES · **Parent Git:** `966fa72`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk menyediakan fitur ekspor nilai per kategori (grup soal) pada halaman rekapitulasi nilai pretes (`https://lppai.quizb.my.id/admin/pretes-rekap-nilai.php`), khususnya karena ujian praktik telah ditiadakan bagi mahasiswa RPL sehingga penilaian kelulusan pretes mahasiswa RPL berbasis CBT dan administrator memerlukan analisis capaian butir/grup materi soal (misalnya Thaharah, Sholat, Ubudiyah, dll.) secara transparan.
+
+**Perubahan dan alasan:**
+1. **Fungsi Agregasi dan Generator Ekspor CBT per Kategori (`includes/pretes-helper.php`):**
+   - Menambahkan fungsi helper `pretesGetCbtCategoryExportData(PDO $pdo, array $roster): array` untuk mengagregasi data butir soal dari tabel `pretes_cbt_items` yang terhubung dengan `pretes_cbt_questions.category` bagi setiap attempt CBT resmi peserta periode terpilih.
+   - Mengakumulasi total soal, jawaban benar, persentase nilai per kategori, total butir dijawab, total benar, skor akhir CBT, serta status kelulusan (passing grade $\ge 80$).
+   - Menyediakan generator ekspor multi-format:
+     - `pretesExportCbtCategoriesToXlsxNative()`: Menghasilkan berkas Excel `.xlsx` asli (OpenXML) melalui `ZipArchive` dengan penataan kolom, styling header hijau tua LPPAI (`#0D5C3A`), dan tipe data numerik agar memudahkan perhitungan rata-rata/formula di Excel.
+     - `pretesExportCbtCategoriesToCsv()`: Ekspor CSV berstandar UTF-8 dengan BOM dan kutip teks pada NIM agar tidak terpotong nol di awal.
+     - `pretesExportCbtCategoriesToXlsXml()`: Fallback format XML Spreadsheet 2003 `.xls`.
+2. **Integrasi Export Handler & Filter Program pada Halaman Rekapitulasi (`admin/pretes-rekap-nilai.php`):**
+   - Menambahkan penanganan parameter GET `export=cbt_categories`, `export=cbt_categories_csv`, dan `export=cbt_category_xlsx`.
+   - Menambahkan tombol aksi baru **"📑 Export CBT per Kategori"** pada toolbar atas di samping tombol Export Excel 12 komponen yang sudah ada.
+   - Menambahkan tombol unduh pintas **"📑 Unduh CBT per Kategori"** pada header kartu tabel rekapitulasi nilai.
+   - Menambahkan parameter filter `program` dan dropdown filter **"Jenis Program"** (Semua Program, RPL, Reguler, Non-Reguler) agar admin dapat dengan mudah menyaring dan mengekspor khusus mahasiswa program RPL atau program lainnya.
+3. **Automated Unit & Integration Test (`tests/pretes-rekap-cbt-categories-export-test.php`):**
+   - Membuat test suite mandiri yang memvalidasi pembuatan data fixture CBT multi-kategori, kalkulasi akurat persentase benar per kategori, penentuan status kelulusan, ekspor CSV, serta integritas berkas `.xlsx` OpenXML native.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 12:52:22 | `includes/pretes-helper.php` | 1285-1924 | Penambahan fungsi agregasi `pretesGetCbtCategoryExportData`, generator `pretesExportCbtCategoriesToXlsxNative`, `pretesExportCbtCategoriesToCsv`, dan `pretesExportCbtCategoriesToXlsXml`. |
+| 2026-11-24 12:51:32 | `admin/pretes-rekap-nilai.php` | 208-215, 380-388, 720-853, 1430-1445, 1495-1520, 1575-1590 | Handler `export=cbt_categories`, tombol UI toolbar & card header, serta filter dropdown jenis program. |
+| 2026-11-24 12:48:41 | `tests/pretes-rekap-cbt-categories-export-test.php` | 1-225 | Suite pengujian otomatis verifikasi ekspor per kategori, agregasi nilai, CSV, dan OpenXML XLSX. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `admin/pretes-rekap-nilai.php` dan `includes/pretes-helper.php` lulus 100% tanpa error sintaks.
+- `git diff --check` bersih tanpa isu formatting atau whitespace.
+- Test suite baru `tests/pretes-rekap-cbt-categories-export-test.php` lulus 100% PASS (3 kategori soal, breakdown benar/total, persentase nilai, verifikasi file XLSX ZIP PK header & CSV UTF-8).
+- Seluruh 6 rangkaian test pretes & RPL (`pretes-cbt-export-scope-test.php`, `pretes-cbt-result-filters-test.php`, `pretes-all-students-test.php`, `tutorial-rpl-student-status-test.php`, `tutorial-rpl-student-hub-test.php`) lulus 100% PASS.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory.
+- Fitur ekspor secara otomatis memprioritaskan PhpSpreadsheet jika terpasang di vendor, dengan native OpenXML `ZipArchive` sebagai prioritas utama dan SpreadsheetML / CSV sebagai fallback.
+- Penerapan ke server produksi hosting dilakukan melalui Git push.
+
+---
+
 ## 2026-11-24 09:05:14 +0700 — Penyesuaian Durasi CBT Menjadi 90 Menit dan Perbaikan Tombol Konfirmasi Unggah Tugas Drive agar Teks Terbaca Penuh
 
 **ID:** TUTORIAL-RPL-CBT-90MIN-AND-CONFIRM-BUTTON-FIX · **Parent Git:** `34dc22a`.

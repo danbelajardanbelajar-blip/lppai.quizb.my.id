@@ -211,6 +211,7 @@ $filterDosen        = trim($_GET['dosen'] ?? '');
 $filterRuang        = trim($_GET['ruang'] ?? '');
 $filterKelengkapan  = trim($_GET['kelengkapan'] ?? '');
 $filterStatus       = trim($_GET['status_lulus'] ?? '');
+$filterProgram      = trim($_GET['program'] ?? '');
 $filterSearch       = trim($_GET['q'] ?? '');
 
 // Jika Dosen login, otomatis kunci ke penugasannya sendiri berdasarkan NIM akun (bukan nama)
@@ -377,6 +378,11 @@ foreach ($rawRows as $row) {
         if ($filterStatus === 'lulus' && $statusLulus !== 'lulus') continue;
         if ($filterStatus === 'tidak_lulus' && $statusLulus !== 'tidak_lulus') continue;
         if ($filterStatus === 'menunggu' && $statusLulus !== 'menunggu') continue;
+    }
+
+    // Filter Jenis Program di memori jika diset
+    if (!empty($filterProgram)) {
+        if (strcasecmp((string)$itemData['jenis_program'], $filterProgram) !== 0) continue;
     }
 
     // Filter Search text
@@ -715,6 +721,140 @@ if (!function_exists('pretesExportRosterToXlsXml')) {
         echo '</Workbook>' . "\n";
         exit;
     }
+}
+
+// ── MODE EXPORT: CBT PER KATEGORI SOAL ─────────────────────────────────────────
+$exportFormat = strtolower(trim($_GET['export'] ?? ''));
+if (in_array($exportFormat, ['cbt_categories', 'cbt_categories_csv', 'cbt_category_xlsx', 'cbt_categories_xlsx'], true)) {
+    $cbtExportMode = ($exportFormat === 'cbt_categories_csv' || strtolower(trim($_GET['format'] ?? '')) === 'csv') ? 'csv' : 'xlsx';
+    $safePeriode = preg_replace('/[^a-zA-Z0-9]/', '_', $periodeName ?: 'Semua');
+    $safeProgram = !empty($filterProgram) ? '_' . preg_replace('/[^a-zA-Z0-9]/', '_', $filterProgram) : '';
+    $timestamp = date('Ymd_His');
+    $filename = "Rekap_CBT_Kategori_Pretes_{$safePeriode}{$safeProgram}_{$timestamp}";
+
+    $cbtExportData = pretesGetCbtCategoryExportData($pdo, $roster);
+    $categories = $cbtExportData['categories'];
+    $exportRows = $cbtExportData['rows'];
+
+    $headers = ['No', 'NIM', 'Nama Mahasiswa', 'Program Studi', 'Jenis Program', 'Fakultas', 'Sesi Ujian CBT', 'Waktu Selesai (WIB)'];
+    foreach ($categories as $cat) {
+        $headers[] = $cat . ' (%)';
+        $headers[] = $cat . ' (Benar/Total)';
+    }
+    $headers[] = 'Total Soal';
+    $headers[] = 'Jawaban Benar';
+    $headers[] = 'Nilai Akhir CBT';
+    $headers[] = 'Status Kelulusan';
+
+    // 1. Format CSV
+    if ($cbtExportMode === 'csv') {
+        pretesExportCbtCategoriesToCsv($filename, $headers, $categories, $exportRows);
+    }
+
+    // 2. Format Excel: PhpSpreadsheet jika tersedia di vendor
+    $autoloadPaths = [
+        __DIR__ . '/../vendor/autoload.php',
+        __DIR__ . '/../../vendor/autoload.php',
+        __DIR__ . '/../../../vendor/autoload.php',
+        dirname(__DIR__) . '/vendor/autoload.php',
+        $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php',
+        $_SERVER['DOCUMENT_ROOT'] . '/../vendor/autoload.php',
+        dirname($_SERVER['DOCUMENT_ROOT']) . '/vendor/autoload.php',
+        '/public_html/vendor/autoload.php',
+        '/home/' . get_current_user() . '/public_html/vendor/autoload.php',
+        '/home/' . get_current_user() . '/vendor/autoload.php',
+    ];
+    $hasSpreadsheet = false;
+    foreach ($autoloadPaths as $p) {
+        if (file_exists($p)) {
+            require_once $p;
+            if (class_exists('\PhpOffice\PhpSpreadsheet\Spreadsheet')) {
+                $hasSpreadsheet = true;
+                break;
+            }
+        }
+    }
+
+    if ($hasSpreadsheet) {
+        try {
+            while (ob_get_level()) ob_end_clean();
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Rekap CBT Kategori');
+
+            $sheet->setCellValue('A1', 'LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA');
+            $sheet->setCellValue('A2', "REKAPITULASI NILAI CBT PRETES PER KATEGORI SOAL - PERIODE: {$periodeName}");
+            $lastColLetter = pretesXlsxColLetter(count($headers));
+            $sheet->mergeCells("A1:{$lastColLetter}1");
+            $sheet->mergeCells("A2:{$lastColLetter}2");
+            $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(13);
+            $sheet->getStyle('A1:A2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+            $colChar = 'A';
+            foreach ($headers as $h) {
+                $sheet->setCellValue("{$colChar}4", $h);
+                $sheet->getColumnDimension($colChar)->setAutoSize(true);
+                $colChar++;
+            }
+
+            $sheet->getStyle("A4:{$lastColLetter}4")->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF0D5C3A']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER, 'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            ]);
+            $sheet->getRowDimension(4)->setRowHeight(26);
+
+            $rowNum = 5;
+            if (empty($exportRows)) {
+                $sheet->setCellValue("A5", "Tidak ada data peserta yang sesuai dengan filter yang dipilih.");
+                $sheet->mergeCells("A5:{$lastColLetter}5");
+                $sheet->getStyle("A5")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            } else {
+                foreach ($exportRows as $r) {
+                    $c = 'A';
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['no']); $c++;
+                    $sheet->setCellValueExplicit("{$c}{$rowNum}", $r['nim'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['nama_lengkap']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['program_studi']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['jenis_program']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['fakultas']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['session_title']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['waktu_selesai']); $c++;
+
+                    foreach ($categories as $cat) {
+                        $catItem = $r['categories'][$cat] ?? null;
+                        $sheet->setCellValue("{$c}{$rowNum}", ($catItem && $catItem['score'] !== null) ? round((float)$catItem['score'], 1) : '-'); $c++;
+                        $sheet->setCellValue("{$c}{$rowNum}", ($catItem && $catItem['ratio'] !== null) ? $catItem['ratio'] : '-'); $c++;
+                    }
+
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['total_soal']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['total_benar']); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", ($r['final_score'] !== null) ? round((float)$r['final_score'], 2) : '-'); $c++;
+                    $sheet->setCellValue("{$c}{$rowNum}", $r['status_lulus']); $c++;
+
+                    $rowNum++;
+                }
+            }
+
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header("Content-Disposition: attachment; filename=\"{$filename}.xlsx\"");
+            header('Cache-Control: max-age=0, no-cache, must-revalidate');
+            header('Pragma: public');
+            $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+            $writer->save('php://output');
+            exit;
+        } catch (Throwable $e) {
+            error_log("PhpSpreadsheet CBT export gagal, fallback: " . $e->getMessage());
+        }
+    }
+
+    // 3. Native OpenXML XLSX dengan ZipArchive
+    if (class_exists('ZipArchive')) {
+        pretesExportCbtCategoriesToXlsxNative($filename, $periodeName, $headers, $categories, $exportRows);
+    }
+
+    // 4. Fallback XML Spreadsheet 2003
+    pretesExportCbtCategoriesToXlsXml($filename, $periodeName, $headers, $categories, $exportRows);
 }
 
 // ── MODE EXPORT: XLSX / CSV ───────────────────────────────────────────────────
@@ -1287,11 +1427,15 @@ include __DIR__ . '/../includes/header.php';
         </form>
         <?php endif; ?>
 
-        <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&export=xlsx" class="btn" style="background:#ffffff; color:#0d5c3a; font-weight:700; padding:8px 14px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-            📊 Export Excel
+        <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&program=<?= urlencode($filterProgram) ?>&q=<?= urlencode($filterSearch) ?>&export=xlsx" class="btn" style="background:#ffffff; color:#0d5c3a; font-weight:700; padding:8px 14px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+            📊 Export Excel (12 Komponen)
         </a>
 
-        <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&print=1" target="_blank" class="btn" style="background:rgba(255,255,255,0.25); color:#ffffff; font-weight:700; padding:8px 14px; border-radius:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.4); display:inline-flex; align-items:center; gap:6px;">
+        <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&program=<?= urlencode($filterProgram) ?>&q=<?= urlencode($filterSearch) ?>&export=cbt_categories" class="btn" style="background:#0284c7; color:#ffffff; font-weight:700; padding:8px 14px; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 6px rgba(2,132,199,0.35);" title="Export rekapitulasi nilai CBT per kategori materi / grup soal (Khusus RPL & Analisis Butir Soal)">
+            📑 Export CBT per Kategori
+        </a>
+
+        <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&program=<?= urlencode($filterProgram) ?>&q=<?= urlencode($filterSearch) ?>&print=1" target="_blank" class="btn" style="background:rgba(255,255,255,0.25); color:#ffffff; font-weight:700; padding:8px 14px; border-radius:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.4); display:inline-flex; align-items:center; gap:6px;">
             🖨️ Cetak Resmi
         </a>
     </div>
@@ -1347,7 +1491,7 @@ include __DIR__ . '/../includes/header.php';
             foreach (pretesPeriodDays($selectedMaster ?? null) as $dName) $days[$dName] = $dName; // + Sabtu & Ahad untuk periode Khusus RPL
             foreach ($days as $label => $val):
                 $isActive = (strtolower($filterHari) === strtolower($val)) || ($val === '' && empty($filterHari));
-                $urlPill = "?pretes_id={$selectedPeriodId}&hari=" . urlencode($val) . "&dosen=" . urlencode($filterDosen) . "&ruang=" . urlencode($filterRuang) . "&kelengkapan=" . urlencode($filterKelengkapan) . "&status_lulus=" . urlencode($filterStatus);
+                $urlPill = "?pretes_id={$selectedPeriodId}&hari=" . urlencode($val) . "&dosen=" . urlencode($filterDosen) . "&ruang=" . urlencode($filterRuang) . "&kelengkapan=" . urlencode($filterKelengkapan) . "&status_lulus=" . urlencode($filterStatus) . "&program=" . urlencode($filterProgram) . "&q=" . urlencode($filterSearch);
             ?>
                 <a href="<?= $urlPill ?>" class="day-pill-btn <?= $isActive ? 'active' : '' ?>">
                     <?= $label ?>
@@ -1357,6 +1501,16 @@ include __DIR__ . '/../includes/header.php';
 
         <!-- Baris 2: Dropdowns Multi-Kriteria -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:flex-end;">
+            <div>
+                <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Jenis Program</label>
+                <select name="program" class="form-control" style="width:100%; padding:8px; border-radius:8px; font-size:13px;" onchange="this.form.submit()">
+                    <option value="">-- Semua Program --</option>
+                    <option value="RPL" <?= (strtoupper($filterProgram) === 'RPL') ? 'selected' : '' ?>>RPL (Rekognisi)</option>
+                    <option value="Reguler" <?= (strcasecmp($filterProgram, 'Reguler') === 0) ? 'selected' : '' ?>>Reguler</option>
+                    <option value="Non-Reguler" <?= (strcasecmp($filterProgram, 'Non-Reguler') === 0) ? 'selected' : '' ?>>Non-Reguler</option>
+                </select>
+            </div>
+
             <?php if ($isAdmin): ?>
             <div>
                 <label style="display:block; font-size:12px; font-weight:700; color:#475569; margin-bottom:4px;">Dosen Penguji</label>
@@ -1421,8 +1575,13 @@ include __DIR__ . '/../includes/header.php';
         <div style="font-weight:800; font-size:16px; color:#0f172a;">
             📋 Tabel Nilai Rinci 12 Komponen Pretes (<?= count($roster) ?> Mahasiswa)
         </div>
-        <div style="font-size:12.5px; color:#64748b;">
-            💡 Skor berwarna: <span class="score-pill good">≥80</span> <span class="score-pill low">&lt;80</span>
+        <div style="display:flex; align-items:center; gap:10px; font-size:12.5px; color:#64748b;">
+            <a href="?pretes_id=<?= (int)$selectedPeriodId ?>&hari=<?= urlencode($filterHari) ?>&dosen=<?= urlencode($filterDosen) ?>&ruang=<?= urlencode($filterRuang) ?>&kelengkapan=<?= urlencode($filterKelengkapan) ?>&status_lulus=<?= urlencode($filterStatus) ?>&program=<?= urlencode($filterProgram) ?>&q=<?= urlencode($filterSearch) ?>&export=cbt_categories" class="btn btn-sm" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:700; padding:5px 12px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Unduh rekapitulasi nilai CBT per kategori materi / butir soal">
+                📑 Unduh CBT per Kategori
+            </a>
+            <div>
+                💡 Skor berwarna: <span class="score-pill good">≥80</span> <span class="score-pill low">&lt;80</span>
+            </div>
         </div>
     </div>
 

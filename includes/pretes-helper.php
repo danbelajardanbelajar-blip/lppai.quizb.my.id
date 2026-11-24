@@ -1282,3 +1282,643 @@ if (!function_exists('pretesParseHariFilter')) {
         return array_values(array_filter($valid, static fn($d) => isset($want[$d])));
     }
 }
+
+if (!function_exists('pretesXlsxColLetter')) {
+    function pretesXlsxColLetter($num) {
+        $col = '';
+        while ($num > 0) {
+            $mod = ($num - 1) % 26;
+            $col = chr(65 + $mod) . $col;
+            $num = intdiv($num - $mod - 1, 26);
+        }
+        return $col;
+    }
+}
+
+if (!function_exists('pretesGetCbtCategoryExportData')) {
+    /**
+     * Agregasi data hasil CBT pretes resmi per kategori/grup materi soal untuk daftar mahasiswa ($roster).
+     *
+     * @param PDO $pdo
+     * @param array $roster Daftar peserta pretes
+     * @return array{categories: string[], rows: array}
+     */
+    function pretesGetCbtCategoryExportData(PDO $pdo, array $roster): array {
+        $regIds = array_values(array_filter(array_map('intval', array_column($roster, 'reg_id')), static fn($v) => $v > 0));
+        $userToRegMap = [];
+        foreach ($roster as $r) {
+            $uId = (int)($r['user_id'] ?? 0);
+            $rId = (int)($r['reg_id'] ?? 0);
+            if ($uId > 0 && $rId > 0) {
+                $userToRegMap[$uId] = $rId;
+            }
+        }
+
+        $cbtAttempts = [];
+        if (!empty($regIds)) {
+            foreach (array_chunk($regIds, 500) as $chunk) {
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                try {
+                    $stmt = $pdo->prepare("
+                        SELECT a.id as attempt_id, a.user_id, a.registration_id, a.session_id, a.score, a.correct_count, a.started_at, a.deadline_at, a.submitted_at,
+                               s.title as session_title
+                        FROM pretes_cbt_attempts a
+                        LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                        WHERE a.registration_id IN ($ph)
+                        ORDER BY a.submitted_at DESC, a.id DESC
+                    ");
+                    $stmt->execute($chunk);
+                    while ($att = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $rid = (int)$att['registration_id'];
+                        if (!isset($cbtAttempts[$rid])) {
+                            $cbtAttempts[$rid] = $att;
+                        }
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+
+        // Fallback pencarian attempt berdasarkan user_id jika ada pendaftaran yang belum terpetakan langsung
+        $missingUserIds = [];
+        foreach ($roster as $r) {
+            $rid = (int)($r['reg_id'] ?? 0);
+            $uid = (int)($r['user_id'] ?? 0);
+            if (!isset($cbtAttempts[$rid]) && $uid > 0) {
+                $missingUserIds[] = $uid;
+            }
+        }
+        if (!empty($missingUserIds)) {
+            foreach (array_chunk(array_unique($missingUserIds), 500) as $chunk) {
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                try {
+                    $stmt = $pdo->prepare("
+                        SELECT a.id as attempt_id, a.user_id, a.registration_id, a.session_id, a.score, a.correct_count, a.started_at, a.deadline_at, a.submitted_at,
+                               s.title as session_title
+                        FROM pretes_cbt_attempts a
+                        LEFT JOIN pretes_cbt_sessions s ON s.id = a.session_id
+                        WHERE a.user_id IN ($ph) AND a.registration_id > 0 AND a.submitted_at IS NOT NULL
+                        ORDER BY a.submitted_at DESC, a.id DESC
+                    ");
+                    $stmt->execute($chunk);
+                    while ($att = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $uid = (int)$att['user_id'];
+                        if (isset($userToRegMap[$uid])) {
+                            $rid = $userToRegMap[$uid];
+                            if (!isset($cbtAttempts[$rid])) {
+                                $cbtAttempts[$rid] = $att;
+                            }
+                        }
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+
+        $attemptIds = [];
+        foreach ($cbtAttempts as $att) {
+            if (!empty($att['attempt_id']) && !empty($att['submitted_at'])) {
+                $attemptIds[] = (int)$att['attempt_id'];
+            }
+        }
+        $attemptIds = array_values(array_unique($attemptIds));
+
+        $statsByAttempt = [];
+        $foundCategories = [];
+
+        if (!empty($attemptIds)) {
+            foreach (array_chunk($attemptIds, 500) as $chunk) {
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                try {
+                    $stmt = $pdo->prepare("
+                        SELECT i.attempt_id,
+                               COALESCE(NULLIF(TRIM(q.category), ''), 'Umum') AS cat_name,
+                               SUM(CASE WHEN i.answer IS NOT NULL AND i.answer <> '' AND i.answer = i.correct_answer THEN 1 ELSE 0 END) AS benar_count,
+                               COUNT(i.position) AS total_count
+                        FROM pretes_cbt_items i
+                        LEFT JOIN pretes_cbt_questions q ON q.id = i.question_id
+                        WHERE i.attempt_id IN ($ph)
+                        GROUP BY i.attempt_id, COALESCE(NULLIF(TRIM(q.category), ''), 'Umum')
+                    ");
+                    $stmt->execute($chunk);
+                    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                        $aid = (int)$row['attempt_id'];
+                        $cat = trim((string)$row['cat_name']);
+                        if ($cat === '') $cat = 'Umum';
+                        $benar = (int)$row['benar_count'];
+                        $tot = (int)$row['total_count'];
+                        $pct = ($tot > 0) ? round(($benar / $tot) * 100, 1) : 0.0;
+                        $statsByAttempt[$aid][$cat] = [
+                            'benar' => $benar,
+                            'total' => $tot,
+                            'score' => $pct,
+                        ];
+                        $foundCategories[$cat] = true;
+                    }
+                } catch (Throwable $e) {}
+            }
+        }
+
+        // Tentukan daftar kategori
+        $categories = array_keys($foundCategories);
+        if (empty($categories)) {
+            try {
+                $catStmt = $pdo->query("SELECT DISTINCT category FROM pretes_cbt_questions WHERE is_active = 1 ORDER BY category ASC");
+                $categories = $catStmt ? $catStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+                $categories = array_values(array_filter(array_map('trim', $categories)));
+            } catch (Throwable $e) {}
+        }
+        if (empty($categories)) {
+            $categories = ['Umum'];
+        } else {
+            sort($categories, SORT_NATURAL | SORT_FLAG_CASE);
+        }
+
+        $passMin = function_exists('pretesCbtPassMinScore') ? pretesCbtPassMinScore() : 80.0;
+
+        $rows = [];
+        foreach ($roster as $idx => $r) {
+            $rid = (int)($r['reg_id'] ?? 0);
+            $att = $cbtAttempts[$rid] ?? null;
+            $aid = !empty($att['attempt_id']) ? (int)$att['attempt_id'] : 0;
+            $isSubmitted = ($att && !empty($att['submitted_at']));
+
+            $catData = [];
+            $totalSoal = 0;
+            $totalBenar = 0;
+
+            foreach ($categories as $cat) {
+                if ($isSubmitted && isset($statsByAttempt[$aid][$cat])) {
+                    $cs = $statsByAttempt[$aid][$cat];
+                    $catData[$cat] = [
+                        'score' => $cs['score'],
+                        'ratio' => $cs['benar'] . '/' . $cs['total'],
+                    ];
+                    $totalSoal += $cs['total'];
+                    $totalBenar += $cs['benar'];
+                } else {
+                    $catData[$cat] = [
+                        'score' => null,
+                        'ratio' => '-',
+                    ];
+                }
+            }
+
+            if ($isSubmitted) {
+                $finalScore = isset($att['score']) && $att['score'] !== null ? round((float)$att['score'], 2) : ($totalSoal > 0 ? round(($totalBenar / $totalSoal) * 100, 2) : 0.0);
+                $statusLulus = ($finalScore >= $passMin) ? 'LULUS' : 'TIDAK LULUS';
+                $waktuSelesai = date('d/m/Y H:i', (int)$att['submitted_at']) . ' WIB';
+                $sessionTitle = !empty($att['session_title']) ? $att['session_title'] : 'Sesi CBT Resmi';
+            } else {
+                $finalScore = null;
+                $statusLulus = 'BELUM CBT';
+                $waktuSelesai = '-';
+                $sessionTitle = '-';
+                $totalSoal = '-';
+                $totalBenar = '-';
+            }
+
+            $rows[] = [
+                'no'             => $idx + 1,
+                'nim'            => (string)($r['nim'] ?? ''),
+                'nama_lengkap'   => $r['nama_lengkap'] ?? '',
+                'program_studi'  => $r['program_studi'] ?? '',
+                'jenis_program'  => function_exists('normalizeJenisProgram') ? normalizeJenisProgram($r['jenis_program'] ?? 'Reguler') : ($r['jenis_program'] ?? 'Reguler'),
+                'fakultas'       => $r['fakultas'] ?? '',
+                'session_title'  => $sessionTitle,
+                'waktu_selesai'  => $waktuSelesai,
+                'categories'     => $catData,
+                'total_soal'     => $totalSoal,
+                'total_benar'    => $totalBenar,
+                'final_score'    => $finalScore,
+                'status_lulus'   => $statusLulus,
+                'is_submitted'   => $isSubmitted,
+            ];
+        }
+
+        return [
+            'categories' => $categories,
+            'rows'       => $rows,
+        ];
+    }
+}
+
+if (!function_exists('pretesExportCbtCategoriesToCsv')) {
+    /**
+     * Ekspor hasil CBT per kategori ke format CSV UTF-8.
+     */
+    function pretesExportCbtCategoriesToCsv($filename, $headers, $categories, $exportRows, bool $returnContent = false) {
+        if ($returnContent) {
+            $fp = fopen('php://temp', 'r+');
+            fwrite($fp, "\xEF\xBB\xBF");
+            fputcsv($fp, $headers);
+            foreach ($exportRows as $r) {
+                $line = [
+                    $r['no'],
+                    "'" . $r['nim'],
+                    $r['nama_lengkap'],
+                    $r['program_studi'],
+                    $r['jenis_program'],
+                    $r['fakultas'],
+                    $r['session_title'],
+                    $r['waktu_selesai'],
+                ];
+                foreach ($categories as $cat) {
+                    $catItem = $r['categories'][$cat] ?? null;
+                    $line[] = ($catItem && $catItem['score'] !== null) ? $catItem['score'] : '-';
+                    $line[] = ($catItem && $catItem['ratio'] !== null) ? $catItem['ratio'] : '-';
+                }
+                $line[] = $r['total_soal'];
+                $line[] = $r['total_benar'];
+                $line[] = ($r['final_score'] !== null) ? $r['final_score'] : '-';
+                $line[] = $r['status_lulus'];
+                fputcsv($fp, $line);
+            }
+            rewind($fp);
+            $csv = stream_get_contents($fp);
+            fclose($fp);
+            return $csv;
+        }
+
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: text/csv; charset=UTF-8');
+        header("Content-Disposition: attachment; filename=\"{$filename}.csv\"");
+        echo "\xEF\xBB\xBF"; // UTF-8 BOM
+
+        $out = fopen('php://output', 'w');
+        fputcsv($out, $headers);
+
+        foreach ($exportRows as $r) {
+            $line = [
+                $r['no'],
+                "'" . $r['nim'],
+                $r['nama_lengkap'],
+                $r['program_studi'],
+                $r['jenis_program'],
+                $r['fakultas'],
+                $r['session_title'],
+                $r['waktu_selesai'],
+            ];
+            foreach ($categories as $cat) {
+                $catItem = $r['categories'][$cat] ?? null;
+                $line[] = ($catItem && $catItem['score'] !== null) ? $catItem['score'] : '-';
+                $line[] = ($catItem && $catItem['ratio'] !== null) ? $catItem['ratio'] : '-';
+            }
+            $line[] = $r['total_soal'];
+            $line[] = $r['total_benar'];
+            $line[] = ($r['final_score'] !== null) ? $r['final_score'] : '-';
+            $line[] = $r['status_lulus'];
+            fputcsv($out, $line);
+        }
+        fclose($out);
+        exit;
+    }
+}
+
+if (!function_exists('pretesExportCbtCategoriesToXlsxNative')) {
+    /**
+     * Ekspor hasil CBT per kategori ke format XLSX asli (OpenXML) menggunakan ZipArchive.
+     */
+    function pretesExportCbtCategoriesToXlsxNative($filename, $periodeName, $headers, $categories, $exportRows, bool $returnContent = false) {
+        if (!class_exists('ZipArchive')) {
+            return false;
+        }
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'rekap_cbt_xlsx_') . '.xlsx';
+        $zip = new ZipArchive();
+        if ($zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return false;
+        }
+
+        // [Content_Types].xml
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' .
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' .
+            '<Default Extension="xml" ContentType="application/xml"/>' .
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' .
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' .
+            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' .
+            '</Types>');
+
+        // _rels/.rels
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' .
+            '</Relationships>');
+
+        // xl/_rels/workbook.xml.rels
+        $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' .
+            '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' .
+            '</Relationships>');
+
+        // xl/workbook.xml
+        $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' .
+            '<bookViews><workbookView xWindow="0" yWindow="0" windowWidth="20480" windowHeight="10240"/></bookViews>' .
+            '<sheets><sheet name="Rekap CBT Kategori" sheetId="1" r:id="rId1"/></sheets>' .
+            '</workbook>');
+
+        // xl/styles.xml
+        $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+            '<fonts count="5">' .
+            '<font><sz val="11"/><color rgb="FF0F172A"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><b/><sz val="13"/><color rgb="FF0D5C3A"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><sz val="11"/><color rgb="FF475569"/><name val="Calibri"/><family val="2"/></font>' .
+            '<font><b/><sz val="11"/><color rgb="FF1E293B"/><name val="Calibri"/><family val="2"/></font>' .
+            '</fonts>' .
+            '<fills count="4">' .
+            '<fill><patternFill patternType="none"/></fill>' .
+            '<fill><patternFill patternType="gray125"/></fill>' .
+            '<fill><patternFill patternType="solid"><fgColor rgb="FF0D5C3A"/></patternFill></fill>' .
+            '<fill><patternFill patternType="solid"><fgColor rgb="FF0284C7"/></patternFill></fill>' .
+            '</fills>' .
+            '<borders count="2">' .
+            '<border><left/><right/><top/><bottom/><diagonal/></border>' .
+            '<border>' .
+            '<left style="thin"><color rgb="FFCBD5E1"/></left>' .
+            '<right style="thin"><color rgb="FFCBD5E1"/></right>' .
+            '<top style="thin"><color rgb="FFCBD5E1"/></top>' .
+            '<bottom style="thin"><color rgb="FFCBD5E1"/></bottom>' .
+            '<diagonal/>' .
+            '</border>' .
+            '</borders>' .
+            '<cellStyleXfs count="1">' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>' .
+            '</cellStyleXfs>' .
+            '<cellXfs count="6">' .
+            '<!-- 0: Default -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' .
+            '<!-- 1: Header Green Bold Center -->' .
+            '<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>' .
+            '<!-- 2: Data Left -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' .
+            '<!-- 3: Data Center -->' .
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '<!-- 4: Title Banner -->' .
+            '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '<!-- 5: Subtitle Banner -->' .
+            '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>' .
+            '</cellXfs>' .
+            '</styleSheet>';
+        $zip->addFromString('xl/styles.xml', $stylesXml);
+
+        // xl/worksheets/sheet1.xml
+        $rowsXml = [];
+
+        // Row 1: Banner Title
+        $rowsXml[] = '<row r="1" ht="28" customHeight="1">' .
+            '<c r="A1" t="inlineStr" s="4"><is><t>LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA</t></is></c>' .
+            '</row>';
+
+        // Row 2: Subtitle
+        $rowsXml[] = '<row r="2" ht="22" customHeight="1">' .
+            '<c r="A2" t="inlineStr" s="5"><is><t>REKAPITULASI NILAI CBT PRETES PER KATEGORI SOAL - PERIODE: ' . htmlspecialchars($periodeName, ENT_XML1, 'UTF-8') . '</t></is></c>' .
+            '</row>';
+
+        // Row 4: Column Headers
+        $headerCells = [];
+        foreach ($headers as $colIdx => $h) {
+            $colLetter = pretesXlsxColLetter($colIdx + 1);
+            $headerCells[] = '<c r="' . $colLetter . '4" t="inlineStr" s="1"><is><t>' . htmlspecialchars($h, ENT_XML1, 'UTF-8') . '</t></is></c>';
+        }
+        $rowsXml[] = '<row r="4" ht="26" customHeight="1">' . implode('', $headerCells) . '</row>';
+
+        $totalCols = count($headers);
+        $lastColLetter = pretesXlsxColLetter($totalCols);
+
+        if (empty($exportRows)) {
+            $rowsXml[] = '<row r="5" ht="24" customHeight="1">' .
+                '<c r="A5" t="inlineStr" s="3"><is><t>Tidak ada data peserta yang sesuai dengan filter yang dipilih.</t></is></c>' .
+                '</row>';
+            $extraMerge = '<mergeCell ref="A5:' . $lastColLetter . '5"/>';
+            $mergeCount = 3;
+        } else {
+            $extraMerge = '';
+            $mergeCount = 2;
+            $rowNum = 5;
+            foreach ($exportRows as $r) {
+                $cells = [];
+                $colIdx = 1;
+
+                // 1. No
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . $r['no'] . '</v></c>';
+                // 2. NIM
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['nim'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 3. Nama
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['nama_lengkap'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 4. Prodi
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['program_studi'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 5. Jenis Program
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['jenis_program'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 6. Fakultas
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['fakultas'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 7. Sesi CBT
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="2"><is><t>' . htmlspecialchars($r['session_title'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+                // 8. Waktu Selesai (WIB)
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['waktu_selesai'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+
+                // Breakdown Kategori
+                foreach ($categories as $cat) {
+                    $catItem = $r['categories'][$cat] ?? null;
+                    if ($catItem && $catItem['score'] !== null) {
+                        $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . round((float)$catItem['score'], 1) . '</v></c>';
+                    } else {
+                        $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                    }
+                    $ratioText = ($catItem && $catItem['ratio'] !== null) ? $catItem['ratio'] : '-';
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($ratioText, ENT_XML1, 'UTF-8') . '</t></is></c>';
+                }
+
+                // Total Soal
+                if (is_numeric($r['total_soal'])) {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . (int)$r['total_soal'] . '</v></c>';
+                } else {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                }
+
+                // Total Benar
+                if (is_numeric($r['total_benar'])) {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . (int)$r['total_benar'] . '</v></c>';
+                } else {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                }
+
+                // Nilai Akhir CBT
+                if ($r['final_score'] !== null && is_numeric($r['final_score'])) {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" s="3"><v>' . round((float)$r['final_score'], 2) . '</v></c>';
+                } else {
+                    $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>-</t></is></c>';
+                }
+
+                // Status Kelulusan
+                $cells[] = '<c r="' . pretesXlsxColLetter($colIdx++) . $rowNum . '" t="inlineStr" s="3"><is><t>' . htmlspecialchars($r['status_lulus'], ENT_XML1, 'UTF-8') . '</t></is></c>';
+
+                $rowsXml[] = '<row r="' . $rowNum . '">' . implode('', $cells) . '</row>';
+                $rowNum++;
+            }
+        }
+
+        // Lebar Kolom Dinamis
+        $colsXml = [];
+        for ($cNum = 1; $cNum <= $totalCols; $cNum++) {
+            $w = 14;
+            if ($cNum === 1) $w = 6;
+            elseif ($cNum === 2) $w = 16;
+            elseif ($cNum === 3) $w = 28;
+            elseif ($cNum === 4) $w = 22;
+            elseif ($cNum === 5) $w = 14;
+            elseif ($cNum === 6) $w = 16;
+            elseif ($cNum === 7) $w = 24;
+            elseif ($cNum === 8) $w = 18;
+            elseif ($cNum === $totalCols) $w = 16;
+            $colsXml[] = '<col min="' . $cNum . '" max="' . $cNum . '" width="' . $w . '" customWidth="1"/>';
+        }
+
+        $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+            '<cols>' . implode('', $colsXml) . '</cols>' .
+            '<sheetData>' . implode('', $rowsXml) . '</sheetData>' .
+            '<mergeCells count="' . $mergeCount . '">' .
+            '<mergeCell ref="A1:' . $lastColLetter . '1"/>' .
+            '<mergeCell ref="A2:' . $lastColLetter . '2"/>' .
+            $extraMerge .
+            '</mergeCells>' .
+            '</worksheet>';
+
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+        $zip->close();
+
+        if ($returnContent) {
+            $content = file_get_contents($tmpFile);
+            @unlink($tmpFile);
+            return $content;
+        }
+
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header("Content-Disposition: attachment; filename=\"{$filename}.xlsx\"");
+        header('Content-Length: ' . filesize($tmpFile));
+        header('Cache-Control: max-age=0, no-cache, must-revalidate');
+        header('Pragma: public');
+        readfile($tmpFile);
+        @unlink($tmpFile);
+        exit;
+    }
+}
+
+if (!function_exists('pretesExportCbtCategoriesToXlsXml')) {
+    /**
+     * Ekspor hasil CBT per kategori ke format XML Spreadsheet (Excel 2003 .xls).
+     */
+    function pretesExportCbtCategoriesToXlsXml($filename, $periodeName, $headers, $categories, $exportRows, bool $returnContent = false) {
+        if ($returnContent) {
+            ob_start();
+        } else {
+            while (ob_get_level()) ob_end_clean();
+            header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+            header("Content-Disposition: attachment; filename=\"{$filename}.xls\"");
+            header('Cache-Control: max-age=0, no-cache, must-revalidate');
+            header('Pragma: public');
+        }
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        echo '<?mso-application progid="Excel.Sheet"?>' . "\n";
+        echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+        echo ' xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
+        echo ' xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
+        echo ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' . "\n";
+        echo '<Styles>' . "\n";
+        echo ' <Style ss:ID="Default" ss:Name="Normal"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#0F172A"/></Style>' . "\n";
+        echo ' <Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0D5C3A" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="DataLeft"><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="DataCenter"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/></Borders></Style>' . "\n";
+        echo ' <Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1" ss:Color="#0D5C3A"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>' . "\n";
+        echo ' <Style ss:ID="SubTitle"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#475569"/><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></Style>' . "\n";
+        echo '</Styles>' . "\n";
+        echo '<Worksheet ss:Name="Rekap CBT Kategori">' . "\n";
+        echo '<Table>' . "\n";
+
+        $totalCols = count($headers);
+        for ($i = 0; $i < $totalCols; $i++) {
+            $w = 90;
+            if ($i === 0) $w = 40;
+            elseif ($i === 1) $w = 100;
+            elseif ($i === 2) $w = 170;
+            elseif ($i === 3) $w = 130;
+            elseif ($i === 4) $w = 85;
+            elseif ($i === 5) $w = 100;
+            elseif ($i === 6) $w = 150;
+            elseif ($i === 7) $w = 110;
+            echo '<Column ss:Width="' . $w . '"/>' . "\n";
+        }
+
+        echo '<Row ss:Height="28"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="Title"><Data ss:Type="String">LEMBAGA PENGEMBANGAN PENDIDIKAN AGAMA ISLAM (LPPAI) UNISDA</Data></Cell></Row>' . "\n";
+        echo '<Row ss:Height="22"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="SubTitle"><Data ss:Type="String">REKAPITULASI NILAI CBT PRETES PER KATEGORI SOAL - PERIODE: ' . htmlspecialchars($periodeName, ENT_XML1, 'UTF-8') . '</Data></Cell></Row>' . "\n";
+        echo '<Row ss:Height="12"></Row>' . "\n";
+
+        echo '<Row ss:Height="26">' . "\n";
+        foreach ($headers as $h) {
+            echo '<Cell ss:StyleID="Header"><Data ss:Type="String">' . htmlspecialchars($h, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+        }
+        echo '</Row>' . "\n";
+
+        if (empty($exportRows)) {
+            echo '<Row ss:Height="24"><Cell ss:MergeAcross="' . ($totalCols - 1) . '" ss:StyleID="DataCenter"><Data ss:Type="String">Tidak ada data peserta yang sesuai dengan filter yang dipilih.</Data></Cell></Row>' . "\n";
+        } else {
+            foreach ($exportRows as $r) {
+                echo '<Row ss:Height="20">' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . $r['no'] . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['nim'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['nama_lengkap'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['program_studi'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['jenis_program'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['fakultas'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataLeft"><Data ss:Type="String">' . htmlspecialchars($r['session_title'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['waktu_selesai'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+
+                foreach ($categories as $cat) {
+                    $catItem = $r['categories'][$cat] ?? null;
+                    if ($catItem && $catItem['score'] !== null) {
+                        echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . round((float)$catItem['score'], 1) . '</Data></Cell>' . "\n";
+                    } else {
+                        echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                    }
+                    $ratioText = ($catItem && $catItem['ratio'] !== null) ? $catItem['ratio'] : '-';
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($ratioText, ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                }
+
+                if (is_numeric($r['total_soal'])) {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . (int)$r['total_soal'] . '</Data></Cell>' . "\n";
+                } else {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                }
+
+                if (is_numeric($r['total_benar'])) {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . (int)$r['total_benar'] . '</Data></Cell>' . "\n";
+                } else {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                }
+
+                if ($r['final_score'] !== null && is_numeric($r['final_score'])) {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="Number">' . round((float)$r['final_score'], 2) . '</Data></Cell>' . "\n";
+                } else {
+                    echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">-</Data></Cell>' . "\n";
+                }
+
+                echo '<Cell ss:StyleID="DataCenter"><Data ss:Type="String">' . htmlspecialchars($r['status_lulus'], ENT_XML1, 'UTF-8') . '</Data></Cell>' . "\n";
+                echo '</Row>' . "\n";
+            }
+        }
+
+        echo '</Table>' . "\n";
+        echo '</Worksheet>' . "\n";
+        echo '</Workbook>' . "\n";
+
+        if ($returnContent) {
+            return ob_get_clean();
+        }
+        exit;
+    }
+}
