@@ -1,3 +1,42 @@
+## 2026-11-24 20:26:00 +0700 — Perbaikan HTTP 500 dan Pengamanan Kueri PDO MySQL pada CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-FIX-HTTP-500 · **Parent Git:** `d744d4b735d61d3c663821656d0f150fcfe84f41`.
+
+**Permintaan dan dasar perbaikan:** Merespons laporan pengguna ("link ini jadi gini https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php" disertai tangkapan layar `HTTP ERROR 500: This page isn't working`):
+1. **Penyebab Utama (Root Cause)**:
+   - Pada konfigurasi MySQL produksi dengan prepared statement asli (`PDO::ATTR_EMULATE_PREPARES => false`), penggunaan nama parameter placeholder yang sama secara berulang dalam satu query string (yaitu `:pass_min` pada `a.score >= :pass_min` dan `a.score < :pass_min` di fungsi `tutorialRplCbtResultPassCounts`) dikonversi oleh driver MySQL PDO menjadi dua tanda tanya positional (`?`). Karena nilai yang di-bind hanya satu, MySQL melempar pengecualian fatal `PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens`. Tanpa penanganan try-catch, pengecualian ini memicu kegagalan sistem (*uncaught exception*) yang berujung pada HTTP ERROR 500.
+   - Selain itu, query detail Tab 4 (Hasil Ujian & Live Monitoring) sebelumnya dieksekusi secara tanpa syarat (*unconditional*) pada setiap kali halaman dibuka, sehingga saat admin mengakses Tab 1 (Paket Soal), Tab 2 (Sesi Ujian), atau Tab 3 (Impor Excel), query attempts, live item statistics, dan pass counts tetap berjalan dan rentan terhadap kegagalan database.
+2. **Implementasi & Perbaikan Komprehensif**:
+   - **`includes/tutorial-rpl-helper.php`**:
+     - Memperbaiki `tutorialRplCbtResultPassCounts` dengan memisahkan placeholder parameter menjadi dua nama unik: `:pass_min1` dan `:pass_min2`, mengikat keduanya secara eksplisit, mengubah relasi ke `LEFT JOIN tutorial_rpl_classes`, dan membungkus eksekusi query ke dalam blok `try ... catch (Throwable $e)` yang aman.
+     - Memperbaiki `tutorialRplCbtGetAttempts` dengan mengubah `JOIN tutorial_rpl_classes` menjadi `LEFT JOIN tutorial_rpl_classes` serta membungkusnya dalam blok `try ... catch`.
+     - Menambahkan proteksi skema otomatis pada `ensureTutorialRplTables` untuk kolom `is_active` pada `tutorial_rpl_classes`.
+     - Menambahkan proteksi skema otomatis pada `ensureTutorialRplCbtTables` untuk seluruh kolom baru tabel `tutorial_rpl_cbt_attempts` (`deadline_at`, `session_id`, `package_id`, `total_questions`, `correct_count`, `score`, `submitted`).
+   - **`admin/tutorial-rpl-cbt.php`**:
+     - Mengubah pemuatan query detail hasil ujian (`$attempts`, `$totalFiltered`, `$itemStatsMap`, `$passCounts`, `$groupOptions`) menjadi kondisional HANYA jika Tab Hasil Ujian aktif (`if ($activeTab === 'results')`), sehingga Tab Paket Soal, Sesi Ujian, dan Impor Excel dimuat secara instan, ringan, dan terisolasi dari potensi kendala data ujian.
+     - Membungkus seluruh query metrik card dan query tab results ke dalam blok `try ... catch (Throwable $e)` dengan nilai default yang aman.
+     - Mengamankan endpoint AJAX `live_results` dengan blok `try ... catch (Throwable $e)` dan respons JSON fallback yang valid (`success: false`).
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 20:25:03 | `admin/tutorial-rpl-cbt.php` | 118-272, 536-630 | Isolasi query detail hasil ujian ke tab results, pengamanan try-catch query metrik & AJAX live_results, dan penggunaan LEFT JOIN kelas. |
+| 2026-11-24 20:23:14 | `includes/tutorial-rpl-helper.php` | 63-75, 1018-1035, 1602-1628, 1873-1910 | Pemisahan parameter token unik pass_min1/pass_min2, pengamanan try-catch, LEFT JOIN kelas, dan penambahan kolom skema otomatis. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php` dan `php.exe -l includes/tutorial-rpl-helper.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- Ketiadaan BOM (`BOM: False`) dan ketiadaan mojibake (`mojibake count: 0`) terverifikasi pada kedua berkas.
+- `git diff --check` bersih 100% tanpa whitespace warning atau encoding conflict.
+- 4 Test suites lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (ALL PASS).
+  - `tests/tutorial-rpl-student-hub-test.php` (4/4 test ALL PASS).
+  - `tests/tutorial-rpl-pages-500-fix-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian fungsional berjalan pada runtime PHP 8.3 CLI lokal. Push Git memperbarui repositori sumber; verifikasi deployment hosting dilakukan terpisah di server produksi.
+
 ## 2026-11-24 19:35:00 +0700 — Perbaikan Encoding UTF-8 (No BOM) dan Eliminasi Karakter Mojibake pada CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-FIX-UTF8-MOJIBAKE-BOM · **Parent Git:** `7bafa857573ec0074d2f5a300548dbb736f20374`.

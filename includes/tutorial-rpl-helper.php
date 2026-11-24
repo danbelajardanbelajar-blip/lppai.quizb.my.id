@@ -65,7 +65,8 @@ if (!function_exists('ensureTutorialRplTables')) {
             ['dosen_wa', 'VARCHAR(30) DEFAULT NULL'],
             ['drive_url', 'TEXT DEFAULT NULL'],
             ['kuota', 'INT NOT NULL DEFAULT 50'],
-            ['catatan', 'TEXT DEFAULT NULL']
+            ['catatan', 'TEXT DEFAULT NULL'],
+            ['is_active', 'INT NOT NULL DEFAULT 1']
         ];
         foreach ($neededClassCols as [$col, $def]) {
             try {
@@ -1023,6 +1024,18 @@ if (!function_exists('ensureTutorialRplCbtTables')) {
         try {
             $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN package_id INT DEFAULT NULL");
         } catch (Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN total_questions INT NOT NULL DEFAULT 25");
+        } catch (Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN correct_count INT DEFAULT NULL");
+        } catch (Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN score DECIMAL(5,2) DEFAULT NULL");
+        } catch (Throwable $e) {}
+        try {
+            $pdo->exec("ALTER TABLE tutorial_rpl_cbt_attempts ADD COLUMN submitted INT NOT NULL DEFAULT 0");
+        } catch (Throwable $e) {}
 
         // Inisialisasi dan sinkronisasi Paket Soal, Sesi Ujian, & Data Soal CBT Pretes
         tutorialRplCbtSeedPackagesAndQuestions($pdo, false);
@@ -1597,7 +1610,7 @@ if (!function_exists('tutorialRplCbtGetAttempts')) {
                    p.name AS package_name, p.code AS package_code
             FROM tutorial_rpl_cbt_attempts a
             JOIN users u ON a.user_id = u.id
-            JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            LEFT JOIN tutorial_rpl_classes c ON a.class_id = c.id
             LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
             LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
         ";
@@ -1608,9 +1621,13 @@ if (!function_exists('tutorialRplCbtGetAttempts')) {
         }
         $sql .= " ORDER BY a.submitted_at DESC, a.id DESC";
 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            return [];
+        }
     }
 }
 
@@ -1859,23 +1876,29 @@ if (!function_exists('tutorialRplCbtResultPassCounts')) {
 
         [$whereBase, $paramsBase] = tutorialRplCbtResultWhere($filters, $now, $passingGrade, false);
 
+        $paramsBase[':pass_min1'] = $passingGrade;
+        $paramsBase[':pass_min2'] = $passingGrade;
+
         $sqlBase = "
             SELECT
-                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pass_min THEN 1 ELSE 0 END) AS lulus_count,
-                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pass_min) THEN 1 ELSE 0 END) AS tidak_lulus_count
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pass_min1 THEN 1 ELSE 0 END) AS lulus_count,
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pass_min2) THEN 1 ELSE 0 END) AS tidak_lulus_count
             FROM tutorial_rpl_cbt_attempts a
             JOIN users u ON a.user_id = u.id
-            JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            LEFT JOIN tutorial_rpl_classes c ON a.class_id = c.id
             $whereBase
         ";
 
-        $stmt = $pdo->prepare($sqlBase);
-        $stmt->bindValue(':pass_min', $passingGrade);
-        foreach ($paramsBase as $k => $v) {
-            $stmt->bindValue($k, $v);
+        try {
+            $stmt = $pdo->prepare($sqlBase);
+            foreach ($paramsBase as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        } catch (Throwable $e) {
+            $row = [];
         }
-        $stmt->execute();
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return [
             'lulus' => (int)($row['lulus_count'] ?? 0),

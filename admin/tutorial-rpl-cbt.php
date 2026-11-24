@@ -116,156 +116,164 @@ if (isset($_GET['ajax'])) {
         exit;
     }
     if ($_GET['ajax'] === 'live_results') {
-        $cbtFilters = tutorialRplCbtResultFilters($_GET);
-        $statusFilter = $cbtFilters['status_filter'];
-        $filter = $cbtFilters['result_filter'];
-        $searchQuery = $cbtFilters['q'];
-        $groupFilter = $cbtFilters['group'];
-        $page = $cbtFilters['page'];
-        $perPage = $cbtFilters['per_page'];
+        try {
+            $cbtFilters = tutorialRplCbtResultFilters($_GET);
+            $statusFilter = $cbtFilters['status_filter'];
+            $filter = $cbtFilters['result_filter'];
+            $searchQuery = $cbtFilters['q'];
+            $groupFilter = $cbtFilters['group'];
+            $page = $cbtFilters['page'];
+            $perPage = $cbtFilters['per_page'];
 
-        $now = time();
-        $passingGrade = 70.0;
+            $now = time();
+            $passingGrade = 70.0;
 
-        [$whereSql, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
+            [$whereSql, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
 
-        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereSql");
-        foreach ($params as $k => $v) {
-            $countStmt->bindValue($k, $v);
-        }
-        $countStmt->execute();
-        $totalFiltered = (int)$countStmt->fetchColumn();
-
-        $totalPages = max(1, (int)ceil($totalFiltered / $perPage));
-        if ($page > $totalPages) {
-            $page = $totalPages;
-        }
-        $offset = ($page - 1) * $perPage;
-
-        $stmt = $pdo->prepare("
-            SELECT a.*,
-                   u.nama_lengkap, u.nim, u.program_studi,
-                   c.nama_kelompok, c.dosen_nama,
-                   s.title AS session_title, s.code AS session_code,
-                   p.name AS package_name, p.code AS package_code
-            FROM tutorial_rpl_cbt_attempts a
-            JOIN users u ON a.user_id = u.id
-            JOIN tutorial_rpl_classes c ON a.class_id = c.id
-            LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
-            LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
-            $whereSql
-            ORDER BY a.started_at DESC
-            LIMIT $perPage OFFSET $offset
-        ");
-        foreach ($params as $k => $v) {
-            $stmt->bindValue($k, $v);
-        }
-        $stmt->execute();
-        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
-        $itemStatsMap = [];
-        if (!empty($attemptIds)) {
-            $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
-            $stmtStats = $pdo->prepare("
-                SELECT
-                    attempt_id,
-                    COUNT(*) AS total_items,
-                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
-                    SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
-                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
-                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
-                FROM tutorial_rpl_cbt_items
-                WHERE attempt_id IN ($placeholders)
-                GROUP BY attempt_id
-            ");
-            $stmtStats->execute($attemptIds);
-            foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $itemStatsMap[(int)$row['attempt_id']] = $row;
+            $countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id LEFT JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereSql");
+            foreach ($params as $k => $v) {
+                $countStmt->bindValue($k, $v);
             }
+            $countStmt->execute();
+            $totalFiltered = (int)$countStmt->fetchColumn();
+
+            $totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+            if ($page > $totalPages) {
+                $page = $totalPages;
+            }
+            $offset = ($page - 1) * $perPage;
+
+            $stmt = $pdo->prepare("
+                SELECT a.*,
+                       u.nama_lengkap, u.nim, u.program_studi,
+                       c.nama_kelompok, c.dosen_nama,
+                       s.title AS session_title, s.code AS session_code,
+                       p.name AS package_name, p.code AS package_code
+                FROM tutorial_rpl_cbt_attempts a
+                JOIN users u ON a.user_id = u.id
+                LEFT JOIN tutorial_rpl_classes c ON a.class_id = c.id
+                LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
+                LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
+                $whereSql
+                ORDER BY a.started_at DESC
+                LIMIT $perPage OFFSET $offset
+            ");
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v);
+            }
+            $stmt->execute();
+            $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+            $itemStatsMap = [];
+            if (!empty($attemptIds)) {
+                $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+                $stmtStats = $pdo->prepare("
+                    SELECT
+                        attempt_id,
+                        COUNT(*) AS total_items,
+                        SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+                        SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+                        SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+                        SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+                    FROM tutorial_rpl_cbt_items
+                    WHERE attempt_id IN ($placeholders)
+                    GROUP BY attempt_id
+                ");
+                $stmtStats->execute($attemptIds);
+                foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $itemStatsMap[(int)$row['attempt_id']] = $row;
+                }
+            }
+
+            $data = [];
+            foreach ($attempts as $a) {
+                $attId = (int)$a['id'];
+                $stat = $itemStatsMap[$attId] ?? null;
+                $totalItems = $stat ? (int)$stat['total_items'] : (int)($a['total_questions'] ?? 25);
+                $answered = $stat ? (int)$stat['answered_count'] : 0;
+                $flagged = $stat ? (int)$stat['flagged_count'] : 0;
+                $unanswered = max(0, $totalItems - $answered);
+                $isSubmitted = ($a['submitted_at'] !== null);
+                $deadline = (int)($a['deadline_at'] ?? ($a['started_at'] + 90 * 60));
+                $isExpired = (!$isSubmitted && $now >= $deadline);
+                $isOngoing = (!$isSubmitted && !$isExpired);
+                $remainingSeconds = max(0, $deadline - $now);
+
+                $correct = $isSubmitted ? (int)($a['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
+                $wrong = $isSubmitted ? max(0, $totalItems - $correct) : ($stat ? (int)$stat['live_wrong_count'] : 0);
+                $score = $isSubmitted ? ($a['score'] !== null ? (float)$a['score'] : null) : ($totalItems > 0 ? round(($correct / $totalItems) * 100, 1) : 0.0);
+
+                $durationSeconds = $isSubmitted ? max(0, (int)$a['submitted_at'] - (int)$a['started_at']) : 0;
+                $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+
+                $pkgId = (int)($a['package_id'] ?? 1);
+                $pkgDesc = ($pkgId === 2) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)';
+
+                $data[] = [
+                    'id' => $attId,
+                    'user_id' => (int)$a['user_id'],
+                    'class_id' => (int)$a['class_id'],
+                    'nama_lengkap' => $a['nama_lengkap'],
+                    'nim' => $a['nim'] ?? '-',
+                    'program_studi' => $a['program_studi'] ?? '',
+                    'nama_kelompok' => $a['nama_kelompok'] ?? '-',
+                    'dosen_nama' => $a['dosen_nama'] ?? '-',
+                    'package_id' => $pkgId,
+                    'package_desc' => $pkgDesc,
+                    'session_title' => $a['session_title'] ?? ($pkgId === 2 ? 'Sesi Kristen' : 'Sesi Utama'),
+                    'started_at' => (int)$a['started_at'],
+                    'started_at_wib' => $startedWib,
+                    'is_submitted' => $isSubmitted,
+                    'is_ongoing' => $isOngoing,
+                    'is_expired' => $isExpired,
+                    'deadline_at' => $deadline,
+                    'remaining_seconds' => $remainingSeconds,
+                    'duration_seconds' => $durationSeconds,
+                    'total_items' => $totalItems,
+                    'answered_count' => $answered,
+                    'unanswered_count' => $unanswered,
+                    'flagged_count' => $flagged,
+                    'correct_count' => $correct,
+                    'wrong_count' => $wrong,
+                    'score' => $score !== null ? number_format($score, 1) : null,
+                    'progress_percent' => $totalItems > 0 ? min(100, round(($answered / $totalItems) * 100)) : 0
+                ];
+            }
+
+            $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
+            $totalPkg1 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
+            $totalPkg2 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
+            $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+            $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+
+            echo json_encode([
+                'success' => true,
+                'timestamp' => $now,
+                'timestamp_wib' => (new DateTimeImmutable('@' . $now))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i:s') . ' WIB',
+                'ongoing_count' => $ongoingCount,
+                'finished_count' => $finishedCount,
+                'total_all' => $totalAll,
+                'total_pkg1' => $totalPkg1,
+                'total_pkg2' => $totalPkg2,
+                'total_filtered' => $totalFiltered,
+                'page' => $page,
+                'per_page' => $perPage,
+                'total_pages' => $totalPages,
+                'status_filter' => $statusFilter,
+                'result_filter' => $filter,
+                'group' => $cbtFilters['group'],
+                'pass_filter' => $cbtFilters['pass_filter'],
+                'pass_counts' => tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade),
+                'data' => $data
+            ], JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => []
+            ], JSON_UNESCAPED_UNICODE);
         }
-
-        $data = [];
-        foreach ($attempts as $a) {
-            $attId = (int)$a['id'];
-            $stat = $itemStatsMap[$attId] ?? null;
-            $totalItems = $stat ? (int)$stat['total_items'] : (int)($a['total_questions'] ?? 25);
-            $answered = $stat ? (int)$stat['answered_count'] : 0;
-            $flagged = $stat ? (int)$stat['flagged_count'] : 0;
-            $unanswered = max(0, $totalItems - $answered);
-            $isSubmitted = ($a['submitted_at'] !== null);
-            $deadline = (int)($a['deadline_at'] ?? ($a['started_at'] + 90 * 60));
-            $isExpired = (!$isSubmitted && $now >= $deadline);
-            $isOngoing = (!$isSubmitted && !$isExpired);
-            $remainingSeconds = max(0, $deadline - $now);
-
-            $correct = $isSubmitted ? (int)($a['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
-            $wrong = $isSubmitted ? max(0, $totalItems - $correct) : ($stat ? (int)$stat['live_wrong_count'] : 0);
-            $score = $isSubmitted ? ($a['score'] !== null ? (float)$a['score'] : null) : ($totalItems > 0 ? round(($correct / $totalItems) * 100, 1) : 0.0);
-
-            $durationSeconds = $isSubmitted ? max(0, (int)$a['submitted_at'] - (int)$a['started_at']) : 0;
-            $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
-
-            $pkgId = (int)($a['package_id'] ?? 1);
-            $pkgDesc = ($pkgId === 2) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)';
-
-            $data[] = [
-                'id' => $attId,
-                'user_id' => (int)$a['user_id'],
-                'class_id' => (int)$a['class_id'],
-                'nama_lengkap' => $a['nama_lengkap'],
-                'nim' => $a['nim'] ?? '-',
-                'program_studi' => $a['program_studi'] ?? '',
-                'nama_kelompok' => $a['nama_kelompok'] ?? '-',
-                'dosen_nama' => $a['dosen_nama'] ?? '-',
-                'package_id' => $pkgId,
-                'package_desc' => $pkgDesc,
-                'session_title' => $a['session_title'] ?? ($pkgId === 2 ? 'Sesi Kristen' : 'Sesi Utama'),
-                'started_at' => (int)$a['started_at'],
-                'started_at_wib' => $startedWib,
-                'is_submitted' => $isSubmitted,
-                'is_ongoing' => $isOngoing,
-                'is_expired' => $isExpired,
-                'deadline_at' => $deadline,
-                'remaining_seconds' => $remainingSeconds,
-                'duration_seconds' => $durationSeconds,
-                'total_items' => $totalItems,
-                'answered_count' => $answered,
-                'unanswered_count' => $unanswered,
-                'flagged_count' => $flagged,
-                'correct_count' => $correct,
-                'wrong_count' => $wrong,
-                'score' => $score !== null ? number_format($score, 1) : null,
-                'progress_percent' => $totalItems > 0 ? min(100, round(($answered / $totalItems) * 100)) : 0
-            ];
-        }
-
-        $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
-        $totalPkg1 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
-        $totalPkg2 = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
-        $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
-        $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
-
-        echo json_encode([
-            'success' => true,
-            'timestamp' => $now,
-            'timestamp_wib' => (new DateTimeImmutable('@' . $now))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('H:i:s') . ' WIB',
-            'ongoing_count' => $ongoingCount,
-            'finished_count' => $finishedCount,
-            'total_all' => $totalAll,
-            'total_pkg1' => $totalPkg1,
-            'total_pkg2' => $totalPkg2,
-            'total_filtered' => $totalFiltered,
-            'page' => $page,
-            'per_page' => $perPage,
-            'total_pages' => $totalPages,
-            'status_filter' => $statusFilter,
-            'result_filter' => $filter,
-            'group' => $cbtFilters['group'],
-            'pass_filter' => $cbtFilters['pass_filter'],
-            'pass_counts' => tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade),
-            'data' => $data
-        ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
@@ -529,6 +537,34 @@ sort($categories);
 $passingGrade = (float)($session['passing_grade'] ?? 70.0);
 $now = time();
 
+// Default values untuk metrik dan tab results
+$totalAllAttempts = 0;
+$totalAttempts = 0;
+$totalPkg1Attempts = 0;
+$totalPkg2Attempts = 0;
+$ongoingCount = 0;
+$finishedCount = 0;
+$totalFiltered = 0;
+$totalPages = 1;
+$attempts = [];
+$itemStatsMap = [];
+$groupOptions = [];
+$passCounts = ['lulus' => 0, 'tidak_lulus' => 0];
+$passCount = 0;
+$avgScore = 0.0;
+$passPercent = 0.0;
+
+try {
+    $totalAllAttempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
+    $totalAttempts = $totalAllAttempts;
+    $allSubmitted = $pdo->query("SELECT COUNT(*) as cnt, SUM(CASE WHEN score >= $passingGrade THEN 1 ELSE 0 END) as passed, AVG(score) as avg_sc FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL")->fetch(PDO::FETCH_ASSOC);
+    $passCount = (int)($allSubmitted['passed'] ?? 0);
+    $avgScore = ($allSubmitted && $allSubmitted['avg_sc'] !== null) ? round((float)$allSubmitted['avg_sc'], 1) : 0.0;
+    $passPercent = (!empty($allSubmitted['cnt'])) ? round(($passCount / (int)$allSubmitted['cnt']) * 100, 1) : 0.0;
+} catch (Throwable $e) {
+    // Fallback safe defaults jika tabel attempts belum memiliki data
+}
+
 $cbtFilters = tutorialRplCbtResultFilters($_GET);
 $statusFilter = $cbtFilters['status_filter'];
 $resultFilter = $cbtFilters['result_filter'];
@@ -538,81 +574,78 @@ $passFilter = $cbtFilters['pass_filter'];
 $page = $cbtFilters['page'];
 $perPage = $cbtFilters['per_page'];
 
-$totalAllAttempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts')->fetchColumn() ?: 0);
-$totalAttempts = $totalAllAttempts;
-$totalPkg1Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
-$totalPkg2Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
-$ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
-$finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+// Query data detail Hasil Ujian HANYA dijalankan saat tab results aktif untuk performa & stabilitas maksimal
+if ($activeTab === 'results') {
+    try {
+        $totalPkg1Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 1')->fetchColumn() ?: 0);
+        $totalPkg2Attempts = (int)($pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE package_id = 2')->fetchColumn() ?: 0);
+        $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
+        $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
 
-[$whereClause, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
-$passCounts = tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade);
+        [$whereClause, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
+        $passCounts = tutorialRplCbtResultPassCounts($pdo, $cbtFilters, $now, $passingGrade);
 
-$countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereClause");
-foreach ($params as $k => $v) {
-    $countStmt->bindValue($k, $v);
-}
-$countStmt->execute();
-$totalFiltered = (int)$countStmt->fetchColumn();
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM tutorial_rpl_cbt_attempts a JOIN users u ON u.id = a.user_id LEFT JOIN tutorial_rpl_classes c ON c.id = a.class_id $whereClause");
+        foreach ($params as $k => $v) {
+            $countStmt->bindValue($k, $v);
+        }
+        $countStmt->execute();
+        $totalFiltered = (int)$countStmt->fetchColumn();
 
-$totalPages = max(1, (int)ceil($totalFiltered / $perPage));
-if ($page > $totalPages) {
-    $page = $totalPages;
-}
-$offset = ($page - 1) * $perPage;
+        $totalPages = max(1, (int)ceil($totalFiltered / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+        }
+        $offset = ($page - 1) * $perPage;
 
-$stmt = $pdo->prepare("
-    SELECT a.*,
-           u.nama_lengkap, u.nim, u.program_studi,
-           c.nama_kelompok, c.dosen_nama,
-           s.title AS session_title, s.code AS session_code,
-           p.name AS package_name, p.code AS package_code
-    FROM tutorial_rpl_cbt_attempts a
-    JOIN users u ON a.user_id = u.id
-    JOIN tutorial_rpl_classes c ON a.class_id = c.id
-    LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
-    LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
-    $whereClause
-    ORDER BY a.started_at DESC
-    LIMIT $perPage OFFSET $offset
-");
-foreach ($params as $k => $v) {
-    $stmt->bindValue($k, $v);
-}
-$stmt->execute();
-$attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $pdo->prepare("
+            SELECT a.*,
+                   u.nama_lengkap, u.nim, u.program_studi,
+                   c.nama_kelompok, c.dosen_nama,
+                   s.title AS session_title, s.code AS session_code,
+                   p.name AS package_name, p.code AS package_code
+            FROM tutorial_rpl_cbt_attempts a
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
+            LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
+            $whereClause
+            ORDER BY a.started_at DESC
+            LIMIT $perPage OFFSET $offset
+        ");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch item stats for each attempt in current page
-$attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
-$itemStatsMap = [];
-if (!empty($attemptIds)) {
-    $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
-    $stmtStats = $pdo->prepare("
-        SELECT
-            attempt_id,
-            COUNT(*) AS total_items,
-            SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
-            SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
-            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
-            SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
-        FROM tutorial_rpl_cbt_items
-        WHERE attempt_id IN ($placeholders)
-        GROUP BY attempt_id
-    ");
-    $stmtStats->execute($attemptIds);
-    foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $itemStatsMap[(int)$row['attempt_id']] = $row;
+        $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+        if (!empty($attemptIds)) {
+            $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+            $stmtStats = $pdo->prepare("
+                SELECT
+                    attempt_id,
+                    COUNT(*) AS total_items,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+                    SUM(CASE WHEN flagged = 1 THEN 1 ELSE 0 END) AS flagged_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count,
+                    SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer != correct_answer THEN 1 ELSE 0 END) AS live_wrong_count
+                FROM tutorial_rpl_cbt_items
+                WHERE attempt_id IN ($placeholders)
+                GROUP BY attempt_id
+            ");
+            $stmtStats->execute($attemptIds);
+            foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $itemStatsMap[(int)$row['attempt_id']] = $row;
+            }
+        }
+
+        $groupOptions = $pdo->query("SELECT DISTINCT nama_kelompok FROM tutorial_rpl_classes ORDER BY nama_kelompok ASC")->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } catch (Throwable $e) {
+        $attempts = [];
+        $totalFiltered = 0;
     }
 }
-
-// Group options for dropdown
-$groupOptions = $pdo->query("SELECT DISTINCT nama_kelompok FROM tutorial_rpl_classes WHERE is_active = 1 ORDER BY nama_kelompok ASC")->fetchAll(PDO::FETCH_COLUMN) ?: [];
-
-// Metrics for top cards
-$allSubmitted = $pdo->query("SELECT COUNT(*) as cnt, SUM(CASE WHEN score >= $passingGrade THEN 1 ELSE 0 END) as passed, AVG(score) as avg_sc FROM tutorial_rpl_cbt_attempts WHERE submitted_at IS NOT NULL")->fetch(PDO::FETCH_ASSOC);
-$passCount = (int)($allSubmitted['passed'] ?? 0);
-$avgScore = $allSubmitted['avg_sc'] !== null ? round((float)$allSubmitted['avg_sc'], 1) : 0.0;
-$passPercent = !empty($allSubmitted['cnt']) ? round(($passCount / (int)$allSubmitted['cnt']) * 100, 1) : 0.0;
 
 include __DIR__ . '/../includes/header.php';
 ?>
