@@ -444,7 +444,7 @@ include __DIR__ . '/../includes/header.php';
                     <p>Kelola wadah materi soal ujian. Paket 1 Utama (Muslim) &amp; Paket 2 Kristen Protestan.</p>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <form method="POST" style="margin:0;" onsubmit="return confirm('Tindih seluruh data soal Tutorial RPL dengan butir soal resmi CBT Pretes (40 Muslim + 25 Kristen Protestan)? Tindakan ini akan menimpa data soal lama.');">
+                    <form method="POST" style="margin:0;" onsubmit="return confirm('Tindih seluruh data soal Tutorial RPL dengan butir soal resmi CBT Pretes (177 Muslim + 25 Kristen Protestan = 202 Soal)? Tindakan ini akan menimpa data soal lama.');">
                         <input type="hidden" name="action" value="reset_pretes_parity_packages">
                         <button type="submit" class="bank-button" style="background:#fef3c7; border-color:#fde047; color:#92400e; font-weight:700;">
                             🔄 Pulihkan &amp; Tindih Soal CBT Pretes

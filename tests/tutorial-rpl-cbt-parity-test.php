@@ -85,14 +85,14 @@ $questionsPkg1 = tutorialRplCbtGetQuestions($pdo, null, 1);
 $questionsPkg2 = tutorialRplCbtGetQuestions($pdo, null, 2);
 $allQuestions = tutorialRplCbtGetQuestions($pdo);
 
-assert(count($questionsPkg1) === 40, 'Paket 1 Muslim harus memuat 40 butir soal resmi dari data/pretes-cbt-bank.php');
+assert(count($questionsPkg1) === 177, 'Paket 1 Muslim harus memuat 177 butir soal resmi dari CBT Pretes');
 assert(count($questionsPkg2) === 25, 'Paket 2 Kristen Protestan harus memuat 25 butir soal resmi dari data/paket-2-kristen-protestan.php');
-assert(count($allQuestions) === 65, 'Total butir soal aktif harus 65 butir soal resmi');
+assert(count($allQuestions) === 202, 'Total butir soal aktif harus 202 butir soal resmi (177 Muslim + 25 Kristen)');
 
 // Pastikan soal lama dummy TUTOR-RPL-Q% sudah tertindih bersih
 $dummyCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions WHERE code LIKE 'TUTOR-RPL-Q%'")->fetchColumn();
 assert($dummyCount === 0, 'Data soal dummy lama TUTOR-RPL-Q% harus tertindih bersih (0 butir)');
-echo "[PASS] Penindihan data soal CBT Pretes (40 Muslim + 25 Kristen = 65 soal resmi) terverifikasi.\n";
+echo "[PASS] Penindihan data soal CBT Pretes (177 Muslim + 25 Kristen = 202 soal resmi) terverifikasi.\n";
 
 // Tambah soal baru di Paket 1
 $newQId = tutorialRplCbtSaveQuestion($pdo, [

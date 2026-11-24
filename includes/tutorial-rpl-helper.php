@@ -1105,35 +1105,106 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
             $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET package_ids_json = ?, duration_minutes = 90, passing_grade = 70.00 WHERE id = ?")->execute(['[2]', $ses2Id]);
         }
 
-        // 3. Menindih Data Soal Lama dengan Soal Resmi CBT Pretes
+        // 3. Menindih Data Soal Lama dengan Soal Resmi CBT Pretes (177 Muslim + 25 Kristen = 202 Soal)
         $totalQuestions = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions")->fetchColumn();
         $hasDummy = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions WHERE code LIKE 'TUTOR-RPL-Q%'")->fetchColumn() > 0;
-        $hasPaket2 = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions WHERE package_id = 2")->fetchColumn() > 0;
+        $hasOld40Seed = ((int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_questions WHERE code LIKE 'TUTOR-ISL-%'")->fetchColumn() === 40);
 
         $addedIslam = 0;
         $addedKristen = 0;
 
-        if ($force || $totalQuestions === 0 || $hasDummy) {
+        if ($force || $totalQuestions === 0 || $hasDummy || $hasOld40Seed) {
             $pdo->exec("DELETE FROM tutorial_rpl_cbt_questions");
 
-            // 3a. Soal Muslim / Ubudiyah (Paket 1) dari data/pretes-cbt-bank.php
-            $bankFile = __DIR__ . '/../data/pretes-cbt-bank.php';
-            if (file_exists($bankFile)) {
-                $bank = require $bankFile;
-                $stmtIns = $pdo->prepare("
-                    INSERT INTO tutorial_rpl_cbt_questions (code, package_id, category, question_text, options_json, correct_answer, is_active)
-                    VALUES (?, 1, ?, ?, ?, ?, 1)
-                ");
-                foreach ($bank as $i => [$qText, $opts, $ans, $cat]) {
-                    $code = 'TUTOR-ISL-' . sprintf('%03d', $i + 1);
-                    $stmtIns->execute([
-                        $code,
-                        $cat,
-                        $qText,
-                        json_encode(array_values($opts), JSON_UNESCAPED_UNICODE),
-                        $ans
-                    ]);
-                    $addedIslam++;
+            // 3a. Soal Muslim / Ubudiyah (Paket 1) — Salin 177 butir soal resmi CBT Pretes
+            $seededIslam = false;
+
+            // Prioritas 1: Jika tabel pretes_cbt_questions di database sudah terisi >= 100 butir soal
+            try {
+                $hasPretesTable = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_questions WHERE package_id = 1")->fetchColumn();
+                if ($hasPretesTable >= 100) {
+                    $pretesQuestions = $pdo->query("SELECT * FROM pretes_cbt_questions WHERE package_id = 1 ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+                    if (!empty($pretesQuestions)) {
+                        $stmtIns = $pdo->prepare("
+                            INSERT INTO tutorial_rpl_cbt_questions (code, package_id, category, question_text, options_json, correct_answer, is_active)
+                            VALUES (?, 1, ?, ?, ?, ?, ?)
+                        ");
+                        foreach ($pretesQuestions as $i => $pq) {
+                            $code = 'TUTOR-ISL-' . sprintf('%03d', $i + 1);
+                            $stmtIns->execute([
+                                $code,
+                                $pq['category'] ?? 'Umum',
+                                $pq['question_text'],
+                                $pq['options_json'],
+                                $pq['correct_answer'],
+                                (int)($pq['is_active'] ?? 1)
+                            ]);
+                            $addedIslam++;
+                        }
+                        if ($addedIslam > 0) $seededIslam = true;
+                    }
+                }
+            } catch (Throwable $e) {}
+
+            // Prioritas 2: Membaca berkas master 177 soal CBT Pretes (downloads/bank-soal-pretes-177-soal.xlsx)
+            if (!$seededIslam) {
+                $xlsx177 = __DIR__ . '/../downloads/bank-soal-pretes-177-soal.xlsx';
+                if (file_exists($xlsx177)) {
+                    require_once __DIR__ . '/pretes-cbt-xlsx.php';
+                    if (function_exists('cbtReadQuestionXlsx')) {
+                        try {
+                            $rows = cbtReadQuestionXlsx($xlsx177);
+                            $stmtIns = $pdo->prepare("
+                                INSERT INTO tutorial_rpl_cbt_questions (code, package_id, category, question_text, options_json, correct_answer, is_active)
+                                VALUES (?, 1, ?, ?, ?, ?, ?)
+                            ");
+                            $qIdx = 0;
+                            foreach ($rows as $r) {
+                                if (($r['row'] ?? 0) === 1) continue; // lewati baris judul header
+                                $cells = $r['cells'] ?? [];
+                                $cat = trim($cells[1] ?? 'Umum');
+                                $qText = trim($cells[2] ?? '');
+                                $optA = trim($cells[3] ?? '');
+                                $optB = trim($cells[4] ?? '');
+                                $optC = trim($cells[5] ?? '');
+                                $optD = trim($cells[6] ?? '');
+                                $optE = trim($cells[7] ?? '');
+                                $ans = strtoupper(trim($cells[8] ?? 'A'));
+                                $status = trim($cells[9] ?? 'Aktif');
+                                if (!$qText || !$optA || !$optB) continue;
+                                $qIdx++;
+                                $code = 'TUTOR-ISL-' . sprintf('%03d', $qIdx);
+                                $optsJson = json_encode([$optA, $optB, $optC, $optD, $optE], JSON_UNESCAPED_UNICODE);
+                                $isActive = (strtolower($status) !== 'nonaktif') ? 1 : 0;
+                                $stmtIns->execute([$code, $cat, $qText, $optsJson, $ans, $isActive]);
+                                $addedIslam++;
+                            }
+                            if ($addedIslam > 0) $seededIslam = true;
+                        } catch (Throwable $e) {}
+                    }
+                }
+            }
+
+            // Prioritas 3 (Fallback cadangan jika berkas xlsx tidak terbaca): data/pretes-cbt-bank.php
+            if (!$seededIslam) {
+                $bankFile = __DIR__ . '/../data/pretes-cbt-bank.php';
+                if (file_exists($bankFile)) {
+                    $bank = require $bankFile;
+                    $stmtIns = $pdo->prepare("
+                        INSERT INTO tutorial_rpl_cbt_questions (code, package_id, category, question_text, options_json, correct_answer, is_active)
+                        VALUES (?, 1, ?, ?, ?, ?, 1)
+                    ");
+                    foreach ($bank as $i => [$qText, $opts, $ans, $cat]) {
+                        $code = 'TUTOR-ISL-' . sprintf('%03d', $i + 1);
+                        $stmtIns->execute([
+                            $code,
+                            $cat,
+                            $qText,
+                            json_encode(array_values($opts), JSON_UNESCAPED_UNICODE),
+                            $ans
+                        ]);
+                        $addedIslam++;
+                    }
                 }
             }
 

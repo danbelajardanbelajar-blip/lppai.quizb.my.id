@@ -1,3 +1,42 @@
+## 2026-11-24 17:46:00 +0700 — Penyelarasan Salinan 177 Butir Soal Resmi CBT Pretes ke Paket 1 CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-177-SOAL-SYNC · **Parent Git:** `bdd1fbe0571569c284883fd3de3469b88d3ae811`.
+
+**Permintaan dan dasar perbaikan:** Merespons instruksi pengguna ("lakukan kopi soal dari pretes ke tutorial rpl sebanyak 177 soal") untuk menyalin seluruh 177 butir soal resmi dari CBT Pretes ke Paket 1 (Muslim/Ubudiyah) CBT Tutorial RPL:
+1. **Latar Belakang & Identifikasi**:
+   - Sebelumnya, penindihan soal mengambil file benih sampel awal `data/pretes-cbt-bank.php` (hanya 40 soal).
+   - Bank soal resmi dan lengkap milik pengguna di CBT Pretes sebenarnya berisi **177 butir soal** (tersimpan di tabel `pretes_cbt_questions` dan file master `downloads/bank-soal-pretes-177-soal.xlsx`) dengan 4 Bab lengkap: *BAB I – THAHARAH, BAB II – SHALAT FARDHU, BAB III – PENGURUSAN JENAZAH, dan BAB IV – AMALIYAH MASYARAKAT*.
+2. **Implementasi Penyelarasan**:
+   - **`includes/tutorial-rpl-helper.php`**:
+     - Memperbarui fungsi `tutorialRplCbtSeedPackagesAndQuestions()`:
+       - **Prioritas 1**: Menyalin langsung seluruh butir pertanyaan dari tabel database aktif `pretes_cbt_questions WHERE package_id = 1` jika sudah terisi (>= 100 butir).
+       - **Prioritas 2**: Jika tabel pretes belum ada/kosong, membaca langsung seluruh 177 butir soal dari file master Excel [downloads/bank-soal-pretes-177-soal.xlsx](file:///d:/all_project/lppai.quizb.my.id/downloads/bank-soal-pretes-177-soal.xlsx) via `cbtReadQuestionXlsx()`.
+       - **Prioritas 3**: Fallback aman ke `data/pretes-cbt-bank.php`.
+     - Paket 2 Kristen Protestan tetap dipertahankan sebanyak 25 butir soal resmi, sehingga total butir soal CBT Tutorial RPL menjadi **202 butir soal** (177 Muslim + 25 Kristen Protestan).
+     - Menambahkan deteksi pembaruan otomatis `$hasOld40Seed` agar sistem langsung memigrasikan database lama dari 40 soal ke 177 soal tanpa perlu tindakan manual yang rumit.
+   - **`admin/tutorial-rpl-cbt.php`**:
+     - Memperbarui teks konfirmasi tombol "🔄 Pulihkan & Tindih Soal CBT Pretes" menjadi `(177 Muslim + 25 Kristen Protestan = 202 Soal)`.
+   - **`tests/tutorial-rpl-cbt-parity-test.php`**:
+     - Memperbarui asersi kuota butir soal: Paket 1 harus memuat 177 butir soal dan total soal aktif harus 202 butir.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 17:45:02 | `includes/tutorial-rpl-helper.php` | 1108-1195 | Implementasi seeder 177 soal CBT Pretes via DB & XLSX fallback, deteksi `$hasOld40Seed`, dan total 202 soal. |
+| 2026-11-24 17:43:34 | `admin/tutorial-rpl-cbt.php` | 447 | Pembaruan teks konfirmasi tombol pulihkan soal menjadi 177 Muslim + 25 Kristen Protestan = 202 Soal. |
+| 2026-11-24 17:43:46 | `tests/tutorial-rpl-cbt-parity-test.php` | 88-95 | Pembaruan asersi jumlah soal Paket 1 (177 butir) dan total soal (202 butir). |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada ketiga berkas lulus 100% tanpa error sintaks.
+- `git diff --check` bersih tanpa konflik atau trailing whitespace.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap ALL PASS, 177 Muslim + 25 Kristen = 202 soal terverifikasi).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% (4/4 test ALL PASS).
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory / file fixture.
+
 ## 2026-11-24 17:30:00 +0700 — Perbaikan Total Tombol Tidak Berfungsi: Eliminasi Syntax Error JS, Sanitasi Modal Backdrop, dan Penambahan Class no-datatable pada CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-CLICKABLE-BUTTONS-FIX · **Parent Git:** `00c6370069db439b0f84530a19ea1537f607497e`.
