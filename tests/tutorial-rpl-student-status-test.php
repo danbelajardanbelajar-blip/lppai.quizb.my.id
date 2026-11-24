@@ -85,8 +85,17 @@ trAssert(str_contains($hubSrc, 'Alhamdulillah! Anda Dinyatakan LULUS Tutorial RP
 trAssert(str_contains($hubSrc, 'badge-success') && str_contains($hubSrc, '✅ LULUS'), 'Hub memformat status lulus dengan badge hijau', $errors);
 trAssert(str_contains($hubSrc, 'badge-danger') && str_contains($hubSrc, '❌ TIDAK LULUS'), 'Hub memformat status tidak lulus dengan badge merah (bukan Tidak_lulus)', $errors);
 trAssert(!str_contains($hubSrc, 'ucfirst($membership[\'status_lulus\'])'), 'Hub tidak lagi memakai format underscore kasar ucfirst()', $errors);
-trAssert(str_contains($hubSrc, '$isLulusTutorialRpl = ($membership && ($statusLulusVal ?? \'\') === \'lulus\');'), 'Hub mengecek kondisi kelulusan sebelum merender form pendaftaran', $errors);
+trAssert(str_contains($hubSrc, '$isSudahDaftarRpl = ($membership !== null) || (!empty($existingRegistration));'), 'Hub membersihkan card pendaftaran jika mahasiswa sudah daftar Tutorial RPL', $errors);
 trAssert(str_contains($hubSrc, 'Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban tugas video Google Drive dan Ujian Tulis CBT telah Anda serahkan. Namun akumulasi Nilai Akhir Anda belum mencapai standar kelulusan'), 'Hub menjelaskan pemisahan presensi vs kelulusan saat tidak lulus', $errors);
+
+// Verifikasi 3 Opsi Tugas Bagi yang Tidak Lulus
+trAssert(str_contains($hubSrc, 'Pilihan Tugas Pemenuhan Kelulusan Tutorial RPL'), 'Hub memuat panel 3 pilihan tugas remedial kelulusan', $errors);
+trAssert(str_contains($hubSrc, 'Opsi A') && str_contains($hubSrc, 'Mengerjakan Soal CBT (Min. 70)'), 'Hub memuat Opsi A: Mengerjakan soal CBT minimal 70', $errors);
+trAssert(str_contains($hubSrc, 'Opsi B') && str_contains($hubSrc, 'Ujian Praktik di Depan Dosen'), 'Hub memuat Opsi B: Menemui dosen untuk ujian 6 poin di depan dosen', $errors);
+trAssert(str_contains($hubSrc, 'Opsi C') && str_contains($hubSrc, 'Rekaman Video di Google Drive'), 'Hub memuat Opsi C: Ujian praktik 6 poin direkam dan diupload ke Google Drive', $errors);
+trAssert(str_contains($hubSrc, 'bersifat pilihan untuk mempermudah mahasiswa RPL'), 'Hub menegaskan 3 tugas bersifat pilihan mempermudah mahasiswa', $errors);
+trAssert(str_contains($hubSrc, 'Jika nilai CBT masih di bawah 70, maka <strong>tidak ada pilihan lain selain ujian praktik</strong>'), 'Hub menegaskan jika CBT di bawah 70 wajib memilih ujian praktik online/offline', $errors);
+trAssert(str_contains($hubSrc, 'Rincian 6 Poin Tugas Ujian Praktik Ibadah'), 'Hub memuat rincian 6 poin tugas ibadah', $errors);
 
 echo "\n=== TEST 4: Verifikasi Sidebar Mahasiswa RPL (includes/sidebar.php) ===\n";
 $sidebarSrc = file_get_contents(__DIR__ . '/../includes/sidebar.php');

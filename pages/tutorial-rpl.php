@@ -26,6 +26,20 @@ try {
     if (function_exists('tutorialRplCbtGetSession')) {
         $sessionCbt = tutorialRplCbtGetSession($pdo);
     }
+    // Cek pendaftaran tutorial RPL mahasiswa
+    try {
+        $stmtRegCheck = $pdo->prepare("SELECT r.*, p.nama AS period_nama, p.gelombang AS period_gelombang FROM tutorial_rpl_registrations r LEFT JOIN tutorial_rpl_registration_periods p ON p.id = r.period_id WHERE r.user_id = ? ORDER BY r.id DESC LIMIT 1");
+        $stmtRegCheck->execute([(int)($actor['id'] ?? 0)]);
+        $existingRegistration = $stmtRegCheck->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (Throwable $e) {
+        try {
+            $stmtRegCheck = $pdo->prepare("SELECT * FROM tutorial_rpl_registrations WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+            $stmtRegCheck->execute([(int)($actor['id'] ?? 0)]);
+            $existingRegistration = $stmtRegCheck->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Throwable $e2) {
+            $existingRegistration = null;
+        }
+    }
 } catch (Throwable $e) {
     // Abaikan error skema bila dijalankan pada fixture uji terisolasi
 }
@@ -277,7 +291,7 @@ include __DIR__ . '/../includes/header.php';
                     <?php if ($isHadirSah): ?>
                         <?php if ($statusLulusVal === 'tidak_lulus'): ?>
                             <div class="alert alert-warning" style="margin:0; font-size:13.5px; line-height:1.6;">
-                                ⚠️ <strong>Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban tugas video Google Drive dan Ujian Tulis CBT telah Anda serahkan. Namun akumulasi Nilai Akhir Anda belum mencapai standar kelulusan (passing grade 80.0). Silakan hubungi admin LPPAI atau tutor bimbingan Anda terkait informasi pembukaan periode pendaftaran berikutnya.
+                                ⚠️ <strong>Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban tugas video Google Drive dan Ujian Tulis CBT telah Anda serahkan. Namun akumulasi Nilai Akhir Anda belum mencapai standar kelulusan (passing grade 80.0). Silakan ikuti salah satu dari 3 opsi tugas penyelesaian kelulusan di bawah.
                             </div>
                         <?php else: ?>
                             <div class="alert alert-success" style="margin:0; font-size:14px; line-height:1.6;">
@@ -292,12 +306,190 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         </div>
+
+        <?php if ($statusLulusVal === 'tidak_lulus'): ?>
+            <!-- ═══════════════════════════════════════════════════════════════
+                 OPSI TUGAS BAGI MAHASISWA YANG TIDAK LULUS TUTORIAL RPL
+                 ═══════════════════════════════════════════════════════════════ -->
+            <?php
+            $cbtScore = (!empty($membership['exam_submitted']) && $membership['nilai_ujian_tulis'] !== null)
+                ? (float)$membership['nilai_ujian_tulis']
+                : null;
+            $isCbtUnder70 = ($cbtScore !== null && $cbtScore < 70.0);
+            $isCbtPass70  = ($cbtScore !== null && $cbtScore >= 70.0);
+            ?>
+            <div class="card" style="margin-bottom:24px; border:2px solid #f87171; border-radius:14px; background:#fff; box-shadow:0 6px 20px rgba(239,68,68,0.1);">
+                <div style="background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color:#fff; padding:18px 22px; border-radius:12px 12px 0 0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:26px;">📋</span>
+                        <div>
+                            <h3 style="margin:0; font-size:17.5px; font-weight:800; color:#fff;">
+                                Pilihan Tugas Pemenuhan Kelulusan Tutorial RPL
+                            </h3>
+                            <small style="opacity:0.95; font-size:12.5px;">Bagi mahasiswa yang belum memenuhi standar kelulusan Tutorial RPL</small>
+                        </div>
+                    </div>
+                    <span class="badge" style="background:#fee2e2; color:#991b1b; font-weight:700; font-size:12px; padding:5px 12px; border-radius:20px;">
+                        Status: Belum Lulus (Nilai: <?= (float)$membership['nilai_akhir'] ?>)
+                    </span>
+                </div>
+
+                <div class="card-body" style="padding:22px;">
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:14px 18px; margin-bottom:20px;">
+                        <p style="margin:0; font-size:13.5px; color:#991b1b; line-height:1.6;">
+                            <strong>📢 Keterangan Kebijakan:</strong> 3 (tiga) tugas di bawah ini <strong>bersifat pilihan untuk mempermudah mahasiswa RPL</strong>. Anda dipersilakan memilih salah satu opsi tugas yang paling sesuai guna memenuhi kelulusan Tutorial RPL:
+                        </p>
+                    </div>
+
+                    <!-- 3 KARTU OPSI PILIHAN TUGAS -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:20px;">
+
+                        <!-- OPSI A: MENGERJAKAN SOAL CBT MINIMAL 70 -->
+                        <div style="background:<?= $isCbtUnder70 ? '#fff7ed' : '#f8fafc' ?>; border:2px solid <?= $isCbtUnder70 ? '#f97316' : ($isCbtPass70 ? '#86efac' : '#cbd5e1') ?>; border-radius:12px; padding:18px; display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Opsi A</span>
+                                    <?php if ($isCbtPass70): ?>
+                                        <span class="badge badge-success" style="font-size:11px;">✅ Memenuhi (≥70)</span>
+                                    <?php elseif ($isCbtUnder70): ?>
+                                        <span class="badge badge-danger" style="font-size:11px;">❌ Di Bawah 70</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-secondary" style="font-size:11px;">Tersedia</span>
+                                    <?php endif; ?>
+                                </div>
+                                <h4 style="margin:0 0 8px; font-size:15.5px; font-weight:800; color:#0f172a;">
+                                    🧩 Mengerjakan Soal CBT (Min. 70)
+                                </h4>
+                                <p style="margin:0 0 12px; font-size:13px; color:#475569; line-height:1.55;">
+                                    Mengerjakan evaluasi tertulis CBT Tutorial RPL secara daring dengan capaian nilai minimal <strong>70.0</strong>.
+                                </p>
+
+                                <?php if ($isCbtUnder70): ?>
+                                    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:8px; padding:10px 12px; font-size:12px; color:#991b1b; line-height:1.5; margin-bottom:12px;">
+                                        <strong>⚠️ Nilai CBT Anda: <?= $cbtScore ?></strong><br>
+                                        Jika nilai CBT masih di bawah 70, maka <strong>tidak ada pilihan lain selain ujian praktik</strong> (silakan pilih Opsi B atau Opsi C di sebelah).
+                                    </div>
+                                <?php elseif ($isCbtPass70): ?>
+                                    <div style="background:#dcfce7; border:1px solid #86efac; border-radius:8px; padding:10px 12px; font-size:12px; color:#166534; line-height:1.5; margin-bottom:12px;">
+                                        <strong>✅ Nilai CBT Anda: <?= $cbtScore ?></strong><br>
+                                        Nilai ujian tulis CBT Anda telah memenuhi standar minimal (≥ 70.0).
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div style="margin-top:12px;">
+                                <a href="<?= BASE_URL ?>/tutorial-rpl-cbt.php" class="btn <?= $isCbtUnder70 ? 'btn-secondary' : 'btn-primary' ?>" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-block; text-decoration:none;">
+                                    <?= !empty($membership['exam_submitted']) ? '📊 Cek Hasil / Lembar CBT' : '🚀 Masuk Pengerjaan CBT' ?>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- OPSI B: UJIAN 6 POIN TUGAS DI DEPAN DOSEN (OFFLINE) -->
+                        <div style="background:<?= $isCbtUnder70 ? '#f0fdf4' : '#f8fafc' ?>; border:2px solid <?= $isCbtUnder70 ? '#16a34a' : '#cbd5e1' ?>; border-radius:12px; padding:18px; display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Opsi B</span>
+                                    <span class="badge badge-info" style="font-size:11px;">Tatap Muka (Offline)</span>
+                                </div>
+                                <h4 style="margin:0 0 8px; font-size:15.5px; font-weight:800; color:#0f172a;">
+                                    👨‍🏫 Ujian Praktik di Depan Dosen
+                                </h4>
+                                <p style="margin:0 0 12px; font-size:13px; color:#475569; line-height:1.55;">
+                                    Menemui dosen tutor bimbingan untuk melaksanakan evaluasi <strong>6 Poin Tugas Ibadah</strong> langsung di depan dosen pengampu.
+                                </p>
+                                <div style="font-size:12.5px; color:#334155; margin-bottom:10px;">
+                                    Dosen Pengampu: <strong><?= $escape($membership['dosen_nama'] ?: 'Menunggu penugasan') ?></strong>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:12px;">
+                                <?php if (!empty($membership['dosen_wa'])): ?>
+                                    <a href="https://wa.me/<?= preg_replace('/\D/', '', $membership['dosen_wa']) ?>?text=<?= rawurlencode('Assalamu\'alaikum Bapak/Ibu Dosen ' . ($membership['dosen_nama'] ?? '') . ', saya mahasiswa RPL ' . ($actor['nama_lengkap'] ?? '') . ' (NIM: ' . ($actor['nim'] ?? '') . ') ingin berkonsultasi mengenai jadwal ujian tatap muka 6 poin tugas ibadah Tutorial RPL.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;">
+                                        <span>💬</span> Chat WhatsApp Dosen
+                                    </a>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:9px;">
+                                        Kontak Dosen Belum Tersedia
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- OPSI C: UJIAN 6 POIN TUGAS REKAMAN VIDEO GOOGLE DRIVE (ONLINE) -->
+                        <div style="background:<?= $isCbtUnder70 ? '#f0fdf4' : '#f8fafc' ?>; border:2px solid <?= $isCbtUnder70 ? '#16a34a' : '#cbd5e1' ?>; border-radius:12px; padding:18px; display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <span style="font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:0.5px;">Opsi C</span>
+                                    <span class="badge badge-info" style="font-size:11px;">Daring (Online)</span>
+                                </div>
+                                <h4 style="margin:0 0 8px; font-size:15.5px; font-weight:800; color:#0f172a;">
+                                    📹 Rekaman Video di Google Drive
+                                </h4>
+                                <p style="margin:0 0 12px; font-size:13px; color:#475569; line-height:1.55;">
+                                    Melakukan ujian praktik <strong>6 Poin Tugas Ibadah</strong> dengan cara direkam dan diupload ke folder Google Drive kelompok.
+                                </p>
+                                <div style="font-size:12.5px; color:#334155; margin-bottom:10px;">
+                                    Status Video: <strong><?= !empty($membership['drive_verified']) ? '✅ Terverifikasi Dosen' : (!empty($membership['drive_submitted']) ? '⏳ Sudah Diunggah' : 'Belum Diunggah') ?></strong>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:12px;">
+                                <?php if (!empty($membership['drive_url'])): ?>
+                                    <a href="<?= $escape($membership['drive_url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width:100%; text-align:center; padding:9px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none;">
+                                        <span>📁</span> Buka Folder Drive ↗
+                                    </a>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-secondary" disabled style="width:100%; font-size:13px; padding:9px;">
+                                        Folder Drive Belum Tersedia
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- RINCIAN 6 POIN TUGAS PRAKTIK -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px 20px;">
+                        <h4 style="margin:0 0 10px; font-size:14.5px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                            <span>📌</span>
+                            <span>Rincian 6 Poin Tugas Ujian Praktik Ibadah (Opsi B &amp; C):</span>
+                        </h4>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; margin-top:12px;">
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>1. Praktik Thaharah (Wudhu):</strong> Gerakan wudhu tertib &amp; doa setelah wudhu.
+                            </div>
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>2. Praktik Tayammum:</strong> Syarat, niat, rukun mengusap muka/tangan, &amp; doa tayammum.
+                            </div>
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>3. Niat Mandi Wajib &amp; Jamak Qashar:</strong> Niat mandi besar dan niat shalat jamak taqdim/takhir qashar.
+                            </div>
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>4. Bacaan Shalat Subuh:</strong> Niat, bacaan shalat fardhu Subuh lengkap dengan doa Qunut.
+                            </div>
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>5. Shalat Jenazah:</strong> Tata cara shalat jenazah (niat, 4 takbir, doa shalat jenazah, salam).
+                            </div>
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
+                                <strong>6. Amaliyah &amp; Hafalan:</strong> Surat pendek pilihan (Ad-Dhuha/Al-Alaq/Al-Bayyinah) &amp; bacaan Istighatsah.
+                            </div>
+                        </div>
+                        <div style="margin-top:12px; font-size:12.5px; color:#64748b; line-height:1.5;">
+                            <em>Catatan Tambahan:</em> Jika memilih <strong>Opsi B</strong>, ujian dilakukan langsung secara tatap muka di depan dosen tutor. Jika memilih <strong>Opsi C</strong>, mahasiswa merekam video praktik 6 poin tersebut dan mengunggahnya ke Google Drive kelompok bimbingan.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 
-    <?php $isLulusTutorialRpl = ($membership && ($statusLulusVal ?? '') === 'lulus'); ?>
-    <?php if (!$isLulusTutorialRpl): ?>
+    <?php
+    // Mahasiswa dianggap sudah daftar jika sudah terplot ke kelompok bimbingan atau sudah melakukan pendaftaran
+    $isSudahDaftarRpl = ($membership !== null) || (!empty($existingRegistration));
+    ?>
+    <?php if (!$isSudahDaftarRpl): ?>
         <!-- ═══════════════════════════════════════════════════════════════
-             PANDUAN & STATUS PERIODE PENDAFTARAN (KOMPATIBILITAS PENUH)
+             PANDUAN & STATUS PERIODE PENDAFTARAN (TAMPIL HANYA JIKA BELUM DAFTAR)
              ═══════════════════════════════════════════════════════════════ -->
         <?php include __DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php'; ?>
 
@@ -323,7 +515,30 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
         </div>
+    <?php elseif (!$membership && !empty($existingRegistration)): ?>
+        <!-- STATUS TERDAFTAR (MENUNGGU PEMBAGIAN KELAS PLOTTING OLEH ADMIN) -->
+        <div class="card" style="margin-top:20px; border-left:4px solid var(--primary);">
+            <div class="card-header">
+                <span>Status Pendaftaran Tutorial RPL</span>
+            </div>
+            <div class="card-body">
+                <h3 style="margin-top:0;font-size:17.5px;font-weight:700;color:var(--text-dark);">
+                    Terdaftar di <?= $escape($existingRegistration['period_nama'] ?? $existingRegistration['nama'] ?? 'Tutorial RPL') ?>
+                </h3>
+                <p style="color:#15803d; font-weight:600; font-size:14px; margin-bottom:8px;">
+                    ✅ Anda sudah terdaftar sejak <?= $escape($existingRegistration['registered_at'] ?? '-') ?> WIB. Hari pilihan: <strong><?= $escape($existingRegistration['hari_pilihan'] ?? 'Belum dipilih') ?></strong>.
+                </p>
+                <p style="color:#64748b; font-size:13.5px; line-height:1.6; margin-bottom:16px;">
+                    Pendaftaran Anda telah tercatat pada sistem LPPAI. Saat ini Anda sedang menunggu proses plotting / penempatan kelompok bimbingan dan penugasan dosen tutor oleh administrator. Informasi ruang kelas dan dosen pembimbing akan otomatis muncul di halaman ini setelah proses plotting selesai.
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">🏠 Dashboard</a>
+                    <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-secondary">📋 Halaman Pretes</a>
+                </div>
+            </div>
+        </div>
     <?php else: ?>
+        <!-- MAHASISWA SUDAH MEMILIKI KELAS (BERSIHKAN DARI CARD PENDAFTARAN) -->
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">
             <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">🏠 Kembali ke Dashboard</a>
             <a href="<?= BASE_URL ?>/pretes-peserta.php" class="btn btn-secondary">📋 Halaman Pretes</a>

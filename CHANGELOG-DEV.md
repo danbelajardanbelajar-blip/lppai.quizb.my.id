@@ -5,6 +5,45 @@ Format: waktu (WIB, sampai detik) · file · baris · bagian · perubahan · ala
 
 ---
 
+## 2026-11-24 08:41:22 +0700 — Pembersihan Card Pendaftaran bagi yang Sudah Terdaftar dan Implementasi 3 Opsi Tugas Pemenuhan Kelulusan Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CLEANUP-AND-3-REMEDIAL-OPTIONS · **Parent Git:** `b48e7d6`.
+
+**Permintaan dan dasar perbaikan:** Permintaan pengguna untuk: (1) Membersihkan halaman `tutorial-rpl.php` dari link / card pendaftaran tutorial jika mahasiswa sudah daftar tutorial RPL, dan (2) Memberikan 3 opsi tugas bagi yang tidak lulus tutorial: (a) mengerjakan soal CBT minimal 70, atau (b) menemui dosen untuk ujian 6 poin tugas di depan dosen, atau (c) melakukan ujian praktik 6 poin tugas dengan cara direkam dan diupload ke Google Drive. Ketentuan: 3 tugas ini bersifat pilihan untuk mempermudah mahasiswa RPL; jika CBT masih di bawah 70, maka tidak ada pilihan lain selain ujian praktik (boleh pilih online atau offline).
+
+**Perubahan dan alasan:**
+1. **Pembersihan Link/Card Pendaftaran Tutorial RPL (`pages/tutorial-rpl.php`):**
+   - Mengambil data pendaftaran aktif mahasiswa (`tutorial_rpl_registrations`) dan menyatukannya dengan status keanggotaan kelas (`$membership`) melalui kondisi `$isSudahDaftarRpl = ($membership !== null) || (!empty($existingRegistration))`.
+   - Jika mahasiswa sudah terdaftar, card pendaftaran dan tautan pendaftaran mandiri `tutorial-rpl-daftar.php` dibersihkan secara total.
+   - Jika mahasiswa sudah mendaftar namun belum ditempatkan dalam kelas plotting, halaman menampilkan kartu status pendaftaran tanpa formulir pendaftaran ulang.
+2. **Implementasi Panel 3 Opsi Tugas Pemenuhan Kelulusan (`pages/tutorial-rpl.php`):**
+   - Menambahkan panel terpadu bagi mahasiswa berstatus `tidak_lulus` yang menampilkan 3 kartu opsi tugas:
+     - **Opsi A (CBT Min. 70):** Evaluasi tertulis CBT Tutorial RPL dengan batas minimal 70.0. Jika nilai CBT mahasiswa di bawah 70, sistem menampilkan peringatan tegas bahwa tidak ada pilihan lain selain ujian praktik (Opsi B atau C).
+     - **Opsi B (Tatap Muka Offline):** Ujian praktik 6 poin tugas ibadah langsung di depan dosen tutor, dilengkapi tombol WhatsApp langsung ke dosen pengampu.
+     - **Opsi C (Daring Rekaman Video Drive):** Ujian praktik 6 poin tugas ibadah secara mandiri direkam video dan diunggah ke folder Google Drive kelompok bimbingan.
+   - Menambahkan rincian modul 6 poin tugas praktik ibadah (1. Thaharah/Wudhu, 2. Tayammum, 3. Niat Mandi Wajib & Jamak Qashar, 4. Shalat Subuh & Qunut, 5. Shalat Jenazah, 6. Amaliyah & Hafalan Surat/Istighatsah).
+3. **Pembaruan Suite Pengujian (`tests/tutorial-rpl-student-status-test.php`):**
+   - Menambahkan asersi pengujian untuk pembersihan card pendaftaran jika sudah daftar (`$isSudahDaftarRpl`), 3 opsi tugas pilihan, penegasan kondisi CBT < 70, serta rincian 6 poin tugas ibadah (100% PASS).
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 08:40:49 | `pages/tutorial-rpl.php` | 26-44, 275-385 | Pembersihan card pendaftaran jika sudah daftar, panel 3 opsi tugas kelulusan (CBT min 70, dosen offline, Drive online), aturan CBT < 70, dan rincian 6 poin tugas. |
+| 2026-11-24 08:41:22 | `tests/tutorial-rpl-student-status-test.php` | 82-105 | Asersi pembersihan card pendaftaran jika sudah daftar, 3 opsi tugas remedial, dan rincian 6 poin tugas. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `pages/tutorial-rpl.php` dan `tests/tutorial-rpl-student-status-test.php` lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Seluruh 13 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa kegagalan.
+- Pengujian regresi alur pretes RPL dan periode hasil pretes (`tests/pretes-rpl-flow-test.php`, `tests/pretes-hasil-active-period-test.php`) lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
+---
+
 ## 2026-11-24 08:28:03 +0700 — Penyempurnaan Tampilan Role Mahasiswa RPL (Status Lulus/Tidak Lulus) dan Pengalihan Langsung Pendaftaran Pretes Tanpa Opsi Remedial
 
 **ID:** TUTORIAL-RPL-STUDENT-STATUS-AND-PRETES-FLOW · **Parent Git:** `283e4cf`.
