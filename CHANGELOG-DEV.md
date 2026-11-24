@@ -1,3 +1,31 @@
+## 2026-11-24 17:50:00 +0700 — Penghapusan Card Redundan "Daftar Butir Soal CBT: Semua Paket" pada Tab Paket Soal CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-REMOVE-REDUNDANT-QUESTIONS-CARD · **Parent Git:** `9e051ed8686960e43c7f43e7c878e2b493dd5f83`.
+
+**Permintaan dan dasar perbaikan:** Merespons instruksi pengguna ("hilangkan card 'Daftar Butir Soal CBT: Semua Paket' yang ada di bawah card paket") pada halaman `admin/tutorial-rpl-cbt.php`:
+1. **Latar Belakang & Identifikasi**:
+   - Di CBT Pretes RPL (`includes/pretes-cbt-admin-view.php`), tab Paket Soal hanya menampilkan satu panel utama yaitu **Daftar Paket Soal CBT**. Pengelolaan butir-butir pertanyaan dilakukan secara modular di dalam jendela popup modal **"📋 Kelola Soal"** (`#modalPackageQuestions`).
+   - Pada halaman `admin/tutorial-rpl-cbt.php`, sebelumnya terdapat sisa card redundan di bawah tabel paket: `<div class="bank-panel" id="questionsSection">` ("Daftar Butir Soal CBT: Semua Paket") yang merender seluruh butir soal langsung di halaman sehingga memperpanjang halaman dan tidak selaras dengan arsitektur modal CBT Pretes.
+2. **Implementasi & Pembersihan**:
+   - Menghapus card `#questionsSection` (Panel 2) beserta tabel butir soal inline dan toolbar filter inline dari tab `packages` di [admin/tutorial-rpl-cbt.php](file:///d:/all_project/lppai.quizb.my.id/admin/tutorial-rpl-cbt.php).
+   - Seluruh pengelolaan butir soal (melihat, mencari, menyaring kategori/status, menambah, mengedit, dan menghapus) kini 100% terpusat dan berparitas penuh di modal popup **📋 Kelola Soal** saat admin menekan tombol aksi pada baris paket soal terkait.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 17:48:53 | `admin/tutorial-rpl-cbt.php` | 537-655 | Penghapusan panel redundan `#questionsSection` ("Daftar Butir Soal CBT: Semua Paket") di bawah tabel daftar paket. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- `git diff --check` bersih tanpa konflik atau trailing whitespace.
+- Test suite `tests/tutorial-rpl-cbt-parity-test.php` lulus 100% (9/9 tahap ALL PASS).
+- Test pendukung `tests/tutorial-rpl-student-hub-test.php` lulus 100% (4/4 test ALL PASS).
+- Test pendukung `tests/tutorial-rpl-cbt-nilai-test.php` lulus 100% (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory / file fixture.
+
 ## 2026-11-24 17:46:00 +0700 — Penyelarasan Salinan 177 Butir Soal Resmi CBT Pretes ke Paket 1 CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-177-SOAL-SYNC · **Parent Git:** `bdd1fbe0571569c284883fd3de3469b88d3ae811`.
