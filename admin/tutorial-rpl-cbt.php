@@ -185,30 +185,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgType = 'danger';
         }
         $activeTab = 'packages';
-    } elseif ($action === 'update_session') {
-        $sesId = (int)($_POST['session_id'] ?? 1);
+    } elseif ($action === 'save_session' || $action === 'update_session') {
+        $sesId = (int)($_POST['session_id'] ?? 0);
         $title = trim($_POST['title'] ?? '');
+        $code = trim($_POST['code'] ?? '');
         $duration = (int)($_POST['duration_minutes'] ?? 90);
         $passingGrade = (float)($_POST['passing_grade'] ?? 70.0);
         $token = strtoupper(trim($_POST['token'] ?? 'TUTOR26'));
         $examOpen = isset($_POST['exam_open']) ? 1 : 0;
+        $isActive = isset($_POST['is_active']) ? 1 : 0;
         $pkgId = (int)($_POST['package_id'] ?? ($sesId === 2 ? 2 : 1));
 
-        $ok = tutorialRplCbtUpdateSession($pdo, [
+        $savedId = tutorialRplCbtSaveSession($pdo, [
             'id' => $sesId,
+            'code' => $code,
             'title' => $title,
             'package_ids_json' => json_encode([$pkgId]),
             'duration_minutes' => $duration,
             'passing_grade' => $passingGrade,
             'token' => $token,
-            'exam_open' => $examOpen
+            'exam_open' => $examOpen,
+            'is_active' => $isActive
         ]);
 
-        if ($ok) {
-            $message = "Pengaturan sesi #{$sesId} CBT Tutorial RPL berhasil disimpan.";
+        if ($savedId > 0) {
+            $message = "Sesi ujian #{$savedId} (" . sanitize($title ?: 'Tutorial RPL') . ") berhasil disimpan.";
             $msgType = 'success';
         } else {
-            $message = 'Gagal menyimpan pengaturan sesi.';
+            $message = 'Gagal menyimpan konfigurasi sesi ujian.';
+            $msgType = 'danger';
+        }
+        $activeTab = 'sessions';
+    } elseif ($action === 'delete_session') {
+        $sesId = (int)($_POST['session_id'] ?? 0);
+        if ($sesId <= 0) {
+            $message = 'ID sesi ujian tidak valid.';
+            $msgType = 'danger';
+        } elseif (tutorialRplCbtDeleteSession($pdo, $sesId)) {
+            $message = "Sesi ujian #{$sesId} berhasil dihapus.";
+            $msgType = 'success';
+        } else {
+            $message = "Gagal menghapus sesi ujian #{$sesId}. Minimal harus ada 1 sesi ujian di sistem.";
             $msgType = 'danger';
         }
         $activeTab = 'sessions';
@@ -543,138 +560,106 @@ include __DIR__ . '/../includes/header.php';
             <div class="bank-panel-head">
                 <div>
                     <h3>Daftar &amp; Konfigurasi Sesi Ujian Tulis Tutorial RPL</h3>
-                    <p>Berparitas dengan CBT Pretes: Sesi 1 Utama (Muslim) &amp; Sesi 2 Kristen Protestan (Durasi 90 Menit, Passing Grade 70.00).</p>
+                    <p>Atur sesi ujian tulis: paket soal terhubung, durasi, passing grade, token masuk, serta status gerbang pengerjaan.</p>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="bank-button primary" onclick="openSessionModal();" data-action="create-session">
+                        🎯 ＋ Buat Sesi Baru
+                    </button>
                 </div>
             </div>
 
             <!-- Tabel Ringkasan Sesi Ujian -->
-            <div class="bank-table-scroll" style="margin-bottom:24px;">
+            <div class="bank-table-scroll">
                 <table class="bank-table no-datatable">
                     <thead>
                         <tr>
-                            <th style="width:40px;">ID</th>
+                            <th style="width:40px;">No.</th>
+                            <th style="width:130px;">Kode</th>
                             <th>Nama Sesi Ujian</th>
                             <th>Paket Terhubung</th>
-                            <th style="text-align:center;">Durasi</th>
-                            <th style="text-align:center;">Passing Grade</th>
-                            <th style="text-align:center;">Token Masuk</th>
-                            <th style="text-align:center;">Status Gerbang</th>
-                            <th style="text-align:center; width:130px;">Aksi Cepat</th>
+                            <th style="text-align:center; width:95px;">Durasi</th>
+                            <th style="text-align:center; width:110px;">Passing Grade</th>
+                            <th style="text-align:center; width:120px;">Token Masuk</th>
+                            <th style="text-align:center; width:130px;">Status Gerbang</th>
+                            <th style="text-align:right; width:220px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($sessions as $s):
-                            $sOpen = !empty($s['exam_open']);
-                            $sPkgIds = json_decode((string)($s['package_ids_json'] ?? '[]'), true) ?: [1];
-                            $sPkgDesc = (in_array(2, $sPkgIds, true) || str_contains($s['code'], 'PROTESTAN')) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)';
-                        ?>
+                        <?php if (empty($sessions)): ?>
                             <tr>
-                                <td style="font-weight:700; color:#64748b;"><?= (int)$s['id'] ?></td>
-                                <td>
-                                    <div style="font-weight:700; color:#0f172a;"><?= sanitize($s['title']) ?></div>
-                                    <span class="bank-code"><?= sanitize($s['code']) ?></span>
-                                </td>
-                                <td>
-                                    <span class="bank-badge package"><?= $sPkgDesc ?></span>
-                                </td>
-                                <td style="text-align:center; font-weight:700; color:#0369a1;">
-                                    <?= (int)$s['duration_minutes'] ?> Menit
-                                </td>
-                                <td style="text-align:center; font-weight:700; color:#0f766e;">
-                                    <?= (float)$s['passing_grade'] ?>
-                                </td>
-                                <td style="text-align:center;">
-                                    <span class="bank-badge token-badge"><?= sanitize($s['token']) ?></span>
-                                </td>
-                                <td style="text-align:center;">
-                                    <span class="bank-badge <?= $sOpen ? 'active' : 'danger-sm' ?>" style="font-weight:800;">
-                                        <?= $sOpen ? '🟢 BUKA' : '🔴 TUTUP' ?>
-                                    </span>
-                                </td>
-                                <td style="text-align:center;">
-                                    <form method="POST" style="margin:0;">
-                                        <input type="hidden" name="action" value="toggle_exam">
-                                        <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
-                                        <?php if ($sOpen): ?>
-                                            <button type="submit" class="bank-button danger-sm" onclick="return confirm('Tutup gerbang sesi <?= sanitize($s['title']) ?>?');">
-                                                🔒 Tutup
-                                            </button>
-                                        <?php else: ?>
-                                            <button type="submit" class="bank-button" style="background:#dcfce7; border-color:#86efac; color:#166534; font-weight:700;" onclick="return confirm('Buka gerbang sesi <?= sanitize($s['title']) ?>?');">
-                                                🚀 Buka
-                                            </button>
-                                        <?php endif; ?>
-                                    </form>
+                                <td colspan="9" class="bank-empty">
+                                    Belum ada sesi ujian dibuat. Klik tombol <strong>🎯 ＋ Buat Sesi Baru</strong> untuk membuat sesi ujian pertama.
                                 </td>
                             </tr>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <?php foreach ($sessions as $sIdx => $s):
+                                $sOpen = !empty($s['exam_open']);
+                                $sPkgIds = json_decode((string)($s['package_ids_json'] ?? '[]'), true) ?: [1];
+                                $sPkgNames = [];
+                                foreach ($sPkgIds as $pId) {
+                                    foreach ($packages as $pkg) {
+                                        if ((int)$pkg['id'] === (int)$pId) {
+                                            $sPkgNames[] = $pkg['name'];
+                                            break;
+                                        }
+                                    }
+                                }
+                                $sPkgDesc = !empty($sPkgNames) ? implode(', ', $sPkgNames) : ((in_array(2, $sPkgIds, true) || str_contains($s['code'], 'PROTESTAN')) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)');
+                            ?>
+                                <tr>
+                                    <td style="font-weight:700; color:#64748b;"><?= $sIdx + 1 ?></td>
+                                    <td><span class="bank-code"><?= sanitize($s['code']) ?></span></td>
+                                    <td>
+                                        <div style="font-weight:700; color:#0f172a; font-size:13.5px;"><?= sanitize($s['title']) ?></div>
+                                    </td>
+                                    <td>
+                                        <span class="bank-badge package">📦 <?= sanitize($sPkgDesc) ?></span>
+                                    </td>
+                                    <td style="text-align:center; font-weight:700; color:#0369a1;">
+                                        <?= (int)$s['duration_minutes'] ?> Menit
+                                    </td>
+                                    <td style="text-align:center; font-weight:700; color:#0f766e;">
+                                        <?= number_format((float)$s['passing_grade'], 1) ?>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span class="bank-badge token-badge"><?= sanitize($s['token']) ?></span>
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span class="bank-badge <?= $sOpen ? 'active' : 'danger-sm' ?>" style="font-weight:800;">
+                                            <?= $sOpen ? '🟢 BUKA' : '🔴 TUTUP' ?>
+                                        </span>
+                                    </td>
+                                    <td style="text-align:right; white-space:nowrap;">
+                                        <form method="POST" style="display:inline; margin:0 3px;">
+                                            <input type="hidden" name="action" value="toggle_exam">
+                                            <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
+                                            <?php if ($sOpen): ?>
+                                                <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" onclick="return confirm('Tutup gerbang sesi <?= sanitize($s['title']) ?>?');" title="Tutup Gerbang Ujian">
+                                                    🔒 Tutup
+                                                </button>
+                                            <?php else: ?>
+                                                <button type="submit" class="bank-button" style="padding:4px 8px; font-size:11px; background:#dcfce7; border-color:#86efac; color:#166534; font-weight:700;" onclick="return confirm('Buka gerbang sesi <?= sanitize($s['title']) ?>?');" title="Buka Gerbang Ujian">
+                                                    🚀 Buka
+                                                </button>
+                                            <?php endif; ?>
+                                        </form>
+                                        <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick='openEditSessionModal(<?= json_encode($s, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>);' data-action="edit-session" title="Edit Sesi Ujian Ini">
+                                            ✏️ Edit
+                                        </button>
+                                        <form method="POST" style="display:inline; margin:0 0 0 3px;" onsubmit="return confirm('Hapus sesi ujian \'<?= htmlspecialchars(addslashes($s['title']), ENT_QUOTES, 'UTF-8') ?>\'?');">
+                                            <input type="hidden" name="action" value="delete_session">
+                                            <input type="hidden" name="session_id" value="<?= (int)$s['id'] ?>">
+                                            <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Sesi Ujian">
+                                                🗑️ Hapus
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
-            </div>
-
-            <!-- Formulir Edit Sesi -->
-            <div class="bank-panel-body" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:20px;">
-                <h4 style="margin:0 0 16px; color:#0f172a;">⚙️ Edit Rincian Sesi Ujian</h4>
-                <form method="POST">
-                    <input type="hidden" name="action" value="update_session">
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-bottom:18px;">
-                        <div class="bank-field">
-                            <label class="bank-label">Pilih Sesi yang Dikonfigurasi:</label>
-                            <select name="session_id" id="editSessionSelect" class="bank-input" onchange="loadSessionConfig(this.value);" style="font-weight:700;">
-                                <?php foreach ($sessions as $s): ?>
-                                    <option value="<?= (int)$s['id'] ?>"><?= (int)$s['id'] ?> - <?= sanitize($s['title']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="bank-field">
-                            <label class="bank-label">Paket Soal Terhubung:</label>
-                            <select name="package_id" id="sessionPackageSelect" class="bank-input" style="font-weight:700;">
-                                <option value="1">📦 Paket 1: Utama (Ubudiyah / Muslim)</option>
-                                <option value="2">📦 Paket 2: Kristen Protestan</option>
-                            </select>
-                        </div>
-                        <div class="bank-field">
-                            <label class="bank-label">Judul Sesi Ujian:</label>
-                            <input type="text" name="title" id="sessionTitleInput" class="bank-input" value="<?= sanitize($session['title'] ?? 'Ujian Tulis Tutorial RPL 2026/2027 (Utama / Muslim)') ?>" required>
-                        </div>
-                        <div class="bank-field">
-                            <label class="bank-label">Token Masuk Ujian:</label>
-                            <div class="bank-token-group">
-                                <input type="text" id="sessionTokenInput" name="token" class="bank-input" value="<?= sanitize($session['token'] ?? 'TUTOR26') ?>" required style="text-transform:uppercase; font-weight:800; letter-spacing:2px;">
-                                <button type="button" class="bank-button" onclick="generateRandomToken();" title="Buat Token Acak">
-                                    🎲 Acak
-                                </button>
-                                <button type="button" class="bank-button" onclick="copyTokenToClipboard();" title="Salin Token">
-                                    📋 Salin
-                                </button>
-                            </div>
-                        </div>
-                        <div class="bank-field">
-                            <label class="bank-label">Durasi Pengerjaan (Menit):</label>
-                            <input type="number" name="duration_minutes" id="sessionDurationInput" class="bank-input" value="<?= (int)($session['duration_minutes'] ?? 90) ?>" min="5" max="180" required>
-                        </div>
-                        <div class="bank-field">
-                            <label class="bank-label">Passing Grade (Batas Kelulusan):</label>
-                            <input type="number" step="0.1" name="passing_grade" id="sessionPassingGradeInput" class="bank-input" value="<?= (float)($session['passing_grade'] ?? 70.0) ?>" min="0" max="100" required>
-                        </div>
-                    </div>
-
-                    <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:16px; margin-bottom:20px;">
-                        <label class="bank-toggle" style="cursor:pointer;">
-                            <input type="checkbox" name="exam_open" id="sessionExamOpenCheck" value="1" <?= !empty($session['exam_open']) ? 'checked' : '' ?> style="width:20px; height:20px;">
-                            <div>
-                                <strong style="font-size:14px; color:#0f172a;">Buka Gerbang Pengerjaan Sesi Ini (Live)</strong>
-                                <div class="bank-note">Saat dicentang, peserta yang dijadwalkan dapat memasukkan token dan mengerjakan soal sesi ini.</div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <div style="display:flex; justify-content:flex-end;">
-                        <button type="submit" class="bank-button primary" style="padding:12px 28px; font-size:14px;">
-                            💾 Simpan Konfigurasi Sesi
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     <?php endif; ?>
@@ -915,6 +900,91 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL TAMBAH / EDIT SESI UJIAN
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="bank-modal-backdrop" id="sessionModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="sessionModalTitle">
+    <div class="bank-modal" style="max-width:620px;">
+        <div class="bank-modal-head" style="background:#eff6ff;">
+            <div>
+                <h3 id="sessionModalTitle" style="color:#1e40af;">🎯 Buat Sesi Ujian Baru</h3>
+                <div style="font-size:12px; color:#475569; margin-top:2px;">Konfigurasi parameter sesi ujian tulis Tutorial RPL</div>
+            </div>
+            <button type="button" class="bank-modal-close" onclick="closeSessionModal();">✕</button>
+        </div>
+        <form method="POST">
+            <input type="hidden" name="action" value="save_session">
+            <input type="hidden" name="session_id" id="sessionModalId" value="0">
+            <div class="bank-modal-body" style="padding:20px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div class="bank-field">
+                        <label class="bank-label">Kode Sesi *</label>
+                        <input type="text" name="code" id="sessionModalCode" class="bank-input" placeholder="Cth: SESI-TUTOR-UTAMA" required>
+                    </div>
+                    <div class="bank-field">
+                        <label class="bank-label">Paket Soal Terhubung *</label>
+                        <select name="package_id" id="sessionModalPackageId" class="bank-input" style="font-weight:700;">
+                            <?php foreach ($packages as $pkg): ?>
+                                <option value="<?= (int)$pkg['id'] ?>">📦 <?= sanitize($pkg['name']) ?> (<?= (int)$pkg['duration_minutes'] ?> mnt / <?= (int)$pkg['question_count'] ?> soal)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bank-field" style="margin-bottom:14px;">
+                    <label class="bank-label">Judul Sesi Ujian *</label>
+                    <input type="text" name="title" id="sessionModalTitleInput" class="bank-input" placeholder="Cth: Ujian Tulis Tutorial RPL 2026/2027 (Utama / Muslim)" required>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+                    <div class="bank-field">
+                        <label class="bank-label">Durasi Pengerjaan (Menit) *</label>
+                        <input type="number" name="duration_minutes" id="sessionModalDuration" class="bank-input" value="90" min="5" max="300" required>
+                    </div>
+                    <div class="bank-field">
+                        <label class="bank-label">Passing Grade (KKM) *</label>
+                        <input type="number" step="0.1" name="passing_grade" id="sessionModalPassingGrade" class="bank-input" value="70.0" min="0" max="100" required>
+                    </div>
+                </div>
+
+                <div class="bank-field" style="margin-bottom:14px;">
+                    <label class="bank-label">Token Masuk Ujian *</label>
+                    <div class="bank-token-group" style="display:flex; gap:8px;">
+                        <input type="text" name="token" id="sessionModalToken" class="bank-input" value="TUTOR26" required style="text-transform:uppercase; font-weight:800; letter-spacing:2px;">
+                        <button type="button" class="bank-button" onclick="generateRandomSessionToken();" title="Buat Token Acak">
+                            🎲 Acak
+                        </button>
+                        <button type="button" class="bank-button" onclick="copySessionModalToken();" title="Salin Token">
+                            📋 Salin
+                        </button>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:10px;">
+                    <label class="bank-toggle" style="cursor:pointer; margin-bottom:10px;">
+                        <input type="checkbox" name="exam_open" id="sessionModalExamOpen" value="1" checked style="width:18px; height:18px;">
+                        <div>
+                            <strong style="color:#0f172a; font-size:13.5px;">Buka Gerbang Pengerjaan Sesi Ini (Live)</strong>
+                            <div class="bank-note">Peserta yang terdaftar dapat memasukkan token dan mengerjakan soal sesi ini.</div>
+                        </div>
+                    </label>
+                    <label class="bank-toggle" style="cursor:pointer; margin:0;">
+                        <input type="checkbox" name="is_active" id="sessionModalIsActive" value="1" checked style="width:18px; height:18px;">
+                        <div>
+                            <strong style="color:#0f172a; font-size:13.5px;">Aktifkan Sesi Ujian Ini</strong>
+                            <div class="bank-note">Sesi aktif akan dapat diakses oleh mahasiswa di portal Tutorial RPL.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="bank-modal-foot">
+                <button type="button" class="bank-button" onclick="closeSessionModal();">Batal</button>
+                <button type="submit" class="bank-button primary">💾 Simpan Sesi Ujian</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
      MODAL TAMBAH / EDIT PAKET SOAL
      ═══════════════════════════════════════════════════════════════════════════ -->
 <div class="bank-modal-backdrop" id="packageModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="packageModalTitle">
@@ -1125,24 +1195,95 @@ include __DIR__ . '/../includes/header.php';
 <script>
 const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
 
-function loadSessionConfig(sessionId) {
-    sessionId = parseInt(sessionId, 10);
-    const s = SESSIONS_DATA.find(item => parseInt(item.id, 10) === sessionId);
-    if (!s) return;
+// Modal Sesi Ujian (Create & Edit per record)
+function openSessionModal() {
+    const titleEl = document.getElementById('sessionModalTitle');
+    if (titleEl) titleEl.textContent = '🎯 Buat Sesi Ujian Baru';
+    if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = '0';
+    if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = '';
+    if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = '';
+    if (document.getElementById('sessionModalDuration')) document.getElementById('sessionModalDuration').value = '90';
+    if (document.getElementById('sessionModalPassingGrade')) document.getElementById('sessionModalPassingGrade').value = '70.0';
+    generateRandomSessionToken();
+    if (document.getElementById('sessionModalExamOpen')) document.getElementById('sessionModalExamOpen').checked = true;
+    if (document.getElementById('sessionModalIsActive')) document.getElementById('sessionModalIsActive').checked = true;
 
-    if (document.getElementById('sessionTitleInput')) document.getElementById('sessionTitleInput').value = s.title || '';
-    if (document.getElementById('sessionTokenInput')) document.getElementById('sessionTokenInput').value = s.token || '';
-    if (document.getElementById('sessionDurationInput')) document.getElementById('sessionDurationInput').value = s.duration_minutes || 90;
-    if (document.getElementById('sessionPassingGradeInput')) document.getElementById('sessionPassingGradeInput').value = s.passing_grade || 70.0;
-    if (document.getElementById('sessionExamOpenCheck')) document.getElementById('sessionExamOpenCheck').checked = (parseInt(s.exam_open, 10) === 1);
+    const el = document.getElementById('sessionModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
+}
 
-    if (document.getElementById('sessionPackageSelect')) {
+function openEditSessionModal(s) {
+    const titleEl = document.getElementById('sessionModalTitle');
+    if (titleEl) titleEl.textContent = '✏️ Edit Sesi Ujian (' + (s.code || 'ID: ' + s.id) + ')';
+    if (document.getElementById('sessionModalId')) document.getElementById('sessionModalId').value = s.id;
+    if (document.getElementById('sessionModalCode')) document.getElementById('sessionModalCode').value = s.code || '';
+    if (document.getElementById('sessionModalTitleInput')) document.getElementById('sessionModalTitleInput').value = s.title || '';
+    if (document.getElementById('sessionModalDuration')) document.getElementById('sessionModalDuration').value = s.duration_minutes || 90;
+    if (document.getElementById('sessionModalPassingGrade')) document.getElementById('sessionModalPassingGrade').value = s.passing_grade || 70.0;
+    if (document.getElementById('sessionModalToken')) document.getElementById('sessionModalToken').value = s.token || 'TUTOR26';
+    if (document.getElementById('sessionModalExamOpen')) document.getElementById('sessionModalExamOpen').checked = (parseInt(s.exam_open, 10) === 1);
+    if (document.getElementById('sessionModalIsActive')) document.getElementById('sessionModalIsActive').checked = (parseInt(s.is_active !== undefined ? s.is_active : 1, 10) === 1);
+
+    if (document.getElementById('sessionModalPackageId')) {
         let pkgIds = [1];
         try {
             pkgIds = JSON.parse(s.package_ids_json) || [1];
         } catch(e) {}
-        document.getElementById('sessionPackageSelect').value = pkgIds[0] || (sessionId === 2 ? '2' : '1');
+        document.getElementById('sessionModalPackageId').value = pkgIds[0] || (parseInt(s.id, 10) === 2 ? '2' : '1');
     }
+
+    const el = document.getElementById('sessionModalBackdrop');
+    if (el) {
+        el.style.display = 'flex';
+        el.style.pointerEvents = 'auto';
+        el.style.visibility = 'visible';
+        el.classList.add('open');
+    }
+}
+
+function closeSessionModal() {
+    const el = document.getElementById('sessionModalBackdrop');
+    if (el) {
+        el.classList.remove('open');
+        el.style.display = 'none';
+        el.style.pointerEvents = 'none';
+        el.style.visibility = 'hidden';
+    }
+    document.body.style.overflow = '';
+}
+
+function generateRandomSessionToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let token = '';
+    for (let i = 0; i < 7; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const tokenInput = document.getElementById('sessionModalToken') || document.getElementById('sessionTokenInput');
+    if (tokenInput) tokenInput.value = token;
+}
+
+function copySessionModalToken() {
+    const tokenInput = document.getElementById('sessionModalToken') || document.getElementById('sessionTokenInput');
+    if (!tokenInput) return;
+    navigator.clipboard.writeText(tokenInput.value).then(() => {
+        alert('Token ' + tokenInput.value + ' berhasil disalin!');
+    }).catch(() => {
+        tokenInput.select();
+        document.execCommand('copy');
+        alert('Token ' + tokenInput.value + ' berhasil disalin!');
+    });
+}
+
+function loadSessionConfig(sessionId) {
+    sessionId = parseInt(sessionId, 10);
+    const s = SESSIONS_DATA.find(item => parseInt(item.id, 10) === sessionId);
+    if (!s) return;
+    openEditSessionModal(s);
 }
 
 // Filter Bank Soal
@@ -1662,6 +1803,14 @@ document.addEventListener('click', function(e) {
         e.preventDefault();
         const pId = parseInt(btnAddQ.getAttribute('data-package-id') || '0', 10);
         openAddModal(pId);
+        return;
+    }
+
+    // Tombol Buat Sesi Baru
+    const btnCreateSession = e.target.closest('[data-action="create-session"]');
+    if (btnCreateSession) {
+        e.preventDefault();
+        openSessionModal();
         return;
     }
 

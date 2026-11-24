@@ -1378,43 +1378,121 @@ if (!function_exists('tutorialRplCbtGetSession')) {
 }
 
 /**
- * Update pengaturan sesi CBT Tutorial RPL.
+ * Menyimpan atau memperbarui data sesi ujian CBT Tutorial RPL.
  */
-if (!function_exists('tutorialRplCbtUpdateSession')) {
-    function tutorialRplCbtUpdateSession(PDO $pdo, array $data): bool {
+if (!function_exists('tutorialRplCbtSaveSession')) {
+    function tutorialRplCbtSaveSession(PDO $pdo, array $data): int {
         ensureTutorialRplCbtTables($pdo);
         $sesId = (int)($data['id'] ?? ($data['session_id'] ?? 0));
-        if ($sesId <= 0) {
-            $ses = tutorialRplCbtGetSession($pdo);
-            $sesId = (int)($ses['id'] ?? 1);
+        $code = trim((string)($data['code'] ?? ''));
+        $title = trim((string)($data['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Sesi Ujian Tulis Tutorial RPL';
         }
 
         $packageIds = $data['package_ids'] ?? ($data['package_ids_json'] ?? null);
         if (is_array($packageIds)) {
             $packageIds = json_encode(array_values(array_map('intval', $packageIds)));
+        } elseif (empty($packageIds)) {
+            $pkgId = (int)($data['package_id'] ?? ($sesId === 2 ? 2 : 1));
+            $packageIds = json_encode([$pkgId]);
         } elseif (!is_string($packageIds)) {
-            $packageIds = ($sesId === 2) ? '[2]' : '[1]';
+            $packageIds = json_encode([1]);
         }
 
-        $stmt = $pdo->prepare("
-            UPDATE tutorial_rpl_cbt_sessions SET
-                title = ?,
-                package_ids_json = ?,
-                duration_minutes = ?,
-                passing_grade = ?,
-                token = ?,
-                exam_open = ?
-            WHERE id = ?
-        ");
-        return $stmt->execute([
-            trim((string)($data['title'] ?? 'Ujian Tulis Tutorial RPL')),
-            $packageIds,
-            max(5, min(180, (int)($data['duration_minutes'] ?? 90))),
-            max(0, min(100, (float)($data['passing_grade'] ?? 70.0))),
-            trim((string)($data['token'] ?? 'TUTOR26')),
-            !empty($data['exam_open']) ? 1 : 0,
-            $sesId
-        ]);
+        $duration = max(5, min(300, (int)($data['duration_minutes'] ?? 90)));
+        $passingGrade = max(0, min(100, (float)($data['passing_grade'] ?? 70.0)));
+        $token = strtoupper(trim((string)($data['token'] ?? 'TUTOR26')));
+        if ($token === '') $token = 'TUTOR26';
+        $examOpen = !empty($data['exam_open']) ? 1 : 0;
+        $isActive = isset($data['is_active']) ? (!empty($data['is_active']) ? 1 : 0) : 1;
+
+        if ($sesId > 0) {
+            if ($code !== '') {
+                $stmt = $pdo->prepare("
+                    UPDATE tutorial_rpl_cbt_sessions SET
+                        code = ?,
+                        title = ?,
+                        package_ids_json = ?,
+                        duration_minutes = ?,
+                        passing_grade = ?,
+                        token = ?,
+                        exam_open = ?,
+                        is_active = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([$code, $title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive, $sesId]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE tutorial_rpl_cbt_sessions SET
+                        title = ?,
+                        package_ids_json = ?,
+                        duration_minutes = ?,
+                        passing_grade = ?,
+                        token = ?,
+                        exam_open = ?,
+                        is_active = ?
+                    WHERE id = ?
+                ");
+                $stmt->execute([$title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive, $sesId]);
+            }
+            return $sesId;
+        } else {
+            if ($code === '') {
+                $code = 'SESI-TUTOR-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+            }
+            $stmt = $pdo->prepare("
+                INSERT INTO tutorial_rpl_cbt_sessions
+                    (code, title, package_ids_json, duration_minutes, passing_grade, token, exam_open, is_active)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$code, $title, $packageIds, $duration, $passingGrade, $token, $examOpen, $isActive]);
+            return (int)$pdo->lastInsertId();
+        }
+    }
+}
+
+/**
+ * Menghapus sesi ujian CBT Tutorial RPL.
+ */
+if (!function_exists('tutorialRplCbtDeleteSession')) {
+    function tutorialRplCbtDeleteSession(PDO $pdo, int $sessionId): bool {
+        if ($sessionId <= 0) return false;
+        ensureTutorialRplCbtTables($pdo);
+
+        $total = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions")->fetchColumn();
+        if ($total <= 1) {
+            return false;
+        }
+
+        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_sessions WHERE id = ?");
+        $ok = $stmt->execute([$sessionId]);
+
+        if ($ok && $stmt->rowCount() > 0) {
+            $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1")->fetchColumn();
+            if ($activeCount === 0) {
+                $firstId = $pdo->query("SELECT id FROM tutorial_rpl_cbt_sessions ORDER BY id ASC LIMIT 1")->fetchColumn();
+                if ($firstId) {
+                    $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?")->execute([(int)$firstId]);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+}
+
+/**
+ * Update pengaturan sesi CBT Tutorial RPL (backward compatibility).
+ */
+if (!function_exists('tutorialRplCbtUpdateSession')) {
+    function tutorialRplCbtUpdateSession(PDO $pdo, array $data): bool {
+        if (empty($data['id']) && empty($data['session_id'])) {
+            $ses = tutorialRplCbtGetSession($pdo);
+            $data['id'] = (int)($ses['id'] ?? 1);
+        }
+        return tutorialRplCbtSaveSession($pdo, $data) > 0;
     }
 }
 

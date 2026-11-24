@@ -1,3 +1,41 @@
+## 2026-11-24 18:53:00 +0700 — Penyelarasan Aksi Sesi Ujian Menjadi Edit & Hapus per Record di CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-SESSION-PER-RECORD-ACTIONS · **Parent Git:** `5b937a022ec750915cf1bb8f7e59fecab28a980e`.
+
+**Permintaan dan dasar perbaikan:** Merespons instruksi pengguna ("https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=sessions pindahkan menu edit di halaman ini menjadi edit per record, serta berikan menu delete"):
+1. **Latar Belakang & Identifikasi Masalah**:
+   - Sebelumnya, konfigurasi sesi ujian pada tab `sessions` di `admin/tutorial-rpl-cbt.php` menggunakan satu formulir statis di bagian bawah tabel dengan dropdown select untuk memilih sesi mana yang ingin diedit (`loadSessionConfig()`). Pendekatan ini kurang praktis, tidak modular, dan tidak menyediakan opsi penghapusan (delete) sesi ujian secara langsung per record.
+2. **Implementasi & Peningkatan**:
+   - **`admin/tutorial-rpl-cbt.php`**:
+     - Memindahkan aksi pengeditan langsung ke baris masing-masing sesi ujian pada tabel: tombol `✏️ Edit` (`openEditSessionModal(s)`) yang memuat data sesi ke dalam jendela popup modal `#sessionModalBackdrop`.
+     - Menambahkan aksi penghapusan per baris: tombol `🗑️ Hapus` dengan form konfirmasi `confirm()` yang memicu aksi `delete_session` ke backend.
+     - Menyediakan tombol `🎯 ＋ Buat Sesi Baru` pada header panel sesi (`data-action="create-session"`) untuk menambah sesi ujian baru melalui modal yang sama.
+     - Menghapus formulir statis di bagian bawah tabel dan merefleksikan arsitektur modular popup modal yang berparitas penuh dengan antarmuka CBT Pretes.
+     - Menambahkan penanganan backend untuk aksi POST `save_session` dan `delete_session`.
+   - **`includes/tutorial-rpl-helper.php`**:
+     - Menambahkan fungsi `tutorialRplCbtSaveSession(PDO $pdo, array $data): int` untuk menyimpan sesi baru maupun pembaruan sesi yang sudah ada.
+     - Menambahkan fungsi `tutorialRplCbtDeleteSession(PDO $pdo, int $sessionId): bool` untuk menghapus sesi dengan proteksi menjaga minimal 1 sesi ujian aktif di sistem.
+     - Memperbarui fungsi `tutorialRplCbtUpdateSession()` agar tetap kompatibel ke belakang.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 18:48:36 | `admin/tutorial-rpl-cbt.php` | 188-223, 555-667, 904-989, 1200-1285, 1810-1820 | Pemindahan formulir edit ke modal popup per record, penambahan tombol delete & create sesi, dan penanganan POST action. |
+| 2026-11-24 18:51:22 | `includes/tutorial-rpl-helper.php` | 1380-1495 | Penambahan helper `tutorialRplCbtSaveSession()`, `tutorialRplCbtDeleteSession()`, dan penyelarasan `tutorialRplCbtUpdateSession()`. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php` dan `php.exe -l includes/tutorial-rpl-helper.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- `git diff --check` bersih tanpa konflik atau trailing whitespace.
+- Script verifikasi sesi CBT (create, update per record, fetch, dan delete) lulus 100% (`ALL TESTS PASSED`).
+- Seluruh rangkaian test suite proyek lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-student-hub-test.php` (4/4 test ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian menggunakan runtime PHP 8.3 CLI lokal dan SQLite in-memory / file fixture.
+
 ## 2026-11-24 17:50:00 +0700 — Penghapusan Card Redundan "Daftar Butir Soal CBT: Semua Paket" pada Tab Paket Soal CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-REMOVE-REDUNDANT-QUESTIONS-CARD · **Parent Git:** `9e051ed8686960e43c7f43e7c878e2b493dd5f83`.
