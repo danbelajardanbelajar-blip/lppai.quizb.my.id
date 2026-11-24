@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * LPPAI Corner - Helper & Skema Basis Data Tutorial RPL Online
  *
@@ -1100,7 +1100,7 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
                 INSERT INTO tutorial_rpl_cbt_sessions (id, code, title, package_ids_json, duration_minutes, passing_grade, token, exam_open, is_active)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([2, 'SESI-TUTORIAL-PROTESTAN-2026', 'Sesi Ujian Tulis Tutorial RPL â€“ Kristen Protestan', '[2]', 90, 70.00, 'TUTOR26', 1, 1]);
+            $stmt->execute([2, 'SESI-TUTORIAL-PROTESTAN-2026', 'Sesi Ujian Tulis Tutorial RPL – Kristen Protestan', '[2]', 90, 70.00, 'TUTOR26', 1, 1]);
         } elseif ($force) {
             $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET package_ids_json = ?, duration_minutes = 90, passing_grade = 70.00 WHERE id = ?")->execute(['[2]', $ses2Id]);
         }
@@ -1116,7 +1116,7 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
         if ($force || $totalQuestions === 0 || $hasDummy || $hasOld40Seed) {
             $pdo->exec("DELETE FROM tutorial_rpl_cbt_questions");
 
-            // 3a. Soal Muslim / Ubudiyah (Paket 1) â€” Salin 177 butir soal resmi CBT Pretes
+            // 3a. Soal Muslim / Ubudiyah (Paket 1) — Salin 177 butir soal resmi CBT Pretes
             $seededIslam = false;
 
             // Prioritas 1: Jika tabel pretes_cbt_questions di database sudah terisi >= 100 butir soal
@@ -1715,6 +1715,10 @@ if (!function_exists('tutorialRplCbtResetAttempt')) {
 }
 
 /**
+ * Mengambil attempt aktif mahasiswa atau membuat attempt baru beserta lembar butir soalnya.
+ * Mendukung adaptasi paket soal berdasarkan sesi yang dipilih atau deteksi agama mahasiswa (Muslim vs Kristen).
+ */
+/**
  * Menghapus / me-reset satu attempt ujian CBT Tutorial RPL berdasarkan ID attempt.
  */
 if (!function_exists('tutorialRplCbtDeleteAttempt')) {
@@ -1841,40 +1845,47 @@ if (!function_exists('tutorialRplCbtResultWhere')) {
             $params[':kw_grp'] = $kw;
         }
 
-        return [$conds ? ('WHERE ' . implode(' AND ', $conds)) : '', $params];
+        $sql = !empty($conds) ? 'WHERE ' . implode(' AND ', $conds) : '';
+        return [$sql, $params];
     }
 }
 
 /**
- * Jumlah sesi selesai lulus / tidak lulus untuk filter aktif Tutorial RPL.
+ * Hitung jumlah lulus dan tidak lulus untuk filter chips.
  */
 if (!function_exists('tutorialRplCbtResultPassCounts')) {
-    function tutorialRplCbtResultPassCounts(PDO $pdo, array $f, int $now, float $passingGrade): array {
-        if (($f['status_filter'] ?? 'all') === 'live') $f['status_filter'] = 'finished';
-        [$where, $params] = tutorialRplCbtResultWhere($f, $now, $passingGrade, false);
-        $params[':pc_min1'] = $passingGrade;
-        $params[':pc_min2'] = $passingGrade;
-        $sql = "SELECT
-                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pc_min1 THEN 1 ELSE 0 END) AS lulus,
-                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pc_min2) THEN 1 ELSE 0 END) AS tidak_lulus
+    function tutorialRplCbtResultPassCounts(PDO $pdo, array $filters, int $now, float $passingGrade): array {
+        ensureTutorialRplCbtTables($pdo);
+
+        [$whereBase, $paramsBase] = tutorialRplCbtResultWhere($filters, $now, $passingGrade, false);
+
+        $sqlBase = "
+            SELECT
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND a.score >= :pass_min THEN 1 ELSE 0 END) AS lulus_count,
+                SUM(CASE WHEN a.submitted_at IS NOT NULL AND (a.score IS NULL OR a.score < :pass_min) THEN 1 ELSE 0 END) AS tidak_lulus_count
             FROM tutorial_rpl_cbt_attempts a
-            JOIN users u ON u.id = a.user_id
-            JOIN tutorial_rpl_classes c ON c.id = a.class_id
-            $where";
-        try {
-            $st = $pdo->prepare($sql);
-            foreach ($params as $k => $v) $st->bindValue($k, $v);
-            $st->execute();
-            $row = $st->fetch(PDO::FETCH_ASSOC) ?: [];
-        } catch (Throwable $e) {
-            $row = [];
+            JOIN users u ON a.user_id = u.id
+            JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            $whereBase
+        ";
+
+        $stmt = $pdo->prepare($sqlBase);
+        $stmt->bindValue(':pass_min', $passingGrade);
+        foreach ($paramsBase as $k => $v) {
+            $stmt->bindValue($k, $v);
         }
-        return ['lulus' => (int)($row['lulus'] ?? 0), 'tidak_lulus' => (int)($row['tidak_lulus'] ?? 0)];
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return [
+            'lulus' => (int)($row['lulus_count'] ?? 0),
+            'tidak_lulus' => (int)($row['tidak_lulus_count'] ?? 0),
+        ];
     }
 }
 
 /**
- * Bangun URL link filter hasil Tutorial RPL CBT.
+ * Bangun URL navigasi tab Hasil Ujian CBT Tutorial RPL.
  */
 if (!function_exists('buildTutorialRplResultUrl')) {
     function buildTutorialRplResultUrl(array $overrides = []): string {
@@ -1893,17 +1904,13 @@ if (!function_exists('buildTutorialRplResultUrl')) {
         if ($pass !== 'all') $params['pass_filter'] = $pass;
         if ($group !== '') $params['group'] = $group;
         if ($q !== '') $params['q'] = $q;
-        if ($perPage !== 25) $params['per_page'] = $perPage;
-        if ($page > 1) $params['page'] = $page;
+        if ((int)$page > 1) $params['page'] = (int)$page;
+        if ((int)$perPage !== 25) $params['per_page'] = (int)$perPage;
 
         return '?' . http_build_query($params);
     }
 }
 
-/**
- * Mengambil attempt aktif mahasiswa atau membuat attempt baru beserta lembar butir soalnya.
- * Mendukung adaptasi paket soal berdasarkan sesi yang dipilih atau deteksi agama mahasiswa (Muslim vs Kristen).
- */
 if (!function_exists('tutorialRplCbtGetOrCreateAttempt')) {
     function tutorialRplCbtGetOrCreateAttempt(PDO $pdo, int $userId, int $classId, ?array $session = null, ?int $sessionId = null, ?int $packageId = null): array {
         ensureTutorialRplCbtTables($pdo);

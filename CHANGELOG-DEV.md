@@ -1,3 +1,35 @@
+## 2026-11-24 19:35:00 +0700 — Perbaikan Encoding UTF-8 (No BOM) dan Eliminasi Karakter Mojibake pada CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-FIX-UTF8-MOJIBAKE-BOM · **Parent Git:** `7bafa857573ec0074d2f5a300548dbb736f20374`.
+
+**Permintaan dan dasar perbaikan:** Merespons pertanyaan dan laporan pengguna ("mengapa banyak huruf aneh?" beserta tangkapan layar tampilan `tab=results` yang memuat teks mojibake seperti `🔴 TUTUP` menjadi karakter rusak, `âš¡`, `âœ“`, `ًں“¦`, `ðŸ“‹`, dll.):
+1. **Penyebab Utama (Root Cause)**:
+   - Terjadi degradasi encoding akibat operasi command pipeline PowerShell 5.1 sebelumnya saat proses perapian trailing whitespace (`Get-Content | Set-Content -Encoding utf8`). Pada Windows PowerShell 5.1, `Get-Content` secara default membaca file dengan encoding ANSI (Windows-1252) alih-alih UTF-8 murni, dan `Set-Content -Encoding utf8` secara otomatis menambahkan UTF-8 Byte Order Mark (BOM: `\xef\xbb\xbf`).
+   - Akibatnya, byte multibyte UTF-8 untuk emotikon dan simbol antarmuka (seperti `🔴`, `🟢`, `📦`, `⚙️`, `📥`, `📊`, `⚡`, `✓`, `📋`, `✕`, `🔍`, `⏱️`, `⏳`, `⌛`, `👁️`, `🔄`, `🗑️`) terkonversi ganda (double-encoded) menjadi runtutan karakter mojibake (`âš¡`, `âœ“`, `ًں“¦`, `ðŸ“‹`, `Ã—`, dll.), serta header berkas PHP diawali oleh 3 byte BOM yang tidak diinginkan.
+2. **Implementasi & Perbaikan Komprehensif**:
+   - Memulihkan dan merekonstruksi `admin/tutorial-rpl-cbt.php` dan `includes/tutorial-rpl-helper.php` ke format UTF-8 murni tanpa BOM (UTF-8 no-BOM) secara deterministik menggunakan skrip Python langsung dari baseline clean commit `143829237f571dd976b17c74e99dea8382cf9999`.
+   - Mengintegrasikan kembali seluruh pembaruan Tab 4 Hasil Ujian & Live Monitoring (endpoint AJAX `live_results`, live countdown clock, auto-refresh polling, filter chips paket & kelulusan, reset/delete attempts) dengan simbol-simbol Unicode dan emotikon yang valid dan bersih tanpa double encoding.
+   - Menghapus trailing whitespace di seluruh file yang diubah dan memverifikasi ketiadaan byte BOM (`starts_with_bom == False`) serta jumlah karakter mojibake (`mojibake count == 0`).
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 19:33:40 | `admin/tutorial-rpl-cbt.php` | 1-2580 | Pemulihan encoding UTF-8 no-BOM, eliminasi karakter mojibake pada header status gerbang, tab icons, filter chips, tombol live monitoring, dan tabel hasil. |
+| 2026-11-24 19:33:40 | `includes/tutorial-rpl-helper.php` | 1-1880 | Pemulihan encoding UTF-8 no-BOM dan eliminasi karakter mojibake pada seluruh fungsi helper CBT Tutorial RPL. |
+
+**Verifikasi:**
+- Pemeriksaan Byte Order Mark (BOM): `admin/tutorial-rpl-cbt.php` BOM: `False`, `includes/tutorial-rpl-helper.php` BOM: `False`.
+- Deteksi karakter mojibake ganda (`â`, `Ã`, `ð` abnormal): `0` (bersih 100%).
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php` dan `php.exe -l includes/tutorial-rpl-helper.php`) lulus 100% tanpa syntax error (`No syntax errors detected`).
+- `git diff --check` bersih 100% tanpa error trailing whitespace atau encoding conflict.
+- Test suites paritas dan fungsionalitas berjalan dan lulus 100%:
+  - `tests/tutorial-rpl-cbt-parity-test.php` (9/9 tahap ALL PASS).
+  - `tests/tutorial-rpl-cbt-nilai-test.php` (ALL PASS).
+
+**Batas/deployment:**
+- Pengujian fungsional berjalan pada runtime PHP 8.3 CLI lokal. Push Git memperbarui repositori sumber; verifikasi deployment hosting dilakukan terpisah di server produksi.
+
 ## 2026-11-24 19:16:00 +0700 — Penyelarasan Total Tab Hasil Ujian & Live Monitoring CBT Tutorial RPL Berparitas 100% dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-RESULTS-PARITY-PRETES · **Parent Git:** `143829237f571dd976b17c74e99dea8382cf9999`.
