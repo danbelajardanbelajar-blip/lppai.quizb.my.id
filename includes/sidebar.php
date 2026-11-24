@@ -462,12 +462,15 @@ if (!function_exists('isNavGroupActive')) {
             $isRplLulus = ($db && function_exists('tutorialRplIsUserLulus'))
                 ? tutorialRplIsUserLulus($db, (int)($currentUser['id'] ?? 0))
                 : false;
+            $isRplRegistered = ($db && function_exists('tutorialRplIsUserRegistered'))
+                ? tutorialRplIsUserRegistered($db, (int)($currentUser['id'] ?? 0))
+                : false;
             ?>
             <div class="menu-label">Tutorial RPL</div>
             <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
                 <span class="icon">🌐</span><span class="nav-text">Info &amp; Kelas RPL</span>
             </a>
-            <?php if (!$isRplLulus): ?>
+            <?php if (!$isRplLulus && !$isRplRegistered): ?>
             <a href="<?= BASE_URL ?>/tutorial-rpl-daftar.php" class="page-nav <?= menuActive('tutorial-rpl-daftar.php') ?>">
                 <span class="icon">📝</span><span class="nav-text">Daftar Tutorial RPL</span>
             </a>

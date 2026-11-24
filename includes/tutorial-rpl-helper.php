@@ -247,6 +247,33 @@ if (!function_exists('tutorialRplIsUserLulus')) {
 }
 
 /**
+ * Periksa apakah mahasiswa sudah mendaftar Tutorial RPL (baik sudah diplot ke kelas maupun terdaftar pada periode).
+ */
+if (!function_exists('tutorialRplIsUserRegistered')) {
+    function tutorialRplIsUserRegistered(PDO $pdo, int $userId): bool {
+        if ($userId <= 0) return false;
+        ensureTutorialRplTables($pdo);
+        try {
+            $stmtMember = $pdo->prepare("SELECT 1 FROM tutorial_rpl_members WHERE user_id = ? LIMIT 1");
+            $stmtMember->execute([$userId]);
+            if ((bool)$stmtMember->fetchColumn()) {
+                return true;
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $stmtReg = $pdo->prepare("SELECT 1 FROM tutorial_rpl_registrations WHERE user_id = ? LIMIT 1");
+            $stmtReg->execute([$userId]);
+            if ((bool)$stmtReg->fetchColumn()) {
+                return true;
+            }
+        } catch (Throwable $e) {}
+
+        return false;
+    }
+}
+
+/**
  * Konfirmasi pengunggahan tugas video ke Google Drive oleh mahasiswa.
  */
 if (!function_exists('tutorialRplConfirmDriveSubmission')) {

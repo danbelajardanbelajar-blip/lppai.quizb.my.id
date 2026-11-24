@@ -64,11 +64,16 @@ $pdo->exec("
     VALUES (3, 1, 12, 0, 0, 0, NULL, NULL, NULL, 'proses');
 ");
 
-echo "=== TEST 1: Fungsi Helper tutorialRplIsUserLulus ===\n";
+echo "=== TEST 1: Fungsi Helper tutorialRplIsUserLulus & tutorialRplIsUserRegistered ===\n";
 trAssert(tutorialRplIsUserLulus($pdo, 10) === true, 'Mahasiswa 10 (status_lulus = lulus) terdeteksi lulus', $errors);
 trAssert(tutorialRplIsUserLulus($pdo, 11) === false, 'Mahasiswa 11 (tidak_lulus) terdeteksi belum lulus', $errors);
 trAssert(tutorialRplIsUserLulus($pdo, 12) === false, 'Mahasiswa 12 (proses) terdeteksi belum lulus', $errors);
 trAssert(tutorialRplIsUserLulus($pdo, 999) === false, 'Mahasiswa nonexistent terdeteksi false', $errors);
+
+trAssert(tutorialRplIsUserRegistered($pdo, 10) === true, 'Mahasiswa 10 (member) terdeteksi registered', $errors);
+trAssert(tutorialRplIsUserRegistered($pdo, 11) === true, 'Mahasiswa 11 (member) terdeteksi registered', $errors);
+trAssert(tutorialRplIsUserRegistered($pdo, 12) === true, 'Mahasiswa 12 (member) terdeteksi registered', $errors);
+trAssert(tutorialRplIsUserRegistered($pdo, 999) === false, 'Mahasiswa 999 tidak terdaftar', $errors);
 
 echo "\n=== TEST 2: Kebijakan Pendaftaran Tutorial RPL Bagi yang Sudah Lulus ===\n";
 $mhsLulus = ['id' => 10, 'role' => 'mahasiswa', 'jenis_program' => 'RPL', 'already_passed_rpl' => true];
@@ -86,10 +91,10 @@ trAssert(str_contains($hubSrc, 'badge-success') && str_contains($hubSrc, '✅ LU
 trAssert(str_contains($hubSrc, 'badge-danger') && str_contains($hubSrc, '❌ TIDAK LULUS'), 'Hub memformat status tidak lulus dengan badge merah (bukan Tidak_lulus)', $errors);
 trAssert(!str_contains($hubSrc, 'ucfirst($membership[\'status_lulus\'])'), 'Hub tidak lagi memakai format underscore kasar ucfirst()', $errors);
 trAssert(str_contains($hubSrc, '$isSudahDaftarRpl = ($membership !== null) || (!empty($existingRegistration));'), 'Hub membersihkan card pendaftaran jika mahasiswa sudah daftar Tutorial RPL', $errors);
-trAssert(str_contains($hubSrc, 'Presensi Sah &amp; Lengkap:</strong> Seluruh kewajiban tugas video Google Drive dan Ujian Tulis CBT telah Anda serahkan. Namun akumulasi Nilai Akhir Anda belum mencapai standar kelulusan'), 'Hub menjelaskan pemisahan presensi vs kelulusan saat tidak lulus', $errors);
+trAssert(str_contains($hubSrc, '$isTugasTerpenuhi ? \'✅ Hadir Sah &amp; Lengkap\' : \'⏳ Tugas Belum Lengkap\''), 'Hub menampilkan badge pemenuhan tugas fleksibel', $errors);
 
-// Verifikasi 3 Opsi Tugas Bagi yang Tidak Lulus
-trAssert(str_contains($hubSrc, 'Pilihan Tugas Pemenuhan Kelulusan Tutorial RPL'), 'Hub memuat panel 3 pilihan tugas remedial kelulusan', $errors);
+// Verifikasi 3 Opsi Tugas Bagi yang Belum Lulus (Proses / Tidak Lulus)
+trAssert(str_contains($hubSrc, 'Pilihan Tugas Pemenuhan Kelulusan Tutorial RPL'), 'Hub memuat panel 3 pilihan tugas kelulusan langsung bagi yang belum lulus', $errors);
 trAssert(str_contains($hubSrc, 'Opsi A') && str_contains($hubSrc, 'Mengerjakan Soal CBT (Min. 70)'), 'Hub memuat Opsi A: Mengerjakan soal CBT minimal 70', $errors);
 trAssert(str_contains($hubSrc, 'Opsi B') && str_contains($hubSrc, 'Ujian Praktik di Depan Dosen'), 'Hub memuat Opsi B: Menemui dosen untuk ujian 6 poin di depan dosen', $errors);
 trAssert(str_contains($hubSrc, 'Opsi C') && str_contains($hubSrc, 'Rekaman Video di Google Drive'), 'Hub memuat Opsi C: Ujian praktik 6 poin direkam dan diupload ke Google Drive', $errors);
@@ -102,7 +107,8 @@ $sidebarSrc = file_get_contents(__DIR__ . '/../includes/sidebar.php');
 trAssert(str_contains($sidebarSrc, '$isRplStudent = strtoupper(trim((string)($currentUser[\'jenis_program\'] ?? \'\'))) === \'RPL\';'), 'Sidebar mendeteksi program RPL mahasiswa', $errors);
 trAssert(str_contains($sidebarSrc, '$showTutorialMenus = !$isRplStudent && !$isMahasiswaPretesAktif'), 'Sidebar mengecualikan menu Tutorial Reguler untuk mahasiswa RPL', $errors);
 trAssert(str_contains($sidebarSrc, 'tutorialRplIsUserLulus($db, (int)($currentUser[\'id\'] ?? 0))'), 'Sidebar memeriksa status kelulusan Tutorial RPL', $errors);
-trAssert(str_contains($sidebarSrc, '<?php if (!$isRplLulus): ?>') && str_contains($sidebarSrc, 'tutorial-rpl-daftar.php'), 'Sidebar menyembunyikan link Daftar Tutorial RPL bagi yang sudah lulus', $errors);
+trAssert(str_contains($sidebarSrc, 'tutorialRplIsUserRegistered($db, (int)($currentUser[\'id\'] ?? 0))'), 'Sidebar memeriksa status pendaftaran Tutorial RPL', $errors);
+trAssert(str_contains($sidebarSrc, '<?php if (!$isRplLulus && !$isRplRegistered): ?>') && str_contains($sidebarSrc, 'tutorial-rpl-daftar.php'), 'Sidebar menyembunyikan link Daftar Tutorial RPL jika sudah daftar atau sudah lulus', $errors);
 
 echo "\n=== TEST 5: Pretes Tidak Lulus Mengarah ke Pendaftaran Pretes Tanpa Remedial ===\n";
 $dashboardSrc = file_get_contents(__DIR__ . '/../pages/dashboard.php');

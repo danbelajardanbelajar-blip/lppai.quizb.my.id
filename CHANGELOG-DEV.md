@@ -1,3 +1,49 @@
+## 2026-11-24 08:57:33 +0700 — Penyelarasan Total Tampilan Mahasiswa RPL: Pembersihan Menu Pendaftaran di Sidebar dan Penggantian Layout Kaku dengan Panel 3 Opsi Pilihan Bebas
+
+**ID:** TUTORIAL-RPL-SIDEBAR-CLEANUP-AND-UNIFIED-3-OPTIONS-VIEW · **Parent Git:** `9dd7ea5`.
+
+**Permintaan dan dasar perbaikan:** Merespons konfirmasi dan tangkapan layar pengguna di mana mahasiswa RPL yang sudah terdaftar masih melihat menu `Daftar Tutorial RPL` di sidebar sebelah kiri serta halaman kelas masih menampilkan format lama tugas kaku nomor 1 (Google Drive wajib) & nomor 2 (CBT wajib) dengan kewajiban ganda. Permintaan pengguna ditegaskan kembali: (1) Membersihkan link pendaftaran dari sidebar dan halaman jika mahasiswa sudah daftar, dan (2) Menggantikan tugas dengan 3 opsi pilihan bebas bagi yang belum lulus (CBT min 70, tatap muka 6 poin di depan dosen, atau rekaman video 6 poin di Drive), disertai penegasan bahwa 3 opsi bersifat pilihan mempermudah mahasiswa RPL dan jika CBT < 70 wajib memilih ujian praktik online atau offline.
+
+**Perubahan dan alasan:**
+1. **Pembersihan Menu Pendaftaran pada Sidebar (`includes/sidebar.php` & `includes/tutorial-rpl-helper.php`):**
+   - Menambahkan fungsi helper `tutorialRplIsUserRegistered(PDO $pdo, int $userId): bool` untuk mendeteksi apakah mahasiswa sudah terdaftar di `tutorial_rpl_members` (terplot kelas) maupun `tutorial_rpl_registrations` (terdaftar periode).
+   - Memperbarui `includes/sidebar.php` pada blok menu mahasiswa RPL agar memeriksa kondisi `!$isRplLulus && !$isRplRegistered`. Jika mahasiswa sudah terdaftar atau sudah diplot kelompok kelas bimbingan, menu `Daftar Tutorial RPL` tidak lagi ditampilkan di sidebar menu navigasi.
+2. **Penggantian Layout Lama dengan Panel 3 Opsi Tugas Pilihan Bebas (`pages/tutorial-rpl.php`):**
+   - Menghapus tampilan layout lama yang kaku (1. Tugas Rekaman Video Hafalan Google Drive wajib, 2. Ujian CBT wajib, dan teks lama "Anda wajib menyelesaikan kedua komponen").
+   - Menjadikan panel **3 Pilihan Tugas Pemenuhan Kelulusan Tutorial RPL** tampil langsung bagi seluruh mahasiswa yang belum lulus (`$statusLulusVal !== 'lulus'`, baik berstatus `proses` maupun `tidak_lulus`).
+   - Tiga kartu pilihan tugas terpadu:
+     - **Opsi A (CBT Min. 70):** Evaluasi daring CBT materi praktis dengan passing grade 70.0. Jika nilai CBT pengerjaan di bawah 70, tampil alert penegasan bahwa tidak ada pilihan lain selain ujian praktik (Opsi B atau Opsi C).
+     - **Opsi B (Tatap Muka Offline):** Ujian praktik 6 poin tugas ibadah langsung di depan dosen tutor, dilengkapi tombol WhatsApp langsung ke dosen pengampu untuk perjanjian jadwal.
+     - **Opsi C (Daring Rekaman Video Drive):** Ujian praktik 6 poin tugas ibadah mandiri direkam video ke folder Google Drive kelompok, dilengkapi aturan nama file `NIM_NamaLengkap_Hafalan.mp4`, tombol konfirmasi unggah tugas, dan status verifikasi dosen.
+   - Menyertakan rincian modul 6 poin tugas praktik ibadah ubudiyah (1. Wudhu, 2. Tayammum, 3. Niat Mandi Wajib & Jamak Qashar, 4. Shalat Subuh & Qunut, 5. Shalat Jenazah, 6. Amaliyah & Hafalan Surat Pendek/Istighatsah).
+   - Memperbarui penanda status pada header kelompok menjadi fleksibel: Hadir Sah & Lengkap jika salah satu opsi tugas telah terpenuhi (CBT ≥ 70, video terverifikasi sah, atau nilai praktik dosen ≥ 70).
+3. **Pembaruan Suite Pengujian Otomatis (`tests/tutorial-rpl-student-status-test.php` & `tests/tutorial-rpl-structure-test.php`):**
+   - Memvalidasi fungsi `tutorialRplIsUserRegistered` untuk anggota kelas maupun pendaftar periode.
+   - Memvalidasi bahwa mahasiswa RPL yang sudah terdaftar tidak lagi melihat link `tutorial-rpl-daftar.php` di sidebar, sedangkan mahasiswa baru yang belum daftar tetap melihatnya.
+   - Memvalidasi tampilan 3 opsi tugas pilihan dan badge fleksibel pada halaman kelas bimbingan.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat edit. Baris merupakan awal hunk berkas lama atau rentang penuh berkas baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-24 08:52:07 | `includes/tutorial-rpl-helper.php` | 248-275 | Penambahan fungsi helper `tutorialRplIsUserRegistered()` untuk deteksi pendaftaran aktif mahasiswa RPL. |
+| 2026-11-24 08:52:19 | `includes/sidebar.php` | 460-476 | Sembunyikan link menu `Daftar Tutorial RPL` pada sidebar jika mahasiswa sudah daftar atau sudah diplot ke kelas. |
+| 2026-11-24 08:57:04 | `pages/tutorial-rpl.php` | 120-415 | Mengganti layout kaku lama dengan panel 3 opsi pilihan tugas langsung bagi mahasiswa proses/tidak lulus, badge tugas fleksibel, dan tombol konfirmasi unggah. |
+| 2026-11-24 08:57:14 | `tests/tutorial-rpl-structure-test.php` | 168-175 | Penyesuaian asersi sidebar mahasiswa RPL terdaftar (tidak melihat daftar) vs belum terdaftar (melihat daftar). |
+| 2026-11-24 08:57:33 | `tests/tutorial-rpl-student-status-test.php` | 67-107 | Asersi pengujian fungsi `tutorialRplIsUserRegistered`, badge tugas fleksibel, dan pembersihan sidebar. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada `pages/tutorial-rpl.php`, `includes/sidebar.php`, dan `includes/tutorial-rpl-helper.php` lulus 100% tanpa error sintaks.
+- `git diff --check` lulus bersih tanpa peringatan whitespace.
+- Seluruh 13 suite pengujian modul Tutorial RPL (`tests/tutorial-rpl-*.php`) lulus 100% tanpa kegagalan.
+- Pengujian regresi alur pretes RPL dan periode hasil pretes (`tests/pretes-rpl-flow-test.php`, `tests/pretes-hasil-active-period-test.php`) lulus 100%.
+
+**Batas/deployment:**
+- Pengujian dijalankan menggunakan runtime PHP 8.3 CLI lokal dan database uji SQLite in-memory / file fixture.
+- Penerapan ke server web produksi dilakukan via Git push dan penarikan commit di server hosting aktif.
+
+---
+
 # Log Perubahan Pengembangan (CHANGELOG-DEV)
 
 Catatan sistematis setiap perubahan kode. Entri terbaru di atas.

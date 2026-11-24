@@ -168,8 +168,10 @@ $mhsHtml = $renderSidebar(['id' => 101, 'role' => 'mahasiswa', 'nim' => '2026010
 $check(!str_contains($mhsHtml, 'admin-tutorial-rpl'), 'Mahasiswa sidebar: Bebas dari menu admin tutorial RPL');
 $check(!str_contains($mhsHtml, 'tutorial-rpl-kelas.php'), 'Mahasiswa sidebar: Bebas dari link admin');
 $check(!str_contains($mhsHtml, 'tutorial-rpl-daftar.php'), 'Mahasiswa non-RPL tidak diberi menu pendaftaran RPL');
-$rplHtml = $renderSidebar(['id'=>101, 'role'=>'mahasiswa', 'jenis_program'=>'RPL', 'nim'=>'20260101', 'nama_lengkap'=>'Mahasiswa RPL']);
-$check(str_contains($rplHtml, 'tutorial-rpl-daftar.php'), 'Mahasiswa RPL dapat membuka pendaftaran tanpa bergantung menu tutorial reguler');
+$rplHtmlRegistered = $renderSidebar(['id'=>101, 'role'=>'mahasiswa', 'jenis_program'=>'RPL', 'nim'=>'20260101', 'nama_lengkap'=>'Mahasiswa RPL Terdaftar']);
+$check(!str_contains($rplHtmlRegistered, 'tutorial-rpl-daftar.php'), 'Mahasiswa RPL yang sudah terdaftar dibersihkan dari menu pendaftaran');
+$rplHtmlUnregistered = $renderSidebar(['id'=>102, 'role'=>'mahasiswa', 'jenis_program'=>'RPL', 'nim'=>'20260102', 'nama_lengkap'=>'Mahasiswa RPL Belum Terdaftar']);
+$check(str_contains($rplHtmlUnregistered, 'tutorial-rpl-daftar.php'), 'Mahasiswa RPL belum daftar dapat membuka pendaftaran tanpa bergantung menu tutorial reguler');
 
 echo "\n=== TEST 3: Smoke Test Halaman Baru Tutorial RPL ===\n";
 // Pastikan semua file halaman baru ada di disk dan valid PHP
