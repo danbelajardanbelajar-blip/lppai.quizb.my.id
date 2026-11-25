@@ -4,23 +4,33 @@
  * Tambah, edit, simpan, urutkan, nonaktifkan/aktifkan, dan hapus (hanya yang belum bernilai).
  * Data: tabel pretes_components (includes/pretes-components.php).
  */
-define('PAGE_TITLE', 'Kelola Tugas Pretes');
+$fixedTaskProgram = defined('PRETES_TASK_PROGRAM') ? PRETES_TASK_PROGRAM : null;
+define('PAGE_TITLE', 'Kelola Tugas Pretes' . ($fixedTaskProgram === 'rpl' ? ' RPL' : ($fixedTaskProgram === 'reguler' ? ' Reguler' : '')));
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-helper.php';
 
+if ($fixedTaskProgram !== null) {
+    if (!in_array($fixedTaskProgram, ['rpl','reguler'], true)) { http_response_code(404); return; }
+    foreach ([$_GET['program'] ?? null, $_POST['program'] ?? null] as $requestedProgram) {
+        if ($requestedProgram !== null && $requestedProgram !== $fixedTaskProgram) {
+            http_response_code(403); echo 'Program permintaan tidak sesuai halaman.'; return;
+        }
+    }
+}
+$program = $fixedTaskProgram ?? strtolower((string)($_GET['program'] ?? $_POST['program'] ?? 'reguler'));
+if (!isset(PRETES_COMPONENT_PROGRAMS[$program])) $program = 'reguler';
+$selfUrl = $fixedTaskProgram !== null ? BASE_URL . '/admin/pretes-' . $program . '-tugas.php'
+    : BASE_URL . '/admin/pretes-tugas.php?program=' . rawurlencode($program);
+$flashKey = 'pretes_tugas_flash' . ($fixedTaskProgram !== null ? '_' . $program : '');
 $pdo = getDBConnection();
 pretesComponentsPdo($pdo);
-ensurePretesFeatures($pdo); // tabel nilai (pretes_assessments) dipakai untuk cek "sudah bernilai" sebelum hapus
+ensurePretesFeatures($pdo);
 ensurePretesComponentTable($pdo);
 
-$program = strtolower((string)($_GET['program'] ?? $_POST['program'] ?? 'reguler'));
-if (!isset(PRETES_COMPONENT_PROGRAMS[$program])) $program = 'reguler';
-$selfUrl = BASE_URL . '/admin/pretes-tugas.php?program=' . rawurlencode($program);
-
 if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
-$flash = $_SESSION['pretes_tugas_flash'] ?? null;
-unset($_SESSION['pretes_tugas_flash']);
+$flash = $_SESSION[$flashKey] ?? null;
+unset($_SESSION[$flashKey]);
 $formError = '';
 $formInput = null;
 
@@ -28,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
     $id = (int)($_POST['id'] ?? 0);
     try {
-        if (!verifyCsrf((string)($_POST['csrf_token'] ?? ''))) throw new InvalidArgumentException('Sesi tidak valid, muat ulang halaman lalu coba lagi.');
+        if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) { http_response_code(403); throw new InvalidArgumentException('Sesi tidak valid, muat ulang halaman lalu coba lagi.'); }
         $msg = '';
         switch ($action) {
             case 'save':
@@ -50,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = 'Komponen dihapus permanen.';
                 break;
             case 'set_rpl_mode':
+                if ($program !== 'rpl') { http_response_code(403); throw new InvalidArgumentException('Pengaturan kelulusan RPL hanya tersedia di program RPL.'); }
                 $mode = (string)($_POST['rpl_pass_mode'] ?? '');
                 if (!isset(PRETES_RPL_PASS_MODES[$mode])) throw new InvalidArgumentException('Mode kelulusan RPL tidak dikenal.');
                 pretesSettingSet($pdo, 'rpl_pass_mode', $mode);
@@ -58,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             default:
                 throw new InvalidArgumentException('Aksi tidak dikenal.');
         }
-        $_SESSION['pretes_tugas_flash'] = ['type' => 'success', 'text' => $msg];
+        $_SESSION[$flashKey] = ['type' => 'success', 'text' => $msg];
         header('Location: ' . $selfUrl . '#daftar-tugas');
         exit;
     } catch (InvalidArgumentException $e) {
@@ -124,13 +135,13 @@ include __DIR__ . '/../includes/header.php';
                 input nilai dosen, Hasil Pretes, dan rekap nilai sesuai program mahasiswa. Lulus bila seluruh komponen aktif bernilai minimal 80.
             </p>
         </div>
-        <a href="<?= BASE_URL ?>/admin/pretes-rekap-nilai.php" class="btn btn-secondary" style="text-decoration:none;">🎓 Rekap Nilai</a>
+        <a href="<?= $fixedTaskProgram !== null ? BASE_URL . '/admin/pretes-' . $program . '.php?tab=results' : BASE_URL . '/admin/pretes-rekap-nilai.php' ?>" class="btn btn-secondary" style="text-decoration:none;">🎓 Rekap Nilai</a>
     </div>
 </div>
 
 <nav class="ptg-tabs" aria-label="Pilih program">
     <?php foreach (PRETES_COMPONENT_PROGRAMS as $pk => $pl): ?>
-        <a class="ptg-tab <?= $pk === $program ? 'active' : '' ?>" href="<?= BASE_URL ?>/admin/pretes-tugas.php?program=<?= $pk ?>" data-program-tab="<?= $pk ?>">🎓 Program <?= $e($pl) ?></a>
+        <a class="ptg-tab <?= $pk === $program ? 'active' : '' ?>" href="<?= $fixedTaskProgram !== null ? BASE_URL . '/admin/pretes-' . $pk . '-tugas.php' : BASE_URL . '/admin/pretes-tugas.php?program=' . $pk ?>" data-program-tab="<?= $pk ?>">🎓 Program <?= $e($pl) ?></a>
     <?php endforeach; ?>
 </nav>
 

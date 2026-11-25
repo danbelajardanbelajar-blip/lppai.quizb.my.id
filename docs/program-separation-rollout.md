@@ -1,3 +1,11 @@
+## Pembaruan: portal admin per program (25 November 2026)
+
+Route baru `/admin/pretes-rpl.php` dan `/admin/pretes-reguler.php` menyediakan periode, peserta, hasil CBT, review snapshot, pencarian, pagination, dan ekspor CSV yang dibatasi program di server. Sidebar admin memiliki grup Pretes per Program. Pengelolaan tugas melalui wrapper tetap RPL/Reguler menolak perubahan program lewat GET/POST dan ID tugas lintas program; CSRF wajib. CRUD tugas menggunakan helper lama dengan filter program.
+
+Pembacaan portal tidak memanggil initializer CBT, migrasi, finalisasi attempt, atau perhitungan ulang nilai. Pengelompokan riwayat sementara berdasarkan `users.jenis_program` saat ini, bukan bukti program historis. Periode target Semua tetap ditampilkan sebagai Campuran lama. Nama periode duplikat ditolak untuk filter, bukan ditebak. Route lama tetap tersedia untuk maintenance arsip.
+
+Ini pemisahan akses admin awal, belum pemisahan total: migrasi periode campuran, penetapan program historis, routing mahasiswa/dosen, pengelolaan sesi/paket dan peralihan produksi masih belum selesai. Restore backup pada database uji terisolasi masih perlu dijalankan serta diverifikasi. Database uji tidak menjadi database aplikasi. Bagian rencana awal di bawah adalah catatan tahap sebelumnya.
+
 # Pemisahan RPL dan Reguler — rencana pelaksanaan dan paket persiapan
 
 ## Status paket ini

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Lppai\ProgramSeparation;
 
-/** Staging-only boundary. Not loaded by any live route; no database/session side effects. */
+/** Pure server-side boundary shared by scoped readers and rollout tools; no session/database side effects. */
 final class Scope
 {
     private const MODULES = [

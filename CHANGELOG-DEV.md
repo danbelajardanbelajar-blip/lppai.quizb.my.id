@@ -1,3 +1,29 @@
+## 2026-11-25 17.28.24 +0700 — Portal admin Pretes per program
+
+**ID:** PRETES-PROGRAM-ADMIN-PORTALS · **Parent Git:** 5d23d07363a66a7873500b5bf859ee6aaa9ec394.
+
+**Perubahan/alasan:** Route RPL/Reguler tetap dengan filter server untuk periode, peserta, hasil, review snapshot, ekspor CSV dan tugas; menolak manipulasi program/ID/role/CSRF. CSV melindungi sel formula. Sidebar menautkan portal baru. Scope dipakai repository SELECT-only; tidak memanggil engine CBT. Kelola tugas memakai helper per-program lama. Dokumentasi menjelaskan batas dan tahap berikutnya.
+
+**Lokasi snapshot:** repository seluruh fungsi 1-akhir; controller validasi/filter/review/CSV 1-akhir; view/CSS seluruh komponen; wrapper seluruh file; sidebar grup baru 55-66; tugas konteks/guard/CSRF/flash 7-75, navigasi 138-144; scope hanya deskripsi kelas. Daftar berikut mencatat waktu penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan. Rentang seluruh file baru mencakup implementasi dan fixture.
+
+- admin/pretes-tugas.php | simpan terakhir WIB 2026-11-25 17.20.01 | snapshot baris 1-307
+- includes/program-separation/scope.php | simpan terakhir WIB 2026-11-25 17.20.01 | snapshot baris 1-75
+- includes/sidebar.php | simpan terakhir WIB 2026-11-25 17.13.40 | snapshot baris 1-673
+- admin/pretes-program.php | simpan terakhir WIB 2026-11-25 17.13.40 | snapshot baris 1-54
+- admin/pretes-reguler-tugas.php | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-3
+- admin/pretes-reguler.php | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-3
+- admin/pretes-rpl-tugas.php | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-3
+- admin/pretes-rpl.php | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-3
+- assets/css/pretes-program.css | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-18
+- includes/pretes-program-repository.php | simpan terakhir WIB 2026-11-25 17.12.23 | snapshot baris 1-84
+- includes/pretes-program-view.php | simpan terakhir WIB 2026-11-25 17.20.01 | snapshot baris 1-51
+- tests/pretes-program-portals-test.php | simpan terakhir WIB 2026-11-25 17.20.01 | snapshot baris 1-112
+- docs/program-separation-rollout.md | simpan terakhir WIB 2026-11-25 17.28.24 | snapshot baris 1-143
+
+**Verifikasi:** lint 11 file PHP berubah lulus; tests/pretes-program-portals-test.php, pretes-components-test.php, sidebar-accordion-compact-test.php (assertions aktif), tutorial-rpl-sidebar-pretes-test.php, pretes-cbt-init-preservation-test.php lulus. Fixture menguji pembacaan/export/review tidak mengubah fingerprint seluruh tabel, penyimpanan tugas sendiri, penolakan lintas program dan preservasi nilai/jawaban/gerbang tertutup. Browser headless lokal: desktop dan mobile 390px, cari literal, pagination, review, penolakan silang, tanpa overflow halaman/JS/PHP error. Screenshot fixture diperiksa. git diff --check lulus sebelum commit.
+
+**Batas:** belum diuji MySQL hosting/deployment. Program riwayat berdasarkan akun saat ini; periode Semua arsip bersama. Route legacy belum dialihkan. Migrasi/pemisahan total dan restore-test hosting belum dilakukan; tidak mengubah database produksi atau mengaktifkan ujian dalam paket ini.
+
 ## 2026-11-25 16:43:57 +0700 — Siapkan penutupan gerbang Pretes terpilih dengan perlindungan seluruh data
 
 **ID:** PROGRAM-SEPARATION-CLOSE-PRETES-GATES · **Parent Git:** `1a0b3e2db19de213b129c270433f0478fb7836dd`.
