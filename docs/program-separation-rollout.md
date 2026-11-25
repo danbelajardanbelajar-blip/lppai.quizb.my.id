@@ -1,3 +1,9 @@
+## Pembaruan: restore terverifikasi dan latihan skema (25 November 2026)
+
+Pengguna melaporkan restore akademik lulus pada database uji quic1934_uji: 78 tabel total, 43 tabel akademik identik dengan baseline, different_tables kosong. SHA256 SQL c30a4a8a54a574c5b63e3670b193537b7997621cc12f45c251f004b91af8e0ac. Report private restore-verification-20261125-174226-b6d56ecc.json. Bukti ini hanya isi tabel akademik historis; tidak menyatakan seluruh skema/data nonakademik terverifikasi.
+
+Paket berikut menyiapkan latihan skema pada salinan itu saja: enam kolom nullable untuk scope periode/sesi/paket serta snapshot program dan ID periode pendaftaran/attempt. Data lama tidak dipindah atau dihapus. Program hanya diisi bila terbukti dari target periode tunggal; akun mahasiswa saat ini tidak dipakai untuk memindahkan sejarah. Periode Semua, label ambigu/hilang, tryout dan pemilik pendaftaran konflik tetap tidak diberi program secara tebakan. Kepemilikan sesi/paket belum diisi otomatis. Seluruh nilai kolom lama pada seluruh tabel wajib identik sebelum/sesudah. Latihan ini belum dijalankan hosting dan tidak mengaktifkan routing/CBT atau cutover produksi. Lihat checkpoint hosting untuk perintah dan batas DDL.
+
 ## Pembaruan: portal admin per program (25 November 2026)
 
 Route baru `/admin/pretes-rpl.php` dan `/admin/pretes-reguler.php` menyediakan periode, peserta, hasil CBT, review snapshot, pencarian, pagination, dan ekspor CSV yang dibatasi program di server. Sidebar admin memiliki grup Pretes per Program. Pengelolaan tugas melalui wrapper tetap RPL/Reguler menolak perubahan program lewat GET/POST dan ID tugas lintas program; CSRF wajib. CRUD tugas menggunakan helper lama dengan filter program.

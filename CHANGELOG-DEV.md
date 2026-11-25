@@ -1,3 +1,26 @@
+## 2026-11-25 17.48.29 +0700 — Latihan fondasi skema pemisahan pada salinan terverifikasi
+
+**ID:** PROGRAM-SEPARATION-ADDITIVE-REHEARSAL · **Parent Git:** f2af1a4f0f5a1f231c6991fb07a3085ea9d36189.
+
+**Bukti hosting:** Pengguna mengirim restore_academic_verification_passed pada quic1934_uji, 78 tabel total, 43 akademik cocok, different_tables kosong, restore_tested true. Backup SHA256 c30a4a8a54a574c5b63e3670b193537b7997621cc12f45c251f004b91af8e0ac. Report private restore-verification-20261125-174226-b6d56ecc.json. Ini verifikasi isi akademik historis, bukan semua schema objects/nonacademic atau produksi terkini.
+
+**Perubahan/alasan:** CLI baru hanya mengizinkan target quic1934_uji dan menolak bila sama dengan DB_NAME produksi, tanpa flag override. Perlu report restore lulus, checksum/identitas capture dan kecocokan akademik ulang sebelum ALTER. Tambah enam kolom nullable pada lima tabel Pretes: scope periode/sesi/paket, periode_id dan snapshot pendaftaran, snapshot attempt. Isi program hanya dari target periode eksplisit, ID periode hanya label unik memakai collation database. Semua/unknown/ambigu, tryout dan konflik pemilik tidak dipaksa program. Akun saat ini bukan sumber backfill sejarah. Sesi/paket tetap belum diberi owner. Tidak load initializer, pindah/hapus riwayat, tulis kolom lama, aktivasi sesi atau grading.
+
+**Integritas:** Jurnal private 0600 sebelum DDL menyimpan proyeksi kolom lama dan fingerprint seluruh tabel (termasuk nonakademik). Sesudah metadata DML, semua kolom asli/jumlah baris/tabel harus identik sebelum commit. Efek trigger ke nilai menyebabkan rollback DML. MySQL DDL implicit commit dinyatakan jujur: kolom dapat tersisa setelah kegagalan; tidak ada auto-drop/import/rollback penuh. Schema bekas latihan atau input berubah ditolak. cutover_allowed selalu false. Config website tidak dialihkan.
+
+**Lokasi/waktu:** File baru seluruh rentang: fungsi columns/projection/prepare/apply, CLI guard/jurnal, fixture integritas/guard. Checkpoint bagian awal 3-28; rollout bagian awal status bukti restore/latihan. Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- includes/program-separation/additive-rehearsal.php | snapshot 1-100 | simpan terakhir WIB 2026-11-25 17.46.29
+- tools/program-separation-rehearse-schema.php | snapshot 1-50 | simpan terakhir WIB 2026-11-25 17.45.30
+- tests/program-separation-additive-rehearsal-test.php | snapshot 1-47 | simpan terakhir WIB 2026-11-25 17.46.29
+- tests/program-separation-rehearsal-target-test.php | snapshot 1-25 | simpan terakhir WIB 2026-11-25 17.47.28
+- docs/program-separation-hosting-checkpoint.md | snapshot 1-185 | simpan terakhir WIB 2026-11-25 17.47.28
+- docs/program-separation-rollout.md | snapshot 1-149 | simpan terakhir WIB 2026-11-25 17.47.28
+
+**Verifikasi:** Lint empat file PHP baru lulus. program-separation-additive-rehearsal-test.php lulus normal dan proc_open/proc_close nonaktif: seluruh nilai kolom lama tetap, program akun tidak memindahkan sejarah, periode Semua/duplikat beda kapital/hilang, tryout/pemilik konflik, input stale dan penolakan ulang, efek trigger dibatalkan sementara DDL dapat tersisa. program-separation-rehearsal-target-test.php memakai CLI asli/config dummy untuk melarang produksi case-insensitive dan semua target selain database uji; target sah mencapai guard capture tanpa koneksi/ALTER. program-separation-verify-restore-test.php dan pretes-cbt-init-preservation-test.php lulus. bash -n perintah hosting yang diekstrak dari dokumen lulus. git diff --check lulus sebelum commit.
+
+**Batas:** Uji lokal menggunakan SQLite dan fixture CLI, belum mengeksekusi ALTER MySQL hosting. Pengguna perlu menjalankan latihan dan mengirim ringkasan. Belum pemisahan total, ownership sesi/paket, routing baru, atau migrasi/cutover produksi. Latihan schema harus lulus dulu; jangan mengklaim enam kolom baru sebagai isolasi runtime yang sudah aktif.
+
 ## 2026-11-25 17.40.01 +0700 — Koreksi argumen impor latihan restore MariaDB
 
 **ID:** RESTORE-IMPORT-POSITIONAL-DATABASE · **Parent Git:** dc48d4825399d0251825f7bff2ab7f1232b0fdaa.

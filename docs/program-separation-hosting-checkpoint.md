@@ -1,5 +1,31 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Latihan skema additive setelah restore lulus
+
+Bukti hosting terbaru: restore_academic_verification_passed, 78 tabel total, 43 tabel akademik cocok, different_tables=[], report restore-verification-20261125-174226-b6d56ecc.json. Langkah berikut hanya mengubah salinan quic1934_uji. CLI rehearsal tidak memiliki mode produksi/override dan menolak jika nama database uji sama dengan konfigurasi aplikasi. Password user yang sama dapat dipakai, tetapi koneksi dibuat eksplisit ke database uji. Semua tabel harus InnoDB; baseline akademik diperiksa ulang sebelum ALTER.
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+git pull --ff-only &&
+(
+  set +x
+  umask 077
+  IFS= read -r -s -p "Password database uji: " lppai_test_password || exit 1
+  printf '\n'
+  printf '%s' "$lppai_test_password" | php tools/program-separation-rehearse-schema.php \
+    --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+    --restore-report="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915/restore-verification-20261125-174226-b6d56ecc.json" \
+    --database=quic1934_uji \
+    --username=quic1934_zenhkm
+)
+```
+
+Enam kolom baru: master_pretes.program_scope; pretes_registrations.periode_id dan program_snapshot; pretes_cbt_sessions.program_scope; pretes_cbt_packages.program_scope; pretes_cbt_attempts.program_snapshot. Semua nullable, tidak rename/drop kolom/tabel dan tidak menambah FK yang bisa menghapus riwayat. Pendaftaran diberi periode_id hanya bila label cocok tepat satu periode berdasarkan collation database. Program pendaftaran/attempt resmi hanya diisi dari target periode RPL/Reguler yang eksplisit, dengan pemilik pendaftaran valid. Program akun saat ini bukan dasar backfill. Periode Semua/unknown, label ambigu, tryout dan konflik pemilik tetap tanpa program; sesi/paket tetap belum diberi pemilik. Tidak menyimpulkan pemisahan total dari latihan ini.
+
+Sebelum DDL, jurnal private menyimpan daftar kolom asli dan fingerprint seluruh tabel, termasuk akun dan data nonakademik (hanya hash/jumlah, bukan isi pribadi). Setelah metadata baru diisi dalam transaksi, proyeksi semua kolom asli harus identik. Efek trigger ke nilai/data lama membatalkan DML. MySQL ALTER melakukan implicit commit: jika gagal, kolom yang sudah ditambahkan dapat tetap ada. Tool tidak pernah mengklaim rollback DDL, menghapus kolom otomatis atau memulihkan database penuh. Bila gagal, kirim error ringkas; jangan impor/ulang/drop sendiri. Tool menolak schema yang telah dimodifikasi atau input berubah.
+
+Hasil yang diharapkan test_schema_rehearsal_passed, added_columns=6, original_tables_verified=78, all_original_column_values_unchanged=true, cutover_allowed=false. Ini hanya latihan fondasi skema, belum migrasi produksi, pengisian kepemilikan paket/sesi, atau aktivasi endpoint per program. Verifier restore lama membandingkan seluruh kolom dengan backup sebelum ALTER; sesudah latihan, jangan menggunakannya untuk menilai proyeksi kolom lama karena enam kolom baru memang tidak ada dalam baseline. Gunakan jurnal/proyeksi rehearsal, bukan menghapus kolom agar verifier lama lulus.
+
 ## Koreksi impor MariaDB yang selesai tetapi database uji tetap kosong
 
 Keluaran hosting setelah verifier dc48d48: koneksi ke quic1934_uji berhasil, tetapi academic_tables=0 dan restored_total_tables=0. Ini belum bukti kerusakan nilai; tidak ada data restore yang dapat dibandingkan. Perintah impor sebelumnya dari agen memakai --one-database bersama -D. Pada kode klien MariaDB, opsi -o mengatur one_database=skip_updates=1; argumen database positional di akhir memulihkan skip_updates=0, sedangkan -D hanya mengatur current_db. Karena itu kombinasi lama dapat melewati query tanpa exit gagal. Referensi primer: https://github.com/MariaDB/server/blob/11.4/client/mysql.cc (case 'o', opsi database/-D, penanganan argc==1, dan skip_updates di com_go). Versi klien hosting belum dicatat, sehingga kecocokan ini merupakan diagnosis berdasarkan kode serta hasil 0 tabel, bukan reproduksi langsung pada hosting dari agen.
