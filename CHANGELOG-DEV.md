@@ -28,6 +28,34 @@ Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riway
 
 ---
 
+## 2026-11-25 08:13:02 +0700 — Perbaikan Tombol Delete & Toolbar Hapus Massal Sesi Ujian CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-FIX-DELETE-SESSION · **Parent Git:** `57010300e3e2f2db39846b54376c1bda177ed0ee`.
+
+**Permintaan dan dasar perbaikan:** Merespons laporan pengguna ("https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=sessions mengapa menu delete tidak bisa dpakai di sini?"):
+1. **Penonaktifan Intersepsi SPA pada Form Aksi Sesi (`admin/tutorial-rpl-cbt.php`):**
+   - Menambahkan atribut `data-no-spa` pada form `activate_session`, `deactivate_session`, dan `delete_session` agar submit POST berjalan native tanpa dicegat oleh `SPA.submitForm()` di `assets/js/app.js`.
+2. **Pencegahan Redeclare Error pada Skrip Inline (`admin/tutorial-rpl-cbt.php`):**
+   - Menghapus deklarasi top-level `const PACKAGES_DATA` dan `const SESSIONS_DATA`, langsung menetapkan ke `window.PACKAGES_DATA` dan `window.SESSIONS_DATA` sehingga tidak memicu `SyntaxError: Identifier has already been declared` saat halaman dimuat ulang via SPA.
+3. **Sinkronisasi Visibilitas Toolbar Hapus Massal (`admin/tutorial-rpl-cbt.php`):**
+   - Memperbarui `refreshBulkSelection` untuk mengatur `toolbar.style.display = checked.length ? 'flex' : 'none'` (mengatasi override `display: flex` pada `.bank-panel-head`), menambahkan `selectAll.disabled = items.length === 0`, serta memanggil inisialisasi awal saat `DOMContentLoaded`.
+
+Waktu pada tabel adalah **waktu penyimpanan terakhir file** yang tercatat di sistem (WIB).
+
+| Waktu Simpan Terakhir (WIB) | File | Baris | Bagian / Perubahan |
+|---|---|---|---|
+| 2026-11-25 08:13:02 | `admin/tutorial-rpl-cbt.php` | 1007, 1014, 1031 | Penambahan `data-no-spa` pada form `activate_session`, `deactivate_session`, dan `delete_session`. |
+| 2026-11-25 08:13:02 | `admin/tutorial-rpl-cbt.php` | 1890-1893 | Penggantian `const PACKAGES_DATA`/`SESSIONS_DATA` menjadi assignment langsung ke `window.*`. |
+| 2026-11-25 08:13:02 | `admin/tutorial-rpl-cbt.php` | 2122-2135 | Perbaikan `refreshBulkSelection` (`style.display`, `selectAll.disabled`, dan init). |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l admin/tutorial-rpl-cbt.php`): `No syntax errors detected`.
+- `git diff --check`: bersih.
+- `tests/tutorial-rpl-cbt-parity-test.php`: 9/9 tahap ALL PASS.
+- `tests/tutorial-rpl-cbt-nilai-test.php`: 4/4 tahap ALL PASS.
+
+---
+
 ## 2026-11-25 07:13:00 +0700 — Paritas Penuh CBT Mahasiswa & Pengawasan Kamera AI (Proctoring) Tutorial RPL dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-STUDENT-PROCTORING-PARITY · **Parent Git:** `a8860287c6853a2b54c08c7089b5de3ac4b77637`.

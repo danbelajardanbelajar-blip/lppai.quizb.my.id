@@ -1004,14 +1004,14 @@ include __DIR__ . '/../includes/header.php';
                         </td>
                         <td style="text-align:right;white-space:nowrap">
                             <?php if (!$ses['is_active']): ?>
-                                <form method="post" action="?tab=sessions" style="display:inline;margin:0 3px">
+                                <form method="post" action="?tab=sessions" data-no-spa style="display:inline;margin:0 3px">
                                     <input type="hidden" name="action" value="activate_session">
                                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                     <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
                                     <button type="submit" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" title="Aktifkan sesi ini untuk ujian mahasiswa">🟢 Aktifkan</button>
                                 </form>
                             <?php else: ?>
-                                <form method="post" action="?tab=sessions" style="display:inline;margin:0 3px">
+                                <form method="post" action="?tab=sessions" data-no-spa style="display:inline;margin:0 3px">
                                     <input type="hidden" name="action" value="deactivate_session">
                                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                     <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
@@ -1028,7 +1028,7 @@ include __DIR__ . '/../includes/header.php';
                                 </form>
                             <?php endif; ?>
                             <button type="button" class="bank-button" style="min-height:28px;padding:4px 8px;font-size:11px" data-action="edit-session" data-session-id="<?= (int)$ses['id'] ?>" onclick="openEditSessionModalById(<?= (int)$ses['id'] ?>)">✏️ Edit</button>
-                            <form method="post" action="?tab=sessions" style="display:inline;margin:0 0 0 3px" onsubmit="return confirm(<?= htmlspecialchars(json_encode("PERINGATAN: Yakin ingin menghapus Sesi Ujian '" . $ses['title'] . "'?"), ENT_QUOTES, 'UTF-8') ?>)">
+                            <form method="post" action="?tab=sessions" data-no-spa style="display:inline;margin:0 0 0 3px" onsubmit="return confirm(<?= htmlspecialchars(json_encode("PERINGATAN: Yakin ingin menghapus Sesi Ujian '" . $ses['title'] . "'?"), ENT_QUOTES, 'UTF-8') ?>)">
                                 <input type="hidden" name="action" value="delete_session">
                                 <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                 <input type="hidden" name="session_id" value="<?= (int)$ses['id'] ?>">
@@ -1889,10 +1889,8 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 window.CBT_PACKAGE_CATEGORIES = <?= json_encode($packageCategoriesMap, JSON_UNESCAPED_UNICODE) ?>;
-const PACKAGES_DATA = <?= json_encode($packages, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
-const SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
-window.PACKAGES_DATA = PACKAGES_DATA;
-window.SESSIONS_DATA = SESSIONS_DATA;
+window.PACKAGES_DATA = <?= json_encode($packages, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
+window.SESSIONS_DATA = <?= json_encode($sessions, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>;
 
 window.openEditPackageModalById = function (packageId) {
     packageId = parseInt(packageId, 10);
@@ -2121,12 +2119,21 @@ function refreshBulkSelection(kind) {
     const toolbar = document.querySelector('[data-bulk-toolbar="' + kind + '"]');
     const count = document.querySelector('[data-bulk-count="' + kind + '"]');
     const selectAll = document.querySelector('[data-bulk-select-all="' + kind + '"]');
-    if (toolbar) toolbar.hidden = checked.length === 0;
+    if (toolbar) {
+        toolbar.hidden = checked.length === 0;
+        toolbar.style.display = checked.length ? 'flex' : 'none';
+    }
     if (count) count.textContent = checked.length + ' sesi dipilih';
     if (selectAll) {
         selectAll.checked = items.length > 0 && checked.length === items.length;
         selectAll.indeterminate = checked.length > 0 && checked.length < items.length;
+        selectAll.disabled = items.length === 0;
     }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { refreshBulkSelection('sessions'); }, { once: true });
+} else {
+    refreshBulkSelection('sessions');
 }
 
 document.addEventListener('click', function (e) {
