@@ -28,6 +28,31 @@ Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riway
 
 ---
 
+## 2026-11-25 08:16:16 +0700 — Pencegahan Auto-Reseed Sesi & Paket Bawaan Setelah Dihapus di CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-PREVENT-RESEED-DELETED-SESSIONS · **Parent Git:** `2e70dae19812f509d8de33a66ac110e14c1e802f`.
+
+**Permintaan dan dasar perbaikan:** Menindaklanjuti laporan pengguna bahwa menu hapus pada `admin/tutorial-rpl-cbt.php?tab=sessions` masih belum berfungsi setelah reload:
+1. **Akar Masalah Backend (`includes/tutorial-rpl-helper.php`):**
+   - `ensureTutorialRplCbtTables()` dipanggil di setiap pemuatan halaman dan menjalankan `tutorialRplCbtSeedPackagesAndQuestions($pdo, false)`.
+   - Sebelumnya, fungsi tersebut memeriksa keberadaan `SESI-TUTORIAL-RPL-2026` dan `SESI-TUTORIAL-PROTESTAN-2026` (serta paket bawaan) secara individual tanpa memeriksa apakah tabel sudah berisi data. Akibatnya, setiap kali admin menghapus salah satu sesi bawaan tersebut, pemuatan ulang halaman langsung menyisipkan ulang sesi yang baru dihapus.
+2. **Perbaikan (`includes/tutorial-rpl-helper.php`):**
+   - Memastikan paket bawaan (`PKT-TUTOR-UTAMA`, `PKT-2-KRISTEN-PROTESTAN`) dan sesi bawaan (`SESI-TUTORIAL-RPL-2026`, `SESI-TUTORIAL-PROTESTAN-2026`) hanya di-seed saat tabel masih kosong (`$existingPkgCount === 0` / `$existingSesCount === 0`) atau saat `$force === true`.
+
+Waktu pada tabel adalah **waktu penyimpanan terakhir file** yang tercatat di sistem (WIB).
+
+| Waktu Simpan Terakhir (WIB) | File | Baris | Bagian / Perubahan |
+|---|---|---|---|
+| 2026-11-25 08:16:16 | `includes/tutorial-rpl-helper.php` | 1067-1140 | Penambahan guard `$existingPkgCount === 0` dan `$existingSesCount === 0` pada `tutorialRplCbtSeedPackagesAndQuestions()`. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l includes/tutorial-rpl-helper.php`): `No syntax errors detected`.
+- `git diff --check`: bersih.
+- `tests/tutorial-rpl-cbt-parity-test.php`: 9/9 tahap ALL PASS.
+- `tests/tutorial-rpl-cbt-nilai-test.php`: 4/4 tahap ALL PASS.
+
+---
+
 ## 2026-11-25 08:13:02 +0700 — Perbaikan Tombol Delete & Toolbar Hapus Massal Sesi Ujian CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-FIX-DELETE-SESSION · **Parent Git:** `57010300e3e2f2db39846b54376c1bda177ed0ee`.
