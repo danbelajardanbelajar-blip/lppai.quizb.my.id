@@ -1729,13 +1729,10 @@ if (!function_exists('tutorialRplCbtActivateSession')) {
  */
 if (!function_exists('tutorialRplCbtDeactivateSession')) {
     function tutorialRplCbtDeactivateSession(PDO $pdo, int $sessionId): bool {
+        if ($sessionId <= 0) return false;
         ensureTutorialRplCbtTables($pdo);
-        $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
-        if ($activeCount <= 1) {
-            return false;
-        }
         $stmt = $pdo->prepare('UPDATE tutorial_rpl_cbt_sessions SET is_active = 0 WHERE id = ?');
-        return $stmt->execute([$sessionId]);
+        return $stmt->execute([$sessionId]) && $stmt->rowCount() > 0;
     }
 }
 
@@ -1746,11 +1743,6 @@ if (!function_exists('tutorialRplCbtDeleteSession')) {
     function tutorialRplCbtDeleteSession(PDO $pdo, int $sessionId): bool {
         if ($sessionId <= 0) return false;
         ensureTutorialRplCbtTables($pdo);
-
-        $total = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions")->fetchColumn();
-        if ($total <= 1) {
-            return false;
-        }
 
         $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_sessions WHERE id = ?");
         $ok = $stmt->execute([$sessionId]);
@@ -1775,15 +1767,8 @@ if (!function_exists('tutorialRplCbtDeleteSession')) {
 if (!function_exists('tutorialRplCbtDeleteSessions')) {
     function tutorialRplCbtDeleteSessions(PDO $pdo, array $sessionIds): int {
         ensureTutorialRplCbtTables($pdo);
-        $ids = array_values(array_filter(array_map('intval', $sessionIds), fn($id) => $id > 0));
+        $ids = array_values(array_unique(array_filter(array_map('intval', $sessionIds), fn($id) => $id > 0)));
         if (empty($ids)) return 0;
-
-        $total = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions")->fetchColumn();
-        if (count($ids) >= $total) {
-            // Sisakan minimal 1 sesi jika semua dipilih
-            array_pop($ids);
-            if (empty($ids)) return 0;
-        }
 
         $in = implode(',', $ids);
         $count = $pdo->exec("DELETE FROM tutorial_rpl_cbt_sessions WHERE id IN ($in)");

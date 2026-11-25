@@ -28,6 +28,30 @@ Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riway
 
 ---
 
+## 2026-11-25 08:20:21 +0700 — Penghapusan Pembatasan Blokir Nonaktifkan & Hapus Sesi Ujian CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-ALLOW-DEACTIVATE-DELETE-SESSION · **Parent Git:** `753b2e69bbb9a74ee2f195980d4932a35f881fb9`.
+
+**Permintaan dan dasar perbaikan:** Merespons laporan pengguna ("masih sama https://lppai.quizb.my.id/admin/tutorial-rpl-cbt.php?tab=sessions belum bisa didelete dan belum bisa dinonaktifkan"):
+1. **`tutorialRplCbtDeactivateSession()` (`includes/tutorial-rpl-helper.php`):**
+   - Menghapus pembatasan `$activeCount <= 1` yang sebelumnya memblokir aksi `deactivate_session` (termasuk pada sesi tryout ketika hanya ada 1 sesi resmi aktif). Kini admin dapat menonaktifkan sesi mana pun secara langsung.
+2. **`tutorialRplCbtDeleteSession()` & `tutorialRplCbtDeleteSessions()` (`includes/tutorial-rpl-helper.php`):**
+   - Menghapus pembatasan `$total <= 1` dan pemotongan `array_pop($ids)` (menyelaraskan dengan `pretesCbtDeleteSession()` di CBT Pretes), sehingga penghapusan sesi satuan maupun massal selalu berhasil sesuai pilihan admin.
+
+Waktu pada tabel adalah **waktu penyimpanan terakhir file** yang tercatat di sistem (WIB).
+
+| Waktu Simpan Terakhir (WIB) | File | Baris | Bagian / Perubahan |
+|---|---|---|---|
+| 2026-11-25 08:20:21 | `includes/tutorial-rpl-helper.php` | 1730-1780 | Penghapusan guard `$activeCount <= 1` pada `tutorialRplCbtDeactivateSession` dan `$total <= 1` pada `tutorialRplCbtDeleteSession`/`DeleteSessions`. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l includes/tutorial-rpl-helper.php`): `No syntax errors detected`.
+- `git diff --check`: bersih.
+- `tests/tutorial-rpl-cbt-parity-test.php`: 9/9 tahap ALL PASS.
+- `tests/tutorial-rpl-cbt-nilai-test.php`: 4/4 tahap ALL PASS.
+
+---
+
 ## 2026-11-25 08:16:16 +0700 — Pencegahan Auto-Reseed Sesi & Paket Bawaan Setelah Dihapus di CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-PREVENT-RESEED-DELETED-SESSIONS · **Parent Git:** `2e70dae19812f509d8de33a66ac110e14c1e802f`.
