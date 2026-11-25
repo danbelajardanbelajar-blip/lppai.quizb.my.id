@@ -1,3 +1,29 @@
+## 2026-11-25 16:35:30 +0700 — Bedakan tryout dan tester dari konflik pendaftaran resmi pada audit pemisahan
+
+**ID:** PROGRAM-SEPARATION-ATTEMPT-CLASSIFICATION · **Parent Git:** `c8bd9fffec9923df718063dc2910823acfc8914d`.
+
+**Laporan pengguna:** Backup hosting berhasil (32.904.359 byte, 43 tabel akademik tidak berubah selama capture, restore_tested=false). Audit awal melaporkan 159 temuan: satu periode Semua, 96 konflik pemilik attempt, tiga pending, tiga sesi aktif, masing-masing satu sesi/paket belum jelas programnya dan 54 pendaftaran Tutorial Reguler perlu review program akun. Ini temuan kandidat, bukan bukti 159 data rusak. Peringatan stat cPanel pada php -r multiline tidak menghentikan keluaran JSON.
+
+**Kesalahan auditor dan perbaikan:** Auditor awal memperlakukan seluruh registration_id sebagai FK positif, padahal skrip proyek menyimpan tryout dalam registration_id negatif dan tester dapat memakai placeholder 999999. Tambahkan klasifikasi dan validasi encoding yang benar, tanpa memanggil engine atau mengubah data. Tryout valid tidak lagi otomatis dianggap konflik pemilik resmi. Negative dengan slot nol, sesi berbeda atau mode resmi tetap konflik; orphan resmi/pemilik salah tetap ditandai. Placeholder tester tetap review tanpa persetujuan migrasi; ID 999999 yang benar-benar ada tetap diperiksa pemiliknya. ID invalid tidak ditebak menjadi resmi. Attempt pending dan sesi aktif dibedakan per jenis, tetap tercatat.
+
+**Review lanjutan:** Mode/exam_open menjadi kolom snapshot opsional. Snapshot lama yang tidak menyimpannya tidak ditimpa dan mode tidak ditebak. CLI baru memverifikasi checksum backup/snapshot, menampilkan ringkasan jenis/temuan serta boleh membaca metadata sesi live melalui transaksi SELECT-only; fakta live dipisahkan dari laporan historis. Tidak memerlukan proc_open, tidak mengulang dump, tidak menghapus/mengumpulkan attempt, dan selalu cutover_allowed=false. Belum dapat menyimpulkan berapa dari 96 temuan awal sebenarnya tryout/tester sampai output reviewer hosting diterima.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Baris adalah awal hunk file lama atau rentang penuh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 16:33:50 | `includes/program-separation/audit.php` | 25, 56, 102, 104, 142 | Klasifikasi resmi/tryout/tester/invalid. Decode ID tryout negatif mengikuti slot 1000, cek sesi/mode/pemilik dan tetap tandai pending. Mode sesi opsional membedakan aktif resmi/tryout; snapshot lama tetap perlu verifikasi. |
+| 2026-11-25 16:31:23 | `includes/program-separation/capture.php` | 61 | Proyeksikan mode/exam_open jika kolom tersedia pada snapshot baru; tidak mengubah skema atau snapshot lama. |
+| 2026-11-25 16:33:04 | `tools/program-separation-review.php` | 1-46 | CLI read-only pada folder capture private, verifikasi checksum backup/snapshot, kelompokkan temuan/jenis attempt; opsi SELECT metadata sesi live dengan validasi identitas DB, tanpa helper runtime/proc_open. |
+| 2026-11-25 16:33:50 | `tests/program-separation-attempt-kinds-test.php` | 1-68 | Uji tryout valid/batas/slot nol/sesi salah/mode salah, tester vs pendaftaran nyata, orphan/pemilik, integer invalid, snapshot lama dan capture opsional; CLI review tanpa proc_open, tanpa perubahan file, checksum gagal ditolak. |
+| 2026-11-25 16:33:04 | `docs/program-separation-rollout.md` | 85, 124 | Catat laporan hosting awal sebagai temuan belum diputuskan, koreksi kelemahan auditor, perbedaan metadata live/historis serta perintah review tanpa mengulang backup. |
+
+**Verifikasi:** Lint empat file PHP berubah/baru lulus. tests/program-separation-attempt-kinds-test.php, tests/program-separation-test.php, tests/program-separation-capture-test.php dan tests/program-separation-shell-capture-test.php lulus dengan assertions aktif. Review CLI pada capture sintetis berjalan dengan proc_open/proc_close dinonaktifkan, memeriksa checksum dan tidak menulis file; backup berubah menyebabkan penolakan. Snapshot baru mengekspor mode opsional dari kolom asli. git diff --check diperiksa sebelum commit/push.
+
+**Keterbatasan:** Tidak memiliki koneksi hosting dari terminal agen; opsi metadata live belum diuji pada MySQL hosting nyata. Backup produksi tidak didownload/diubah dan belum dilatih restore. Data/nilai belum dimigrasi dan pemisahan produksi belum aktif. Pengguna perlu pull lalu menjalankan reviewer pada capture private yang sudah tersedia; tidak diminta mengirim SQL, password atau jawaban ujian.
+
+---
+
 ## 2026-11-25 16:15:12 +0700 — Jalankan backup shared hosting tanpa proc_open PHP
 
 **ID:** PROGRAM-SEPARATION-SHELL-CAPTURE · **Parent Git:** `7aeae9cfdeca1943cd9f0e1ecc4789a74450c725`.

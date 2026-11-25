@@ -22,6 +22,16 @@ final class Audit
         'tutorial_rpl_cbt_attempts' => ['id', 'user_id', 'class_id', 'session_id', 'submitted', 'submitted_at'],
     ];
 
+    public const OPTIONAL_FIELDS = ['pretes_cbt_sessions'=>['mode','exam_open']];
+
+    /** Matches includes/pretes-tryout.php: -(session_id * 1000 + attempt_no), slots 1..999. */
+    public static function registrationNumber(mixed $value): ?int
+    {
+        if (!is_string($value) && !is_int($value)) return null;
+        $number=filter_var($value,FILTER_VALIDATE_INT,['options'=>['min_range'=>PHP_INT_MIN+1]]);
+        return $number===false || $number===0 ? null : $number;
+    }
+
     public static function inspect(array $snapshot): array
     {
         if (($snapshot['schema_version'] ?? null) !== 1 || !is_array($snapshot['tables'] ?? null)) {
@@ -43,7 +53,7 @@ final class Audit
                 throw new \InvalidArgumentException('Isi tabel harus berupa list baris.');
             }
             foreach ($snapshot['tables'][$table] as $row) {
-                if (!is_array($row) || array_diff(array_keys($row), $fields)) {
+                if (!is_array($row) || array_diff(array_keys($row), array_merge($fields,self::OPTIONAL_FIELDS[$table]??[]))) {
                     throw new \InvalidArgumentException('Snapshot memuat kolom di luar daftar minimum yang diizinkan.');
                 }
                 $id = Scope::positiveId($row['id'] ?? null);
@@ -89,24 +99,50 @@ final class Audit
         }
         $sessionPrograms = [];
         foreach ($tables['pretes_cbt_attempts'] as $id => $row) {
-            if (!Scope::positiveId($row['submitted_at'])) $issue('unfinished_pretes_attempt', 'pretes_cbt_attempts', $id);
-            $regId = Scope::positiveId($row['registration_id']);
-            $registration = $tables['pretes_registrations'][$regId ?? 0] ?? null;
-            $program = $map['pretes_registrations'][$regId ?? 0]['candidate_program'] ?? null;
-            if (!$registration || Scope::positiveId($registration['user_id']) !== Scope::positiveId($row['user_id'])) {
-                $issue('attempt_registration_owner_conflict', 'pretes_cbt_attempts', $id); $program = null;
-            }
+            $regId = self::registrationNumber($row['registration_id']);
             $sessionId = Scope::positiveId($row['session_id']);
-            if (!$sessionId || !isset($tables['pretes_cbt_sessions'][$sessionId])) {
-                $issue('attempt_session_unresolved', 'pretes_cbt_attempts', $id);
-            } elseif ($program) $sessionPrograms[$sessionId][$program] = true;
-            $map['pretes_cbt_attempts'][$id] = ['candidate_program' => $program, 'registration_source_id' => $regId,
-                'session_source_id' => $sessionId, 'preserve_original' => true];
+            $session=$tables['pretes_cbt_sessions'][$sessionId ?? 0]??null;
+            $kind=$regId===null?'invalid':'official';$program=null;
+            if ($regId!==null && $regId<0) {
+                $kind='tryout';$number=-$regId;
+                $encodedSession=intdiv($number,1000);$attemptNo=$number%1000;
+                $mode=$session['mode']??null;
+                if (!$session || $encodedSession!==$sessionId || $attemptNo<1 || ($mode!==null && $mode!=='tryout')) {
+                    $issue('tryout_registration_session_conflict','pretes_cbt_attempts',$id);
+                } else {
+                    $program=$userProgram($row['user_id']);
+                    if (!$program) $issue('tryout_user_unresolved','pretes_cbt_attempts',$id);
+                    if ($mode===null) $issue('tryout_session_mode_unverified','pretes_cbt_attempts',$id);
+                }
+            } else {
+                $registration=$tables['pretes_registrations'][$regId??0]??null;
+                if ($regId===null) {
+                    $issue('attempt_registration_invalid','pretes_cbt_attempts',$id);
+                } elseif (!$registration && $regId===999999) {
+                    // The legacy tester route uses this placeholder; it is NOT an approved enrollment.
+                    $kind='synthetic_tester';$issue('synthetic_tester_registration_requires_review','pretes_cbt_attempts',$id);
+                } elseif (!$registration || Scope::positiveId($registration['user_id'])!==Scope::positiveId($row['user_id'])) {
+                    $issue('attempt_registration_owner_conflict','pretes_cbt_attempts',$id);
+                } else $program=$map['pretes_registrations'][$regId]['candidate_program']??null;
+                if (($session['mode']??null)==='tryout' && $kind==='official') {
+                    $issue('official_registration_tryout_session_conflict','pretes_cbt_attempts',$id);$program=null;
+                }
+            }
+            if (!Scope::positiveId($row['submitted_at'])) {
+                $issue($kind==='tryout'?'unfinished_pretes_tryout_attempt':'unfinished_pretes_attempt','pretes_cbt_attempts',$id);
+            }
+            if (!$session) $issue('attempt_session_unresolved','pretes_cbt_attempts',$id);
+            elseif ($program) $sessionPrograms[$sessionId][$program]=true;
+            $map['pretes_cbt_attempts'][$id]=['registration_kind'=>$kind,'candidate_program'=>$program,
+                'registration_source_id'=>$regId,'session_source_id'=>$sessionId,'preserve_original'=>true];
         }
         $packagePrograms = [];
         foreach ($tables['pretes_cbt_sessions'] as $id => $row) {
             // Active sessions block cutover even when no attempt has started yet.
-            if (!in_array($row['is_active'], [0, '0'], true)) $issue('active_or_unknown_pretes_session', 'pretes_cbt_sessions', $id);
+            if (!in_array($row['is_active'], [0, '0'], true)) {
+                $code=match($row['mode']??null){'tryout'=>'active_pretes_tryout_session','resmi'=>'active_official_pretes_session',default=>'active_or_unknown_pretes_session'};
+                $issue($code,'pretes_cbt_sessions',$id);
+            }
             $programs = array_keys($sessionPrograms[$id] ?? []); sort($programs);
             if (count($programs) !== 1) $issue('session_ownership_requires_review', 'pretes_cbt_sessions', $id);
             $map['pretes_cbt_sessions'][$id] = ['observed_programs' => $programs, 'requires_explicit_owner' => true];

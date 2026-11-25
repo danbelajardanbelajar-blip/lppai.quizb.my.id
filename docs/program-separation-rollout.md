@@ -82,7 +82,7 @@ Format input: objek `schema_version: 1`, `tables` berisi seluruh tabel minimum d
 | users | id, jenis_program |
 | master_pretes | id, periode, target_program, status |
 | pretes_registrations | id, user_id, periode |
-| pretes_cbt_sessions | id, is_active, package_ids_json |
+| pretes_cbt_sessions | id, is_active, package_ids_json; opsional mode, exam_open |
 | pretes_cbt_packages | id |
 | pretes_cbt_attempts | id, user_id, registration_id, session_id, submitted_at |
 | tutorial_registrations | id, user_id |
@@ -121,3 +121,15 @@ Audit ini belum membaca isi nilai, items, log, sertifikat, tugas atau seluruh re
 Tidak menjalankan perintah ke hosting/VPS, tidak membuka halaman ujian produksi untuk menguji, tidak mengubah token/jadwal/sakelar ujian, tidak menjalankan migrasi ataupun restart layanan. Pemeriksaan regresi berjalan pada fixture lokal. Commit/pull/push hanya membawa berkas baru yang belum terhubung ke runtime dan catatan perubahan; bukan bukti deployment/aktivasi pemisahan produksi.
 
 Verifikasi paket: lint empat file PHP baru dan delapan suite (fondasi scope/audit, CBT Pretes, sesi Pretes, token, interruption/resume, akses ujian, paritas CBT Tutorial RPL, paritas pengawasan Tutorial RPL) lulus. Beberapa suite Pretes lama mencatat `no such table: pretes_assessments` karena fixture minimumnya tidak menyediakan tabel sinkronisasi tersebut; suite tetap lulus. Engine dan suite lama tidak diubah untuk menutupi log ini. Pengujian baru tidak memuat konfigurasi, koneksi database atau helper runtime dan tidak menghasilkan log tersebut. MySQL hosting, restore backup dan sesi peserta nyata belum diuji.
+
+## Review hasil audit pertama dari hosting
+
+Capture hosting 2026-11-25 16:17:32 WIB berhasil membuat backup 32.904.359 byte; pengguna melaporkan fingerprint 43 tabel akademik tidak berubah dan 159 temuan. Ringkasan: satu periode Semua (ID 1), 96 konflik pemilik attempt, tiga attempt belum submit (36,54,119), tiga sesi aktif (3,4,5), satu sesi/paket perlu review (3) dan 54 pendaftaran pada tabel Tutorial Reguler yang program akunnya berbeda. Angka ini berasal dari laporan awal, **bukan pernyataan ada 159 data rusak**.
+
+Auditor awal belum membedakan registration_id negatif untuk tryout (`-(session_id * 1000 + attempt_no)`) dan placeholder tester 999999 dari pendaftaran resmi. Perbaikan mengklasifikasikan jenis attempt tanpa mengubah data. Slot tryout harus 1..999, session_id harus cocok, dan mode jika tersedia harus tryout; ketidakcocokan tetap temuan. Placeholder tester tanpa pendaftaran nyata tetap perlu review, bukan izin melewati pemeriksaan. Jika pendaftaran 999999 benar-benar ada, pemiliknya tetap diperiksa.
+
+Mode/exam_open kini menjadi kolom snapshot opsional. Snapshot lama tetap bisa dibaca, tetapi mode tryout yang tidak terekam diberi status belum terverifikasi. Attempt tryout yang belum submit dan sesi tryout aktif tetap dilaporkan terpisah dari resmi; keduanya tidak dihapus/di-submit untuk membersihkan audit. Periode campuran dan riwayat Tutorial Reguler milik akun yang kini RPL harus ditinjau sebagai data historis, tanpa dipindah/dihapus berdasarkan program akun saat ini saja.
+
+`tools/program-separation-review.php --capture-dir=PRIVATE_CAPTURE --live-sessions` memverifikasi hash SQL/snapshot lalu menyajikan ringkasan jenis attempt dan temuan berdasarkan snapshot asli, serta metadata sesi terkini (ID, mode, is_active, exam_open) dari SELECT dalam transaksi read-only. Metadata live ditampilkan terpisah dan tidak menulis ulang snapshot historis. Tidak memanggil helper/initializer aplikasi dan tidak memerlukan proc_open. Skrip PHP file menghindari peringatan cPanel CLI ketika menerima kode php -r multiline; peringatan stat tersebut bukan bukti kerusakan database.
+
+Backup belum diuji restore; pemisahan produksi tetap belum diaktifkan. Review ini tidak membuktikan seluruh 96 temuan awal adalah tryout/tester—jumlah sebenarnya baru diketahui setelah pengguna menjalankan reviewer pada snapshot hosting.

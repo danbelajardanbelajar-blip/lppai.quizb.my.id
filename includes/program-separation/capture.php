@@ -58,6 +58,9 @@ final class Capture
                 $projection[]=(in_array($field,$columns,true) ? self::identifier($field) : 'NULL').' AS '.self::identifier($field);
                 if (!in_array($field,$columns,true)) $missing[$table][]=$field;
             }
+            foreach (Audit::OPTIONAL_FIELDS[$table]??[] as $field) {
+                if (in_array($field,$columns,true)) $projection[]=self::identifier($field);
+            }
             $where=$table==='users' && in_array('role',$columns,true) ? " WHERE role='mahasiswa'" : '';
             $snapshot['tables'][$table]=$pdo->query('SELECT '.implode(',',$projection).' FROM '.self::identifier($table).$where.' ORDER BY id')->fetchAll(\PDO::FETCH_ASSOC);
         }
