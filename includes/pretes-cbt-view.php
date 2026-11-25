@@ -1,7 +1,13 @@
-<link rel="stylesheet" href="<?= BASE_URL ?>/pretes-ujian.php?cbt_style=exam&amp;v=<?= filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css') ?>">
-<section class="cbt-shell" id="pretesCbt" aria-label="CBT Pretes Ubudiyah">
+<?php
+$cbtStyleUrl = $cbtViewOptions['style_url'] ?? (BASE_URL . '/pretes-ujian.php?cbt_style=exam&amp;v=' . filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css'));
+$cbtAriaLabel = $cbtViewOptions['aria_label'] ?? 'CBT Pretes Ubudiyah';
+$cbtEyebrow = $cbtViewOptions['eyebrow'] ?? 'LPPAI / Ruang Asesmen';
+$cbtTitle = $cbtViewOptions['title'] ?? 'CBT Pretes Ubudiyah';
+?>
+<link rel="stylesheet" href="<?= $cbtStyleUrl ?>">
+<section class="cbt-shell" id="pretesCbt" aria-label="<?= htmlspecialchars($cbtAriaLabel, ENT_QUOTES, 'UTF-8') ?>">
     <div class="cbt-heading">
-        <div><div class="cbt-eyebrow">LPPAI / Ruang Asesmen</div><h3>CBT Pretes Ubudiyah <span id="cbtActiveSessionPill" class="bank-badge session" style="display:none;margin-left:8px;background:#e0e7ff;color:#3730a3;font-size:11px;vertical-align:middle"></span></h3><p>Soal acak terstandar · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
+        <div><div class="cbt-eyebrow"><?= htmlspecialchars($cbtEyebrow, ENT_QUOTES, 'UTF-8') ?></div><h3><?= htmlspecialchars($cbtTitle, ENT_QUOTES, 'UTF-8') ?> <span id="cbtActiveSessionPill" class="bank-badge session" style="display:none;margin-left:8px;background:#e0e7ff;color:#3730a3;font-size:11px;vertical-align:middle"></span></h3><p>Soal acak terstandar · Pilihan A–E · Jawaban tersimpan otomatis</p></div>
         <div class="cbt-time-box"><small>Sisa waktu ujian</small><div class="cbt-timer" id="cbtTimer">--:--</div></div>
     </div>
     <div class="cbt-completion"><b>Terjawab <span id="cbtAnsweredCount">0/0</span></b><div id="cbtCompletion" class="cbt-progress-track" role="progressbar" aria-label="Soal terjawab" aria-valuemin="0" aria-valuemax="25" aria-valuenow="0"><span id="cbtCompletionFill"></span></div></div>

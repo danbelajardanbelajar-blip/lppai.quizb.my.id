@@ -1,777 +1,1069 @@
 <?php
 /**
- * LPPAI Corner - Ujian Tulis Tutorial RPL Online (CBT Mahasiswa)
- * Berparitas penuh dengan CBT Pretes: engine 2 kolom, timer server, auto-save per butir, flag ragu-ragu, dan navigasi nomor.
+ * LPPAI Corner - Portal Ujian Tulis Tutorial RPL Online & Sistem Pengawasan AI (Proctoring)
+ * Berparitas penuh dengan pages/pretes-ujian.php:
+ * - Skenario A: Verifikasi Wajah di Awal (Gatekeeper Check-in).
+ * - Skenario B: Pengawasan Kamera Berkala Setiap 30 Detik Selama Ujian Berlangsung.
+ * - Engine CBT 2 kolom, timer server, auto-save, jeda & acak ulang anti-kecurangan.
  */
-define('PAGE_TITLE', 'Ujian Tulis Tutorial RPL (CBT)');
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
-require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 
-$user = getCurrentUser();
-$pdo = getDBConnection();
-ensureTutorialRplTables($pdo);
-ensureTutorialRplCbtTables($pdo);
-
-$userId = (int)($user['id'] ?? 0);
-$isRpl = (strtoupper(trim((string)($user['jenis_program'] ?? ''))) === 'RPL');
-$escape = static fn($value) => htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
-
-$membership = tutorialRplGetStudentMembership($pdo, $userId);
-
-// Deteksi apakah mahasiswa terdaftar Kristen Protestan
-$isKristen = function_exists('isPretesUserKristen') ? isPretesUserKristen($pdo, $userId) : false;
-
-// Ambil seluruh sesi yang tersedia
-$sessions = tutorialRplCbtGetSessions($pdo);
-
-// Tentukan sesi yang dituju (berdasarkan parameter URL/POST atau deteksi agama)
-$selectedSessionId = isset($_GET['session_id']) && (int)$_GET['session_id'] > 0
-    ? (int)$_GET['session_id']
-    : (isset($_POST['session_id']) && (int)$_POST['session_id'] > 0 ? (int)$_POST['session_id'] : ($isKristen ? 2 : 1));
-
-$session = tutorialRplCbtGetSession($pdo, $selectedSessionId);
-$error = '';
-$notice = '';
-
-// ── Penanganan Request AJAX (Auto-Save, Flag, Submit) ────────────────────────
-if (isset($_GET['ajax']) || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || isset($_POST['ajax_action'])) {
-    header('Content-Type: application/json; charset=utf-8');
-
-    $ajaxAction = $_POST['ajax_action'] ?? ($_GET['ajax'] ?? '');
-    $attemptId = (int)($_POST['attempt_id'] ?? ($_GET['attempt_id'] ?? 0));
-
-    // Validasi kepemilikan attempt oleh user yang sedang login
-    if ($attemptId > 0) {
-        $stmtChk = $pdo->prepare("SELECT user_id, submitted, deadline_at FROM tutorial_rpl_cbt_attempts WHERE id = ?");
-        $stmtChk->execute([$attemptId]);
-        $attCheck = $stmtChk->fetch(PDO::FETCH_ASSOC);
-
-        if (!$attCheck || (int)$attCheck['user_id'] !== $userId) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Akses attempt tidak sah.']);
-            exit;
-        }
-    }
-
-    if ($ajaxAction === 'save_answer') {
-        $pos = (int)($_POST['position'] ?? 0);
-        $ans = strtoupper(trim((string)($_POST['answer'] ?? '')));
-        if ($attemptId <= 0 || $pos <= 0) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap.']);
-            exit;
-        }
-
-        $ok = tutorialRplCbtSaveAnswer($pdo, $attemptId, $pos, $ans);
-        echo json_encode(['success' => $ok, 'position' => $pos, 'answer' => $ans]);
-        exit;
-    }
-
-    if ($ajaxAction === 'save_flag') {
-        $pos = (int)($_POST['position'] ?? 0);
-        $flagged = (int)($_POST['flagged'] ?? 0);
-        if ($attemptId <= 0 || $pos <= 0) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap.']);
-            exit;
-        }
-
-        $ok = tutorialRplCbtSaveFlag($pdo, $attemptId, $pos, $flagged);
-        echo json_encode(['success' => $ok, 'position' => $pos, 'flagged' => $flagged]);
-        exit;
-    }
-
-    if ($ajaxAction === 'finish_exam') {
-        if ($attemptId <= 0) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'ID Attempt tidak valid.']);
-            exit;
-        }
-
-        try {
-            $result = tutorialRplCbtFinishAttempt($pdo, $attemptId);
-            unset($_SESSION['tutorial_rpl_cbt_token_verified']);
-            echo json_encode(['success' => true, 'data' => $result]);
-        } catch (Throwable $e) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        exit;
-    }
-
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Aksi AJAX tidak dikenal.']);
+if (isset($_GET['face_api'])) {
+    require __DIR__ . '/../api/tutorial-rpl-proctoring-check.php';
+    exit;
+}
+if (isset($_GET['cbt_api'])) {
+    require __DIR__ . '/../api/tutorial-rpl-cbt.php';
+    exit;
+}
+if (isset($_GET['cbt_asset'])) {
+    header('Content-Type: application/javascript; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: public, max-age=3600');
+    readfile(__DIR__ . '/../assets/js/pretes-cbt.js');
+    exit;
+}
+if (isset($_GET['cbt_style'])) {
+    $styles = ['bank' => 'pretes-cbt-admin.css', 'exam' => 'pretes-cbt-exam.css'];
+    $key = is_string($_GET['cbt_style']) ? $_GET['cbt_style'] : '';
+    if (!isset($styles[$key])) { http_response_code(404); exit; }
+    header('Content-Type: text/css; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: public, max-age=3600');
+    readfile(__DIR__ . '/../assets/css/' . $styles[$key]);
     exit;
 }
 
-// ── Penanganan POST Biasa (Verifikasi Token & Submit Tradisional) ─────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = $_POST['csrf_token'] ?? '';
-    if (!verifyCsrf($token)) {
-        $error = 'Sesi formulir kedaluwarsa. Muat ulang halaman dan coba lagi.';
-    } else {
-        $action = trim($_POST['action'] ?? '');
+define('PAGE_TITLE', 'Ujian Tulis Tutorial RPL & Pengawas AI');
+define('HIDE_MESSAGE_WIDGET', true);
+require_once __DIR__ . '/../includes/auth.php';
+requireLogin();
 
-        if ($action === 'verify_token') {
-            $targetSessionId = (int)($_POST['session_id'] ?? $selectedSessionId);
-            $session = tutorialRplCbtGetSession($pdo, $targetSessionId);
-            $inputToken = strtoupper(trim((string)($_POST['token'] ?? '')));
-            $validToken = strtoupper(trim((string)($session['token'] ?? 'TUTOR26')));
-            if ($inputToken !== '' && $inputToken === $validToken) {
-                $_SESSION['tutorial_rpl_cbt_token_verified'] = true;
-                $_SESSION['tutorial_rpl_cbt_session_id'] = $targetSessionId;
-                if ($membership) {
-                    tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session, $targetSessionId);
+$user = getCurrentUser();
+$pdo = getDBConnection();
+
+require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/tutorial-rpl-cbt-engine.php';
+ensurePretesProctoringTables($pdo);
+ensureTutorialRplCbtProctoringTables($pdo);
+
+$userId = (int)($user['id'] ?? 0);
+$membership = tutorialRplGetStudentMembership($pdo, $userId);
+
+$isTesterPrivileged = (isset($user['username']) && (string)$user['username'] === '12345')
+    || (isset($user['nim']) && (string)$user['nim'] === '12345')
+    || ($userId === 12345);
+
+$regId = $membership ? (int)$membership['id'] : 0;
+$classId = $membership ? (int)$membership['class_id'] : 0;
+
+if ($isTesterPrivileged && isset($_GET['action'])) {
+    if ($_GET['action'] === 'reset_session' || $_GET['action'] === 'reset_cbt') {
+        unset($_SESSION['tutorial_rpl_cbt_verified_' . $regId]);
+        unset($_SESSION['tutorial_rpl_cbt_verified_v2_' . $regId]);
+        unset($_SESSION['tutorial_rpl_cbt_verified_999999']);
+        unset($_SESSION['tutorial_rpl_cbt_verified_v2_999999']);
+        if ($_GET['action'] === 'reset_cbt') {
+            try {
+                $stmtAtt = $pdo->prepare('SELECT id FROM tutorial_rpl_cbt_attempts WHERE user_id = ?');
+                $stmtAtt->execute([$userId]);
+                $attIds = $stmtAtt->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($attIds)) {
+                    $placeholders = implode(',', array_fill(0, count($attIds), '?'));
+                    $pdo->prepare("DELETE FROM tutorial_rpl_cbt_interruption_events WHERE attempt_id IN ($placeholders)")->execute($attIds);
+                    $pdo->prepare("DELETE FROM tutorial_rpl_cbt_interruptions WHERE attempt_id IN ($placeholders)")->execute($attIds);
+                    $pdo->prepare("DELETE FROM tutorial_rpl_cbt_items WHERE attempt_id IN ($placeholders)")->execute($attIds);
+                    $pdo->prepare("DELETE FROM tutorial_rpl_cbt_attempts WHERE id IN ($placeholders)")->execute($attIds);
                 }
-                header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php?session_id=' . $targetSessionId);
-                exit;
-            } else {
-                $error = 'Token ujian tidak valid untuk sesi ' . ($session['title'] ?? '') . '. Silakan periksa kembali token yang diberikan admin atau tutor.';
-            }
-        } elseif ($action === 'submit_exam') {
-            if (!$membership) {
-                $error = 'Anda belum terdaftar pada kelompok Tutorial RPL yang aktif.';
-            } elseif (empty($session['exam_open'])) {
-                $error = 'Akses ujian telah ditutup.';
-            } else {
-                $questions = tutorialRplCbtGetQuestions($pdo, null, (int)($session['id'] ?? 1));
-                if (empty($questions)) {
-                    tutorialRplCbtSeedPackagesAndQuestions($pdo, true);
-                    $questions = tutorialRplCbtGetQuestions($pdo, null, (int)($session['id'] ?? 1));
+                if ($classId > 0) {
+                    $pdo->prepare("UPDATE tutorial_rpl_members SET exam_submitted = 0, nilai_ujian_tulis = NULL, nilai_akhir = NULL, status_lulus = 'proses' WHERE user_id = ? AND class_id = ?")
+                        ->execute([$userId, $classId]);
                 }
-
-                $totalQuestions = count($questions);
-                $correctCount = 0;
-                $answers = is_array($_POST['answers'] ?? null) ? $_POST['answers'] : [];
-
-                foreach ($questions as $q) {
-                    $qid = (int)$q['id'];
-                    $chosen = strtoupper(trim((string)($answers[$qid] ?? '')));
-                    $correct = strtoupper(trim((string)$q['correct_answer']));
-                    if ($chosen !== '' && $chosen === $correct) {
-                        $correctCount++;
-                    }
-                }
-
-                $score = ($totalQuestions > 0) ? round(($correctCount / $totalQuestions) * 100, 2) : 0.00;
-                tutorialRplCbtSubmitAttempt($pdo, $userId, (int)$membership['class_id'], $score, $correctCount, $totalQuestions);
-                unset($_SESSION['tutorial_rpl_cbt_token_verified']);
-
-                $_SESSION['rpl_student_hub_notice'] = "Alhamdulillah! Pengerjaan Ujian Tulis Tutorial RPL berhasil dikirim. Nilai Anda: $score (Benar $correctCount dari $totalQuestions soal).";
-                header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php');
-                exit;
-            }
+            } catch (Throwable $e) {}
         }
+        header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php');
+        exit;
+    } elseif ($_GET['action'] === 'bypass_checkin' && getenv('PRETES_ALLOW_TEST_BYPASS') === '1') {
+        $bypassId = $regId ?: 999999;
+        $_SESSION['tutorial_rpl_cbt_verified_' . $bypassId] = time();
+        $_SESSION['tutorial_rpl_cbt_verified_v2_' . $bypassId] = time();
+        header('Location: ' . BASE_URL . '/tutorial-rpl-cbt.php');
+        exit;
     }
 }
 
-$isTokenVerified = !empty($_SESSION['tutorial_rpl_cbt_token_verified']);
-$attempt = null;
-$items = [];
-$remainingSeconds = 0;
-
-if ($membership && empty($membership['exam_submitted'])) {
-    $existingAttempt = tutorialRplCbtGetStudentAttempt($pdo, $userId, (int)$membership['class_id']);
-    if ($existingAttempt) {
-        $attempt = $existingAttempt;
-        if (!empty($attempt['session_id'])) {
-            $session = tutorialRplCbtGetSession($pdo, (int)$attempt['session_id']);
-        }
-        $isTokenVerified = true; // Langsung izinkan pengerjaan jika attempt sudah berjalan
-        $now = time();
-        $deadline = (int)($attempt['deadline_at'] ?? ($attempt['started_at'] + ((int)$session['duration_minutes'] * 60)));
-
-        if (!empty($attempt['submitted'])) {
-            // Sudah submitted di attempt, refresh membership
-            $membership['exam_submitted'] = 1;
-            $membership['nilai_ujian_tulis'] = $attempt['score'];
-        } elseif ($now >= $deadline) {
-            // Waktu habis otomatis
-            $res = tutorialRplCbtFinishAttempt($pdo, (int)$attempt['id']);
-            unset($_SESSION['tutorial_rpl_cbt_token_verified']);
-            $membership['exam_submitted'] = 1;
-            $membership['nilai_ujian_tulis'] = $res['score'];
-        } else {
-            $remainingSeconds = max(0, $deadline - $now);
-            $items = tutorialRplCbtGetAttemptItems($pdo, (int)$attempt['id']);
-        }
-    } elseif ($isTokenVerified && !empty($session['exam_open'])) {
-        $attempt = tutorialRplCbtGetOrCreateAttempt($pdo, $userId, (int)$membership['class_id'], $session, (int)($session['id'] ?? 1));
-        $deadline = (int)$attempt['deadline_at'];
-        $remainingSeconds = max(0, $deadline - time());
-        $items = tutorialRplCbtGetAttemptItems($pdo, (int)$attempt['id']);
-    }
+if (!$membership && $isTesterPrivileged) {
+    $membership = [
+        'id' => 999999,
+        'user_id' => $userId,
+        'class_id' => 999999,
+        'nama_kelompok' => 'Kelompok Uji Coba RPL (Akun 12345)',
+    ];
+    $regId = 999999;
+    $classId = 999999;
 }
+
+require_once __DIR__ . '/../includes/user-exam-photo.php';
+$refPhoto = getUserExamReferencePhoto($pdo, $userId);
+
+$isKristen = function_exists('isPretesUserKristen') ? isPretesUserKristen($pdo, $userId) : false;
+$selectedSessionId = isset($_GET['session_id']) && (int)$_GET['session_id'] > 0
+    ? (int)$_GET['session_id']
+    : ($isKristen ? 2 : 1);
+
+$existingAttempt = ($classId > 0) ? tutorialRplCbtGetStudentAttempt($pdo, $userId, $classId) : null;
+$effectiveSessionId = $existingAttempt && !empty($existingAttempt['session_id'])
+    ? (int)$existingAttempt['session_id']
+    : $selectedSessionId;
+$activeSession = tutorialRplCbtGetActiveSession($pdo, $effectiveSessionId);
+$isCameraRequired = ($activeSession['camera_mode'] ?? 'tidak_aktif') === 'wajib';
+
+$isVerified = ($regId > 0 && !empty($_SESSION['tutorial_rpl_cbt_verified_v2_' . $regId])
+    && time() - (int)$_SESSION['tutorial_rpl_cbt_verified_v2_' . $regId] <= 14400);
+
+if (!$isCameraRequired) {
+    $isVerified = true;
+}
+
+$examStatus = tutorialRplCbtExamStatus($pdo);
+$isSessionOpen = !empty($examStatus['open']) || $isTesterPrivileged;
+$sessionNotice = $isSessionOpen ? '' : ($examStatus['notice'] ?? 'Ujian tulis Tutorial RPL belum dibuka.');
+if (!$isSessionOpen && $existingAttempt) {
+    $isSessionOpen = true;
+}
+
+$cbtViewOptions = [
+    'style_url' => BASE_URL . '/tutorial-rpl-cbt.php?cbt_style=exam&amp;v=' . filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css'),
+    'aria_label' => 'CBT Ujian Tulis Tutorial RPL',
+    'eyebrow' => 'LPPAI / Ruang Asesmen Tutorial RPL',
+    'title' => 'CBT Tutorial RPL Online',
+];
 
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/pretes-cbt-exam.css?v=<?= filemtime(__DIR__ . '/../assets/css/pretes-cbt-exam.css') ?>">
+<style>
+.face-check-loading{display:inline-flex;align-items:center;gap:8px;max-width:100%}
+.face-check-spinner{display:inline-block;flex:0 0 auto;width:1em;height:1em;box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:face-check-spin .75s linear infinite}
+@keyframes face-check-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.face-check-spinner{animation:none}}
+/* ── Styling Khusus Portal Proctoring Ujian CBT ── */
+.proctoring-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+.proctoring-badge.badge-active {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+}
+.proctoring-badge.badge-waiting {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+.proctoring-badge.badge-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
 
-<div class="tutorial-rpl-container" style="max-width:1080px; margin:0 auto; padding:10px 14px 40px;">
+.checkin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 18px;
+}
 
-    <?php if ($error): ?>
-        <div class="cbt-message error" role="alert" style="margin-bottom:20px;"><?= $escape($error) ?></div>
-    <?php endif; ?>
+.checkin-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
 
-    <?php if (!$isRpl): ?>
-        <!-- Bukan Mahasiswa RPL -->
-        <div class="card" style="padding:40px 20px; text-align:center; border-radius:16px;">
-            <div style="font-size:42px; margin-bottom:12px;">🚫</div>
-            <h3 style="margin:0 0 8px;">Khusus Program RPL</h3>
-            <p style="color:#64748b; max-width:500px; margin:0 auto 16px;">
-                Halaman asesmen ini dikhususkan bagi mahasiswa program Rekognisi Pembelajaran Lampau (RPL).
-            </p>
-            <a href="<?= BASE_URL ?>/dashboard.php" class="btn btn-secondary">Kembali ke Dashboard</a>
+.camera-guide-box {
+    position: relative;
+    width: 240px;
+    height: 320px;
+    margin: 0 auto 14px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0f172a;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+.camera-guide-box video, .camera-guide-box canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.camera-oval-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 160px;
+    height: 220px;
+    border: 2px dashed rgba(34, 197, 94, 0.85);
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+
+.face-pose-guide {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    z-index: 12;
+    display: none;
+    grid-template-columns: 60px 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 2px solid #facc15;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.94);
+    color: #fff;
+    text-align: left;
+    pointer-events: none;
+}
+.face-pose-guide-symbol {
+    font-family: Arial, sans-serif;
+    font-size: 60px;
+    font-weight: 900;
+    line-height: 1;
+    text-align: center;
+    color: #fde047;
+}
+
+.proctoring-monitor-bar {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    color: #ffffff;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(15,118,110,0.2);
+}
+
+@media (max-width: 768px) {
+    .checkin-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="container-fluid" style="max-width:1100px; margin:0 auto; padding:10px 14px 40px;">
+
+<?php if ($isTesterPrivileged): ?>
+    <div style="background:#fffbeb;border:2px dashed #f59e0b;padding:14px 18px;border-radius:14px;margin-bottom:20px;box-shadow:0 2px 10px rgba(245,158,11,0.08);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <span style="font-size:26px;flex-shrink:0;">🧪</span>
+                <div>
+                    <strong style="color:#92400e;font-size:14px;display:block;">Panel Percobaan CBT Tutorial RPL (Hak Akses Akun: <?= sanitize($user['username'] ?? '12345') ?>)</strong>
+                    <div style="color:#b45309;font-size:12px;margin-top:2px;">
+                        Privilege aktif: Anda dapat menguji Skenario A (Check-in Awal) dan Skenario B (Pengawasan Kamera) secara langsung.
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="?action=reset_session" class="btn btn-sm btn-secondary" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    🔄 Reset Sesi Kamera (Skenario A)
+                </a>
+                <a href="?action=reset_cbt" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#dc2626;color:#ffffff;border:none;" onclick="return confirm('Hapus lembar ujian CBT akun tester ini agar dapat menguji ulang dari layar intro dan pemilihan sesi?')">
+                    🗑️ Reset Ujian CBT (Hapus Attempt & Pilih Sesi Baru)
+                </a>
+                <?php if (getenv('PRETES_ALLOW_TEST_BYPASS') === '1'): ?>
+                <a href="?action=bypass_checkin" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0f766e;color:#fff;">
+                    ⚡ Buka Skenario B (Ruang Ujian)
+                </a>
+                <?php endif; ?>
+                <button type="button" onclick="testFastPeriodicTimer()" class="btn btn-sm btn-warning" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    ⏱️ Uji Timer Pengawasan
+                </button>
+                <button type="button" onclick="runPeriodicProctoringCheck()" class="btn btn-sm btn-success" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;">
+                    📸 Test Snapshot Sekarang
+                </button>
+                <button type="button" onclick="testWebcamDiagnostics()" class="btn btn-sm" style="font-size:11.5px;padding:6px 12px;border-radius:8px;font-weight:700;background:#0284c7;color:#fff;border:none;">
+                    🔍 Diagnosa Kamera
+                </button>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if (!$membership): ?>
+    <div class="card" style="border:2px solid #0f766e; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px;">
+        <span style="font-size:48px; display:block; margin-bottom:12px;">⚠️</span>
+        <h3 style="margin:0 0 8px; font-weight:800; color:#0f172a;">Anda Belum Terdaftar pada Kelompok Tutorial RPL yang Aktif</h3>
+        <p style="color:#64748b; font-size:14px; max-width:520px; margin:0 auto 20px; line-height:1.5;">
+            Ujian Tulis Tutorial RPL (CBT) hanya dapat diakses oleh mahasiswa yang sudah terdaftar dan diplot pada kelompok Tutorial RPL Online.
+        </p>
+        <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
+            👉 Kembali ke Info & Kelas RPL
+        </a>
+    </div>
+
+<?php elseif (!$isSessionOpen): ?>
+    <div class="card" style="border:2px solid #0284c7; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px; background:#f0f9ff;">
+        <span style="font-size:48px; display:block; margin-bottom:12px;">🕒</span>
+        <h3 style="margin:0 0 8px; font-weight:800; color:#0369a1;"><?= sanitize($activeSession['title'] ?? 'Sesi Ujian Tulis Tutorial RPL') ?></h3>
+        <p style="color:#334155; font-size:14px; max-width:550px; margin:0 auto 16px; line-height:1.6;">
+            <?= sanitize($sessionNotice) ?>
+        </p>
+        <div style="font-size:12.5px; color:#64748b; margin-top:8px;">
+            Hubungi pengawas atau dosen tutor jika jadwal belum sesuai dengan sesi Anda.
+        </div>
+    </div>
+
+<?php elseif ($isCameraRequired && empty($refPhoto)): ?>
+    <div class="card" style="border:2px solid #eab308; border-radius:16px; padding:32px 20px; text-align:center; margin-top:20px;">
+        <span style="font-size:48px; display:block; margin-bottom:12px;">📸</span>
+        <h3 style="margin:0 0 8px; font-weight:800; color:#854d0e;">Foto Profil Acuan Belum Tersedia</h3>
+        <p style="color:#64748b; font-size:14px; max-width:500px; margin:0 auto 20px; line-height:1.5;">
+            Sistem pengawasan AI memerlukan pasfoto resmi acuan Anda untuk memverifikasi keaslian peserta saat ujian berlangsung.
+        </p>
+        <a href="<?= BASE_URL ?>/profil.php" class="btn btn-primary" style="padding:10px 24px; font-weight:700; border-radius:10px;">
+            Perbarui Foto Profil ➔
+        </a>
+    </div>
+
+<?php else: ?>
+
+    <!-- ═════════════════════════════════════════════════════════════════════
+         BAGIAN 1: SKENARIO A — CHECK-IN VERIFIKASI WAJAH DI AWAL UJIAN
+         ═════════════════════════════════════════════════════════════════════ -->
+    <div id="sectionCheckin" style="<?= $isVerified ? 'display:none;' : 'display:block;' ?>">
+        <div style="margin-bottom:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <h2 style="margin:0; font-size:22px; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
+                        <span>🛡️</span> <span>Verifikasi Identitas Peserta Ujian Tutorial RPL</span>
+                    </h2>
+                    <p style="margin:4px 0 0; color:#64748b; font-size:13.5px;">
+                        Tahap 1 (Skenario A): Pengecekan wajah live mahasiswa terhadap foto profil acuan sebelum membuka soal.
+                    </p>
+                </div>
+                <div class="proctoring-badge badge-waiting" id="badgeCheckinStatus">
+                    ⏳ Menunggu Verifikasi Awal
+                </div>
+            </div>
         </div>
 
-    <?php elseif (!$membership): ?>
-        <!-- Belum Terplot Kelompok -->
-        <div class="card" style="padding:40px 20px; text-align:center; border-radius:16px;">
-            <div style="font-size:42px; margin-bottom:12px;">🏫</div>
-            <h3 style="margin:0 0 8px;">Belum Terplot ke Kelompok RPL</h3>
-            <p style="color:var(--text-muted, #64748b); max-width:540px; margin:0 auto 16px;">
-                Anda belum ditempatkan ke dalam kelompok Tutorial RPL oleh administrator. Ujian CBT baru dapat diakses setelah penempatan kelompok selesai.
-            </p>
-            <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="btn btn-primary">Lihat Status RPL</a>
+        <div class="card" style="border:1.5px solid #cbd5e1; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,0.04);">
+            <div style="background:#f8fafc; border-bottom:1.5px solid #e2e8f0; padding:14px 18px; font-size:13px; color:#334155;">
+                <strong>Petunjuk:</strong> Pratinjau kamera tampil seperti cermin. <strong>Kanan dan kiri mengikuti tubuh Anda.</strong> Putar kepala mengikuti instruksi, tahan hingga hitung mundur selesai, lalu kembali ke posisi awal. Pastikan hanya Anda berada di kamera dengan pencahayaan terang.
+            </div>
+
+            <div class="card-body" style="padding:20px;">
+                <div class="checkin-grid">
+                    <div class="checkin-card">
+                        <div style="font-size:12px; font-weight:800; color:#0f766e; text-transform:uppercase; margin-bottom:8px;">
+                            Foto Profil Acuan Ujian
+                        </div>
+                        <div style="width:180px; height:240px; margin:0 auto 12px; border-radius:12px; overflow:hidden; border:2.5px solid #0f766e; box-shadow:0 4px 12px rgba(15,118,110,0.15);">
+                            <?php if (!empty($refPhoto)): ?>
+                            <img src="<?= BASE_URL ?>/<?= htmlspecialchars(ltrim(str_replace('\\', '/', $refPhoto), '/')) ?>"
+                                 alt="Pasfoto Referensi"
+                                 style="width:100%; height:100%; object-fit:cover; display:block;">
+                            <?php endif; ?>
+                        </div>
+                        <div style="font-size:13px; font-weight:700; color:#0f172a;">
+                            <?= sanitize($user['nama_lengkap'] ?? $user['name'] ?? 'Peserta Tutorial RPL') ?>
+                        </div>
+                        <div style="font-size:12px; color:#64748b;">NIM: <?= sanitize($user['nim'] ?? '-') ?></div>
+                    </div>
+
+                    <div class="checkin-card">
+                        <div style="font-size:12px; font-weight:800; color:#0f766e; text-transform:uppercase; margin-bottom:8px;">
+                            Kamera Langsung Peserta (Live Webcam)
+                        </div>
+                        <div style="font-size:11px;color:#64748b;margin-bottom:10px;">Mode cermin · arah kanan/kiri Anda</div>
+
+                        <div class="camera-guide-box" id="checkinCameraBox" style="position:relative; width:240px; height:320px; margin:0 auto 14px; border-radius:12px; overflow:hidden; background:#0f172a; box-shadow:0 4px 14px rgba(0,0,0,0.15);">
+                            <video id="checkinVideo" playsinline autoplay muted style="width:100%; height:100%; object-fit:cover; display:block;"></video>
+                            <canvas id="checkinCanvas" style="display:none;"></canvas>
+                            <div class="camera-oval-overlay" id="checkinOvalGuide" style="display:none;"></div>
+                            <div id="checkinCameraBadge" style="display:none; position:absolute; top:8px; left:50%; transform:translateX(-50%); background:rgba(22,163,74,0.95); color:#fff; font-size:11px; font-weight:700; padding:3px 10px; border-radius:12px; z-index:10; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.3);">
+                                🟢 Kamera Aktif (Siap Verifikasi)
+                            </div>
+
+                            <div id="facePoseGuide" class="face-pose-guide" role="status" aria-live="polite">
+                                <span id="facePoseSymbol" class="face-pose-guide-symbol" aria-hidden="true"></span>
+                                <div>
+                                    <strong id="facePoseTitle" style="display:block; font-size:13px; line-height:1.3;"></strong>
+                                    <span id="facePoseCountdown" aria-hidden="true" style="display:block; margin-top:4px; font-size:14px; font-weight:800; color:#fde047;"></span>
+                                </div>
+                            </div>
+
+                            <div id="checkinCameraPlaceholder" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; background:#0f172a; color:#fff; z-index:5;">
+                                <span style="font-size:38px; display:block; margin-bottom:8px;">📹</span>
+                                <div style="font-size:13.5px; font-weight:800; color:#f8fafc; margin-bottom:4px;">Kamera Belum Aktif</div>
+                                <p style="font-size:11px; color:#94a3b8; margin:0 0 14px; line-height:1.45;">
+                                    Klik tombol di bawah untuk menyalakan kamera peramban Anda.
+                                </p>
+                                <button type="button" class="btn btn-primary" id="btnActivateCamera" onclick="startCheckinCamera(true)"
+                                    style="background:#0f766e; border:none; padding:9px 18px; border-radius:8px; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; gap:6px; cursor:pointer; box-shadow:0 4px 12px rgba(15,118,110,0.4);">
+                                    <span>📹</span> <span id="btnActivateCameraText">Aktifkan Kamera</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="checkinAlert" role="status" aria-live="polite" style="display:none; margin:10px auto; padding:12px 14px; border-radius:10px; font-size:12px; text-align:left; line-height:1.5;"></div>
+
+                        <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                            <button type="button" class="btn btn-secondary" onclick="startCheckinCamera(true)" style="font-size:11.5px; padding:7px 12px; border-radius:8px; font-weight:600;">
+                                🔄 Nyalakan / Ulang
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="toggleCameraFace()" style="font-size:11.5px; padding:7px 12px; border-radius:8px; font-weight:600;">
+                                📷 Balik Kamera
+                            </button>
+                            <button type="button" id="btnRunCheckin" class="btn btn-success" onclick="runInitialCheckin()"
+                                style="font-size:13.5px; font-weight:800; padding:9px 20px; border-radius:10px; box-shadow:0 4px 12px rgba(22,163,74,0.3); display:inline-flex; align-items:center; gap:8px;">
+                                <span>🔍</span> <span>Verifikasi Wajah & Buka Ujian</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════════
+         BAGIAN 2: SKENARIO B — RUANG PENGERJAAN UJIAN DENGAN PENGAWAS AI
+         ═════════════════════════════════════════════════════════════════════ -->
+    <div id="sectionExamRoom" style="<?= $isVerified ? 'display:block;' : 'display:none;' ?>">
+
+        <div class="proctoring-monitor-bar">
+            <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <span style="font-size:28px;">🟢</span>
+                <div>
+                    <div style="font-size:14px; font-weight:800; display:flex; align-items:center; gap:8px;">
+                        <span id="proctorStatusTitle">Kamera Siap untuk Ujian</span>
+                        <span id="proctorFrequency" style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">Pengawasan Kamera</span>
+                    </div>
+                    <div style="font-size:12px; color:#ccfbf1; margin-top:2px;" id="lastCheckInfo">
+                        Sesi diverifikasi. Pemeriksaan berkala dimulai saat ujian dikerjakan.
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="width:48px; height:64px; border-radius:6px; overflow:hidden; border:1.5px solid rgba(255,255,255,0.5); background:#000;">
+                    <video id="proctorVideo" playsinline autoplay muted style="width:100%; height:100%; object-fit:cover;"></video>
+                </div>
+            </div>
         </div>
 
-    <?php elseif (!empty($membership['exam_submitted'])): ?>
-        <!-- ═══════════════════════════════════════════════════════════════════
-             LAYAR HASIL AKHIR UJIAN (RESULT SCREEN)
-             ═══════════════════════════════════════════════════════════════════ -->
-        <section class="cbt-shell" style="max-width:800px; margin:0 auto;">
-            <div class="cbt-heading">
-                <div>
-                    <div class="cbt-eyebrow">LPPAI / HASIL ASESMEN</div>
-                    <h3>Ujian Tulis Telah Selesai Dikerjakan</h3>
-                    <p>Kelompok: <strong><?= $escape($membership['nama_kelompok'] ?? '-') ?></strong> · Periode: <?= $escape($membership['periode'] ?? '-') ?></p>
-                </div>
+        <div id="proctorViolationAlert" style="display:none; background:#fef2f2; border:2px solid #ef4444; color:#991b1b; padding:16px 20px; border-radius:14px; margin-bottom:20px; box-shadow:0 4px 14px rgba(239,68,68,0.15);">
+            <div style="font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                <span>⚠️</span> <span>PERINGATAN PENGAWAS AI TUTORIAL RPL:</span>
             </div>
-            <div class="cbt-body">
-                <div class="cbt-result" style="display:block;">
-                    <div style="font-size:48px; margin-bottom:8px;">🎉</div>
-                    <div style="font-size:13px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px;">Nilai Ujian Tulis (CBT)</div>
-                    <strong style="font-size:64px; color:var(--primary, #0f766e); margin:10px 0;">
-                        <?= (float)$membership['nilai_ujian_tulis'] ?>
-                    </strong>
-                    <div style="font-size:13.5px; color:#475569; margin-bottom:14px;">
-                        Standar Kelulusan Minimal (Passing Grade): <strong><?= (float)($session['passing_grade'] ?? 70.0) ?></strong>
-                    </div>
-
-                    <div style="margin-bottom:24px;">
-                        <?php if ((float)$membership['nilai_ujian_tulis'] >= (float)($session['passing_grade'] ?? 70.0)): ?>
-                            <span class="bank-badge active" style="font-size:14px; padding:6px 18px; border-radius:20px; font-weight:800;">
-                                ✅ MEMENUHI STANDAR KELULUSAN (LULUS)
-                            </span>
-                        <?php else: ?>
-                            <span class="bank-badge danger-sm" style="font-size:14px; padding:6px 18px; border-radius:20px; font-weight:800; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">
-                                ⚠️ BELUM MEMENUHI STANDAR KELULUSAN
-                            </span>
-                        <?php endif; ?>
-                    </div>
-
-                    <p style="max-width:520px; margin:0 auto 24px; font-size:13px; color:#64748b; line-height:1.6;">
-                        Nilai ujian tulis telah otomatis tersimpan dan disinkronisasikan ke sistem penilaian akhir Tutorial RPL Anda.
-                    </p>
-
-                    <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="btn btn-primary" style="padding:12px 28px; font-weight:800; border-radius:10px;">
-                        ← Kembali ke Info &amp; Kelas RPL
-                    </a>
-                </div>
+            <div id="proctorViolationMsg" style="font-size:13.5px; line-height:1.5;"></div>
+            <div style="margin-top:8px; font-size:12px; color:#b91c1c; font-weight:600;">
+                Perhatian: Pelanggaran dicatat pada sistem log audit proctoring pengawas ujian. Harap tetap berada di depan kamera.
             </div>
-        </section>
-
-    <?php elseif (empty($session['exam_open'])): ?>
-        <!-- Akses CBT Sedang Ditutup -->
-        <div class="card" style="padding:40px 20px; text-align:center; border-radius:16px;">
-            <div style="font-size:42px; margin-bottom:12px;">🔒</div>
-            <h3 style="margin:0 0 8px; color:#b91c1c;">Gerbang Ujian Tulis Sedang Ditutup</h3>
-            <p style="color:var(--text-muted, #64748b); max-width:540px; margin:0 auto 20px;">
-                Administrator LPPAI saat ini belum membuka akses gerbang ujian CBT Tutorial RPL. Silakan cek berkala atau hubungi tutor bimbingan Anda.
-            </p>
-            <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="btn btn-secondary">Kembali ke Info Kelas</a>
         </div>
 
-    <?php elseif (!$isTokenVerified || empty($attempt)): ?>
-        <!-- ═══════════════════════════════════════════════════════════════════
-             LAYAR INTRO & VERIFIKASI TOKEN (GATEWAY)
-             ═══════════════════════════════════════════════════════════════════ -->
-        <section class="cbt-shell" style="max-width:680px; margin:0 auto;">
-            <div class="cbt-heading">
-                <div>
-                    <div class="cbt-eyebrow">LPPAI / RUANG ASESMEN</div>
-                    <h3>CBT Ujian Tulis Tutorial RPL</h3>
-                    <p>Soal pilihan ganda · Waktu server 90 Menit · Jawaban tersimpan otomatis</p>
-                </div>
+        <?php require __DIR__ . '/../includes/pretes-cbt-view.php'; ?>
+
+        <div class="card" style="border:1px solid #e2e8f0; border-radius:14px; padding:18px; background:#f8fafc;">
+            <div style="font-size:13.5px; font-weight:800; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                <span>📋</span> <span>Tata Tertib Ujian Selama Proctoring Berlangsung:</span>
             </div>
-            <div class="cbt-body">
-                <div id="cbtIntro">
-                    <h4 style="margin-top:0;">Petunjuk Pengerjaan Ujian Tulis</h4>
-                    <div class="cbt-intro-facts">
-                        <span>Pilihan Ganda A–E</span>
-                        <span>Durasi <strong><?= (int)$session['duration_minutes'] ?> Menit</strong></span>
-                        <span>Passing Grade <strong><?= (float)$session['passing_grade'] ?></strong></span>
-                    </div>
-                    <p>
-                        Ujian evaluasi ini menguji pemahaman materi fiqih ibadah, thaharah, shalat fardhu, shalat jenazah, dan ubudiyah amaliyah. Setiap pilihan jawaban yang Anda klik akan <strong>tersimpan otomatis secara real-time</strong> ke server. Anda dapat berpindah nomor soal secara bebas dan menandai soal ragu-ragu.
-                    </p>
+            <ul style="margin:0; padding-left:20px; font-size:12.5px; color:#475569; display:flex; flex-direction:column; gap:4px; line-height:1.55;">
+                <li>1. Wajib dikerjakan secara mandiri dan jujur tanpa bantuan orang lain (tidak memakai joki).</li>
+                <li>2. Pastikan wajah selalu menghadap ke arah layar dan tidak meninggalkan kamera selama ujian berlangsung.</li>
+                <li>3. Dilarang membuka website lain atau menggunakan HP tambahan saat mengerjakan soal.</li>
+                <li>4. Sistem AI memeriksa kesesuaian wajah selama pengerjaan berlangsung.</li>
+            </ul>
+        </div>
+    </div>
 
-                    <form method="POST" action="<?= BASE_URL ?>/tutorial-rpl-cbt.php" style="margin-top:20px;">
-                        <input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>">
-                        <input type="hidden" name="action" value="verify_token">
+<?php endif; ?>
 
-                        <div style="margin:16px 0; text-align:left;">
-                            <label for="cbtSessionSelect" style="display:block; font-size:12.5px; font-weight:800; color:#1e293b; margin-bottom:6px;">
-                                📌 Sesi &amp; Paket Ujian CBT:
-                            </label>
-                            <select id="cbtSessionSelect" name="session_id" class="bank-input" style="font-weight:700; width:100%;" onchange="window.location.href='<?= BASE_URL ?>/tutorial-rpl-cbt.php?session_id=' + this.value;">
-                                <?php foreach ($sessions as $s): ?>
-                                    <option value="<?= (int)$s['id'] ?>" <?= (int)$s['id'] === (int)$session['id'] ? 'selected' : '' ?>>
-                                        <?= (int)$s['id'] === 2 ? '✝️ ' : '🕌 ' ?><?= $escape($s['title']) ?> (Durasi: <?= (int)$s['duration_minutes'] ?> Menit)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div id="cbtTokenBox" style="display:block; margin:16px 0; background:#fefce8; border:1.5px solid #fde047; border-radius:12px; padding:16px; text-align:left;">
-                            <label for="cbtInputToken" style="display:block; font-size:12.5px; font-weight:800; color:#854d0e; margin-bottom:6px;">
-                                🔑 Masukkan Token Masuk Ujian *
-                            </label>
-                            <input type="text" id="cbtInputToken" name="token" maxlength="32" placeholder="TOKEN UJIAN" required style="font-family:monospace; font-size:18px; font-weight:800; letter-spacing:2px; text-align:center; text-transform:uppercase; padding:10px 14px; border:1.5px solid #ca8a04; border-radius:8px; width:100%; box-sizing:border-box; background:#fff;">
-                            <span style="font-size:11.5px; color:#a16207; display:block; margin-top:6px;">
-                                Masukkan token resmi yang diumumkan oleh admin atau tutor Anda (Bawaan: <code><?= $escape($session['token'] ?? 'TUTOR26') ?></code>).
-                            </span>
-                        </div>
-
-                        <button type="submit" class="btn btn-success" style="width:100%; min-height:46px; font-weight:800; font-size:14px; border-radius:10px;">
-                            Mulai Pengerjaan Ujian 🚀
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </section>
-
-    <?php else: ?>
-        <!-- ═══════════════════════════════════════════════════════════════════
-             RUANG UJIAN INTERAKTIF 2 KOLOM (MODERN CBT ENGINE)
-             ═══════════════════════════════════════════════════════════════════ -->
-        <?php
-        $totalItems = count($items);
-        $answeredInit = 0;
-        foreach ($items as $it) {
-            if (!empty($it['answer'])) $answeredInit++;
-        }
-        ?>
-
-        <section class="cbt-shell" id="tutorialRplCbtExam">
-            <!-- Header Bar Sticky -->
-            <div class="cbt-heading">
-                <div>
-                    <div class="cbt-eyebrow">LPPAI / CBT TUTORIAL RPL</div>
-                    <h3><?= $escape($session['title'] ?? 'Ujian Tulis Tutorial RPL') ?></h3>
-                    <p>Kelompok: <strong><?= $escape($membership['nama_kelompok'] ?? '-') ?></strong> · Soal acak terstandar · Jawaban tersimpan otomatis</p>
-                </div>
-                <div class="cbt-time-box">
-                    <small>Sisa Waktu Ujian</small>
-                    <div class="cbt-timer" id="cbtTimer">--:--:--</div>
-                </div>
-            </div>
-
-            <!-- Progress Bar Terjawab -->
-            <div class="cbt-completion">
-                <b>Terjawab <span id="cbtAnsweredCount"><?= $answeredInit ?>/<?= $totalItems ?></span></b>
-                <div id="cbtCompletion" class="cbt-progress-track" role="progressbar" aria-label="Soal terjawab" aria-valuemin="0" aria-valuemax="<?= $totalItems ?>" aria-valuenow="<?= $answeredInit ?>">
-                    <span id="cbtCompletionFill" style="width:<?= $totalItems > 0 ? round(($answeredInit / $totalItems) * 100) : 0 ?>%;"></span>
-                </div>
-            </div>
-
-            <div class="cbt-body">
-                <div id="cbtSaveStatus" class="cbt-message" style="display:none; padding:8px 14px; margin-bottom:12px; font-size:11.5px;"></div>
-
-                <div class="cbt-layout">
-                    <!-- Kolom Kiri: Lembar Soal -->
-                    <div>
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                            <div id="cbtPosition" style="font-weight:700;">Soal No. 1 dari <?= $totalItems ?></div>
-                            <span id="cbtCategoryPill" class="bank-badge package" style="font-size:11px;">Materi</span>
-                        </div>
-
-                        <div id="cbtQuestion" class="cbt-question"></div>
-
-                        <fieldset id="cbtOptions" style="border:0; padding:0; margin:0;">
-                            <legend class="sr-only" style="font-size:13px;">Pilih satu jawaban</legend>
-                            <div id="cbtOptionsContainer"></div>
-                        </fieldset>
-
-                        <label class="cbt-review-label" style="cursor:pointer; margin-top:18px;">
-                            <input type="checkbox" id="cbtFlag" onchange="toggleCurrentFlag(this.checked);">
-                            <span>🚩 Tandai untuk diperiksa kembali (Ragu-ragu)</span>
-                        </label>
-
-                        <div class="cbt-actions">
-                            <button type="button" class="btn btn-secondary" id="cbtPrevious" onclick="navigateQuestion(-1);">← Sebelumnya</button>
-                            <button type="button" class="btn btn-primary" id="cbtNext" onclick="navigateQuestion(1);">Berikutnya →</button>
-                            <button type="button" class="btn btn-secondary" id="cbtClear" onclick="clearCurrentAnswer();">Kosongkan Jawaban</button>
-                            <span id="cbtAutoSavedNotice" style="display:none; color:#15803d; font-size:12px; font-weight:700; align-self:center; margin-left:8px;">✓ Tersimpan</span>
-                        </div>
-                    </div>
-
-                    <!-- Kolom Kanan: Sidebar Navigasi Nomor -->
-                    <aside class="cbt-sidebar">
-                        <strong>Navigasi Soal</strong>
-                        <div id="cbtNumbers" class="cbt-nav" aria-label="Nomor soal"></div>
-                        <p id="cbtProgressText" style="font-size:12.5px; color:#475569; margin:12px 0 6px;"></p>
-                        <p style="font-size:11.5px; color:#64748b; line-height:1.5;">
-                            Hijau: dijawab · Kuning: ragu-ragu · Bingkai: aktif
-                        </p>
-                        <button type="button" id="cbtSubmit" class="btn btn-success" style="width:100%; font-weight:800; min-height:44px; margin-top:10px;" onclick="openConfirmSubmitModal();">
-                            Kumpulkan Ujian
-                        </button>
-                    </aside>
-                </div>
-            </div>
-        </section>
-
-        <!-- Dialog Konfirmasi Kumpulkan Ujian -->
-        <dialog id="cbtSubmitModal" class="bank-modal-backdrop" style="border:none; padding:0; background:rgba(15,23,42,0.65);">
-            <div class="bank-modal" style="max-width:500px; margin:auto;">
-                <div class="bank-modal-head" style="background:#f8fafc;">
-                    <h3 style="color:#0f172a;">Konfirmasi Pengumpulan Ujian</h3>
-                    <button type="button" class="bank-modal-close" onclick="closeConfirmSubmitModal();">✕</button>
-                </div>
-                <div class="bank-modal-body" style="padding:22px;">
-                    <p style="font-size:14px; color:#334155; margin:0 0 16px;">
-                        Apakah Anda yakin ingin mengakhiri dan mengumpulkan lembar jawaban ujian CBT Tutorial RPL ini?
-                    </p>
-
-                    <div style="background:#f1f5f9; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px; line-height:1.7;">
-                        <div>✓ Soal Terjawab: <strong id="modalAnsweredCount" style="color:#15803d;">0</strong> butir</div>
-                        <div>🚩 Soal Ragu-ragu: <strong id="modalFlaggedCount" style="color:#b45309;">0</strong> butir</div>
-                        <div>⚠️ Belum Dijawab: <strong id="modalUnansweredCount" style="color:#b91c1c;">0</strong> butir</div>
-                    </div>
-
-                    <p style="font-size:12px; color:#64748b; margin:0;">
-                        * Setelah dikumpulkan, lembar jawaban akan langsung dinilai oleh sistem dan tidak dapat diubah kembali.
-                    </p>
-                </div>
-                <div class="bank-modal-foot">
-                    <button type="button" class="bank-button" onclick="closeConfirmSubmitModal();">Periksa Kembali</button>
-                    <button type="button" class="bank-button primary" id="btnConfirmSubmit" onclick="executeFinalSubmit();">
-                        Ya, Kumpulkan Sekarang
-                    </button>
-                </div>
-            </div>
-        </dialog>
-
-        <!-- Data State JSON untuk JS Engine -->
-        <script>
-        const CBT_STATE = {
-            attemptId: <?= (int)$attempt['id'] ?>,
-            totalQuestions: <?= $totalItems ?>,
-            remainingSeconds: <?= (int)$remainingSeconds ?>,
-            currentIndex: 0,
-            items: <?= json_encode($items, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>
-        };
-
-        // Parse options_json jika berupa string
-        CBT_STATE.items.forEach(it => {
-            if (typeof it.options_json === 'string') {
-                try {
-                    it.options = JSON.parse(it.options_json);
-                } catch(e) {
-                    it.options = [];
-                }
-            } else {
-                it.options = it.options_json || [];
-            }
-        });
-
-        // ── Inisialisasi CBT Engine ──────────────────────────────────────────
-        document.addEventListener('DOMContentLoaded', () => {
-            renderNumbersGrid();
-            renderQuestion(0);
-            startCountdownTimer();
-        });
-
-        // Render Grid Nomor Soal
-        function renderNumbersGrid() {
-            const grid = document.getElementById('cbtNumbers');
-            if (!grid) return;
-            grid.innerHTML = '';
-
-            let answered = 0;
-            let flagged = 0;
-
-            CBT_STATE.items.forEach((it, idx) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = idx + 1;
-                btn.id = 'cbtNumBtn_' + idx;
-
-                let cls = '';
-                if (it.answer && it.answer !== '') {
-                    cls += ' answered';
-                    answered++;
-                }
-                if (parseInt(it.flagged, 10) === 1) {
-                    cls += ' flagged';
-                    flagged++;
-                }
-                if (idx === CBT_STATE.currentIndex) {
-                    cls += ' current';
-                }
-
-                btn.className = cls.trim();
-                btn.onclick = () => renderQuestion(idx);
-                grid.appendChild(btn);
-            });
-
-            // Update Progress Bar
-            document.getElementById('cbtAnsweredCount').textContent = `${answered}/${CBT_STATE.totalQuestions}`;
-            const pct = CBT_STATE.totalQuestions > 0 ? Math.round((answered / CBT_STATE.totalQuestions) * 100) : 0;
-            document.getElementById('cbtCompletionFill').style.width = pct + '%';
-            document.getElementById('cbtProgressText').textContent = `Terjawab ${answered} dari ${CBT_STATE.totalQuestions} soal (${pct}%)`;
-        }
-
-        // Render Lembar Soal Aktif
-        function renderQuestion(index) {
-            if (index < 0 || index >= CBT_STATE.totalQuestions) return;
-            CBT_STATE.currentIndex = index;
-
-            const item = CBT_STATE.items[index];
-            document.getElementById('cbtPosition').textContent = `Soal No. ${index + 1} dari ${CBT_STATE.totalQuestions}`;
-            document.getElementById('cbtCategoryPill').textContent = item.category || 'Umum';
-            document.getElementById('cbtQuestion').textContent = item.question_text || '';
-
-            // Render Pilihan A–E
-            const container = document.getElementById('cbtOptionsContainer');
-            container.innerHTML = '';
-
-            const letters = ['A', 'B', 'C', 'D', 'E'];
-            const currentAnswer = (item.answer || '').toUpperCase();
-
-            letters.forEach((letter, lIdx) => {
-                const text = item.options[lIdx] || item.options[letter] || '';
-                if (!text && lIdx >= 2) return; // opsi C, D, E opsional jika kosong
-
-                const label = document.createElement('label');
-                label.className = 'cbt-option' + (currentAnswer === letter ? ' selected' : '');
-                label.innerHTML = `
-                    <input type="radio" name="opt_choice" value="${letter}" ${currentAnswer === letter ? 'checked' : ''} onchange="handleAnswerSelect('${letter}');">
-                    <div><strong>${letter}.</strong> ${escapeHtml(text)}</div>
-                `;
-                container.appendChild(label);
-            });
-
-            // Checkbox Flag Ragu-ragu
-            document.getElementById('cbtFlag').checked = (parseInt(item.flagged, 10) === 1);
-
-            // Navigasi Prev/Next
-            document.getElementById('cbtPrevious').disabled = (index === 0);
-            document.getElementById('cbtNext').disabled = (index === CBT_STATE.totalQuestions - 1);
-
-            // Update border current di grid
-            for (let i = 0; i < CBT_STATE.totalQuestions; i++) {
-                const b = document.getElementById('cbtNumBtn_' + i);
-                if (b) {
-                    if (i === index) b.classList.add('current');
-                    else b.classList.remove('current');
-                }
-            }
-        }
-
-        function navigateQuestion(step) {
-            renderQuestion(CBT_STATE.currentIndex + step);
-        }
-
-        // Simpan Jawaban (Auto-Save Real-Time)
-        function handleAnswerSelect(choice) {
-            const item = CBT_STATE.items[CBT_STATE.currentIndex];
-            item.answer = choice;
-
-            // Highlight kartu terpilih
-            const options = document.querySelectorAll('.cbt-option');
-            options.forEach(opt => {
-                const r = opt.querySelector('input[type="radio"]');
-                if (r && r.value === choice) {
-                    opt.classList.add('selected');
-                } else {
-                    opt.classList.remove('selected');
-                }
-            });
-
-            showAutoSaveIndicator();
-            renderNumbersGrid();
-
-            // Kirim ke server via AJAX
-            const fd = new FormData();
-            fd.append('ajax_action', 'save_answer');
-            fd.append('attempt_id', CBT_STATE.attemptId);
-            fd.append('position', item.position);
-            fd.append('answer', choice);
-
-            fetch('<?= BASE_URL ?>/tutorial-rpl-cbt.php', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-            }).catch(e => console.error('Save error:', e));
-        }
-
-        // Toggle Flag Ragu-ragu
-        function toggleCurrentFlag(isFlagged) {
-            const item = CBT_STATE.items[CBT_STATE.currentIndex];
-            item.flagged = isFlagged ? 1 : 0;
-            renderNumbersGrid();
-
-            const fd = new FormData();
-            fd.append('ajax_action', 'save_flag');
-            fd.append('attempt_id', CBT_STATE.attemptId);
-            fd.append('position', item.position);
-            fd.append('flagged', isFlagged ? 1 : 0);
-
-            fetch('<?= BASE_URL ?>/tutorial-rpl-cbt.php', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-            }).catch(e => console.error('Flag error:', e));
-        }
-
-        // Kosongkan Jawaban
-        function clearCurrentAnswer() {
-            const item = CBT_STATE.items[CBT_STATE.currentIndex];
-            item.answer = '';
-
-            const radios = document.querySelectorAll('input[name="opt_choice"]');
-            radios.forEach(r => r.checked = false);
-            const options = document.querySelectorAll('.cbt-option');
-            options.forEach(o => o.classList.remove('selected'));
-
-            showAutoSaveIndicator('Jawaban dikosongkan');
-            renderNumbersGrid();
-
-            const fd = new FormData();
-            fd.append('ajax_action', 'save_answer');
-            fd.append('attempt_id', CBT_STATE.attemptId);
-            fd.append('position', item.position);
-            fd.append('answer', '');
-
-            fetch('<?= BASE_URL ?>/tutorial-rpl-cbt.php', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-            }).catch(e => console.error('Clear error:', e));
-        }
-
-        function showAutoSaveIndicator(msg) {
-            const el = document.getElementById('cbtAutoSavedNotice');
-            if (!el) return;
-            el.textContent = '✓ ' + (msg || 'Tersimpan otomatis');
-            el.style.display = 'inline-block';
-            clearTimeout(window._saveTimer);
-            window._saveTimer = setTimeout(() => {
-                el.style.display = 'none';
-            }, 1800);
-        }
-
-        // Countdown Timer
-        function startCountdownTimer() {
-            let left = CBT_STATE.remainingSeconds;
-            const timerEl = document.getElementById('cbtTimer');
-
-            function update() {
-                if (left <= 0) {
-                    timerEl.textContent = '00:00:00';
-                    alert('Waktu ujian telah habis! Jawaban Anda akan otomatis dikumpulkan.');
-                    executeFinalSubmit();
-                    return;
-                }
-
-                const h = Math.floor(left / 3600);
-                const m = Math.floor((left % 3600) / 60);
-                const s = left % 60;
-                timerEl.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
-                left--;
-                setTimeout(update, 1000);
-            }
-            update();
-        }
-
-        function pad(n) {
-            return n < 10 ? '0' + n : n;
-        }
-
-        // Modal Konfirmasi Pengumpulan
-        function openConfirmSubmitModal() {
-            let answered = 0;
-            let flagged = 0;
-            CBT_STATE.items.forEach(it => {
-                if (it.answer && it.answer !== '') answered++;
-                if (parseInt(it.flagged, 10) === 1) flagged++;
-            });
-            const unanswered = CBT_STATE.totalQuestions - answered;
-
-            document.getElementById('modalAnsweredCount').textContent = answered;
-            document.getElementById('modalFlaggedCount').textContent = flagged;
-            document.getElementById('modalUnansweredCount').textContent = unanswered;
-
-            const modal = document.getElementById('cbtSubmitModal');
-            modal.style.display = 'flex';
-        }
-
-        function closeConfirmSubmitModal() {
-            const modal = document.getElementById('cbtSubmitModal');
-            modal.style.display = 'none';
-        }
-
-        // Eksekusi Submit Final
-        function executeFinalSubmit() {
-            const btn = document.getElementById('btnConfirmSubmit');
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Mengumpulkan jawaban...';
-            }
-
-            const fd = new FormData();
-            fd.append('ajax_action', 'finish_exam');
-            fd.append('attempt_id', CBT_STATE.attemptId);
-
-            fetch('<?= BASE_URL ?>/tutorial-rpl-cbt.php', {
-                method: 'POST',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                body: fd
-            })
-            .then(r => r.json())
-            .then(res => {
-                if (res.success) {
-                    window.location.reload();
-                } else {
-                    alert('Terjadi kesalahan saat pengumpulan: ' + (res.message || 'Coba lagi.'));
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.textContent = 'Ya, Kumpulkan Sekarang';
-                    }
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                // Fallback reload jika koneksi selesai
-                window.location.reload();
-            });
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-        </script>
-    <?php endif; ?>
 </div>
+
+<script src="<?= BASE_URL ?>/tutorial-rpl-cbt.php?cbt_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt.js') ?>"></script>
+<script>
+const CSRF_TOKEN = <?= json_encode(csrfToken()) ?>;
+const REGISTRATION_ID = <?= (int)$regId ?>;
+const API_URL = <?= json_encode(BASE_URL . '/tutorial-rpl-cbt.php?face_api=1') ?>;
+const CBT_API_URL = <?= json_encode(BASE_URL . '/tutorial-rpl-cbt.php?cbt_api=1') ?>;
+const IS_CAMERA_REQUIRED = <?= json_encode($isCameraRequired ?? false) ?>;
+window.TOKEN_REQUIRED = <?= json_encode(!empty($activeSession['token_required']) && !empty($activeSession['token'])) ?>;
+
+let proctorInterval = null;
+let countdownTimer = null;
+const PROCTOR_INTERVAL_SECONDS = 30;
+let secondsRemaining = PROCTOR_INTERVAL_SECONDS;
+let nextProctorCheckAt = 0;
+let periodicCheckPending = false;
+let proctorVisibilityBound = false;
+let activeStream = null;
+let currentFacingMode = 'user';
+let cbtCompleted = false;
+
+function pretesRequestError(message, code, status) {
+    const error = new Error(message);
+    error.code = code;
+    if (status) error.status = status;
+    return error;
+}
+
+function requestProctoringCheck(payload, endpoint) {
+    const controller = new AbortController();
+    let timeoutId;
+    const timeout = new Promise(function(resolve, reject) {
+        timeoutId = setTimeout(function() {
+            reject(pretesRequestError('Server belum merespons dalam 20 detik. Silakan coba lagi. Jika berulang, hubungi admin.', 'TIMEOUT'));
+            controller.abort();
+        }, 20000);
+    });
+    const request = Promise.resolve().then(function() {
+        return fetch(endpoint || API_URL, {
+            method: 'POST',
+            keepalive: payload.action === 'interrupt',
+            credentials: 'same-origin',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ csrf_token: CSRF_TOKEN, registration_id: REGISTRATION_ID }, payload))
+        });
+    }).then(async function(response) {
+        let data;
+        try {
+            data = await response.json();
+        } catch (error) {
+            throw pretesRequestError('Respons server tidak valid (HTTP ' + response.status + '). Muat ulang halaman atau hubungi admin.', 'INVALID_RESPONSE', response.status);
+        }
+        if (!response.ok) {
+            throw pretesRequestError(data.message || 'Server gagal memproses verifikasi (HTTP ' + response.status + ').', 'HTTP_ERROR', response.status);
+        }
+        if (!data || typeof data !== 'object') throw new Error('Data verifikasi server tidak valid.');
+        return data;
+    });
+    return Promise.race([request, timeout]).finally(function() { clearTimeout(timeoutId); });
+}
+
+function waitForFacePose(milliseconds) {
+    return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+}
+
+async function guideFacePose(symbol, title, instruction, seconds, sample) {
+    const guide = document.getElementById('facePoseGuide');
+    const icon = document.getElementById('facePoseSymbol');
+    const label = document.getElementById('facePoseTitle');
+    const countdown = document.getElementById('facePoseCountdown');
+    const alertBox = document.getElementById('checkinAlert');
+    if (guide) guide.style.display = 'grid';
+    if (icon) icon.textContent = symbol;
+    if (label) label.textContent = title;
+    if (alertBox) alertBox.textContent = instruction;
+    for (let remaining = seconds; remaining > 0; remaining--) {
+        if (countdown) countdown.textContent = 'Tahan ' + remaining + ' detik';
+        await waitForFacePose(1000);
+        if (sample && remaining <= 3) sample();
+    }
+    if (countdown) countdown.textContent = 'Foto diambil';
+}
+
+function captureFaceFrame(video) {
+    if (!video.videoWidth || !video.videoHeight) throw pretesRequestError('Kamera belum siap. Silakan nyalakan ulang kamera.', 'CAMERA_UNAVAILABLE');
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+function mirrorCameraPreview(video) {
+    if (video) video.style.transform = 'scaleX(-1)';
+}
+
+function facePosePrompt(rawDirection) {
+    return rawDirection === 'left'
+        ? { symbol: '→', label: 'KANAN Anda', side: 'kanan' }
+        : { symbol: '←', label: 'KIRI Anda', side: 'kiri' };
+}
+
+window.startCheckinCamera = function(isUserAction) {
+    const video = document.getElementById('checkinVideo');
+    const placeholder = document.getElementById('checkinCameraPlaceholder');
+    const ovalGuide = document.getElementById('checkinOvalGuide');
+    const cameraBadge = document.getElementById('checkinCameraBadge');
+    const alertBox = document.getElementById('checkinAlert');
+    const btnText = document.getElementById('btnActivateCameraText');
+
+    if (btnText) btnText.textContent = '⏳ Membuka Kamera...';
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.border = '1.5px solid #bfdbfe';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = '<strong>⏳ Sedang Menghubungkan Kamera...</strong><div style="font-size:11.5px;margin-top:3px;color:#2563eb;">Jika peramban Anda memunculkan pop-up izin, harap klik <strong>"Allow / Izinkan"</strong>.</div>';
+    }
+
+    if (!video) return;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const notSupportedMsg = "Peramban ini tidak mendukung akses kamera WebRTC atau halaman tidak diakses via HTTPS aman.";
+        if (alertBox) {
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '1.5px solid #fca5a5';
+            alertBox.style.color = '#991b1b';
+            alertBox.innerHTML = '<strong>❌ Tidak Mendukung Kamera:</strong> ' + notSupportedMsg;
+        }
+        if (btnText) btnText.textContent = 'Aktifkan Kamera';
+        return;
+    }
+
+    if (activeStream) {
+        try { activeStream.getTracks().forEach(function(t) { t.stop(); }); } catch(e) {}
+        activeStream = null;
+    }
+
+    function onStreamSuccess(stream) {
+        activeStream = stream;
+        video.srcObject = stream;
+        mirrorCameraPreview(video);
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('autoplay', 'true');
+        video.muted = true;
+
+        var playPromise = video.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(function() {});
+        }
+
+        if (placeholder) placeholder.style.display = 'none';
+        if (ovalGuide) ovalGuide.style.display = 'block';
+        if (cameraBadge) cameraBadge.style.display = 'block';
+        if (btnText) btnText.textContent = 'Aktifkan Kamera';
+
+        if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#f0fdf4';
+            alertBox.style.border = '1.5px solid #86efac';
+            alertBox.style.color = '#15803d';
+            alertBox.innerHTML = '<strong>🟢 Kamera Aktif & Siap Verifikasi!</strong><div style="font-size:11.5px;margin-top:2px;">Posisikan wajah Anda tegak di dalam oval, lalu klik tombol <strong>"Verifikasi Wajah & Buka Ujian"</strong> di bawah.</div>';
+        }
+    }
+
+    function onStreamError(err) {
+        if (placeholder) placeholder.style.display = 'flex';
+        if (ovalGuide) ovalGuide.style.display = 'none';
+        if (cameraBadge) cameraBadge.style.display = 'none';
+        if (btnText) btnText.textContent = 'Coba Aktifkan Lagi';
+
+        let errTitle = "Akses Kamera Ditolak / Gagal";
+        let errMsg = err.message || "Akses kamera tidak diizinkan oleh peramban.";
+        let errTip = "Pastikan Anda memilih <strong>'Izinkan / Allow'</strong> saat peramban meminta izin kamera.";
+
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errTitle = "Izin Kamera Terblokir di Browser";
+            errMsg = "Peramban Anda saat ini memblokir izin akses kamera.";
+            errTip = "Klik ikon <strong>Gembok (🔒)</strong> di bilah alamat URL peramban Anda, ubah Kamera menjadi <strong>Izinkan (Allow)</strong>, lalu klik tombol ini lagi.";
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            errTitle = "Perangkat Kamera Tidak Ditemukan";
+            errMsg = "Tidak ada webcam yang terdeteksi di perangkat Anda.";
+            errTip = "Pastikan webcam tercolok dengan baik atau kamera perangkat aktif.";
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            errTitle = "Kamera Sedang Digunakan Aplikasi Lain";
+            errMsg = "Kamera terkunci oleh aplikasi lain.";
+            errTip = "Tutup aplikasi yang sedang menggunakan kamera, lalu coba klik aktifkan kembali.";
+        }
+
+        if (alertBox) {
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '1.5px solid #fca5a5';
+            alertBox.style.color = '#991b1b';
+            alertBox.innerHTML = '<strong style="display:block;margin-bottom:3px;font-size:13px;">❌ ' + errTitle + '</strong>' +
+                '<div style="font-size:12px;color:#b91c1c;">' + errMsg + '</div>' +
+                '<div style="margin-top:8px;font-size:11.5px;color:#7f1d1d;line-height:1.45;background:#fff;padding:8px 10px;border-radius:6px;border:1px dashed #fca5a5;">💡 ' + errTip + '</div>';
+        }
+
+        if (isUserAction) {
+            alert(errTitle + ":\n" + errMsg + "\n\n" + errTip.replace(/<[^>]*>/g, ''));
+        }
+    }
+
+    const c1 = { audio: false, video: { facingMode: currentFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } };
+    const c2 = { audio: false, video: true };
+
+    navigator.mediaDevices.getUserMedia(c1)
+        .then(onStreamSuccess)
+        .catch(function() {
+            navigator.mediaDevices.getUserMedia(c2)
+                .then(onStreamSuccess)
+                .catch(onStreamError);
+        });
+};
+
+window.toggleCameraFace = function() {
+    currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+    window.startCheckinCamera(true);
+};
+
+window.testWebcamDiagnostics = function() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        alert("Diagnosa: navigator.mediaDevices tidak didukung di peramban ini.");
+        return;
+    }
+    navigator.mediaDevices.enumerateDevices().then(function(devices) {
+        var videoDevices = devices.filter(d => d.kind === 'videoinput');
+        var report = "=== HASIL DIAGNOSA KAMERA WEBRTC ===\n";
+        report += "• Jumlah Kamera Terdeteksi: " + videoDevices.length + "\n";
+        videoDevices.forEach(function(d, idx) {
+            report += "  " + (idx + 1) + ". Label: " + (d.label || '(Nama belum diizinkan oleh browser)') + "\n";
+        });
+        report += "• Protokol URL: " + window.location.protocol + "\n";
+        report += "• Status Stream Aktif: " + (activeStream ? "Aktif" : "Belum Aktif") + "\n";
+        alert(report);
+        window.startCheckinCamera(true);
+    }).catch(function(err) {
+        alert("Diagnosa Gagal: " + err.message);
+    });
+};
+
+function inspectCameraPermissions() {
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'camera' }).then(function(p) {
+            if (p.state === 'denied') {
+                const alertBox = document.getElementById('checkinAlert');
+                if (alertBox) {
+                    alertBox.style.display = 'block';
+                    alertBox.style.background = '#fef2f2';
+                    alertBox.style.border = '1.5px solid #fca5a5';
+                    alertBox.style.color = '#991b1b';
+                    alertBox.innerHTML = '<strong style="display:block;margin-bottom:3px;font-size:13px;">⚠️ Izin Kamera Terblokir di Pengaturan Browser</strong>' +
+                        '<div style="font-size:12px;color:#b91c1c;">Peramban Anda sebelumnya menandai izin kamera sebagai "Ditolak / Blokir".</div>';
+                }
+            } else if (p.state === 'granted') {
+                window.startCheckinCamera(false);
+            }
+        }).catch(function() {});
+    }
+}
+
+function initCameraBindings() {
+    const isAlreadyVerified = <?= $isVerified ? 'true' : 'false' ?>;
+    if (isAlreadyVerified) {
+        initProctoringExamRoom();
+        return;
+    }
+
+    inspectCameraPermissions();
+
+    const btnActivate = document.getElementById('btnActivateCamera');
+    const placeholder = document.getElementById('checkinCameraPlaceholder');
+    if (placeholder) {
+        placeholder.style.cursor = 'pointer';
+        placeholder.addEventListener('click', function(e) {
+            if (!btnActivate || (e.target !== btnActivate && !btnActivate.contains(e.target))) {
+                window.startCheckinCamera(true);
+            }
+        });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCameraBindings);
+} else {
+    initCameraBindings();
+}
+
+function runInitialCheckin() {
+    const video = document.getElementById('checkinVideo');
+    const alertBox = document.getElementById('checkinAlert');
+    const btn = document.getElementById('btnRunCheckin');
+    let motionGuide = null;
+    if (btn && btn.disabled) return;
+
+    if (!video || !video.videoWidth || !activeStream) {
+        alert("Kamera belum aktif. Klik tombol 'Aktifkan Kamera' terlebih dahulu dan pastikan wajah Anda tampak di layar.");
+        window.startCheckinCamera(true);
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳</span> <span>Memeriksa Wajah...</span>';
+    }
+
+    if (alertBox) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.border = '1px solid #bfdbfe';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = '<strong>⏳ Sedang Mencocokkan...</strong><br>Sistem AI sedang membandingkan wajah di kamera dengan foto profil acuan Anda.';
+    }
+
+    Promise.resolve().then(async function() {
+        const challenge = await requestProctoringCheck({ action: 'challenge' });
+        if (!challenge.challenge_id || !['left', 'right'].includes(challenge.direction)) {
+            throw new Error('Tantangan wajah tidak valid. Silakan ulangi.');
+        }
+        const frames = [];
+        const sample = function() { frames.push(captureFaceFrame(video)); };
+        await guideFacePose('◎', '1/3 · Wajah lurus', 'Hadapkan wajah lurus ke kamera. Tahan posisi; kamera mengambil beberapa sampel selama hitung mundur.', 3, sample);
+        motionGuide = facePosePrompt(challenge.direction);
+        await guideFacePose(motionGuide.symbol, '2/3 · ' + motionGuide.label,
+            'Tolehkan kepala ke ' + motionGuide.side + ' Anda, seperti saat bercermin. Ikuti panah kuning dan tahan hingga hitung mundur selesai. Jangan hanya menggeser badan.', 4, sample);
+        await guideFacePose('◎', '3/3 · Kembali lurus', 'Kembalikan kepala ke posisi seperti langkah pertama. Tahan hingga hitung mundur selesai.', 3, sample);
+        const guide = document.getElementById('facePoseGuide');
+        if (guide) guide.style.display = 'none';
+        if (alertBox) alertBox.innerHTML = '<span class="face-check-loading"><span class="face-check-spinner" aria-hidden="true"></span><span>Sedang memeriksa ciri wajah dan gerakan di server…</span></span>';
+        return requestProctoringCheck({
+            action: 'initial_checkin',
+            challenge_id: challenge.challenge_id,
+            frames: frames,
+            live_photo: frames[0]
+        });
+    })
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔍</span> <span>Verifikasi Wajah & Buka Ujian</span>';
+        }
+
+        if (data && data.verified) {
+            if (alertBox) {
+                alertBox.style.background = '#f0fdf4';
+                alertBox.style.border = '1px solid #86efac';
+                alertBox.style.color = '#15803d';
+                alertBox.textContent = 'Verifikasi berhasil. Indeks kemiripan: ' + data.score + '/100. ' + data.message;
+            }
+
+            const badge = document.getElementById('badgeCheckinStatus');
+            if (badge) {
+                badge.className = 'proctoring-badge badge-active';
+                badge.textContent = '✓ Ciri Wajah Sesuai';
+            }
+
+            setTimeout(function() {
+                const secCheckin = document.getElementById('sectionCheckin');
+                const secExam = document.getElementById('sectionExamRoom');
+                if (secCheckin) secCheckin.style.display = 'none';
+                if (secExam) secExam.style.display = 'block';
+                initProctoringExamRoom();
+            }, 1200);
+        } else {
+            if (alertBox) {
+                alertBox.style.background = '#fef2f2';
+                alertBox.style.border = '1px solid #fca5a5';
+                alertBox.style.color = '#991b1b';
+                let reason = data.message || 'Wajah belum sesuai dengan foto profil acuan.';
+                if (data.status === 'MOTION_REQUIRED' && data.failed_step === 2 && motionGuide) {
+                    reason = 'Langkah 2: gerakan menoleh ke ' + motionGuide.side + ' Anda belum cukup terbaca. Putar kepala seperti saat bercermin dan tahan hingga hitung mundur selesai.';
+                }
+                alertBox.textContent = 'Verifikasi belum lolos. ' + reason;
+            }
+        }
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🔍</span> <span>Verifikasi Wajah & Buka Ujian</span>';
+        }
+        if (alertBox) {
+            alertBox.style.background = '#fef2f2';
+            alertBox.style.border = '1px solid #fca5a5';
+            alertBox.style.color = '#991b1b';
+            alertBox.textContent = 'Verifikasi belum selesai: ' + err.message;
+        }
+    }).finally(function() {
+        const guide = document.getElementById('facePoseGuide');
+        if (guide) guide.style.display = 'none';
+    });
+}
+
+function initProctoringExamRoom() {
+    const video = document.getElementById('proctorVideo');
+    mirrorCameraPreview(video);
+    if (!IS_CAMERA_REQUIRED) {
+        const title = document.getElementById('proctorStatusTitle');
+        if (title) title.textContent = 'Ujian Mandiri Berlangsung';
+        const freq = document.getElementById('proctorFrequency');
+        if (freq) freq.textContent = 'Tanpa Kamera';
+        const info = document.getElementById('lastCheckInfo');
+        if (info) info.textContent = 'Sesi ujian ini tidak mewajibkan pengawasan kamera web.';
+    } else if (video) {
+        if (activeStream) {
+            video.srcObject = activeStream;
+            video.play();
+        } else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ audio: false, video: true })
+                .then(function(s) {
+                    if (cbtCompleted) { s.getTracks().forEach(function(track) { track.stop(); }); return; }
+                    activeStream = s;
+                    video.srcObject = s;
+                    video.play();
+                }).catch(e => console.warn("Proctor camera stream:", e));
+        }
+    }
+
+    if (window.PretesCbt) {
+        window.PretesCbt.init({
+            request: function(payload) { return requestProctoringCheck(payload, CBT_API_URL); },
+            verifyAttention: async function() {
+                if (!IS_CAMERA_REQUIRED) return;
+                const camera = document.getElementById('proctorVideo');
+                if (!camera) throw pretesRequestError('Kamera ujian tidak tersedia. Muat ulang halaman.', 'CAMERA_UNAVAILABLE');
+                if (!camera.videoWidth || !activeStream || activeStream.getVideoTracks?.().some(track => track.readyState === 'ended')) {
+                    if (!navigator.mediaDevices?.getUserMedia) throw pretesRequestError('Aktifkan izin kamera untuk melanjutkan ujian.', 'CAMERA_UNAVAILABLE');
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+                    if (activeStream) activeStream.getTracks().forEach(track => track.stop());
+                    activeStream = stream;
+                    camera.srcObject = stream;
+                    await camera.play();
+                }
+                const result = await requestProctoringCheck({ action: 'periodic_check', live_photo: captureFaceFrame(camera) });
+                if (!result.verified) throw pretesRequestError(result.message || 'Hadapkan wajah ke kamera untuk melanjutkan ujian.', result.status || 'VERIFICATION_ERROR');
+            },
+            onStarted: function() {
+                if (IS_CAMERA_REQUIRED) {
+                    activeStream?.getVideoTracks?.().forEach(track => track.addEventListener?.('ended', function() {
+                        if (!cbtCompleted) recordProctoringViolation('Kamera terputus saat ujian berlangsung.');
+                    }));
+                    const title = document.getElementById('proctorStatusTitle');
+                    if (title) title.textContent = 'Pengawas Kamera Aktif';
+                    const info = document.getElementById('lastCheckInfo');
+                    if (info) info.textContent = 'Pemeriksaan wajah aktif selama ujian berlangsung.';
+                    startProctoringTimer();
+                }
+            },
+            onSubmitted: function() {
+                cbtCompleted = true;
+                if (countdownTimer) clearInterval(countdownTimer);
+                if (proctorInterval) clearInterval(proctorInterval);
+                if (activeStream) activeStream.getTracks().forEach(function(track) { track.stop(); });
+                activeStream = null;
+                const title = document.getElementById('proctorStatusTitle');
+                if (title) title.textContent = 'Ujian Selesai';
+                const frequency = document.getElementById('proctorFrequency');
+                if (frequency) frequency.textContent = 'Kamera dihentikan';
+                const info = document.getElementById('lastCheckInfo');
+                if (info) info.textContent = 'Hasil CBT tersimpan. Pengawasan kamera telah selesai.';
+            }
+        });
+    } else {
+        const message = document.getElementById('cbtMessage');
+        if (message) message.textContent = 'Modul CBT belum termuat. Muat ulang halaman untuk mencoba lagi.';
+    }
+}
+
+function scheduleProctoringCheck(seconds) {
+    nextProctorCheckAt = Date.now() + seconds * 1000;
+    secondsRemaining = seconds;
+}
+
+function tickProctoringTimer() {
+    if (cbtCompleted || periodicCheckPending || !nextProctorCheckAt) return;
+    secondsRemaining = Math.max(0, Math.ceil((nextProctorCheckAt - Date.now()) / 1000));
+    if (secondsRemaining <= 0) { runPeriodicProctoringCheck(); return; }
+}
+
+function startProctoringTimer() {
+    if (cbtCompleted) return;
+    if (countdownTimer) clearInterval(countdownTimer);
+    if (proctorInterval) clearInterval(proctorInterval);
+    scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
+    countdownTimer = setInterval(tickProctoringTimer, 1000);
+    if (!proctorVisibilityBound) {
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) tickProctoringTimer();
+        });
+        proctorVisibilityBound = true;
+    }
+}
+
+function runPeriodicProctoringCheck() {
+    if (cbtCompleted || periodicCheckPending || window.PretesCbt?.isPaused?.()) return;
+    const video = document.getElementById('proctorVideo') || document.getElementById('checkinVideo');
+    if (!video || !video.videoWidth) {
+        recordProctoringViolation("Kamera terputus atau belum aktif. Nyalakan kembali kamera agar pemeriksaan dapat berjalan.");
+        scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
+        return;
+    }
+
+    let livePhotoData;
+    try {
+        livePhotoData = captureFaceFrame(video);
+    } catch (error) {
+        recordProctoringViolation(error.message);
+        scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
+        return;
+    }
+
+    periodicCheckPending = true;
+    return requestProctoringCheck({
+        action: 'periodic_check',
+        live_photo: livePhotoData
+    })
+    .then(data => {
+        const lastInfo = document.getElementById('lastCheckInfo');
+        if (cbtCompleted) return;
+        const alertBox = document.getElementById('proctorViolationAlert');
+        const alertMsg = document.getElementById('proctorViolationMsg');
+
+        if (data && data.verified) {
+            if (lastInfo) {
+                lastInfo.textContent = 'Pemeriksaan terakhir: ' + (data.checked_at || 'Baru saja') + ' · Ciri wajah sesuai (indeks ' + data.score + '/100).';
+            }
+            if (alertBox) alertBox.style.display = 'none';
+        } else {
+            if (lastInfo) {
+                lastInfo.textContent = 'Pemeriksaan terakhir: ' + (data.checked_at || 'Baru saja') + ' · Wajah perlu diperiksa kembali.';
+            }
+            if (data && ['NO_FACE', 'MISMATCH', 'MULTIPLE_FACES'].includes(data.status)) {
+                window.PretesCbt?.interrupt?.(data.status === 'MISMATCH' ? 'face_mismatch' : 'face_missing');
+            }
+            if (alertBox && alertMsg) {
+                alertBox.style.display = 'block';
+                alertMsg.textContent = (data.message || 'Wajah belum terdeteksi atau belum sesuai pasfoto.') + ' Hadapkan wajah ke kamera dengan pencahayaan yang cukup.';
+            }
+        }
+    })
+    .catch(err => {
+        const lastInfo = document.getElementById('lastCheckInfo');
+        if (!cbtCompleted && lastInfo) lastInfo.textContent = 'Pemeriksaan tertunda (bukan pelanggaran): ' + err.message;
+    }).finally(function() {
+        periodicCheckPending = false;
+        if (!cbtCompleted) scheduleProctoringCheck(PROCTOR_INTERVAL_SECONDS);
+    });
+}
+
+function recordProctoringViolation(msg) {
+    window.PretesCbt?.interrupt?.('camera_unavailable');
+    const alertBox = document.getElementById('proctorViolationAlert');
+    const alertMsg = document.getElementById('proctorViolationMsg');
+    if (alertBox && alertMsg) {
+        alertBox.style.display = 'block';
+        alertMsg.textContent = msg;
+    }
+}
+
+function testFastPeriodicTimer() {
+    scheduleProctoringCheck(15);
+    alert("⏱️ Timer pengawasan disetel untuk pengujian cepat!");
+}
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -6,6 +6,8 @@ $php = "d:\\all_project\\lppai.quizb.my.id\\scratch\\php-runtime\\php.exe";
 $dir = sys_get_temp_dir() . '/test-rpl-student-hub-' . bin2hex(random_bytes(6));
 mkdir($dir . '/pages', 0777, true);
 mkdir($dir . '/includes', 0777, true);
+mkdir($dir . '/assets/css', 0777, true);
+mkdir($dir . '/assets/js', 0777, true);
 
 // Buat basis data SQLite tiruan
 $pdo = new PDO('sqlite:' . $dir . '/test.sqlite', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
@@ -116,9 +118,9 @@ $pdo->exec("
     VALUES (1, 'SESI-TUTORIAL-RPL-2026', 'Ujian Tulis Tutorial RPL 2026/2027', 30, 80.0, 'TUTOR26', 1, 1);
 
     INSERT INTO tutorial_rpl_cbt_questions (code, category, question_text, options_json, correct_answer, is_active)
-    VALUES ('Q1', 'Thaharah', 'Rukun wudhu yang pertama adalah...', '[\"Niat\",\"Membasuh muka\",\"Membasuh tangan\",\"Tertib\"]', 'A', 1);
+    VALUES ('Q1', 'Thaharah', 'Rukun wudhu yang pertama adalah...', '{\"A\":\"Niat\",\"B\":\"Membasuh muka\",\"C\":\"Membasuh tangan\",\"D\":\"Tertib\",\"E\":\"Mengusap kepala\"}', 'A', 1);
     INSERT INTO tutorial_rpl_cbt_questions (code, category, question_text, options_json, correct_answer, is_active)
-    VALUES ('Q2', 'Sholat', 'Membaca Al-Fatihah dalam sholat adalah...', '[\"Sunnah\",\"Rukun sholat\",\"Mubah\",\"Syarat wajib\"]', 'B', 1);
+    VALUES ('Q2', 'Sholat', 'Membaca Al-Fatihah dalam sholat adalah...', '{\"A\":\"Sunnah\",\"B\":\"Rukun sholat\",\"C\":\"Mubah\",\"D\":\"Syarat wajib\",\"E\":\"Makruh\"}', 'B', 1);
 
     INSERT INTO tutorial_rpl_registration_periods (id, nama, gelombang, opens_at, closes_at, active_slot)
     VALUES (1, 'Tutorial RPL 2026/2027', 'Gelombang 1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1);
@@ -128,9 +130,15 @@ $pdo->exec("
 copy(__DIR__ . '/../pages/tutorial-rpl.php', $dir . '/pages/tutorial-rpl.php');
 copy(__DIR__ . '/../pages/tutorial-rpl-cbt.php', $dir . '/pages/tutorial-rpl-cbt.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-helper.php', $dir . '/includes/tutorial-rpl-helper.php');
+copy(__DIR__ . '/../includes/tutorial-rpl-cbt-engine.php', $dir . '/includes/tutorial-rpl-cbt-engine.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-periods.php', $dir . '/includes/tutorial-rpl-periods.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-registration-policy.php', $dir . '/includes/tutorial-rpl-registration-policy.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php', $dir . '/includes/tutorial-rpl-registration-rules-view.php');
+copy(__DIR__ . '/../includes/pretes-cbt-view.php', $dir . '/includes/pretes-cbt-view.php');
+file_put_contents($dir . '/includes/pretes-helper.php', "<?php\nif (!function_exists('ensurePretesProctoringTables')) { function ensurePretesProctoringTables(PDO \$pdo): void {} }\n");
+copy(__DIR__ . '/../includes/user-exam-photo.php', $dir . '/includes/user-exam-photo.php');
+copy(__DIR__ . '/../assets/css/pretes-cbt-exam.css', $dir . '/assets/css/pretes-cbt-exam.css');
+copy(__DIR__ . '/../assets/js/pretes-cbt.js', $dir . '/assets/js/pretes-cbt.js');
 
 file_put_contents($dir . '/includes/auth.php', <<<'PHP'
 <?php
@@ -249,45 +257,46 @@ try {
     $check(str_contains($res['html'], 'Daftar Tutorial RPL'), 'Mahasiswa 102 diarahkan untuk daftar');
 
     echo "\n=== TEST 3: Student CBT (pages/tutorial-rpl-cbt.php) ===\n";
-    // 3a. GET CBT tanpa token -> Tampil form token
+    // 3a. GET CBT -> Tampil shell CBT Pretes-parity (Skenario A & B + Token)
     $res = executeRequest($php, $dir, ['method' => 'GET', 'page' => 'cbt', 'actor' => ['id' => 101, 'role' => 'mahasiswa', 'jenis_program' => 'RPL']]);
     $check($res['status'] === 200, 'GET tutorial-rpl-cbt.php status 200');
-    $check(str_contains($res['html'], 'name="token"'), 'Menampilkan form input token ujian');
+    $check(str_contains($res['html'], 'id="pretesCbt"'), 'Menampilkan shell CBT terpadu (#pretesCbt)');
+    $check(str_contains($res['html'], 'id="cbtInputToken"'), 'Menampilkan input token ujian');
+    $check(str_contains($res['html'], 'id="sectionCheckin"') && str_contains($res['html'], 'id="sectionExamRoom"'), 'Memuat section Skenario A dan Skenario B');
+    $check(str_contains($res['html'], 'tutorial-rpl-cbt.php?face_api=1') && str_contains($res['html'], 'tutorial-rpl-cbt.php?cbt_api=1'), 'Memuat endpoint face_api & cbt_api Tutorial RPL');
 
-    // 3b. POST token salah -> Ditolak
-    $res = executeRequest($php, $dir, [
-        'method' => 'POST',
-        'page' => 'cbt',
-        'actor' => ['id' => 101, 'role' => 'mahasiswa', 'jenis_program' => 'RPL'],
-        'post' => ['action' => 'verify_token', 'token' => 'SALAH', 'csrf_token' => 'valid-csrf-token']
-    ]);
-    $check(str_contains($res['html'], 'Token ujian tidak valid'), 'Token salah ditolak');
+    // Sesuaikan target soal paket 1 ke 2 butir dan wajibkan token untuk fixture uji
+    require_once $dir . '/includes/tutorial-rpl-cbt-engine.php';
+    ensureTutorialRplCbtProctoringTables($pdo);
+    $pdo->exec("UPDATE tutorial_rpl_cbt_packages SET question_count = 2 WHERE id = 1");
+    $pdo->exec("UPDATE tutorial_rpl_cbt_sessions SET token_required = 1 WHERE id = 1");
+    $pdo->exec("DELETE FROM tutorial_rpl_cbt_questions WHERE code NOT IN ('Q1', 'Q2')");
 
-    // 3c. POST token benar -> Verifikasi sukses
-    $res = executeRequest($php, $dir, [
-        'method' => 'POST',
-        'page' => 'cbt',
-        'actor' => ['id' => 101, 'role' => 'mahasiswa', 'jenis_program' => 'RPL'],
-        'post' => ['action' => 'verify_token', 'token' => 'TUTOR26', 'csrf_token' => 'valid-csrf-token']
-    ]);
-    $check($res['status'] === 302, 'Verifikasi token berhasil (redirect 302)');
+    // 3b. Token salah ditolak
+    $tokenRejected = false;
+    try {
+        tutorialRplCbtStart($pdo, 101, 1, time(), 'SALAH', false, 1);
+    } catch (InvalidArgumentException $e) {
+        $tokenRejected = str_contains($e->getMessage(), 'Token ujian tidak valid');
+    }
+    $check($tokenRejected, 'Token salah ditolak oleh engine CBT');
 
-    // 3d. Pengerjaan Soal Ujian (Soal Q1 = A, Q2 = B)
-    $res = executeRequest($php, $dir, [
-        'method' => 'POST',
-        'page' => 'cbt',
-        'actor' => ['id' => 101, 'role' => 'mahasiswa', 'jenis_program' => 'RPL'],
-        'session' => ['tutorial_rpl_cbt_token_verified' => true],
-        'post' => [
-            'action' => 'submit_exam',
-            'csrf_token' => 'valid-csrf-token',
-            'answers' => [
-                1 => 'A', // Benar
-                2 => 'B'  // Benar
-            ]
-        ]
-    ]);
-    $check($res['status'] === 302, 'Submit jawaban ujian berhasil (redirect 302)');
+    // 3c. Token benar -> Mulai ujian & dapatkan soal acak dengan opsi A-E
+    $started = tutorialRplCbtStart($pdo, 101, 1, time(), 'TUTOR26', false, 1);
+    $check(!empty($started['attempt']['id']) && count($started['attempt']['questions']) === 2, 'Verifikasi token berhasil & 2 soal terbit');
+
+    // 3d. Simpan jawaban benar (berdasarkan kunci di tutorial_rpl_cbt_items) dan submit
+    $stmtKeys = $pdo->prepare("SELECT position, correct_answer FROM tutorial_rpl_cbt_items WHERE attempt_id = ? ORDER BY position");
+    $stmtKeys->execute([$started['attempt']['id']]);
+    foreach ($stmtKeys->fetchAll(PDO::FETCH_ASSOC) as $rowKey) {
+        tutorialRplCbtChange($pdo, 101, 1, 'save', [
+            'position' => (int)$rowKey['position'],
+            'answer' => $rowKey['correct_answer'],
+            'revision' => 0
+        ]);
+    }
+    $submittedRes = tutorialRplCbtChange($pdo, 101, 1, 'submit', ['revision' => 0]);
+    $check(!empty($submittedRes['attempt']['submitted']) && (float)$submittedRes['attempt']['score'] === 100.0, 'Submit jawaban ujian berhasil dengan skor 100.0');
 
     // Verifikasi nilai tersimpan di tutorial_rpl_members
     $mRow = $pdo->query("SELECT exam_submitted, nilai_ujian_tulis, nilai_praktik, nilai_akhir, status_lulus FROM tutorial_rpl_members WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
@@ -295,10 +304,9 @@ try {
     $check((float)$mRow['nilai_ujian_tulis'] === 100.0, 'Nilai ujian tulis 100.0 (2/2 benar)');
     $check((float)$mRow['nilai_akhir'] === 92.5, 'Nilai akhir dihitung benar (50% x 85 + 50% x 100 = 92.5)');
 
-    // 3e. Buka kembali halaman CBT setelah submit -> Tampil scorecard nilai
-    $res = executeRequest($php, $dir, ['method' => 'GET', 'page' => 'cbt', 'actor' => ['id' => 101, 'role' => 'mahasiswa', 'jenis_program' => 'RPL']]);
-    $check(str_contains($res['html'], 'Ujian Tulis Telah Selesai'), 'Halaman CBT menampilkan kartu hasil setelah ujian');
-    $check(str_contains($res['html'], '100'), 'Scorecard menampilkan nilai 100');
+    // 3e. State setelah submit mengembalikan submitted=true & score=100
+    $stateAfter = tutorialRplCbtState($pdo, 101, 1);
+    $check(!empty($stateAfter['attempt']['submitted']) && (float)$stateAfter['attempt']['score'] === 100.0, 'State CBT setelah submit menampilkan skor 100');
 
     // 3f. Verifikasi Presensi Hadir Sah di Hub saat drive_verified diaktifkan dosen
     $pdo->exec("UPDATE tutorial_rpl_members SET drive_verified = 1 WHERE id = 1");
@@ -317,13 +325,22 @@ try {
     @unlink($dir . '/pages/tutorial-rpl.php');
     @unlink($dir . '/pages/tutorial-rpl-cbt.php');
     @unlink($dir . '/includes/tutorial-rpl-helper.php');
+    @unlink($dir . '/includes/tutorial-rpl-cbt-engine.php');
     @unlink($dir . '/includes/tutorial-rpl-periods.php');
     @unlink($dir . '/includes/tutorial-rpl-registration-policy.php');
     @unlink($dir . '/includes/tutorial-rpl-registration-rules-view.php');
+    @unlink($dir . '/includes/pretes-cbt-view.php');
+    @unlink($dir . '/includes/pretes-helper.php');
+    @unlink($dir . '/includes/user-exam-photo.php');
     @unlink($dir . '/includes/auth.php');
     @unlink($dir . '/includes/header.php');
     @unlink($dir . '/includes/footer.php');
+    @unlink($dir . '/assets/css/pretes-cbt-exam.css');
+    @unlink($dir . '/assets/js/pretes-cbt.js');
     @unlink($dir . '/runner.php');
+    @rmdir($dir . '/assets/css');
+    @rmdir($dir . '/assets/js');
+    @rmdir($dir . '/assets');
     @rmdir($dir . '/pages');
     @rmdir($dir . '/includes');
     @rmdir($dir);

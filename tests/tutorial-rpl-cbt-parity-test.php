@@ -243,15 +243,21 @@ assert(str_contains($adminContent, 'generateRandomToken'), 'Admin memuat generat
 assert(str_contains($adminContent, 'openReviewModal'), 'Admin memuat modal review lembar jawaban');
 
 $studentContent = file_get_contents(__DIR__ . '/../pages/tutorial-rpl-cbt.php');
-assert(str_contains($studentContent, 'cbt-shell'), 'Mahasiswa memuat container cbt-shell');
-assert(str_contains($studentContent, 'cbt-timer'), 'Mahasiswa memuat countdown timer');
-assert(str_contains($studentContent, 'cbt-completion'), 'Mahasiswa memuat bar terjawab');
-assert(str_contains($studentContent, 'cbt-layout'), 'Mahasiswa memuat layout 2 kolom');
-assert(str_contains($studentContent, 'cbt-option'), 'Mahasiswa memuat kartu opsi pilihan A-E');
-assert(str_contains($studentContent, 'cbtFlag'), 'Mahasiswa memuat checkbox ragu-ragu');
-assert(str_contains($studentContent, 'cbtNumbers'), 'Mahasiswa memuat grid navigasi nomor');
-assert(str_contains($studentContent, 'ajax_action'), 'Mahasiswa memuat handler AJAX auto-save');
-assert(str_contains($studentContent, 'cbtSessionSelect'), 'Mahasiswa memuat selektor sesi/paket adaptif');
+$viewContent = file_get_contents(__DIR__ . '/../includes/pretes-cbt-view.php');
+$jsContent = file_get_contents(__DIR__ . '/../assets/js/pretes-cbt.js');
+assert(str_contains($studentContent, 'pretes-cbt-view.php'), 'Mahasiswa memuat shared view pretes-cbt-view.php');
+assert(str_contains($studentContent, 'face_api=1') && str_contains($studentContent, 'cbt_api=1'), 'Mahasiswa memuat endpoint face_api & cbt_api');
+assert(str_contains($studentContent, 'sectionCheckin') && str_contains($studentContent, 'sectionExamRoom'), 'Mahasiswa memuat Skenario A (Check-in) & Skenario B (Proctoring)');
+assert(str_contains($studentContent, 'runInitialCheckin') && str_contains($studentContent, 'runPeriodicProctoringCheck'), 'Mahasiswa memuat engine verifikasi wajah & pengawasan 30 detik');
+assert(str_contains($viewContent, 'cbt-shell'), 'Shared view memuat container cbt-shell');
+assert(str_contains($viewContent, 'cbt-timer'), 'Shared view memuat countdown timer');
+assert(str_contains($viewContent, 'cbt-completion'), 'Shared view memuat bar terjawab');
+assert(str_contains($viewContent, 'cbt-layout'), 'Shared view memuat layout 2 kolom');
+assert(str_contains($viewContent, 'cbtFlag'), 'Shared view memuat checkbox ragu-ragu');
+assert(str_contains($viewContent, 'cbtNumbers'), 'Shared view memuat grid navigasi nomor');
+assert(str_contains($viewContent, 'cbtInterruption'), 'Shared view memuat dialog jeda anti-kecurangan');
+assert(str_contains($jsContent, 'cbt-option'), 'JS CBT memuat kartu opsi pilihan A-E');
+assert(str_contains($jsContent, 'cbtSessionList'), 'JS CBT memuat selektor sesi ujian');
 echo "[PASS] Kelengkapan antarmuka Admin & Mahasiswa terverifikasi 100% berparitas dengan CBT Pretes.\n";
 
 echo "\n=== SELURUH TES PARITAS CBT TUTORIAL RPL BERHASIL 100% (ALL PASS) ===\n";

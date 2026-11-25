@@ -1,3 +1,45 @@
+## 2026-11-25 07:13:00 +0700 — Paritas Penuh CBT Mahasiswa & Pengawasan Kamera AI (Proctoring) Tutorial RPL dengan CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-STUDENT-PROCTORING-PARITY · **Parent Git:** `a8860287c6853a2b54c08c7089b5de3ac4b77637`.
+
+**Permintaan dan dasar perbaikan:** Menindaklanjuti instruksi pengguna ("copy persis jangan ada yang beda antara cbt pretes dan tutorial rpl" pada sisi CBT mahasiswa, tanpa menyentuh menu Tutorial RPL maupun menu Pretes RPL):
+1. **Shared CBT View (`includes/pretes-cbt-view.php`)**:
+   - Menambahkan dukungan opsional `$cbtViewOptions` (`style_url`, `aria_label`, `eyebrow`, `title`) agar antarmuka ujian CBT Pretes (`pages/pretes-ujian.php`) tetap utuh 100% sekaligus dapat digunakan langsung oleh `pages/tutorial-rpl-cbt.php` beserta `assets/js/pretes-cbt.js` dan `assets/css/pretes-cbt-exam.css`.
+2. **Engine CBT, Interupsi Anti-Kecurangan, & Proctoring (`includes/tutorial-rpl-cbt-engine.php`)**:
+   - Menyediakan skema tabel `tutorial_rpl_cbt_interruptions`, `tutorial_rpl_cbt_interruption_events`, dan `tutorial_rpl_proctoring_logs`.
+   - Mengimplementasikan `tutorialRplCbtState`, `tutorialRplCbtStart` (pemilihan multi-sesi, validasi jadwal `start_time`/`end_time`, `token_required`, kuota kategori, pengacakan CSPRNG soal & opsi A-E), `tutorialRplCbtChange` (`save`, `flag`, `submit`, `interrupt`, `resume`), `tutorialRplCbtInterrupt` (pembekuan waktu server, pengosongan soal terbuka, relokasi & pengacakan ulang opsi saat pelanggaran), `tutorialRplCbtFinalize` (penilaian `standar`/`penalti` dan sinkronisasi otomatis ke `tutorial_rpl_members`), serta `tutorialRplPeriodicSnapshotNeeded`.
+3. **API CBT & API Proctoring Wajah Tutorial RPL (`api/tutorial-rpl-cbt.php`, `api/tutorial-rpl-proctoring-check.php`)**:
+   - Menyamakan 1:1 alur otorisasi, CSRF, validasi `camera_mode === 'wajib'`, verifikasi tantangan 9 foto (`pose-burst-v2`), pengecekan berkala 30 detik (`periodic_check`), serta pengecekan ulang perhatian kamera sebelum `resume` ujian.
+4. **Halaman Ujian Mahasiswa (`pages/tutorial-rpl-cbt.php`)**:
+   - Menyelaraskan penuh UI & JS dengan `pages/pretes-ujian.php`: routing `?face_api=1`, `?cbt_api=1`, `?cbt_asset=1`, `?cbt_style=exam`; toolbar akun tester `12345`; Skenario A (Check-in verifikasi wajah awal dengan panduan pose cermin); Skenario B (Floating Proctoring Bar, peringatan pelanggaran, shared CBT 2 kolom, dialog jeda, dan 4 Tata Tertib).
+5. **Pembaruan & Penambahan Suite Pengujian**:
+   - Menyesuaikan `tests/tutorial-rpl-cbt-parity-test.php` & `tests/tutorial-rpl-student-hub-test.php`, serta menambahkan `tests/tutorial-rpl-cbt-proctoring-parity-test.php`.
+
+Waktu pada tabel adalah **waktu penyimpanan terakhir file** yang tercatat di sistem (WIB).
+
+| Waktu Simpan Terakhir (WIB) | File | Baris | Bagian / Perubahan |
+|---|---|---|---|
+| 2026-11-25 07:08:09 | `includes/pretes-cbt-view.php` | 1-10 | Dukungan `$cbtViewOptions` dengan default Pretes utuh. |
+| 2026-11-25 07:08:53 | `includes/tutorial-rpl-cbt-engine.php` | 1-519 (baru) | Engine CBT, interupsi anti-kecurangan, scoring standar/penalti, & tabel proctoring Tutorial RPL. |
+| 2026-11-25 07:09:15 | `api/tutorial-rpl-cbt.php` | 1-94 (baru) | Endpoint API CBT (`state`, `start`, `save`, `submit`, `interrupt`, `resume`) + gate kamera wajib. |
+| 2026-11-25 07:09:18 | `api/tutorial-rpl-proctoring-check.php` | 1-209 (baru) | Endpoint API Proctoring AI (`challenge`, `initial_checkin`, `periodic_check`, `fetch_logs`). |
+| 2026-11-25 07:12:39 | `pages/tutorial-rpl-cbt.php` | 1-647 | Paritas penuh Skenario A & B, routing asset/API, tester toolbar, dan engine proctoring JS. |
+| 2026-11-25 07:10:50 | `tests/tutorial-rpl-cbt-parity-test.php` | 245-257 | Penyesuaian asersi paritas antarmuka mahasiswa dengan shared view & proctoring. |
+| 2026-11-25 07:12:41 | `tests/tutorial-rpl-student-hub-test.php` | 7-10, 120-143, 259-349 | Penyesuaian fixture & pengujian CBT engine terpadu. |
+| 2026-11-25 07:11:52 | `tests/tutorial-rpl-cbt-proctoring-parity-test.php` | 1-118 (baru) | Pengujian otomatis interupsi, pembekuan waktu, acak ulang, resume, scoring, & snapshot throttling. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`) pada seluruh 5 berkas PHP utama lulus tanpa syntax error.
+- `git diff --check` bersih.
+- `tests/tutorial-rpl-student-hub-test.php`: ALL PASS.
+- `tests/tutorial-rpl-cbt-parity-test.php`: 9/9 tahap ALL PASS.
+- `tests/tutorial-rpl-cbt-nilai-test.php`: 4/4 tahap ALL PASS.
+- `tests/tutorial-rpl-cbt-proctoring-parity-test.php`: ALL PASS.
+- `tests/pretes-cbt-test.php`: PASS.
+- **Keterbatasan:** Pengujian dilakukan pada runtime PHP 8.3 CLI + SQLite; verifikasi kamera WebRTC live dan koneksi ke VPS face-engine produksi belum dijalankan di browser pada sesi ini.
+
+---
+
 ## 2026-11-25 04:01:00 +0700 — Perbaikan Tombol Edit Sesi Ujian dan Koreksi Sintaks JavaScript pada CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-FIX-EDIT-SESSION-CLICK · **Parent Git:** `3e3f790a7bb47ddea0e2fd9245d5a05cfbcafd18`.
