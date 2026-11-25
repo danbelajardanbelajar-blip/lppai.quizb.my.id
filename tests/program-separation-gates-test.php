@@ -1,0 +1,56 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/../includes/program-separation/gates.php';
+use Lppai\ProgramSeparation\Gates;
+use Lppai\ProgramSeparation\Capture;
+function gateCheck(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
+function gateReject(callable $action):void{try{$action();}catch(RuntimeException|InvalidArgumentException $e){return;}throw new LogicException('Expected rejection.');}
+$fixture=static function():PDO{
+    $pdo=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+    $pdo->exec("CREATE TABLE users(id INT,jenis_program TEXT,role TEXT);INSERT INTO users VALUES(1,'RPL','mahasiswa'),(2,'Reguler','mahasiswa');
+CREATE TABLE pretes_cbt_sessions(id INT PRIMARY KEY,mode TEXT,is_active INT,exam_open INT,token TEXT,package_ids_json TEXT);
+INSERT INTO pretes_cbt_sessions VALUES(3,'tryout',1,1,'secret-test','[1]'),(4,'resmi',1,1,'secret-test','[1]'),(5,'resmi',1,1,'secret-test','[1]'),(6,'resmi',0,0,'untouched','[1]');
+CREATE TABLE pretes_cbt_packages(id INT);INSERT INTO pretes_cbt_packages VALUES(1);
+CREATE TABLE pretes_cbt_attempts(id INT,user_id INT,registration_id INT,session_id INT,submitted_at INT,score REAL);
+INSERT INTO pretes_cbt_attempts VALUES(11,1,-3001,3,NULL,NULL),(12,1,21,4,100,86.5);
+CREATE TABLE pretes_cbt_items(attempt_id INT,position INT,answer TEXT,correct_answer TEXT,flagged INT);
+INSERT INTO pretes_cbt_items VALUES(11,1,'B','A',1),(12,1,'A','A',0);
+CREATE TABLE pretes_assessments(registration_id INT,scores_json TEXT);INSERT INTO pretes_assessments VALUES(21,'{\"ujian_tulis\":86.5}');
+CREATE TABLE tutorial_registrations(id INT,user_id INT,nilai_akhir REAL);INSERT INTO tutorial_registrations VALUES(31,1,90),(32,2,85);
+");return $pdo;
+};
+$pdo=$fixture();$protected=array_values(array_diff(Capture::tables($pdo),['pretes_cbt_sessions']));
+$before=Capture::fingerprint($pdo,$protected);$journal=[];
+$result=Gates::close($pdo,[3,4,5],static function(array $row)use(&$journal):void{$journal[]=$row;});
+gateCheck($result['closed_session_ids']===[3,4,5] && $result['cutover_allowed']===false,'Tutup hanya pilihan eksplisit, tanpa migrasi');
+gateCheck(Capture::fingerprint($pdo,$protected)===$before,'Jawaban/kunci/nilai/pending/tutorial tidak berubah');
+gateCheck(count($journal)===1 && $journal[0]['flags_before'][0]['is_active']==='1','Preimage disimpan sebelum perubahan');
+gateCheck((int)$pdo->query('SELECT SUM(is_active)+SUM(exam_open) FROM pretes_cbt_sessions')->fetchColumn()===0,'Sesi terpilih tertutup');
+gateCheck($pdo->query('SELECT token FROM pretes_cbt_sessions WHERE id=6')->fetchColumn()==='untouched','Sesi lain tetap utuh');
+gateCheck($result['legacy_tutorial_registration_program_counts']===['rpl'=>1,'reguler'=>1],'Riwayat tutorial lintas program dilaporkan, bukan dipindah');
+gateCheck(!str_contains(json_encode($result),'secret-test'),'Token tidak dicetak');
+gateCheck($result['current_findings']['unfinished_pretes_tryout_attempt / pretes_cbt_attempts']['id']==='11','Tryout pending tidak otomatis dikumpulkan');
+$repeat=Gates::close($pdo,[3,4,5],static function(array $value):void{});
+gateCheck($repeat['status']==='selected_pretes_gates_closed_no_migration' && Capture::fingerprint($pdo,$protected)===$before,'Pengulangan idempoten');
+foreach(['','0','3,3','3;DROP','3, 4','-1']as$bad)gateReject(fn()=>Gates::ids($bad));
+gateCheck(Gates::ids('5,3,4')===[3,4,5],'ID disortir setelah validasi');
+$pdo=$fixture();$all=Capture::fingerprint($pdo,Capture::academicTables(Capture::tables($pdo)));
+gateReject(fn()=>Gates::close($pdo,[3,99],static function(array $v):void{}));
+gateCheck(Capture::fingerprint($pdo,Capture::academicTables(Capture::tables($pdo)))===$all,'ID hilang membatalkan sebelum write');
+gateReject(fn()=>Gates::close($pdo,[3,4,5],static function(array $v):void{throw new RuntimeException('journal failed');}));
+gateCheck(Capture::fingerprint($pdo,Capture::academicTables(Capture::tables($pdo)))===$all,'Journal gagal tidak mengubah gerbang');
+$pdo->exec("CREATE TRIGGER accidental_grade_change AFTER UPDATE ON pretes_cbt_sessions BEGIN UPDATE pretes_cbt_attempts SET score=99; END");
+gateReject(fn()=>Gates::close($pdo,[3,4,5],static function(array $v):void{}));
+gateCheck(Capture::fingerprint($pdo,Capture::academicTables(Capture::tables($pdo)))===$all && !$pdo->inTransaction(),'Perubahan nilai tidak diharapkan membatalkan seluruh transaksi dan flag');
+$pdo->exec('DROP TRIGGER accidental_grade_change');
+$pdo->exec("CREATE TRIGGER unexpected_session_change AFTER UPDATE ON pretes_cbt_sessions BEGIN UPDATE pretes_cbt_sessions SET token='changed' WHERE id=6; END");
+gateReject(fn()=>Gates::close($pdo,[3,4,5],static function(array $v):void{}));
+gateCheck(Capture::fingerprint($pdo,Capture::academicTables(Capture::tables($pdo)))===$all,'Kolom/sesi lain berubah menyebabkan rollback');
+$pdo->exec('DROP TRIGGER unexpected_session_change');
+$pdo->exec("CREATE TRIGGER unexpected_account_change AFTER UPDATE ON pretes_cbt_sessions BEGIN UPDATE users SET jenis_program='Reguler' WHERE id=1; END");
+gateReject(fn()=>Gates::close($pdo,[3,4,5],static function(array $v):void{}));
+gateCheck($pdo->query('SELECT jenis_program FROM users WHERE id=1')->fetchColumn()==='RPL','Perubahan akun juga terdeteksi dan dibatalkan');
+$p=proc_open([PHP_BINARY,'-d','disable_functions=proc_open,proc_close',__DIR__.'/../tools/program-separation-close-gates.php'],[1=>['pipe','w'],2=>['pipe','w']],$pipes);
+$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);
+gateCheck(proc_close($p)===2 && !str_contains($out.$err,'undefined function'),'CLI tidak butuh proc_open dan argumen tidak lengkap tidak membuka DB');
+echo "PASS: gerbang terpilih ditutup tanpa perubahan jawaban/nilai, preimage, idempoten, pending dipertahankan, rollback bila journal/grade/session bermasalah.\n";

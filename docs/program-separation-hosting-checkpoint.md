@@ -73,3 +73,24 @@ Tidak ada migrasi/aktivasi pemisahan produksi dalam paket checkpoint ini. Pekerj
 ## Hasil uji kompatibilitas lokal
 
 Uji integrasi menjalankan runner shell asli dengan PHP fixture yang menonaktifkan proc_open/proc_close, serta klien mysqldump sintetis. Diuji sukses/gagal/ulang, quoting path dan database dengan kutip, pembersihan file kredensial, perbedaan database, perubahan snapshot/nilai dan larangan klaim restore/migrasi. Ini menguji alur runner, bukan backup MySQL hosting nyata. Setelah perbaikan dipull, keluaran terminal hosting tetap diperlukan untuk memastikan mysqldump/privilege tersedia.
+
+## Tutup gerbang Pretes yang ternyata masih aktif
+
+Review pengguna setelah commit 1a0b3e2 mengonfirmasi 96 attempt tryout dan 77 attempt resmi pada snapshot lama; tiga pending semuanya tryout (36,54,119). Metadata live menunjukkan sesi 3 mode tryout, sesi 4 dan 5 mode resmi, ketiganya is_active=1 dan exam_open=1. Pernyataan sesi sudah ditutup sebelumnya tidak membuktikan seluruh sesi Pretes tertutup; metadata ini menunjukkan gerbang Pretes yang masih terbuka, bukan bukti ada peserta sedang mengerjakan saat itu.
+
+Untuk menutup hanya gerbang sesi yang telah diidentifikasi, jalankan dari checkout aplikasi:
+
+```bash
+git pull --ff-only &&
+php tools/program-separation-close-gates.php \
+  --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+  --close-pretes=3,4,5
+```
+
+Ini operasi tulis terbatas: hanya is_active dan exam_open pada sesi Pretes 3,4,5 dibuat 0. Tidak memanggil engine/cleanup, tidak menutup paksa attempt, tidak mengumpulkan tryout, tidak mengubah token/paket/jadwal/nilai, dan tidak mengubah sesi Tutorial RPL. Tool memverifikasi checksum SQL/snapshot serta identitas database dari capture private sebelum menulis. Sesi yang tidak dipilih tetap utuh. ID tidak valid/hilang membatalkan operasi, bukan diabaikan.
+
+Dalam transaksi InnoDB, tool mengunci baris sesi, menyimpan preimage flag dan fingerprint ke berkas private, lalu membandingkan seluruh tabel database lain (termasuk akun, nilai dan jawaban) dan seluruh kolom sesi sesudah UPDATE. Perubahan tak diharapkan pada nilai/data lain atau field sesi menyebabkan rollback. Snapshot dalam transaksi hanya membuktikan operasi ini tidak mengubah data terlindungi; ini bukan jaminan tidak ada koneksi lain yang menulis sesudah commit. Side-effect trigger nilai pada fixture diuji dan menyebabkan rollback seluruh perubahan termasuk flag.
+
+Keluaran `selected_pretes_gates_closed_no_migration` memuat status sesi terkini, audit baru dari SELECT-only, jumlah riwayat tutorial berdasarkan program akun saat ini, serta lokasi log gate-close-*.json yang menyimpan preimage dan hasil. Snapshot/backup lama tidak ditimpa. Jika log akhir gagal sesudah commit, tool menyatakan perubahan gerbang sudah committed dan meminta pemeriksaan ulang, bukan mengklaim rollback. Jalankan ulang aman untuk sesi yang sudah tertutup.
+
+Kirim ringkasan keluaran saja; tidak perlu mengirim backup SQL, token, nilai individual atau log private. Tiga tryout pending dan 54 riwayat Tutorial Reguler tetap dipertahankan untuk review, bukan dihapus/dipindah supaya audit bersih. Backup belum dilatih restore dan pemisahan program belum diaktifkan; penutupan gerbang ini merupakan prasyarat, bukan pelaksanaan migrasi data.

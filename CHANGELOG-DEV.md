@@ -1,3 +1,28 @@
+## 2026-11-25 16:43:57 +0700 — Siapkan penutupan gerbang Pretes terpilih dengan perlindungan seluruh data
+
+**ID:** PROGRAM-SEPARATION-CLOSE-PRETES-GATES · **Parent Git:** `1a0b3e2db19de213b129c270433f0478fb7836dd`.
+
+**Bukti hosting:** Reviewer pengguna memverifikasi checksum backup/snapshot, menemukan 96 attempt tryout dan 77 resmi. Tiga attempt belum submit adalah tryout (36,54,119). Metadata live: sesi 3 tryout, sesi 4/5 resmi; semuanya is_active=1 dan exam_open=1. Karena itu seluruh Pretes belum tertutup walaupun pengguna sebelumnya menutup/nonaktifkan sesi ujian. Metadata terbuka bukan bukti ada peserta sedang mengerjakan. Riwayat Tutorial Reguler yang perlu review tetap 54; tidak dipindah/dihapus berdasarkan akun saat ini.
+
+**Implementasi:** CLI baru meminta ID sesi eksplisit dan folder capture private yang backup/snapshot/hash DB-nya sesuai. Hanya UPDATE is_active=0,exam_open=0 pada sesi pilihan, tidak memanggil engine, finalisasi, cleanup atau DDL. Di dalam transaksi InnoDB, semua baris sesi dikunci; preimage flag dan fingerprint seluruh tabel database lain disimpan sebelum update. Perbandingan seluruh kolom sesi menjamin field/sesi lain tidak berubah; fingerprint mendeteksi side-effect ke jawaban/nilai/akun/tabel lain dan menyebabkan rollback. Pending tetap utuh. Output mencakup audit baru dari SELECT dan status sesi; selalu tanpa migrasi/cutover. Jika jurnal akhir gagal setelah commit, output menyebut gerbang sudah committed, bukan mengaku rollback. Jurnal private menyimpan preimage dan hasil. Operasi diulang aman.
+
+**Batas operasi:** Pengguna telah mengizinkan peralihan dan meminta tindakan hosting berupa perintah terminal. Paket ini menyiapkan penutupan operasional sesi 3/4/5; agen tidak menjalankan SQL ke hosting. Pengguna akan menjalankan perintah setelah pull. File runtime ujian/penilaian tidak diubah.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Nomor baris adalah awal hunk file lama atau rentang penuh file baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 16:42:40 | `includes/program-separation/gates.php` | 1-59 | Operasi penutupan gerbang eksplisit dalam transaksi; lock sesi, preimage, fingerprint semua tabel lain, perbandingan seluruh kolom sesi, rollback unexpected changes, audit snapshot terkini dan breakdown tutorial legacy. |
+| 2026-11-25 16:40:32 | `tools/program-separation-close-gates.php` | 1-42 | CLI tanpa proc_open/initializer; wajib capture private dengan hash backup/snapshot dan identitas database sesuai; ID sesi eksplisit; jurnal sebelum perubahan dan hasil private, pelaporan jujur bila log gagal sesudah commit. |
+| 2026-11-25 16:43:04 | `tests/program-separation-gates-test.php` | 1-56 | Uji flags-only, data/nilai/jawaban/pending utuh, sesi tidak dipilih, idempoten, ID invalid/hilang, journal gagal, trigger ubah nilai/sesi/akun menyebabkan rollback, CLI validasi tanpa subprocess. |
+| 2026-11-25 16:42:40 | `docs/program-separation-hosting-checkpoint.md` | 76 | Catat 96 tryout/77 resmi, tiga pending tryout serta metadata live sesi 3/4/5 masih terbuka; perintah terminal untuk penutupan terbatas, batas checksum transaksi dan larangan menghapus/memindahkan riwayat. |
+
+**Verifikasi:** Lint tiga PHP baru lulus. tests/program-separation-gates-test.php, tests/program-separation-attempt-kinds-test.php, tests/program-separation-capture-test.php, tests/program-separation-test.php lulus dengan assertions aktif. Fixture SQLite membuktikan hanya flag pilihan berubah; trigger yang mengubah nilai, akun atau field/sesi lain membatalkan transaksi termasuk flag. Uji preimage/journal gagal dan pemanggilan idempoten lulus. CLI pada PHP dengan proc_open/proc_close disabled menolak argumen tidak lengkap sebelum membuka DB. git diff --check diperiksa sebelum commit/push.
+
+**Keterbatasan:** Lock/rollback MySQL dan trigger/schema hosting nyata belum dijalankan agen; tool menolak tabel non-InnoDB sebelum menulis. Fingerprint dalam transaksi menguji efek operasi ini, bukan menjamin koneksi lain tidak menulis setelah commit. Backup belum diuji restore dan pemisahan program belum aktif. Penutupan sesi harus dibuktikan oleh keluaran terminal pengguna; tidak mengklaim gerbang hosting sudah tertutup atau nilai produksi sudah direkonsiliasi hanya karena push berhasil.
+
+---
+
 ## 2026-11-25 16:35:30 +0700 — Bedakan tryout dan tester dari konflik pendaftaran resmi pada audit pemisahan
 
 **ID:** PROGRAM-SEPARATION-ATTEMPT-CLASSIFICATION · **Parent Git:** `c8bd9fffec9923df718063dc2910823acfc8914d`.
