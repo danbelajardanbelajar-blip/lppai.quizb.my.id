@@ -33,13 +33,16 @@ pretesCbtActivateSession($pdo, $try2);
 $check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmiId")->fetchColumn() === 1, 'Mengaktifkan tryout tidak menonaktifkan sesi resmi');
 $check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $tryId")->fetchColumn() === 1, 'Mengaktifkan tryout lain tidak menonaktifkan tryout ini');
 
-// Sesi resmi baru yang aktif hanya menonaktifkan sesi resmi lain
+// Sesi resmi dapat aktif bersamaan; hanya aktivasi exclusive eksplisit yang menggantikan sesi lain.
 $resmi2 = pretesCbtSaveSession($pdo, ['title' => 'Resmi 2', 'package_ids' => [1], 'mode' => 'resmi', 'is_active' => 1]);
-$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmiId")->fetchColumn() === 0, 'Sesi resmi lama nonaktif saat resmi baru diaktifkan');
+$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmiId")->fetchColumn() === 1, 'Sesi resmi lama tetap aktif saat resmi baru dibuat');
 $check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $tryId")->fetchColumn() === 1, 'Tryout tetap aktif saat sesi resmi diganti');
 pretesCbtActivateSession($pdo, $resmiId);
-$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmi2")->fetchColumn() === 0, 'Aktivasi resmi menonaktifkan resmi lain');
+$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmi2")->fetchColumn() === 1, 'Aktivasi biasa mempertahankan sesi resmi lain');
 $check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $tryId")->fetchColumn() === 1, 'Aktivasi resmi tidak menyentuh tryout');
+pretesCbtActivateSession($pdo, $resmiId, true);
+$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $resmi2")->fetchColumn() === 0, 'Aktivasi exclusive eksplisit menonaktifkan sesi resmi lain');
+$check((int)$pdo->query("SELECT is_active FROM pretes_cbt_sessions WHERE id = $tryId")->fetchColumn() === 1, 'Aktivasi exclusive tetap mempertahankan tryout');
 
 $userId = 77; $now = 1000000;
 $session = pretesTryoutGetSession($pdo, $tryId);

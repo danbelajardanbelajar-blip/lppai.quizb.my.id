@@ -1,3 +1,32 @@
+## 2026-11-25 15:57:19 +0700 — Lindungi riwayat CBT dan siapkan backup/audit terminal shared hosting
+
+**ID:** PROGRAM-SEPARATION-HOSTING-CAPTURE · **Parent Git:** `70e9ae296a703cf21ff6f57f92f3a63f1705715a`.
+
+**Arahan pengguna:** Sesi ujian sudah ditutup dan dinonaktifkan; lanjutkan pemisahan dengan menjaga data/nilai. Pengguna kemudian meminta hanya terminal Codex dan tindakan eksternal berupa perintah terminal untuk dijalankannya sendiri. SSH hosting quic1934@kampar.iixcp.rumahweb.net:2223 menolak autentikasi; pengguna mengonfirmasi shared hosting membatasi akses dari IP lain. Karena itu tidak ada migrasi/backup database hosting yang diklaim telah dijalankan agen.
+
+**Temuan dan perlindungan:** ensurePretesCbtTables sebelumnya otomatis memanggil maintenance yang mengaktifkan sesi default, menulis ulang paket sesi dan dapat menghapus attempt yang dianggap tercampur. Dua pemanggilan otomatis dihapus. Import/maintenance eksplisit tidak dijalankan. Fixture lintas proses pada versi parent mereproduksi perubahan data; versi perbaikan mempertahankan seluruh snapshot yang diuji. Efek bootstrap MySQL diuji melalui cabang driver simulasi pada SQLite, bukan koneksi MySQL produksi.
+
+**Perangkat operasi:** Tambahkan capture khusus CLI yang memuat konstanta config saja dan membuka koneksi sendiri tanpa auth/getDBConnection/initializer. Transaksi inspeksi read-only; mysqldump menggunakan single-transaction dan tidak mengambil lock tabel aplikasi. Tolak tabel non-InnoDB agar konsistensi tidak diasumsikan. Backup SQL penuh, audit minimum dan hash akademik ditulis di luar web root dengan izin private. Tabel/kolom hilang dilaporkan tanpa ALTER. Fingerprint berbeda menyebabkan capture gagal. Backup belum dilatih restore tetap diberi restore_tested=false dan cutover_allowed=false; script tidak memiliki apply/migrasi.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Baris adalah awal hunk untuk berkas lama atau rentang penuh untuk berkas baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 15:32:23 | `includes/pretes-cbt.php` | 239 | Hentikan impor Paket 2 dan maintenance aktivasi/cleanup sesi dari inisialisasi rutin; maintenance CLI lama tetap eksplisit. Pembacaan tidak otomatis membuka sesi atau menghapus attempt. |
+| 2026-11-25 15:39:17 | `includes/program-separation/capture.php` | 1-90 | Inspeksi PDO read-only tanpa helper runtime; proyeksi minimum, schema gap, fingerprint multiset semua nilai/jawaban/duplikasi/binary/null pada tabel akademik; guard folder private dan opsi client. |
+| 2026-11-25 15:49:00 | `tools/program-separation-capture.php` | 1-61 | CLI hosting: backup mysqldump database penuh, sidik akademik sebelum-sesudah, snapshot dan audit privat; kredensial melalui file 0600 sementara, bukan argumen/output; tanpa migrasi/apply. |
+| 2026-11-25 15:47:10 | `tests/pretes-cbt-init-preservation-test.php` | 1-50 | Regresi lintas proses PHP dengan simulasi cabang maintenance MySQL di SQLite; sesi tertutup, konfigurasi paket, kunci/snapshot, jawaban pending dan nilai selesai harus identik. |
+| 2026-11-25 15:41:07 | `tests/program-separation-capture-test.php` | 1-52 | Uji read-only/fingerprint, perubahan jawaban/nilai, kolom hilang, privasi password, escape opsi client, direktori web ditolak dan CLI memvalidasi argumen sebelum koneksi. |
+| 2026-11-25 15:50:32 | `tests/pretes-tryout-test.php` | 36, 38, 41, 43 | Perbaiki asumsi single-session lama: aktivasi biasa mempertahankan sesi lain; aktivasi exclusive eksplisit diuji tersendiri dan tidak menyentuh tryout. |
+| 2026-11-25 15:49:00 | `docs/program-separation-hosting-checkpoint.md` | 1-61 | Perintah terminal cPanel untuk pull/capture, izin berkas private, arti hasil, kegagalan, larangan membagikan SQL/kredensial dan batas lanjut migrasi/restore. |
+| 2026-11-25 15:49:00 | `docs/program-separation-rollout.md` | 5 | Perbarui status: ujian dinyatakan sudah ditutup; akses shared hosting perlu terminal pengguna; tautkan checkpoint backup sebelum migrasi. |
+
+**Verifikasi:** Lint enam file PHP yang berubah/baru lulus. Total 13 suite lokal lulus dengan assertions aktif setelah koreksi asumsi test tryout: pretes-cbt-init-preservation; program-separation-capture; program-separation; pretes-cbt; pretes-cbt-session; pretes-cbt-token; pretes-cbt-interruption; pretes-exam-access; tutorial-rpl-cbt-parity; tutorial-rpl-cbt-proctoring-parity; pretes-session-package-isolation; pretes-multi-session-active; pretes-tryout. Tiga kegagalan awal tryout direproduksi identik pada parent: asumsi eksklusivitas lama tidak sesuai dukungan multi-session yang sudah ada. Koreksi test menguji kedua mode tanpa mengubah implementasi aktivasi sesi. CLI capture --help dan penolakan argumen diuji tanpa koneksi produksi. git diff --check diperiksa sebelum commit/push.
+
+**Batas verifikasi dan pekerjaan berikutnya:** Beberapa suite lama mencatat pretes_assessments tidak ada pada fixture SQLite minimal; suite tetap lulus dan tidak ditutupi lewat perubahan engine. Mysqldump, privilege MySQL/MariaDB hosting, ruang disk, hasil backup serta restore belum diuji pada server nyata. Data produksi belum dimigrasi dan pemisahan empat modul belum diaktifkan. Pengguna perlu menjalankan perintah capture di terminal hosting, mengirim ringkasan tanpa SQL/password, kemudian audit konflik dan latihan restore/migrasi dilanjutkan. Tidak ada jaminan integritas produksi sebelum bukti backup dan rekonsiliasi diperoleh; push Git tidak membuktikan deployment hosting berhasil.
+
+---
+
 ## 2026-11-25 10:31:34 +0700 — Siapkan pemisahan program secara offline selama ujian berlangsung
 
 **ID:** PROGRAM-SEPARATION-OFFLINE-PREPARE · **Parent Git:** `e327773e3db23a9fff7d59b5288081f5f9f5bbcb`.

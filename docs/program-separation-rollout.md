@@ -2,6 +2,8 @@
 
 ## Status paket ini
 
+**Pembaruan setelah penutupan ujian:** Pengguna telah menutup/nonaktifkan sesi dan mengizinkan pekerjaan dilanjutkan. Batas berikutnya adalah akses shared hosting: SSH dari agen ditolak dan pengguna meminta seluruh tindakan eksternal berupa perintah terminal. Lihat `docs/program-separation-hosting-checkpoint.md` untuk capture/backup yang harus dijalankan di terminal hosting sebelum migrasi data. Jalur inisialisasi CBT telah diperbaiki agar tidak otomatis mengaktifkan sesi/menghapus attempt melalui maintenance lama; scope empat modul masih belum diaktifkan produksi.
+
 Permintaan pengguna: pisahkan RPL dan Reguler pada Pretes maupun Tutorial, dengan syarat ujian yang sedang berjalan tidak terganggu.
 
 Paket ini menyelesaikan **audit kode awal, rancangan pemisahan, fondasi scope terisolasi, dan pemeriksa snapshot offline**. Tidak mengaktifkan pemisahan produksi, membuat menu pengganti, mengubah database, atau mengalihkan peserta. Tidak ada file runtime lama yang diubah. Berkas scope/audit baru tidak dimuat oleh route aktif mana pun. Keberadaan paket di Git/hosting tidak mengaktifkannya.

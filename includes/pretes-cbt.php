@@ -236,8 +236,8 @@ function ensurePretesCbtTables(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS pretes_cbt_initialization (
         seed_key VARCHAR(64) PRIMARY KEY, initialized_at INTEGER NOT NULL
     )$engine");
-    ensurePaket2KristenProtestan($pdo);
-    pretesCbtEnsureDefaultSessionsActive($pdo);
+    // Initializing/reading CBT must respect admin closures and preserve historical answers.
+    // Imports and session/package maintenance are explicit CLI operations, never request side effects.
     $driver = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
     $insert = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
     if ($pdo->query("SELECT seed_key FROM pretes_cbt_initialization WHERE seed_key = 'defaults-v1'")->fetchColumn()) return;
