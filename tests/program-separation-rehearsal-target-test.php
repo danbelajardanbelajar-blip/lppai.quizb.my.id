@@ -14,9 +14,11 @@ try {
         ['fixture_production','quic1934_uji','Private output directory must exist'],
     ] as [$production,$target,$expected]) {
         file_put_contents($dir.'/config/database.php','<?php const DB_NAME='.var_export($production,true).';');
-        foreach(['rehearse.php','inspect.php'] as $script){
+        foreach(['fresh','resume','inspect'] as $mode){
+        $script=$mode==='inspect'?'inspect.php':'rehearse.php';
         $command=[PHP_BINARY,$dir.'/tools/'.$script,'--capture-dir='.$dir.'/not-present','--database='.$target,'--username=shared_user'];
         if($script==='rehearse.php')$command[]='--restore-report='.$dir.'/not-present/proof.json';
+        if($mode==='resume')$command[]='--resume-from='.$dir.'/not-present/schema-rehearsal-original-before.json';
         $proc=proc_open($command,[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
         if(!is_resource($proc))throw new RuntimeException('CLI fixture failed to start.');
         fclose($pipes[0]);$stdout=stream_get_contents($pipes[1]);$stderr=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$code=proc_close($proc);

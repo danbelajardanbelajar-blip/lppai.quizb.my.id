@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace Lppai\ProgramSeparation;
 require_once __DIR__.'/restore-verification.php';
 
-/** Test-copy schema rehearsal only; no auth/CBT initialization or legacy-column writes. */
+/** Test-copy schema rehearsal only; no auth/CBT initialization or legacy value changes. */
 final class AdditiveRehearsal
 {
     public const ADDITIONS=[
@@ -102,10 +102,55 @@ final class AdditiveRehearsal
         foreach (self::ADDITIONS as $table=>$columns) foreach ($columns as $name=>$type) {
             $pdo->exec('ALTER TABLE '.Capture::identifier($table).' ADD COLUMN '.Capture::identifier($name).' '.$type);
         }
+        return self::backfill($pdo,$plan);
+    }
+
+    /** Resume only the empty six-column schema left after a rolled-back rehearsal. No DDL. */
+    public static function resume(\PDO $pdo,array $plan): array
+    {
+        if($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql' && $pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE' AND ENGINE<>'InnoDB'")->fetchColumn()!==false)throw new \RuntimeException('All resume tables must remain InnoDB.');
+        $inspection=self::inspect($pdo,$plan);
+        if(!$inspection['all_original_column_values_unchanged'] || count($inspection['added_columns_present'])!==6 || array_sum($inspection['new_fields_nonnull_rows'])!==0)throw new \RuntimeException('Resume requires unchanged originals and all six new columns still NULL.');
+        foreach($plan['original_columns'] as $table=>$oldColumns){
+            $expected=array_merge($oldColumns,array_keys(self::ADDITIONS[$table]??[]));
+            if(self::columns($pdo,$table)!==$expected)throw new \RuntimeException('Unexpected schema; resume stopped without ALTER.');
+        }
+        foreach(self::ADDITIONS as $table=>$additions){
+            $sqlite=$pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite';
+            $metadata=$sqlite?$pdo->query('PRAGMA table_info('.Capture::identifier($table).')')->fetchAll(\PDO::FETCH_ASSOC):$pdo->query('SHOW COLUMNS FROM '.Capture::identifier($table))->fetchAll(\PDO::FETCH_ASSOC);
+            foreach($metadata as $column){
+                $name=$column[$sqlite?'name':'Field'];if(!isset($additions[$name]))continue;
+                $type=strtolower((string)$column[$sqlite?'type':'Type']);
+                $validType=$name==='periode_id'?(bool)preg_match('/^bigint(?:\(\d+\))?$/D',$type):$type==='varchar(16)';
+                $nullable=$sqlite?(int)$column['notnull']===0:$column['Null']==='YES';
+                if(!$validType||!$nullable||($column[$sqlite?'dflt_value':'Default']??null)!==null||(!$sqlite&&($column['Extra']??'')!==''))throw new \RuntimeException('Unexpected added-column definition; resume refused.');
+            }
+        }
+        return self::backfill($pdo,$plan)+['resumed_existing_columns'=>true,'alter_statements_executed'=>0];
+    }
+
+    private static function freezeAutomaticTimes(\PDO $pdo,string $table): string
+    {
+        if($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)!=='mysql')return '';
+        $sql='';
+        foreach($pdo->query('SHOW COLUMNS FROM '.Capture::identifier($table))->fetchAll(\PDO::FETCH_ASSOC) as $column){
+            if(stripos((string)($column['Extra']??''),'on update')!==false){
+                $name=Capture::identifier($column['Field']);$sql.=', '.$name.'='.$name;
+            }
+        }
+        return $sql;
+    }
+
+    private static function backfill(\PDO $pdo,array $plan): array
+    {
         $pdo->beginTransaction();
         try {
+            if(self::projection($pdo,$plan['original_columns'])!==$plan['original_fingerprint'])throw new \RuntimeException('Original data changed before metadata UPDATE; stopped.');
+            foreach(self::ADDITIONS as $table=>$columns)foreach($columns as $column=>$type){
+                if((int)$pdo->query('SELECT COUNT(*) FROM '.Capture::identifier($table).' WHERE '.Capture::identifier($column).' IS NOT NULL')->fetchColumn()!==0)throw new \RuntimeException('New metadata is already populated; do not repeat.');
+            }
             $programs=[];$periodUpdates=0;$registrationUpdates=0;$attemptUpdates=0;$unresolved=0;$mixed=0;
-            $updatePeriod=$pdo->prepare('UPDATE master_pretes SET program_scope=? WHERE id=?');
+            $updatePeriod=$pdo->prepare('UPDATE master_pretes SET program_scope=?'.self::freezeAutomaticTimes($pdo,'master_pretes').' WHERE id=?');
             foreach ($pdo->query('SELECT id,periode,target_program FROM master_pretes ORDER BY id')->fetchAll(\PDO::FETCH_ASSOC) as $period) {
                 $id=(int)$period['id'];$programs[$id]=Scope::program($period['target_program']);
                 if($programs[$id]!==null){$updatePeriod->execute([$programs[$id],$id]);$periodUpdates++;}else{$mixed++;}
@@ -113,7 +158,7 @@ final class AdditiveRehearsal
             $registrationPrograms=[];$registrationUsers=[];
             // Respect the database collation; case/accent variants may be ambiguous legacy labels.
             $findPeriod=$pdo->prepare('SELECT id FROM master_pretes WHERE TRIM(periode)'.($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?' COLLATE NOCASE':'').'=?');
-            $updateRegistration=$pdo->prepare('UPDATE pretes_registrations SET periode_id=?,program_snapshot=? WHERE id=?');
+            $updateRegistration=$pdo->prepare('UPDATE pretes_registrations SET periode_id=?,program_snapshot=?'.self::freezeAutomaticTimes($pdo,'pretes_registrations').' WHERE id=?');
             foreach ($pdo->query('SELECT id,user_id,periode FROM pretes_registrations ORDER BY id')->fetchAll(\PDO::FETCH_ASSOC) as $registration) {
                 $id=(int)$registration['id'];$label=trim((string)$registration['periode']);
                 $findPeriod->execute([$label]);$ids=$label!==''?$findPeriod->fetchAll(\PDO::FETCH_COLUMN):[];$findPeriod->closeCursor();
@@ -122,14 +167,16 @@ final class AdditiveRehearsal
                 $periodId=$ids[0];$registrationPrograms[$id]=$programs[$periodId];
                 $updateRegistration->execute([$periodId,$registrationPrograms[$id],$id]);$registrationUpdates++;
             }
-            $updateAttempt=$pdo->prepare('UPDATE pretes_cbt_attempts SET program_snapshot=? WHERE id=?');
+            $updateAttempt=$pdo->prepare('UPDATE pretes_cbt_attempts SET program_snapshot=?'.self::freezeAutomaticTimes($pdo,'pretes_cbt_attempts').' WHERE id=?');
             foreach ($pdo->query('SELECT id,user_id,registration_id FROM pretes_cbt_attempts ORDER BY id')->fetchAll(\PDO::FETCH_ASSOC) as $attempt) {
                 $reg=Audit::registrationNumber($attempt['registration_id']);
                 // Negative tryout IDs, tester placeholders and mixed/unknown periods stay unassigned.
                 if($reg===null || $reg<1 || ($registrationUsers[$reg]??null)!==(int)$attempt['user_id'] || ($registrationPrograms[$reg]??null)===null)continue;
                 $updateAttempt->execute([$registrationPrograms[$reg],(int)$attempt['id']]);$attemptUpdates++;
             }
-            if(Capture::tables($pdo)!==array_keys($plan['original_columns']) || self::projection($pdo,$plan['original_columns'])!==$plan['original_fingerprint']) throw new \RuntimeException('Original data changed during rehearsal; metadata updates rolled back, added columns may remain.');
+            $actual=self::projection($pdo,$plan['original_columns']);$different=[];
+            foreach($plan['original_fingerprint'] as $table=>$fingerprint)if(($actual[$table]??null)!==$fingerprint)$different[]=$table;
+            if(Capture::tables($pdo)!==array_keys($plan['original_columns']) || $different) throw new \RuntimeException('Original data changed during rehearsal (tables: '.implode(',',$different).'); metadata updates rolled back, added columns may remain.');
             $pdo->commit();
             return ['original_tables_verified'=>count($plan['original_columns']),'all_original_column_values_unchanged'=>true,
                 'added_columns'=>array_sum(array_map('count',self::ADDITIONS)),'single_program_periods'=>$periodUpdates,

@@ -1,3 +1,26 @@
+## 2026-11-25 18.09.09 +0700 — Pertahankan timestamp otomatis dan lanjutkan metadata tanpa ALTER ulang
+
+**ID:** PROGRAM-SEPARATION-PRESERVE-TIMESTAMPS · **Parent Git:** 3d950f7641f5f36a070e824a45f90e882ef8eb4e.
+
+**Bukti pengguna:** Inspektor 3d950f7 mengonfirmasi proyeksi semua kolom lama pada 78 tabel identik dengan jurnal schema-rehearsal-20261125-175633-56d7ef73-before.json, tidak ada tabel hilang/bertambah, enam kolom tambahan semuanya NULL. automatic_update_columns berisi master_pretes.updated_at. Produksi tidak dihubungi.
+
+**Penyebab dan perbaikan:** Perilaku UPDATE metadata lama yang mengganti timestamp otomatis direproduksi pada MariaDB 11.4.9 lokal. Backfill kini mendeteksi SHOW COLUMNS Extra ON UPDATE dan melakukan self-assignment untuk mempertahankan nilai temporal historis pada master, pendaftaran dan attempt yang ditulis. Refactor backfill bersama bagi fresh dan resume. Pengaman proyeksi semua nilai lama tetap berlaku; error menyebut tabel berbeda tanpa membocorkan nilai individual. Tidak mengganti waktu lama dengan waktu sekarang, tidak menonaktifkan trigger atau mengabaikan ketidakcocokan.
+
+**Resume:** CLI --resume-from memerlukan jurnal private asli, report restore lulus, database/hash backup sesuai, fingerprint akademik jurnal sama dengan baseline, seluruh nilai lama masih sama, enam kolom tepat tipe/nullable/default/urutan dan masih kosong, serta semua tabel InnoDB. Jalur resume tidak menjalankan ALTER/DROP/impor. Input dan metadata NULL diperiksa ulang dalam transaksi sebelum UPDATE. Snapshot program tetap dari target periode eksplisit, bukan akun kini. Tabel/jawaban/nilai/log/flags asli dipertahankan. Jurnal asli tidak ditimpa, before/after baru private 0600; output memuat mode resume_metadata_only, resumed_existing_columns, zero ALTER, dan cutover_allowed false. Laporan yang gagal setelah commit tidak diklaim rollback.
+
+**Lokasi/waktu:** additive apply 97, resume 109, freezeAutomaticTimes 132, backfill 144-akhir; CLI arg/resume/preimage dan laporan 13-akhir; fixture/guard seluruh tambahan; checkpoint bagian awal perintah resume. Waktu berikut penyimpanan terakhir yang tersedia, bukan waktu semua ketikan:
+
+- includes/program-separation/additive-rehearsal.php | snapshot 1-188 | simpan terakhir WIB 2026-11-25 18.06.37
+- tools/program-separation-rehearse-schema.php | snapshot 1-65 | simpan terakhir WIB 2026-11-25 18.07.03
+- tests/program-separation-additive-rehearsal-test.php | snapshot 1-77 | simpan terakhir WIB 2026-11-25 18.06.37
+- tests/program-separation-rehearsal-target-test.php | snapshot 1-33 | simpan terakhir WIB 2026-11-25 18.07.03
+- tests/program-separation-mariadb-timestamp-test.php | snapshot 1-46 | simpan terakhir WIB 2026-11-25 18.05.54
+- docs/program-separation-hosting-checkpoint.md | snapshot 1-233 | simpan terakhir WIB 2026-11-25 18.07.03
+
+**Verifikasi:** Lint lima PHP berubah/baru lulus. Integrasi MariaDB 11.4.9 nyata pada server fixture loopback terisolasi: UPDATE lama mereproduksi mutasi timestamp dan rollback; fresh ALTER+backfill dan resume mempertahankan TIMESTAMP, DATETIME(6), skor/jawaban, akun, flag; snapshot resmi benar, tryout tidak diubah, resume zero ALTER dan pengulangan ditolak. Arsip portable resmi SHA256 802f9f40a9dca774a3ba62f39c21093942954f178d6d7d458dc51453929bcdda diverifikasi; artefak hanya scratch ignored. Server fixture sudah dihentikan dengan pemeriksaan PID/path/port/datadir. Tes SQLite additive dengan proc_open/proc_close nonaktif lulus termasuk resume sukses, pengulangan, schema parsial/tipe salah/data lama berubah ditolak tanpa perubahan. Guard CLI fresh/resume/inspect menolak produksi dan target lain. Verify-restore test lulus. bash -n perintah hosting dan git diff --check lulus.
+
+**Batas:** Reproduksi dan perbaikan terbukti pada MariaDB lokal, resume hosting belum dijalankan. Tidak ada koneksi/migrasi produksi, belum pemisahan total atau aktivasi CBT baru. Pengguna perlu menjalankan perintah resume pada quic1934_uji dan mengirim hasil. Tidak mengimpor ulang atau menghapus kolom yang ada.
+
 ## 2026-11-25 18.00.05 +0700 — Inspeksi read-only setelah guard latihan membatalkan pengisian metadata
 
 **ID:** PROGRAM-SEPARATION-INSPECT-REHEARSAL · **Parent Git:** 9c0816dba614227c1c0ac25d919eb9d6e3947fe0.

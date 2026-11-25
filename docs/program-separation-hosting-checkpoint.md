@@ -1,5 +1,30 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Lanjutkan metadata dari enam kolom kosong yang sudah terverifikasi
+
+Inspeksi pengguna setelah rollback membuktikan seluruh kolom lama pada 78 tabel tetap sama dengan preimage, tidak ada tabel hilang/bertambah, keenam kolom tambahan ada dan seluruh isinya NULL. Jurnal sumber schema-rehearsal-20261125-175633-56d7ef73-before.json. Hosting mengonfirmasi master_pretes.updated_at memiliki ON UPDATE. Perilaku lama yang mengubah timestamp saat UPDATE metadata telah direproduksi pada MariaDB 11.4.9 lokal; transaksi rollback memulihkan seluruh nilai. Perbaikan mengisi kolom metadata baru sambil menetapkan setiap kolom ON UPDATE pada tabel yang ditulis ke nilainya sendiri, sehingga tidak mengganti waktu historis (referensi: https://dev.mysql.com/doc/refman/8.4/en/timestamp-initialization.html).
+
+Mode resume di bawah tidak menjalankan ALTER, impor atau DROP. Ia membutuhkan report restore lulus dan jurnal sumber yang cocok backup/database, proyeksi akademik jurnal sama dengan baseline backup, seluruh nilai lama saat ini sama, daftar/urutan kolom persis, enam kolom baru bertipe/nullable/default sesuai serta masih NULL, dan semua tabel InnoDB. Jika salah satu tidak cocok, berhenti tanpa mencoba memperbaiki nilai. Pemeriksaan proyeksi lama tetap dijalankan dalam transaksi pengisian; perubahan kolom lama lain tetap menyebabkan rollback. Keberhasilan/ketidakberhasilan resume tidak mengaktifkan pemisahan runtime produksi.
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+git pull --ff-only &&
+(
+  set +x
+  umask 077
+  IFS= read -r -s -p "Password database uji: " lppai_test_password || exit 1
+  printf '\n'
+  printf '%s' "$lppai_test_password" | php tools/program-separation-rehearse-schema.php \
+    --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+    --restore-report="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915/restore-verification-20261125-174226-b6d56ecc.json" \
+    --resume-from="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915/schema-rehearsal-20261125-175633-56d7ef73-before.json" \
+    --database=quic1934_uji \
+    --username=quic1934_zenhkm
+)
+```
+
+Hasil yang diharapkan test_schema_rehearsal_passed, mode=resume_metadata_only, resumed_existing_columns=true, alter_statements_executed=0, all_original_column_values_unchanged=true, original_tables_verified=78, cutover_allowed=false. Jurnal asli tidak ditimpa; jurnal sebelum/sesudah baru dibuat private. Jangan menjalankan ulang setelah sukses; metadata yang sudah diisi ditolak. Bila gagal, kirim error sebelum mengambil langkah lain. Jika laporan akhir gagal ditulis setelah commit, pengisian metadata mungkin sudah tersimpan; jangan menganggap seluruh operasi rollback. Jalankan inspector untuk memastikan kondisi.
+
 ## Inspeksi baca saja setelah latihan membatalkan DML
 
 Pengguna mengirim REHEARSAL INCOMPLETE: Original data changed during rehearsal; metadata updates rolled back, added columns may remain. Jangan mengulang ALTER/impor atau menghapus kolom. Produksi tidak dihubungi; DDL pada database uji dapat sudah committed. Penyebab belum terbukti: salah satu kemungkinan adalah kolom ON UPDATE yang otomatis berubah saat metadata diisi. Definisi master_pretes di admin/pretes-jadwal.php memiliki updated_at TIMESTAMP ... ON UPDATE CURRENT_TIMESTAMP; keberadaan efek pada tabel hosting harus dibuktikan, bukan diasumsikan.

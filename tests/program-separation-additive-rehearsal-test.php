@@ -54,4 +54,24 @@ $changed=Capture::fingerprint($trigger,Capture::tables($trigger));
 $inspection=AdditiveRehearsal::inspect($trigger,$triggerPlan);
 rehearsalCheck(!$inspection['all_original_column_values_unchanged'] && $inspection['different_tables']===['pretes_cbt_attempts'],'Inspector reports altered table without disclosing row values');
 rehearsalCheck(Capture::fingerprint($trigger,Capture::tables($trigger))===$changed,'Inspector cannot repair/overwrite mismatched values');
+$resume=rehearsalFixture();$resumePlan=AdditiveRehearsal::prepare($resume);
+foreach(AdditiveRehearsal::ADDITIONS as $table=>$columns)foreach($columns as $name=>$type)$resume->exec('ALTER TABLE '.Capture::identifier($table).' ADD COLUMN '.Capture::identifier($name).' '.$type);
+$resumed=AdditiveRehearsal::resume($resume,$resumePlan);
+rehearsalCheck($resumed['resumed_existing_columns'] && $resumed['alter_statements_executed']===0,'Resume fills existing empty columns without DDL');
+rehearsalCheck(AdditiveRehearsal::projection($resume,$resumePlan['original_columns'])===$resumePlan['original_fingerprint'],'Resume preserves every old field');
+$afterResume=Capture::fingerprint($resume,Capture::tables($resume));
+try{AdditiveRehearsal::resume($resume,$resumePlan);throw new LogicException('Repeated resume accepted');}catch(RuntimeException $expected){}
+rehearsalCheck(Capture::fingerprint($resume,Capture::tables($resume))===$afterResume,'Repeated resume cannot overwrite populated metadata');
+foreach(['partial','wrong_type','changed_original'] as $case){
+    $copy=rehearsalFixture();$copyPlan=AdditiveRehearsal::prepare($copy);
+    foreach(AdditiveRehearsal::ADDITIONS as $table=>$columns)foreach($columns as $name=>$type){
+        if($case==='partial' && $table!=='master_pretes')continue;
+        if($case==='wrong_type' && $table==='master_pretes')$type='VARCHAR(32) NULL';
+        $copy->exec('ALTER TABLE '.Capture::identifier($table).' ADD COLUMN '.Capture::identifier($name).' '.$type);
+    }
+    if($case==='changed_original')$copy->exec('UPDATE pretes_cbt_attempts SET score=1 WHERE id=1');
+    $caseBefore=Capture::fingerprint($copy,Capture::tables($copy));
+    try{AdditiveRehearsal::resume($copy,$copyPlan);throw new LogicException('Unsafe resume accepted: '.$case);}catch(RuntimeException $expected){}
+    rehearsalCheck(Capture::fingerprint($copy,Capture::tables($copy))===$caseBefore,'Unsafe resume must not modify or repair data: '.$case);
+}
 echo "PASS: additive rehearsal, full original-data preservation, mixed/ambiguous history, ownership, tryout, stale input, repeat guard and trigger rollback with remaining DDL.\n";
