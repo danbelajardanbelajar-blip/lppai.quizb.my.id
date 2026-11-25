@@ -1,3 +1,32 @@
+## 2026-11-25 10:31:34 +0700 — Siapkan pemisahan program secara offline selama ujian berlangsung
+
+**ID:** PROGRAM-SEPARATION-OFFLINE-PREPARE · **Parent Git:** `e327773e3db23a9fff7d59b5288081f5f9f5bbcb`.
+
+**Permintaan dan batas utama:** Pengguna meminta pelaksanaan pemisahan Pretes/Tutorial RPL dan Reguler, kemudian menegaskan ujian sedang berlangsung dan tidak boleh terganggu. Paket ini menjalankan persiapan terisolasi: audit kode, rancangan migrasi/rollout, guard empat modul dan pemeriksa snapshot offline. Tidak mengaktifkan pemisahan penuh atau mengubah data produksi. Pertanyaan waktu selesai ujian diajukan untuk menentukan masa integrasi/peralihan; waktu selesai tidak diasumsikan.
+
+**Temuan:** Pretes masih menggabungkan periode Semua dan hubungan pendaftaran berbasis nama periode; paket/sesi/attempt/item CBT memakai tabel bersama. Beberapa helper melakukan DDL/seed/pembaruan data saat dipanggil, termasuk penyesuaian paket dan penghapusan attempt tertentu pada inisialisasi CBT. Karena itu audit baru tidak memuat helper runtime atau koneksi aplikasi. Tutorial RPL mempunyai tabel terpisah tetapi masih memakai aset/utility Pretes dan alur salin awal tugas; pemisahan memerlukan audit integrasi, bukan penggandaan halaman saja.
+
+**Perubahan:** Tambahkan fondasi scope yang menolak akses silang program/aktivitas dan pemilik, serta CLI yang menerima berkas snapshot minimum saja. Laporan memisahkan kandidat dari keputusan riwayat final, menandai campuran/konflik/sesi aktif/attempt belum selesai, dan selalu menetapkan cutover_allowed=false. Tidak memiliki perintah apply atau koneksi database. Dokumentasi menetapkan tahap lanjutan yang belum selesai, preservasi ID/soal/jawaban/nilai, migrasi additive, rekonsiliasi ekspor/sertifikat dan latihan restore/rollback pada replika.
+
+**Perlindungan ujian:** Tidak ada file runtime lama di api/pages/admin/assets/services/config/includes yang diubah. Tidak ada route aktif yang mengimpor fondasi baru. Tidak ada perubahan skema, token, namespace sesi, soal, jawaban, timer, pengawasan wajah, sakelar ujian atau sidebar. Tidak menjalankan perintah hosting/VPS maupun HTTP probe produksi. Push paket tidak mengaktifkan fitur baru.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat setiap edit. Semua file implementasi/dokumen baru; rentang penuh mengacu snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 10:28:59 | `includes/program-separation/scope.php` | 1-75 | Fondasi scope empat modul; program eksplisit, pemilik mahasiswa, penugasan dosen dan admin; tolak program/aktivitas/resource yang tidak cocok. Tidak terhubung route aktif. |
+| 2026-11-25 10:25:53 | `includes/program-separation/audit.php` | 1-156 | Audit kandidat kepemilikan dari snapshot offline; program ambigu/campuran, konflik referensi, sesi aktif, attempt belum selesai dan minimasi data; tidak pernah mengizinkan cutover. |
+| 2026-11-25 10:30:48 | `tools/program-separation-audit.php` | 1-33 | CLI-only tanpa auth/config/DB/migrasi/apply; snapshot file maksimum 32 MiB, validasi input, laporan stdout dan hash sumber; akses web 404 sebelum memuat helper. |
+| 2026-11-25 10:28:59 | `tests/program-separation-test.php` | 1-123 | Matriks akses silang empat modul, role/pemilik/penugasan, kandidat riwayat, periode duplikat/campuran, blocker ujian, validasi/privasi, CLI nyata dan berkas input tetap. |
+| 2026-11-25 10:28:59 | `docs/examples/program-separation-snapshot.json` | 1-22 | Snapshot sintetis dua program dengan periode/sesi campuran dan attempt belum selesai; contoh wajib menghasilkan exit 3, bukan bukti keadaan hosting. |
+| 2026-11-25 10:30:48 | `docs/program-separation-rollout.md` | 1-121 | Audit kode, relasi data, status tahap 1-7, rancangan pemilik/manifest, perlindungan riwayat, format tool offline, kriteria aktivasi/rollback setelah masa ujian dan keterbatasan verifikasi. |
+
+**Verifikasi:** Lint empat file PHP baru lulus. Delapan suite lokal lulus dengan assertions aktif: tests/program-separation-test.php; tests/pretes-cbt-test.php; tests/pretes-cbt-session-test.php; tests/pretes-cbt-token-test.php; tests/pretes-cbt-interruption-test.php; tests/pretes-exam-access-test.php; tests/tutorial-rpl-cbt-parity-test.php; tests/tutorial-rpl-cbt-proctoring-parity-test.php. CLI pada contoh sintetis menghasilkan laporan review dan exit 3 sesuai harapan. Pemeriksaan jalur runtime lama tidak menemukan perubahan maupun impor baru. git diff --check diperiksa sebelum commit/push.
+
+**Keterbatasan:** Beberapa suite Pretes lama mencatat no such table: pretes_assessments pada fixture SQLite minimumnya, namun seluruh assertion/suite lulus; engine dan suite lama tidak diubah untuk menutupi log tersebut. Tidak memverifikasi database/keadaan ujian hosting, MySQL nyata, deployment atau restore backup. Audit data produksi, integrasi scope, halaman per program dan migrasi/aktivasi tahap 2-7 belum selesai; perpindahan ujian aktif ditahan sesuai instruksi pengguna. Tidak menyatakan pemisahan total sudah aktif atau menjanjikan aktivasi otomatis setelah push.
+
+---
+
 ## 2026-11-25 09:54:35 +0700 — Fokuskan sidebar peserta Tutorial RPL dengan menyembunyikan menu Pretes
 
 **ID:** TUTORIAL-RPL-SIDEBAR-HIDE-PRETES · **Parent Git:** `fc40e7d318be33dd9b65f7ce105b19d4a1efefaf`.

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "tables": {
+    "users": [{"id": 1, "jenis_program": "RPL"}, {"id": 2, "jenis_program": "Reguler"}],
+    "master_pretes": [{"id": 10, "periode": "CONTOH CAMPURAN BUKAN PRODUKSI", "target_program": "Semua", "status": "aktif"}],
+    "pretes_registrations": [
+      {"id": 11, "user_id": 1, "periode": "CONTOH CAMPURAN BUKAN PRODUKSI"},
+      {"id": 12, "user_id": 2, "periode": "CONTOH CAMPURAN BUKAN PRODUKSI"}
+    ],
+    "pretes_cbt_sessions": [{"id": 20, "is_active": 1, "package_ids_json": "[30]"}],
+    "pretes_cbt_packages": [{"id": 30}],
+    "pretes_cbt_attempts": [
+      {"id": 40, "user_id": 1, "registration_id": 11, "session_id": 20, "submitted_at": null},
+      {"id": 41, "user_id": 2, "registration_id": 12, "session_id": 20, "submitted_at": 1795560000}
+    ],
+    "tutorial_registrations": [],
+    "tutorial_rpl_registrations": [],
+    "tutorial_rpl_members": [],
+    "tutorial_rpl_cbt_sessions": [],
+    "tutorial_rpl_cbt_attempts": []
+  }
+}
