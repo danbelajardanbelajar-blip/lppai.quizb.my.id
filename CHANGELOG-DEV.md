@@ -1,3 +1,30 @@
+## 2026-11-25 08:37:10 +0700 — Perbaiki Delete Paket dan Sesi CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-DELETE-PERSISTENCE · **Parent Git:** `5a041c2`.
+
+**Temuan yang direproduksi dari skrip:** Paket id 1/2 diblokir helper/controller dan tombolnya disembunyikan. Setelah dua sesi dihapus, hitungan langsung 0 tetapi tutorialRplCbtGetSessions/ensure berikutnya mengisi kembali menjadi 2; pemeriksaan tabel kosong belum membedakan instalasi awal dengan penghapusan yang disengaja. Jalur attempt lama juga melakukan forced seed bila paket tidak punya soal.
+
+**Perbaikan:** Pakai marker defaults_v1 dalam tabel tutorial_rpl_cbt_initialization untuk membatasi seed otomatis pada inisialisasi awal. Paket/sesi/bank yang kosong karena dihapus tidak dipulihkan pada GET/helper/koneksi baru. Pulihkan & Tindih yang eksplisit tetap dapat mengisi paket/sesi/soal bawaan. Hentikan reset paksa dari jalur attempt kosong dan tampilkan pesan paket/sesi tidak tersedia. Fallback sesi ketika tidak ada sesi memakai id 0, is_active 0 dan exam_open 0, bukan sesi aktif buatan.
+
+**Delete paket:** Izinkan penghapusan semua paket termasuk paket bawaan melalui tombol dan konfirmasi. Hapus paket/soal dalam transaksi; kegagalan penghapusan paket mengembalikan penghapusan soalnya. Lepaskan ID paket dari pilihan sesi; sesi yang kehilangan seluruh paket ditutup/dinonaktifkan. Kunci sesi di MySQL saat memperbarui relasinya agar penghapusan paket bersamaan tidak menimpa pilihan paket terbaru. Attempt, item snapshot, jawaban, dan skor historis tidak dihapus. Delete sesi tunggal memakai helper massal yang transaksional dan mempertahankan riwayat peserta.
+
+**Controller:** Tambahkan token CSRF pada form hapus paket dan pemeriksaan token pada hapus paket/sesi/sesi terpilih. Form paket memakai action tab packages dan data-no-spa. Pesan gagal hapus sesi tidak lagi mengklaim harus tersisa satu sesi. Error tak terduga ditangani dengan pesan aman/log server. Konfirmasi menyebut penghapusan soal dan penutupan sesi tanpa paket.
+
+Waktu berikut adalah **waktu penyimpanan terakhir yang tersedia**, bukan riwayat setiap edit. Baris adalah awal hunk untuk file lama atau rentang penuh untuk file baru pada snapshot paket ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 08:36:25 | `includes/tutorial-rpl-helper.php` | 1067, 1121, 1275, 1374, 1376, 1402, 1479, 1483, 1494, 1778, 1791, 1805, 1810, 2271, 2293, 2297 | Marker inisialisasi persisten, hapus paket termasuk bawaan secara atomik, bersihkan relasi sesi, transaksi hapus sesi, fallback sesi kosong tertutup, hentikan forced reset saat paket kosong. |
+| 2026-11-25 08:26:30 | `admin/tutorial-rpl-cbt.php` | 270, 279, 320, 324, 380, 526, 837, 839, 844 | Tampilkan Delete semua paket, native POST dengan CSRF, validasi tiga aksi hapus, pesan hasil akurat dan error aman. |
+| 2026-11-25 08:29:21 | `tests/tutorial-rpl-cbt-delete-test.php` | 1-82 | Repro penghapusan bawaan/terakhir, reload/koneksi baru, rollback, riwayat tetap, reset eksplisit, jalur attempt dan POST controller/CSRF. |
+| 2026-11-25 08:26:59 | `tests/tutorial-rpl-cbt-parity-test.php` | 78 | Ganti ekspektasi larangan hapus paket bawaan dengan ekspektasi tidak melaporkan ID paket hilang sebagai terhapus; uji positif paket bawaan di suite baru. |
+
+**Verifikasi:** PHP lint 4 berkas berubah/tambahan lulus; git diff --check lulus; node --check keseluruhan script bank setelah nilai PHP dinetralkan lulus. Lima suite lokal lulus (assertions diaktifkan): tutorial-rpl-cbt-delete, tutorial-rpl-cbt-parity, tutorial-rpl-cbt-nilai, tutorial-rpl-cbt-proctoring-parity, tutorial-rpl-cbt-review. Suite baru memakai helper asli/SQLite serta controller penuh dengan auth fixture: hapus paket bawaan, hapus sesi terakhir/tunggal/massal, reload/helper/koneksi baru, marker persisten, bank kosong tetap kosong, reset eksplisit tetap berfungsi, rollback karena trigger gagal, snapshot/nilai tetap, CSRF hilang 403 dan nonadmin 403. Chrome headless lokal menjalankan controller asli dan app.js: batal hapus lalu tombol masih dapat dipakai, hapus paket bawaan, hapus sesi tunggal dan massal, batal konfirmasi massal lalu coba lagi, serta GET ulang tanpa sesi muncul kembali. Tidak ada error JS/PHP pada alur browser akhir; screenshot ditinjau di scratch/cbt-delete-preview.
+
+**Batas/deployment:** Uji menggunakan SQLite/fixture autentikasi, belum MySQL atau hosting produksi. Tidak melakukan penghapusan data hosting. Administrasi tetap memerlukan konfirmasi hapus; hasil Git push bukan bukti deployment. Commit memakai ID ini, diikuti pull --rebase dan push.
+
+---
+
 ## 2026-11-25 08:06:01 +0700 — Samakan Review CBT Tutorial RPL dengan Review CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-REVIEW-SHARED-PARITY · **Parent Git:** `cd1eec9`.

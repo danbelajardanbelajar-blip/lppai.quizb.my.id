@@ -1064,6 +1064,16 @@ if (!function_exists('ensureTutorialRplCbtTables')) {
  */
 if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
     function tutorialRplCbtSeedPackagesAndQuestions(PDO $pdo, bool $force = false): array {
+        // An empty table after an intentional deletion must not trigger automatic restoration.
+        $engine = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_cbt_initialization (scope VARCHAR(40) PRIMARY KEY, initialized_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)$engine");
+        $initialized = (bool)$pdo->query("SELECT scope FROM tutorial_rpl_cbt_initialization WHERE scope='defaults_v1'")->fetchColumn();
+        if (!$force && $initialized) {
+            return ['packages'=>(int)$pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_packages')->fetchColumn(),
+                'sessions'=>(int)$pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions')->fetchColumn(),
+                'questions_islam'=>0,'questions_kristen'=>0,
+                'total_questions'=>(int)$pdo->query('SELECT COUNT(*) FROM tutorial_rpl_cbt_questions')->fetchColumn()];
+        }
         // 1. Paket Soal (Paket 1: Utama / Muslim & Paket 2: Kristen Protestan)
         $existingPkgCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_packages")->fetchColumn();
         $stmtPkg = $pdo->prepare("SELECT id FROM tutorial_rpl_cbt_packages WHERE code = ?");
@@ -1108,7 +1118,7 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
         }
 
         // 2. Sesi Ujian (Sesi 1: Utama / Muslim & Sesi 2: Kristen Protestan)
-        // Hanya seed sesi bawaan saat tabel sesi masih kosong (atau saat $force = true),
+        // Pada inisialisasi pertama, seed sesi hanya saat kosong (atau saat $force = true),
         // agar sesi yang sudah dihapus admin tidak muncul kembali otomatis.
         $existingSesCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions")->fetchColumn();
         $stmtSes = $pdo->prepare("SELECT id FROM tutorial_rpl_cbt_sessions WHERE code = ?");
@@ -1262,6 +1272,8 @@ if (!function_exists('tutorialRplCbtSeedPackagesAndQuestions')) {
             }
         }
 
+        $insert = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
+        $pdo->exec("$insert INTO tutorial_rpl_cbt_initialization(scope) VALUES('defaults_v1')");
         return [
             'packages' => 2,
             'sessions' => 2,
@@ -1359,14 +1371,35 @@ if (!function_exists('tutorialRplCbtActivatePackage')) {
  */
 if (!function_exists('tutorialRplCbtDeletePackage')) {
     function tutorialRplCbtDeletePackage(PDO $pdo, int $id): bool {
+        if ($id <= 0) return false;
         ensureTutorialRplCbtTables($pdo);
-        if ($id <= 2) {
-            // Lindungi Paket Inti 1 (Muslim) dan 2 (Kristen) dari penghapusan total
-            return false;
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) $pdo->beginTransaction();
+        try {
+            $lock=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? ' FOR UPDATE' : '';
+            $existing=$pdo->prepare('SELECT id FROM tutorial_rpl_cbt_packages WHERE id=?'.$lock);$existing->execute([$id]);
+            if (!$existing->fetchColumn()) { if ($ownsTransaction) $pdo->commit(); return false; }
+            $pdo->prepare('DELETE FROM tutorial_rpl_cbt_questions WHERE package_id=?')->execute([$id]);
+            $stmt=$pdo->prepare('DELETE FROM tutorial_rpl_cbt_packages WHERE id=?');$stmt->execute([$id]);
+            $deleted=$stmt->rowCount()>0;
+            if ($deleted) {
+                $sessions=$pdo->query('SELECT id,package_ids_json FROM tutorial_rpl_cbt_sessions ORDER BY id'.$lock)->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($sessions as $session) {
+                    $raw=trim((string)($session['package_ids_json'] ?? ''));
+                    $before=$raw==='' ? [] : json_decode($raw,true,512,JSON_THROW_ON_ERROR);
+                    if (!is_array($before)) throw new RuntimeException('Daftar paket sesi tidak valid. Periksa pengaturan sesi sebelum menghapus paket.');
+                    $after=array_values(array_filter(array_map('intval',$before),static fn($pid)=>$pid!==$id));
+                    if (count($after)===count($before)) continue;
+                    $sql='UPDATE tutorial_rpl_cbt_sessions SET package_ids_json=?'.(!$after?',exam_open=0,is_active=0':'').' WHERE id=?';
+                    $pdo->prepare($sql)->execute([json_encode($after,JSON_THROW_ON_ERROR),$session['id']]);
+                }
+            }
+            if ($ownsTransaction) $pdo->commit();
+            return $deleted;
+        } catch (Throwable $e) {
+            if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
         }
-        $pdo->prepare("DELETE FROM tutorial_rpl_cbt_questions WHERE package_id = ?")->execute([$id]);
-        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_packages WHERE id = ?");
-        return $stmt->execute([$id]);
     }
 }
 
@@ -1443,12 +1476,12 @@ if (!function_exists('tutorialRplCbtGetSession')) {
         $ses = $pdo->query("SELECT * FROM tutorial_rpl_cbt_sessions WHERE is_active = 1 ORDER BY id ASC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
         if (!$ses) {
             return [
-                'id' => 1,
-                'code' => 'SESI-TUTORIAL-RPL-2026',
-                'title' => 'Sesi Ujian Tulis Tutorial RPL 2026/2027 (Utama / Muslim)',
+                'id' => 0,
+                'code' => '',
+                'title' => 'Belum ada sesi ujian CBT Tutorial RPL',
                 'description' => null,
-                'package_ids_json' => '[1]',
-                'package_ids' => [1],
+                'package_ids_json' => '[]',
+                'package_ids' => [],
                 'category_quotas_json' => null,
                 'category_quotas' => [],
                 'camera_mode' => 'tidak_aktif',
@@ -1458,8 +1491,8 @@ if (!function_exists('tutorialRplCbtGetSession')) {
                 'token' => 'TUTOR26',
                 'token_required' => 1,
                 'shuffle_on_violation' => 1,
-                'exam_open' => 1,
-                'is_active' => 1,
+                'exam_open' => 0,
+                'is_active' => 0,
                 'mode' => 'resmi',
                 'max_attempts' => 1
             ];
@@ -1742,22 +1775,7 @@ if (!function_exists('tutorialRplCbtDeactivateSession')) {
 if (!function_exists('tutorialRplCbtDeleteSession')) {
     function tutorialRplCbtDeleteSession(PDO $pdo, int $sessionId): bool {
         if ($sessionId <= 0) return false;
-        ensureTutorialRplCbtTables($pdo);
-
-        $stmt = $pdo->prepare("DELETE FROM tutorial_rpl_cbt_sessions WHERE id = ?");
-        $ok = $stmt->execute([$sessionId]);
-
-        if ($ok && $stmt->rowCount() > 0) {
-            $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1")->fetchColumn();
-            if ($activeCount === 0) {
-                $firstId = $pdo->query("SELECT id FROM tutorial_rpl_cbt_sessions ORDER BY id ASC LIMIT 1")->fetchColumn();
-                if ($firstId) {
-                    $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?")->execute([(int)$firstId]);
-                }
-            }
-            return true;
-        }
-        return false;
+        return tutorialRplCbtDeleteSessions($pdo,[$sessionId])>0;
     }
 }
 
@@ -1770,18 +1788,26 @@ if (!function_exists('tutorialRplCbtDeleteSessions')) {
         $ids = array_values(array_unique(array_filter(array_map('intval', $sessionIds), fn($id) => $id > 0)));
         if (empty($ids)) return 0;
 
-        $in = implode(',', $ids);
-        $count = $pdo->exec("DELETE FROM tutorial_rpl_cbt_sessions WHERE id IN ($in)");
-        if ($count > 0) {
-            $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1")->fetchColumn();
-            if ($activeCount === 0) {
-                $firstId = $pdo->query("SELECT id FROM tutorial_rpl_cbt_sessions ORDER BY id ASC LIMIT 1")->fetchColumn();
-                if ($firstId) {
-                    $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?")->execute([(int)$firstId]);
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) $pdo->beginTransaction();
+        try {
+            $in = implode(',', array_fill(0,count($ids),'?'));
+            $stmt=$pdo->prepare("DELETE FROM tutorial_rpl_cbt_sessions WHERE id IN ($in)");$stmt->execute($ids);$count=$stmt->rowCount();
+            if ($count > 0) {
+                $activeCount = (int)$pdo->query("SELECT COUNT(*) FROM tutorial_rpl_cbt_sessions WHERE is_active = 1")->fetchColumn();
+                if ($activeCount === 0) {
+                    $firstId = $pdo->query("SELECT id FROM tutorial_rpl_cbt_sessions ORDER BY id ASC LIMIT 1")->fetchColumn();
+                    if ($firstId) {
+                        $pdo->prepare("UPDATE tutorial_rpl_cbt_sessions SET is_active = 1 WHERE id = ?")->execute([(int)$firstId]);
+                    }
                 }
             }
+            if ($ownsTransaction) $pdo->commit();
+            return (int)$count;
+        } catch (Throwable $e) {
+            if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
         }
-        return (int)$count;
     }
 }
 
@@ -2242,7 +2268,8 @@ if (!function_exists('tutorialRplCbtGetOrCreateAttempt')) {
             }
         }
 
-        $sessionId = (int)($session['id'] ?? 1);
+        $sessionId = (int)($session['id'] ?? 0);
+        if ($sessionId <= 0) throw new RuntimeException('Belum ada sesi ujian yang tersedia. Hubungi admin.');
 
         // Tentukan package_id
         if ($packageId === null || $packageId <= 0) {
@@ -2263,10 +2290,11 @@ if (!function_exists('tutorialRplCbtGetOrCreateAttempt')) {
         $durationSeconds = $durationMinutes * 60;
 
         if (!$attempt) {
+            $validSession=$pdo->prepare('SELECT id FROM tutorial_rpl_cbt_sessions WHERE id=?');$validSession->execute([$sessionId]);
+            if (!$validSession->fetchColumn()) throw new RuntimeException('Sesi ujian sudah dihapus atau tidak tersedia.');
             $questions = tutorialRplCbtGetQuestions($pdo, null, $packageId);
             if (empty($questions)) {
-                tutorialRplCbtSeedPackagesAndQuestions($pdo, true);
-                $questions = tutorialRplCbtGetQuestions($pdo, null, $packageId);
+                throw new RuntimeException('Paket soal tidak tersedia atau belum berisi soal. Hubungi admin untuk menyiapkan paket ujian.');
             }
 
             // Ambil jumlah soal yang ditentukan paket atau seluruh soal yang tersedia

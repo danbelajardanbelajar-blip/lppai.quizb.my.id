@@ -75,8 +75,8 @@ $customPkg = tutorialRplCbtGetPackage($pdo, $customPkgId);
 assert($customPkg['name'] === 'Paket Uji Coba Tambahan', 'Nama paket tersimpan sesuai');
 $deletedPkg = tutorialRplCbtDeletePackage($pdo, $customPkgId);
 assert($deletedPkg === true, 'Hapus paket tambahan harus berhasil');
-$cannotDeleteCore = tutorialRplCbtDeletePackage($pdo, 1);
-assert($cannotDeleteCore === false, 'Paket inti 1 dilindungi dari penghapusan');
+$missingPackage = tutorialRplCbtDeletePackage($pdo, 999999);
+assert($missingPackage === false, 'Paket yang tidak ditemukan tidak boleh dilaporkan terhapus');
 echo "[PASS] Paritas Paket Soal & Sesi Ujian serta CRUD Paket terverifikasi.\n";
 
 // 3. Bank Soal & Penindihan Data Soal Resmi CBT Pretes

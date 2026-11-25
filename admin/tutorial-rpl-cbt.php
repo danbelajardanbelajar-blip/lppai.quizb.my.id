@@ -267,8 +267,16 @@ if (!in_array($activeTab, $allowedTabs, true)) {
 
 // ── Handle POST Actions ──────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+    $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
+    if (in_array($action,['delete_package','delete_session','delete_sessions'],true)
+        && (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token']))) {
+        http_response_code(403);
+        $message='Sesi formulir tidak valid. Muat ulang halaman sebelum menghapus.';
+        $msgType='danger';
+        $action='';
+    }
 
+    try {
     if ($action === 'save_package') {
         $pkgId = (int)($_POST['package_id'] ?? 0);
         $code = trim($_POST['code'] ?? '');
@@ -309,11 +317,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $activeTab = 'packages';
     } elseif ($action === 'delete_package') {
         $pkgId = (int)($_POST['package_id'] ?? 0);
-        if ($pkgId > 2 && tutorialRplCbtDeletePackage($pdo, $pkgId)) {
+        if ($pkgId > 0 && tutorialRplCbtDeletePackage($pdo, $pkgId)) {
             $message = "Paket soal #{$pkgId} berhasil dihapus.";
             $msgType = 'success';
         } else {
-            $message = 'Paket inti utama tidak dapat dihapus demi integritas data ujian.';
+            $message = 'Paket soal tidak ditemukan atau sudah dihapus.';
             $msgType = 'danger';
         }
         $activeTab = 'packages';
@@ -369,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = "Sesi ujian #{$sesId} berhasil dihapus.";
             $msgType = 'success';
         } else {
-            $message = "Gagal menghapus sesi ujian #{$sesId}. Minimal harus ada 1 sesi ujian di sistem.";
+            $message = "Gagal menghapus sesi ujian #{$sesId}. Sesi mungkin sudah dihapus atau tidak ditemukan.";
             $msgType = 'danger';
         }
         $activeTab = 'sessions';
@@ -514,6 +522,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msgType = 'danger';
         }
         $activeTab = 'results';
+    }
+    } catch (Throwable $e) {
+        error_log('Tutorial RPL CBT action: '.$e->getMessage());
+        $message='Perubahan belum dapat disimpan. Muat ulang halaman; jika berulang hubungi pengelola server.';
+        $msgType='danger';
     }
 }
 
@@ -821,15 +834,14 @@ include __DIR__ . '/../includes/header.php';
                                         <button type="button" class="bank-button" style="padding:4px 8px; font-size:11px;" onclick="openEditPackageModalById(<?= (int)$pkg['id'] ?>);" data-action="edit-package" data-package-id="<?= (int)$pkg['id'] ?>" title="Edit Paket Soal">
                                             ✏️ Edit
                                         </button>
-                                        <?php if ((int)$pkg['id'] > 2): ?>
-                                            <form method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus paket soal ini beserta seluruh butir soal di dalamnya?');">
+                                            <form method="POST" action="?tab=packages" data-no-spa style="display:inline; margin:0;" onsubmit="return confirm('Hapus paket soal ini beserta seluruh butir soal di dalamnya? Sesi yang kehilangan seluruh paket akan dinonaktifkan. Riwayat jawaban dan nilai peserta tetap tersimpan.');">
                                                 <input type="hidden" name="action" value="delete_package">
+                                                <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                                 <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
                                                 <button type="submit" class="bank-button danger-sm" style="padding:4px 8px; font-size:11px;" title="Hapus Paket Soal">
                                                     🗑️
                                                 </button>
                                             </form>
-                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
