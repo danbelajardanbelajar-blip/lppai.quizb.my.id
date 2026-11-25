@@ -393,10 +393,21 @@ if (!function_exists('isNavGroupActive')) {
                 ? studentHasActiveTutorialRegistration($db, $currentUser ?? null)
                 : false;
 
+            $isRplStudent = strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL';
+            $isRplLulus = false;
+            $isRplRegistered = false;
+            if ($isRplStudent && $db) {
+                require_once __DIR__ . '/tutorial-rpl-helper.php';
+                $isRplLulus = tutorialRplIsUserLulus($db, (int)($currentUser['id'] ?? 0));
+                $isRplRegistered = tutorialRplIsUserRegistered($db, (int)($currentUser['id'] ?? 0));
+            }
+
             // Sembunyikan menu pretes jika:
             // 1. Mahasiswa tidak terdaftar pretes sama sekali (baik periode/status aktif maupun non-aktif), ATAU
-            // 2. Mahasiswa memiliki pendaftaran tutorial aktif (fokus mengikuti tutorial)
-            $hidePretesMenus = (!$hasPretesReg) || $hasActiveTutorialReg;
+            // 2. Mahasiswa memiliki pendaftaran tutorial reguler aktif, ATAU
+            // 3. Mahasiswa RPL sudah mendaftar/menjadi anggota/lulus Tutorial RPL.
+            $hidePretesMenus = (!$hasPretesReg) || $hasActiveTutorialReg
+                || ($isRplStudent && ($isRplRegistered || $isRplLulus));
             $showDaftarPretesMenu = ($db && function_exists('shouldShowDaftarPretesToStudent'))
                 ? shouldShowDaftarPretesToStudent($db, $currentUser ?? null)
                 : true;
@@ -410,7 +421,6 @@ if (!function_exists('isNavGroupActive')) {
             $isLulusPretes = ($currentUser && $db && function_exists('isUserLulusPretes'))
                 ? isUserLulusPretes($db, (int)($currentUser['id'] ?? 0))
                 : false;
-            $isRplStudent = strtoupper(trim((string)($currentUser['jenis_program'] ?? ''))) === 'RPL';
             $showTutorialMenus = !$isRplStudent && !$isMahasiswaPretesAktif && ($hasTutorialReg || ($hasPretesReg && !$isLulusPretes));
             // Sudah lulus pretes: tidak perlu mendaftar pretes lagi
             if ($isLulusPretes) $showDaftarPretesMenu = false;
@@ -462,15 +472,6 @@ if (!function_exists('isNavGroupActive')) {
             <?php endif; ?>
 
             <?php if ($isRplStudent): ?>
-            <?php
-            require_once __DIR__ . '/tutorial-rpl-helper.php';
-            $isRplLulus = ($db && function_exists('tutorialRplIsUserLulus'))
-                ? tutorialRplIsUserLulus($db, (int)($currentUser['id'] ?? 0))
-                : false;
-            $isRplRegistered = ($db && function_exists('tutorialRplIsUserRegistered'))
-                ? tutorialRplIsUserRegistered($db, (int)($currentUser['id'] ?? 0))
-                : false;
-            ?>
             <div class="menu-label">Tutorial RPL</div>
             <a href="<?= BASE_URL ?>/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
                 <span class="icon">🌐</span><span class="nav-text">Info &amp; Kelas RPL</span>

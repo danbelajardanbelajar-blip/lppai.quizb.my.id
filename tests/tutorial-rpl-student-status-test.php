@@ -100,7 +100,7 @@ trAssert(str_contains($hubSrc, 'Opsi B') && str_contains($hubSrc, 'Ujian Praktik
 trAssert(str_contains($hubSrc, 'Opsi C') && str_contains($hubSrc, 'Rekaman Video di Google Drive'), 'Hub memuat Opsi C: Ujian praktik 6 poin direkam dan diupload ke Google Drive', $errors);
 trAssert(str_contains($hubSrc, 'bersifat pilihan untuk mempermudah mahasiswa RPL'), 'Hub menegaskan 3 tugas bersifat pilihan mempermudah mahasiswa', $errors);
 trAssert(str_contains($hubSrc, 'Jika nilai CBT masih di bawah 70, maka <strong>tidak ada pilihan lain selain ujian praktik</strong>'), 'Hub menegaskan jika CBT di bawah 70 wajib memilih ujian praktik online/offline', $errors);
-trAssert(str_contains($hubSrc, 'Rincian 6 Poin Tugas Ujian Praktik Ibadah'), 'Hub memuat rincian 6 poin tugas ibadah', $errors);
+trAssert(str_contains($hubSrc, 'tutorial-rpl-student-tasks-view.php'), 'Hub memuat rincian tugas dinamis dari admin', $errors);
 
 echo "\n=== TEST 4: Verifikasi Sidebar Mahasiswa RPL (includes/sidebar.php) ===\n";
 $sidebarSrc = file_get_contents(__DIR__ . '/../includes/sidebar.php');

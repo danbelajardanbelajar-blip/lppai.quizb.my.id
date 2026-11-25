@@ -1,3 +1,25 @@
+## 2026-11-25 09:54:35 +0700 — Fokuskan sidebar peserta Tutorial RPL dengan menyembunyikan menu Pretes
+
+**ID:** TUTORIAL-RPL-SIDEBAR-HIDE-PRETES · **Parent Git:** `fc40e7d318be33dd9b65f7ce105b19d4a1efefaf`.
+
+**Penyebab:** hidePretesMenus sebelumnya hanya memeriksa tutorial reguler aktif (tutorial_registrations); status Tutorial RPL dihitung setelah keputusan tersebut dan hanya mengatur tombol Daftar Tutorial RPL. Akibatnya peserta Tutorial RPL dengan riwayat pretes masih melihat kelompok Pretes.
+
+**Perbaikan:** Hitung status RPL terlebih dahulu, lalu sembunyikan kelompok Pretes dan item Absensi Pretes bagi mahasiswa RPL yang sudah memiliki pendaftaran Tutorial RPL atau keanggotaan kelas (termasuk proses, tidak lulus, lulus dan kelas diarsipkan). Gunakan helper status RPL yang sudah ada agar konsisten dengan larangan daftar ulang. Menu Info & Kelas RPL tetap tersedia; mahasiswa belum tutorial tetap mengikuti aturan Pretes semula. Tidak mengubah syarat pendaftaran, nilai, kelulusan, data keanggotaan atau hak akses endpoint. Ini pengaturan navigasi; akses melalui URL langsung tidak diubah.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat setiap edit. Baris adalah awal hunk pada snapshot ini; file baru memakai rentang penuh.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 09:52:00 | `includes/sidebar.php` | 396, 407, 423, 474 | Hitung status Tutorial RPL sebelum keputusan menu Pretes; gunakan kembali status yang sama pada menu RPL; sembunyikan kelompok Pretes dan Absensi Pretes ketika sudah terdaftar/anggota/lulus RPL. |
+| 2026-11-25 09:54:00 | `tests/tutorial-rpl-sidebar-pretes-test.php` | 1-72 | Render sidebar asli dengan helper RPL dan SQLite asli; isolasi fakta Pretes/Reguler. Uji daftar menunggu kelas, proses, tidak lulus, lulus/kelas arsip, belum tutorial, isolasi akun/program, Reguler aktif, dan perubahan status tanpa cache. |
+| 2026-11-25 09:52:00 | `tests/tutorial-rpl-student-status-test.php` | 103 | Perbarui satu assertion lama enam ringkasan tetap menjadi partial tugas dinamis dari paket sebelumnya agar regresi status mahasiswa relevan. |
+
+**Verifikasi:** Lint ketiga file PHP lulus. tests/tutorial-rpl-sidebar-pretes-test.php, tests/tutorial-rpl-student-status-test.php dan tests/tutorial-rpl-student-hub-test.php lulus dengan assertions aktif. Pengujian render mencakup status peserta, pemisahan akun/program, menu pendaftaran ulang, daftar tanpa cache, keanggotaan/nilai tetap, serta regresi tutorial Reguler. Student Hub juga menguji Drive dan CBT. git diff --check lulus. Tidak ada perubahan CSS/JavaScript/tata letak sehingga verifikasi difokuskan pada tautan hasil render server.
+
+**Keterbatasan:** Pengujian memakai fixture SQLite lokal dengan fakta Pretes/Reguler terisolasi, bukan sesi/data mahasiswa hosting. Deployment hosting belum diverifikasi; push Git tidak membuktikan deployment berhasil. Perubahan menu terlihat setelah halaman dimuat ulang.
+
+---
+
 ## 2026-11-25 09:26:46 +0700 — Tampilkan isi tugas Tutorial RPL pada panel mahasiswa
 
 **ID:** TUTORIAL-RPL-STUDENT-TASK-CONTENT · **Parent Git:** `df462c4d48b8923ac7ed10a3a772e94f8c0dfc53`.
