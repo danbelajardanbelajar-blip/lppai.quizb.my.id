@@ -5,11 +5,13 @@ require_once __DIR__.'/../includes/program-separation/additive-rehearsal.php';
 use Lppai\ProgramSeparation\Capture;
 use Lppai\ProgramSeparation\RestoreVerification;
 use Lppai\ProgramSeparation\AdditiveRehearsal;
+use Lppai\ProgramSeparation\TestCredentials;
 
 $ddlStarted=false;$metadataStarted=false;$resume=false;
 try {
-    $args=[];
+    $args=[];$configCredentials=false;
     foreach(array_slice($argv,1) as $arg){
+        if($arg==='--use-config-test-credentials'){if($configCredentials)throw new RuntimeException('Duplicate credential mode flag.');$configCredentials=true;continue;}
         if(!preg_match('/^--(capture-dir|restore-report|database|username|resume-from)=(.+)$/D',$arg,$m)||isset($args[$m[1]]))throw new RuntimeException('Expected capture/report/database/username arguments, optionally --resume-from=PRIVATE_PREIMAGE.');
         $args[$m[1]]=$m[2];
     }
@@ -26,9 +28,7 @@ try {
     $proof=json_decode(file_get_contents($reportPath),true,64,JSON_THROW_ON_ERROR);
     if(($proof['status']??null)!=='restore_academic_verification_passed'||($proof['test_database']??null)!==$args['database']
         ||($proof['backup_sha256']??null)!==$baseline['backup_sha256']||($proof['academic_data_matches_backup']??null)!==true||($proof['restore_tested']??null)!==true)throw new RuntimeException('Successful restore evidence required.');
-    if(function_exists('stream_isatty')&&stream_isatty(STDIN))throw new RuntimeException('Use a concealed shell prompt piped through stdin.');
-    $password=stream_get_contents(STDIN,65537);
-    if($password===false||$password===''||strlen($password)>65536)throw new RuntimeException('Test password required on stdin.');
+    $password=TestCredentials::password($args['database'],$args['username'],$configCredentials);
     $pdo=new PDO('mysql:host='.DB_HOST.';dbname='.$args['database'].';charset='.DB_CHARSET,$args['username'],$password,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);unset($password);
     if($pdo->query('SELECT DATABASE()')->fetchColumn()!==$args['database'])throw new RuntimeException('Unexpected database connection.');
     if($resume){
@@ -56,7 +56,8 @@ try {
     else{$ddlStarted=true;$result=AdditiveRehearsal::apply($pdo,$plan);}
     $out=['status'=>'test_schema_rehearsal_passed','test_database'=>$args['database'],'backup_sha256'=>$baseline['backup_sha256'],
         'production_database_connected'=>false,'test_schema_modified'=>!$resume,'test_metadata_modified'=>true,
-        'mode'=>$resume?'resume_metadata_only':'fresh_schema_rehearsal','resumed_from'=>$resume?$preimage:null]+$result;
+        'mode'=>$resume?'resume_metadata_only':'fresh_schema_rehearsal','resumed_from'=>$resume?$preimage:null,
+        'credential_source'=>$configCredentials?'hosting_config':'stdin']+$result;
     $write($prefix.'-after.json',$out);$out['private_report']=$prefix.'-after.json';
     echo json_encode($out,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";
 }catch(Throwable $error){

@@ -5,9 +5,11 @@ require_once __DIR__.'/../includes/program-separation/additive-rehearsal.php';
 use Lppai\ProgramSeparation\Capture;
 use Lppai\ProgramSeparation\RestoreVerification;
 use Lppai\ProgramSeparation\AdditiveRehearsal;
+use Lppai\ProgramSeparation\TestCredentials;
 try{
-    $args=[];
+    $args=[];$configCredentials=false;
     foreach(array_slice($argv,1) as $arg){
+        if($arg==='--use-config-test-credentials'){if($configCredentials)throw new RuntimeException('Duplicate credential mode flag.');$configCredentials=true;continue;}
         if(!preg_match('/^--(capture-dir|database|username)=(.+)$/D',$arg,$m)||isset($args[$m[1]]))throw new RuntimeException('Expected --capture-dir, --database and --username.');
         $args[$m[1]]=$m[2];
     }
@@ -27,13 +29,11 @@ try{
         if(($data['test_database']??null)!==$args['database']||($data['backup_sha256']??null)!==$baseline['backup_sha256']||!is_array($data['plan']??null))throw new RuntimeException('Preimage belongs to another test database/backup.');
         $journals[$file]=$data['plan'];
     }
-    if(function_exists('stream_isatty')&&stream_isatty(STDIN))throw new RuntimeException('Use a concealed password prompt piped through stdin.');
-    $password=stream_get_contents(STDIN,65537);
-    if($password===false||$password===''||strlen($password)>65536)throw new RuntimeException('Password required on stdin.');
+    $password=TestCredentials::password($args['database'],$args['username'],$configCredentials);
     $pdo=new PDO('mysql:host='.DB_HOST.';dbname='.$args['database'].';charset='.DB_CHARSET,$args['username'],$password,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);unset($password);
     if($pdo->query('SELECT DATABASE()')->fetchColumn()!==$args['database'])throw new RuntimeException('Unexpected connection database.');
     $results=[];foreach($journals as $file=>$plan)$results[]=['private_preimage'=>$file]+AdditiveRehearsal::inspect($pdo,$plan);
-    echo json_encode(['status'=>'read_only_rehearsal_inspection','test_database'=>$args['database'],'production_database_connected'=>false,'inspections'=>$results],JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";
+    echo json_encode(['status'=>'read_only_rehearsal_inspection','test_database'=>$args['database'],'production_database_connected'=>false,'credential_source'=>$configCredentials?'hosting_config':'stdin','inspections'=>$results],JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n";
 }catch(Throwable $error){
     $safe=$error instanceof PDOException?'Could not inspect test database.':$error->getMessage();
     fwrite(STDERR,'INSPECTION INCOMPLETE: '.$safe."\nNo ALTER/UPDATE or production connection performed.\n");exit(1);

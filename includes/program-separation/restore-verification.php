@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Lppai\ProgramSeparation;
 require_once __DIR__.'/capture.php';
+require_once __DIR__.'/test-credentials.php';
 
 /** Verifies a restored historical backup, never the current production contents. */
 final class RestoreVerification

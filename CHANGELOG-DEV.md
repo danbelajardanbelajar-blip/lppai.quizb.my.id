@@ -1,3 +1,27 @@
+## 2026-11-25 18.15.59 +0700 — Kredensial konfigurasi untuk database uji tanpa prompt berulang
+
+**ID:** PROGRAM-SEPARATION-CONFIG-TEST-CREDENTIALS · **Parent Git:** f2af391320ef4d2bb8dbfbc693a9dd8d8c7f0767.
+
+**Bukti hosting:** Pengguna mengirim test_schema_rehearsal_passed, mode resume_metadata_only, original_tables_verified 78, all_original_column_values_unchanged true, 547 pendaftaran terhubung ke periode unik, 77 attempt resmi diberi snapshot program, satu periode tunggal dan satu campuran, zero ALTER dan cutover false. Report schema-rehearsal-20261125-181114-90b77f87-after.json. Pengguna meminta tidak mengetik password lagi. Nilai password yang dikirim tidak disalin ke kode/dokumen/log perubahan.
+
+**Perubahan/alasan:** TestCredentials::password memakai DB_PASS yang sudah tersedia pada config hosting hanya dengan flag eksplisit --use-config-test-credentials, target persis quic1934_uji, berbeda DB_NAME produksi (case-insensitive), username persis DB_USER. Akun database uji memang sama dengan akun konfigurasi dari bukti guard sebelumnya. Mode ini tidak menambah file kredensial, argumen berisi password, environment, ekspor config atau koneksi produksi. Jalur stdin tetap tersedia untuk user berbeda tanpa flag. Tiga CLI memakai helper bersama, mencatat credential_source saja, tidak mengubah algoritme data/skema/pengaman integritas. Dokumentasi kini mencatat latihan hosting sudah lulus dan tahap paket/sesi/endpoint masih tersisa. Akses SSH luar tetap dibatasi; password database tidak menggantikan akses terminal hosting.
+
+**Lokasi/waktu:** Seluruh helper/test baru; include helper pada restore-verification awal, parser flag/seleksi password/report pada tiga CLI; guard CLI fresh/resume/inspect diuji dengan flag dan tanpa flag; checkpoint/status rollout bagian awal. Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- includes/program-separation/test-credentials.php | snapshot 1-20 | simpan terakhir WIB 2026-11-25 18.14.00
+- includes/program-separation/restore-verification.php | snapshot 1-62 | simpan terakhir WIB 2026-11-25 18.14.00
+- tools/program-separation-inspect-rehearsal.php | snapshot 1-40 | simpan terakhir WIB 2026-11-25 18.14.00
+- tools/program-separation-rehearse-schema.php | snapshot 1-66 | simpan terakhir WIB 2026-11-25 18.14.00
+- tools/program-separation-verify-restore.php | snapshot 1-50 | simpan terakhir WIB 2026-11-25 18.14.42
+- tests/program-separation-test-credentials-test.php | snapshot 1-18 | simpan terakhir WIB 2026-11-25 18.14.42
+- tests/program-separation-rehearsal-target-test.php | snapshot 1-35 | simpan terakhir WIB 2026-11-25 18.14.42
+- docs/program-separation-hosting-checkpoint.md | snapshot 1-253 | simpan terakhir WIB 2026-11-25 18.14.42
+- docs/program-separation-rollout.md | snapshot 1-149 | simpan terakhir WIB 2026-11-25 18.15.30
+
+**Verifikasi:** Lint tujuh PHP berubah/baru lulus. Lima tes lulus: test-credentials (config sintetis, target/username/production/case variant guard dan tanpa pengungkapan password), rehearsal-target (CLI fresh/resume/inspect dengan/tanpa flag), restore-target, additive-rehearsal, verify-restore. Test-credentials juga lulus dengan proc_open/proc_close nonaktif. bash -n perintah hosting tanpa prompt dan git diff --check lulus. Tidak mengubah engine/schema algorithm sehingga tidak mengulang integrasi MariaDB timestamp yang sudah lulus paket sebelumnya.
+
+**Batas:** Mode kredensial belum diverifikasi pada hosting; perintah inspector baca saja disediakan untuk membuktikannya. Password konfigurasi harus masih valid dan akun memiliki akses database uji. Tidak menyatakan pemisahan total; belum menetapkan owner/template paket/sesi, mengintegrasikan semua endpoint atau menjalankan migrasi produksi.
+
 ## 2026-11-25 18.09.09 +0700 — Pertahankan timestamp otomatis dan lanjutkan metadata tanpa ALTER ulang
 
 **ID:** PROGRAM-SEPARATION-PRESERVE-TIMESTAMPS · **Parent Git:** 3d950f7641f5f36a070e824a45f90e882ef8eb4e.

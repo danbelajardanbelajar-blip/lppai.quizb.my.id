@@ -1,5 +1,25 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Bukti latihan lulus dan perintah tanpa mengetik password ulang
+
+Pengguna melaporkan test_schema_rehearsal_passed pada quic1934_uji, mode resume_metadata_only, zero ALTER, seluruh nilai kolom lama pada 78 tabel identik. Sebanyak 547 pendaftaran ditautkan ke periode unik, 77 attempt resmi diberi snapshot program berdasarkan periode, satu periode target tunggal dan satu periode campuran/unknown; paket/sesi belum diberi owner. Report schema-rehearsal-20261125-181114-90b77f87-after.json. Produksi tidak dihubungi, cutover_allowed tetap false.
+
+Pengguna meminta tidak mengetik password berulang. Karena akun database uji sama dengan DB_USER pada hosting, ketiga CLI verify-restore, inspect-rehearsal dan rehearse-schema mendukung flag eksplisit --use-config-test-credentials. Flag ini membaca DB_PASS yang sudah ada pada config hosting, hanya jika target persis quic1934_uji, target berbeda dari DB_NAME produksi (case-insensitive), serta username cocok persis DB_USER. Tidak membuka koneksi produksi. Tidak membuat salinan password, menyimpannya di Git/file baru/environment/argumen atau mencetaknya. Password dari chat tidak disalin ke kode/dokumen. Mode stdin lama tetap tersedia tanpa flag.
+
+Pemeriksaan berikut hanya membaca proyeksi kolom lama dan metadata setelah latihan, sekaligus membuktikan mode kredensial hosting dapat dipakai tanpa prompt:
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+git pull --ff-only &&
+php tools/program-separation-inspect-rehearsal.php \
+  --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+  --database=quic1934_uji \
+  --username=quic1934_zenhkm \
+  --use-config-test-credentials
+```
+
+Jangan ulangi rehearsal yang sudah lulus atau verifier restore lama setelah schema bertambah. Tahap berikut masih memerlukan penetapan owner/template paket-sesi per program dan integrasi endpoint. Kredensial yang tersedia tidak mengatasi pembatasan SSH hosting dari IP luar; tindakan eksternal tetap dijalankan pengguna melalui terminal cPanel.
+
 ## Lanjutkan metadata dari enam kolom kosong yang sudah terverifikasi
 
 Inspeksi pengguna setelah rollback membuktikan seluruh kolom lama pada 78 tabel tetap sama dengan preimage, tidak ada tabel hilang/bertambah, keenam kolom tambahan ada dan seluruh isinya NULL. Jurnal sumber schema-rehearsal-20261125-175633-56d7ef73-before.json. Hosting mengonfirmasi master_pretes.updated_at memiliki ON UPDATE. Perilaku lama yang mengubah timestamp saat UPDATE metadata telah direproduksi pada MariaDB 11.4.9 lokal; transaksi rollback memulihkan seluruh nilai. Perbaikan mengisi kolom metadata baru sambil menetapkan setiap kolom ON UPDATE pada tabel yang ditulis ke nilainya sendiri, sehingga tidak mengganti waktu historis (referensi: https://dev.mysql.com/doc/refman/8.4/en/timestamp-initialization.html).
