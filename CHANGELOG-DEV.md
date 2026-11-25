@@ -1,3 +1,25 @@
+## 2026-11-25 09:26:46 +0700 — Tampilkan isi tugas Tutorial RPL pada panel mahasiswa
+
+**ID:** TUTORIAL-RPL-STUDENT-TASK-CONTENT · **Parent Git:** `df462c4d48b8923ac7ed10a3a772e94f8c0dfc53`.
+
+**Permintaan dan perubahan:** Bagian screenshot di halaman tutorial-rpl.php role mahasiswa sebelumnya memakai enam ringkasan tetap. Sekarang membaca tutorial_rpl_tasks melalui helper daftar aktif yang sama dengan admin, mengikuti nama, urutan, kategori, bentuk serta materi admin. Video dibuka melalui tautan aman; bacaan/instruksi khusus dapat diperluas dan menggantikan bacaan bawaan. Quran dan istighasah memakai data serta view bacaan yang sudah ada di proyek. Jumlah tugas dihitung aktual, tugas nonaktif disembunyikan, daftar kosong tidak diganti ringkasan lama. Gagal memuat menampilkan pemberitahuan dan mencatat error server. Kartu responsif, pembukaan bacaan memperluas kartu untuk keterbacaan.
+
+**Batas cakupan:** Posisi dan syarat tampil panel tetap seperti sebelumnya (mahasiswa memiliki kelompok dan belum berstatus lulus). Pengaturan kelulusan, nilai, konfirmasi Drive dan alur CBT tidak diubah. Inisialisasi tabel/salin sekali tetap mengikuti helper dari paket sebelumnya.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat setiap edit. Baris adalah awal hunk pada snapshot ini; file baru memakai rentang penuh.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 09:26:45 | `pages/tutorial-rpl.php` | 6, 48, 326, 336, 347, 358, 383, 393 | Baca tugas aktif Tutorial RPL pada panel mahasiswa terplot yang belum lulus; ganti enam ringkasan tetap dengan view dinamis dan hilangkan klaim jumlah enam pada Opsi B/C dan konfirmasi. |
+| 2026-11-25 09:23:47 | `includes/tutorial-rpl-student-tasks-view.php` | 1-58 | Kartu responsif dengan jumlah dan urutan aktual, bentuk/kategori, tautan video HTTP(S), accordion instruksi khusus atau bacaan bawaan Quran/istighasah; escape konten, status kosong/gagal. |
+| 2026-11-25 09:24:25 | `tests/tutorial-rpl-student-hub-test.php` | 5, 138, 251, 352 | Perluas fixture Student Hub: seluruh default, perubahan admin/urutan, nonaktif, kosong, video, bacaan, escape skrip serta konfirmasi Drive dan regresi CBT; gunakan PHP_BINARY. |
+
+**Verifikasi:** Lint ketiga file PHP lulus. tests/tutorial-rpl-student-hub-test.php, tests/tutorial-rpl-tugas-test.php dan tests/tutorial-rpl-task-copy-test.php lulus dengan assertions aktif; mencakup tugas dinamis serta regresi membership, Drive dan CBT. Chrome headless pada HTML hasil controller mahasiswa dengan fixture SQLite: 11 tugas tampil, accordion Quran/istighasah bekerja, desktop dan mobile 390px tanpa overflow atau error JavaScript; screenshot desktop/mobile diperiksa. git diff --check lulus.
+
+**Keterbatasan:** Pengujian memakai autentikasi dan data lokal terisolasi; belum mengakses sesi mahasiswa atau memastikan deployment hosting. Push Git tidak membuktikan deployment berhasil. Screenshot lokal di scratch/rpl-student-tasks-preview diabaikan Git.
+
+---
+
 ## 2026-11-25 09:15:37 +0700 — Salin hanya daftar tugas Pretes RPL ke Tutorial RPL
 
 **ID:** TUTORIAL-RPL-TASK-LIST-COPY · **Parent Git:** `db5b05d4387db96ebe7c519697eac8256db37a21`.

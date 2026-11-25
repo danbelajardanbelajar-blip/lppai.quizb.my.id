@@ -3,6 +3,7 @@ define('PAGE_TITLE', 'Tutorial RPL Online');
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 require_once __DIR__ . '/../includes/tutorial-rpl-periods.php';
+require_once __DIR__ . '/../includes/tutorial-rpl-tasks.php';
 if (file_exists(__DIR__ . '/../includes/tutorial-rpl-helper.php')) {
     require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 }
@@ -42,6 +43,18 @@ try {
     }
 } catch (Throwable $e) {
     // Abaikan error skema bila dijalankan pada fixture uji terisolasi
+}
+
+// Daftar yang ditampilkan mahasiswa mengikuti tugas aktif yang dikelola admin.
+$rplTasks = [];
+$rplTasksUnavailable = false;
+if ($membership && strtolower(trim((string)($membership['status_lulus'] ?? 'proses'))) !== 'lulus') {
+    try {
+        $rplTasks = tutorialRplTaskRows($pdo, false);
+    } catch (Throwable $e) {
+        error_log('RPL student tasks: ' . $e->getMessage());
+        $rplTasksUnavailable = true;
+    }
 }
 
 $notice = $_SESSION['rpl_student_hub_notice'] ?? '';
@@ -310,7 +323,7 @@ include __DIR__ . '/../includes/header.php';
                                         👨‍🏫 Ujian Praktik di Depan Dosen
                                     </h4>
                                     <p style="margin:0 0 12px; font-size:13px; color:#475569; line-height:1.55;">
-                                        Menemui dosen tutor bimbingan untuk melaksanakan evaluasi <strong>6 Poin Tugas Ibadah</strong> langsung di depan dosen pengampu.
+                                        Menemui dosen tutor bimbingan untuk melaksanakan evaluasi <strong>tugas praktik sesuai rincian di bawah</strong> langsung di depan dosen pengampu.
                                     </p>
                                     <div style="font-size:12.5px; color:#334155; margin-bottom:10px;">
                                         Dosen Pengampu: <strong><?= $escape($membership['dosen_nama'] ?: 'Menunggu penugasan') ?></strong><br>
@@ -320,7 +333,7 @@ include __DIR__ . '/../includes/header.php';
 
                                 <div style="margin-top:12px;">
                                     <?php if (!empty($membership['dosen_wa'])): ?>
-                                        <a href="https://wa.me/<?= preg_replace('/\D/', '', $membership['dosen_wa']) ?>?text=<?= rawurlencode('Assalamu\'alaikum Bapak/Ibu Dosen ' . ($membership['dosen_nama'] ?? '') . ', saya mahasiswa RPL ' . ($actor['nama_lengkap'] ?? '') . ' (NIM: ' . ($actor['nim'] ?? '') . ') ingin berkonsultasi mengenai jadwal ujian tatap muka 6 poin tugas ibadah Tutorial RPL.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
+                                        <a href="https://wa.me/<?= preg_replace('/\D/', '', $membership['dosen_wa']) ?>?text=<?= rawurlencode('Assalamu\'alaikum Bapak/Ibu Dosen ' . ($membership['dosen_nama'] ?? '') . ', saya mahasiswa RPL ' . ($actor['nama_lengkap'] ?? '') . ' (NIM: ' . ($actor['nim'] ?? '') . ') ingin berkonsultasi mengenai jadwal ujian tatap muka tugas praktik Tutorial RPL.') ?>" target="_blank" rel="noopener noreferrer" class="btn btn-success" style="width:100%; text-align:center; padding:10px 14px; font-weight:700; font-size:13px; display:inline-flex; align-items:center; justify-content:center; gap:6px; text-decoration:none; white-space:normal !important; line-height:1.4; height:auto !important; box-sizing:border-box; border-radius:8px;">
                                             <span>💬</span> Chat WhatsApp Dosen
                                         </a>
                                     <?php else: ?>
@@ -331,7 +344,7 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
 
-                            <!-- OPSI C: UJIAN 6 POIN TUGAS REKAMAN VIDEO GOOGLE DRIVE (ONLINE) -->
+                            <!-- OPSI C: TUGAS REKAMAN VIDEO GOOGLE DRIVE (ONLINE) -->
                             <div style="background:<?= $isCbtUnder70 ? '#f0fdf4' : '#f8fafc' ?>; border:2px solid <?= $isCbtUnder70 ? '#16a34a' : '#cbd5e1' ?>; border-radius:12px; padding:18px; display:flex; flex-direction:column; justify-content:space-between;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -342,7 +355,7 @@ include __DIR__ . '/../includes/header.php';
                                         📹 Rekaman Video di Google Drive
                                     </h4>
                                     <p style="margin:0 0 12px; font-size:13px; color:#475569; line-height:1.55;">
-                                        Melakukan ujian praktik <strong>6 Poin Tugas Ibadah</strong> dengan cara direkam dan diupload ke folder Google Drive kelompok.
+                                        Merekam <strong>seluruh tugas praktik sesuai rincian di bawah</strong> dan mengunggahnya ke folder Google Drive kelompok.
                                     </p>
                                     <div style="font-size:12.5px; color:#334155; margin-bottom:10px;">
                                         Status Video: <strong><?= !empty($membership['drive_verified']) ? '✅ Terverifikasi Sah oleh Dosen' : (!empty($membership['drive_submitted']) ? '⏳ Sudah Diunggah (Menunggu Verifikasi)' : 'Belum Dikonfirmasi Unggah') ?></strong>
@@ -367,7 +380,7 @@ include __DIR__ . '/../includes/header.php';
                                         <form method="POST" style="margin:0;">
                                             <input type="hidden" name="csrf_token" value="<?= $escape(csrfToken()) ?>">
                                             <input type="hidden" name="action" value="confirm_drive">
-                                            <button type="submit" class="btn btn-success" onclick="return confirm('Pastikan Anda telah mengunggah video rekaman 6 poin tugas ke folder Google Drive kelompok sebelum konfirmasi. Lanjutkan?');" style="width:100%; font-weight:700; font-size:12.5px; padding:10px 14px; white-space:normal !important; word-wrap:break-word; word-break:normal; line-height:1.4; height:auto !important; text-align:center; box-sizing:border-box; border-radius:8px; display:block; cursor:pointer;">
+                                            <button type="submit" class="btn btn-success" onclick="return confirm('Pastikan Anda telah mengunggah video rekaman seluruh tugas praktik ke folder Google Drive kelompok sebelum konfirmasi. Lanjutkan?');" style="width:100%; font-weight:700; font-size:12.5px; padding:10px 14px; white-space:normal !important; word-wrap:break-word; word-break:normal; line-height:1.4; height:auto !important; text-align:center; box-sizing:border-box; border-radius:8px; display:block; cursor:pointer;">
                                                 ✓ Konfirmasi Saya Sudah Mengunggah Tugas ke Drive
                                             </button>
                                         </form>
@@ -377,36 +390,7 @@ include __DIR__ . '/../includes/header.php';
 
                         </div>
 
-                        <!-- RINCIAN 6 POIN TUGAS PRAKTIK -->
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:18px 20px;">
-                            <h4 style="margin:0 0 10px; font-size:14.5px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:8px;">
-                                <span>📌</span>
-                                <span>Rincian 6 Poin Tugas Ujian Praktik Ibadah (Opsi B &amp; C):</span>
-                            </h4>
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; margin-top:12px;">
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>1. Praktik Thaharah (Wudhu):</strong> Gerakan wudhu tertib &amp; doa setelah wudhu.
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>2. Praktik Tayammum:</strong> Syarat, niat, rukun mengusap muka/tangan, &amp; doa tayammum.
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>3. Niat Mandi Wajib &amp; Jamak Qashar:</strong> Niat mandi besar dan niat shalat jamak taqdim/takhir qashar.
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>4. Bacaan Shalat Subuh:</strong> Niat, bacaan shalat fardhu Subuh lengkap dengan doa Qunut.
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>5. Shalat Jenazah:</strong> Tata cara shalat jenazah (niat, 4 takbir, doa shalat jenazah, salam).
-                                </div>
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; font-size:13px; color:#334155;">
-                                    <strong>6. Amaliyah &amp; Hafalan:</strong> Surat pendek pilihan (Ad-Dhuha/Al-Alaq/Al-Bayyinah) &amp; bacaan Istighatsah.
-                                </div>
-                            </div>
-                            <div style="margin-top:12px; font-size:12.5px; color:#64748b; line-height:1.5;">
-                                <em>Catatan Tambahan:</em> Jika memilih <strong>Opsi B</strong>, ujian dilakukan langsung secara tatap muka di depan dosen tutor. Jika memilih <strong>Opsi C</strong>, mahasiswa merekam video praktik 6 poin tersebut dan mengunggahnya ke Google Drive kelompok bimbingan.
-                            </div>
-                        </div>
+                        <?php include __DIR__ . '/../includes/tutorial-rpl-student-tasks-view.php'; ?>
                     </div>
                 <?php endif; ?>
             </div>

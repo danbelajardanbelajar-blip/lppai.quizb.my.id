@@ -2,7 +2,7 @@
 /**
  * Test: Student Hub & CBT Integration for Tutorial RPL Online
  */
-$php = "d:\\all_project\\lppai.quizb.my.id\\scratch\\php-runtime\\php.exe";
+$php = PHP_BINARY;
 $dir = sys_get_temp_dir() . '/test-rpl-student-hub-' . bin2hex(random_bytes(6));
 mkdir($dir . '/pages', 0777, true);
 mkdir($dir . '/includes', 0777, true);
@@ -135,6 +135,13 @@ copy(__DIR__ . '/../includes/tutorial-rpl-cbt-engine.php', $dir . '/includes/tut
 copy(__DIR__ . '/../includes/tutorial-rpl-periods.php', $dir . '/includes/tutorial-rpl-periods.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-registration-policy.php', $dir . '/includes/tutorial-rpl-registration-policy.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-registration-rules-view.php', $dir . '/includes/tutorial-rpl-registration-rules-view.php');
+foreach (['tutorial-rpl-tasks.php', 'pretes-components.php', 'tutorial-rpl-student-tasks-view.php', 'pretes-learning-reading-view.php'] as $dependency) {
+    copy(__DIR__ . '/../includes/' . $dependency, $dir . '/includes/' . $dependency);
+}
+mkdir($dir . '/data');
+foreach (['pretes-learning-readings.json', 'pretes-istighasah.php'] as $dependency) {
+    copy(__DIR__ . '/../data/' . $dependency, $dir . '/data/' . $dependency);
+}
 copy(__DIR__ . '/../includes/pretes-cbt-view.php', $dir . '/includes/pretes-cbt-view.php');
 file_put_contents($dir . '/includes/pretes-helper.php', "<?php\nif (!function_exists('ensurePretesProctoringTables')) { function ensurePretesProctoringTables(PDO \$pdo): void {} }\n");
 copy(__DIR__ . '/../includes/user-exam-photo.php', $dir . '/includes/user-exam-photo.php');
@@ -241,6 +248,26 @@ try {
     $check(str_contains($res['html'], 'https://drive.google.com/drive/folders/test1234'), 'Hub memuat link Google Drive kelas');
     $check(str_contains($res['html'], 'Konfirmasi Saya Sudah Mengunggah Tugas'), 'Tombol konfirmasi unggah muncul saat belum dikonfirmasi');
 
+    $check(substr_count($res['html'], 'data-rpl-task=') === 11, 'Semua 11 tugas aktif dari daftar admin tampil');
+    $check(str_contains($res['html'], 'bacaan-istighasah') && str_contains($res['html'], 'Lihat bacaan Al'), 'Bacaan bawaan dapat dibuka');
+    $check(str_contains($res['html'], 'https://www.youtube.com/watch?v=zvCIGrVTE-w'), 'Video tugas admin tampil');
+    $check(!str_contains($res['html'], 'Rincian 6 Poin'), 'Daftar enam ringkasan lama diganti');
+    require_once $dir . '/includes/tutorial-rpl-tasks.php';
+    ensureTutorialRplTasksTables($pdo);
+    $pdo->exec("UPDATE tutorial_rpl_tasks SET is_active=0 WHERE task_key='al_bayyinah'");
+    $pdo->prepare('UPDATE tutorial_rpl_tasks SET label=?,reading_title=?,reading_text=?,video_url=?,sort_order=0 WHERE task_key=?')->execute([
+        'Tugas <uji> khusus', 'Instruksi <admin>', "Baris satu\n<script>alert(1)</script>", 'javascript:alert(1)', 'praktik_wudlu'
+    ]);
+    $res = executeRequest($php, $dir, ['page'=>'hub','actor'=>['id'=>101,'role'=>'mahasiswa','jenis_program'=>'RPL']]);
+    $check(substr_count($res['html'], 'data-rpl-task=') === 10 && !str_contains($res['html'], 'data-rpl-task="al_bayyinah"'), 'Tugas nonaktif disembunyikan dan jumlah berubah');
+    $check(str_contains($res['html'], '1. Tugas &lt;uji&gt; khusus') && str_contains($res['html'], 'Instruksi &lt;admin&gt;'), 'Edit dan urutan admin langsung terbaca, judul di-escape');
+    $check(str_contains($res['html'], '&lt;script&gt;alert(1)&lt;/script&gt;') && !str_contains($res['html'], 'href="javascript:'), 'Instruksi dan tautan tidak menjalankan skrip');
+    $check(!str_contains($res['html'], 'bacaan-praktik-wudlu'), 'Bacaan khusus menggantikan bacaan bawaan');
+    $pdo->exec('UPDATE tutorial_rpl_tasks SET is_active=0');
+    $res = executeRequest($php, $dir, ['page'=>'hub','actor'=>['id'=>101,'role'=>'mahasiswa','jenis_program'=>'RPL']]);
+    $check(str_contains($res['html'], 'Belum ada tugas praktik aktif') && !str_contains($res['html'], 'data-rpl-task='), 'Daftar kosong tidak diganti fallback tugas lama');
+    $pdo->exec('UPDATE tutorial_rpl_tasks SET is_active=1');
+
     // 2b. POST Konfirmasi Unggah Tugas dengan CSRF valid
     $res = executeRequest($php, $dir, [
         'method' => 'POST',
@@ -322,6 +349,9 @@ try {
 
 } finally {
     $pdo = null;
+    foreach (['tutorial-rpl-tasks.php','pretes-components.php','tutorial-rpl-student-tasks-view.php','pretes-learning-reading-view.php'] as $dependency) @unlink($dir . '/includes/' . $dependency);
+    foreach (glob($dir . '/data/*') as $dependency) @unlink($dependency);
+    @rmdir($dir . '/data');
     @unlink($dir . '/test.sqlite');
     @unlink($dir . '/pages/tutorial-rpl.php');
     @unlink($dir . '/pages/tutorial-rpl-cbt.php');
