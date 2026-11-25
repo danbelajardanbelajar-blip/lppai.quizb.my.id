@@ -1,3 +1,21 @@
+## 2026-11-25 17.36.07 +0700 — Izinkan username bersama untuk verifikasi restore baca saja
+
+**ID:** RESTORE-VERIFY-SHARED-USER · **Parent Git:** 03abea70d21a7154961e042eabdc41be394d0f11.
+
+**Masalah/bukti:** Keluaran hosting berhenti dengan Test database and user must be separate from production sebelum koneksi. Username quic1934_zenhkm ternyata juga dipakai konfigurasi produksi, sedangkan database uji quic1934_uji berbeda. Guard username sebelumnya terlalu ketat untuk verifier SELECT-only; tidak ada indikasi kegagalan impor atau kerusakan nilai dari pesan itu.
+
+**Perubahan/alasan:** Hapus penolakan username sama hanya pada verifier baca. Tetap menolak nama database produksi tanpa membedakan huruf besar/kecil, memakai dbname tujuan eksplisit, memeriksa SELECT DATABASE(), capture checksum/identitas dan transaksi READ ONLY. Tidak mengganti konfigurasi atau menambah operasi tulis database. Perbarui dokumentasi agar tidak menganggap user terpisah sebagai fakta.
+
+**Snapshot dan waktu:** Waktu penyimpanan terakhir yang tersedia, bukan riwayat tiap edit:
+
+- docs/program-separation-hosting-checkpoint.md | 5,24: username bersama, batas verifier baca | simpan terakhir WIB 2026-11-25 17.35.38
+- tests/program-separation-restore-target-test.php | 1-akhir: fixture CLI dengan config dummy | simpan terakhir WIB 2026-11-25 17.35.38
+- tools/program-separation-verify-restore.php | 21-23: guard target database | simpan terakhir WIB 2026-11-25 17.35.38
+
+**Verifikasi:** Lint dua file PHP berubah lulus. program-separation-restore-target-test.php menjalankan CLI asli dengan konfigurasi dummy: nama produksi asli dan kapital ditolak; database berbeda dengan username sama melewati guard target sampai guard folder private tanpa membuka koneksi. program-separation-verify-restore-test.php lulus dengan proc_open/proc_close dinonaktifkan: checksum, nilai/jawaban, tabel/duplikasi dan preservasi seluruh data. git diff --check lulus sebelum commit.
+
+**Batas:** Tidak membuka koneksi hosting dari agen; verifikasi hasil restore MySQL tetap menunggu pengguna menjalankan ulang perintah baca. Jangan mengimpor ulang backup. Belum migrasi/cutover produksi.
+
 ## 2026-11-25 17.32.37 +0700 — Verifikasi restore akademik database uji
 
 **ID:** PROGRAM-SEPARATION-VERIFY-RESTORE · **Parent Git:** 48a16103d434042f610480ccd2694dadbd2f409c.

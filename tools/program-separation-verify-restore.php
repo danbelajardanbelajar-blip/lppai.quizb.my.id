@@ -18,7 +18,9 @@ try {
     if (count($args)!==3) throw new RuntimeException('Three arguments required. Use --help.');
     foreach (['database','username'] as $name) if (!preg_match('/^[a-zA-Z0-9_]+$/D',$args[$name])) throw new RuntimeException('Invalid test database or username.');
     require_once __DIR__.'/../config/database.php';
-    if (strcasecmp($args['database'],(string)DB_NAME)===0 || strcasecmp($args['username'],(string)DB_USER)===0) throw new RuntimeException('Test database and user must be separate from production.');
+    // A shared-hosting account may grant one user access to two databases.
+    // This SELECT-only verifier isolates the connection by database, not username.
+    if (strcasecmp($args['database'],(string)DB_NAME)===0) throw new RuntimeException('Test database must be separate from production.');
     $run=Capture::privateDirectory($args['capture-dir'],dirname(__DIR__));
     $baseline=RestoreVerification::baseline($run,hash('sha256',serialize([(string)DB_HOST,(string)DB_NAME])));
     if (function_exists('stream_isatty') && stream_isatty(STDIN)) throw new RuntimeException('Supply the password through a concealed shell prompt and stdin pipe.');

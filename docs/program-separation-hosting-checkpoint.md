@@ -2,7 +2,7 @@
 
 ## Verifikasi hasil restore pada database uji
 
-Pengguna membuat database kosong `quic1934_uji` dan user terpisah `quic1934_zenhkm`, memverifikasi jumlah tabel 0, lalu melaporkan impor SQL selesai setelah checksum SQL cocok. Impor selesai belum membuktikan nilai/jawaban hasil restore sesuai baseline. Jangan mengimpor ulang di atas database uji yang kini berisi data.
+Pengguna membuat database kosong `quic1934_uji` dan memakai user `quic1934_zenhkm`, memverifikasi jumlah tabel 0, lalu melaporkan impor SQL selesai setelah checksum SQL cocok. Keluaran verifier pertama menunjukkan username tersebut sama dengan konfigurasi produksi; database tetap berbeda. Pemeriksaan SELECT-only mengizinkan username bersama, tetapi tetap menolak database produksi. Impor selesai belum membuktikan nilai/jawaban hasil restore sesuai baseline. Jangan mengimpor ulang di atas database uji yang kini berisi data.
 
 Jalankan dari terminal cPanel, bukan melalui URL:
 
@@ -21,7 +21,7 @@ git pull --ff-only &&
 )
 ```
 
-Password melewati stdin pipe dari builtin shell, tidak melalui argumen proses, Git, environment atau chat. Variabel hanya berada dalam subshell. Verifier menolak nama database/user produksi dan hanya membuka koneksi ke database uji di host yang dikonfigurasi. Tidak mengubah config aplikasi dan tidak membutuhkan proc_open. Script memverifikasi identitas sumber capture, checksum SQL dan baseline, marker dump, lalu membandingkan multiset seluruh nilai kolom dan jumlah baris pada semua tabel akademik dalam transaksi read-only. Report baru dibuat private 0600 di direktori capture; metadata capture lama tidak ditimpa.
+Password melewati stdin pipe dari builtin shell, tidak melalui argumen proses, Git, environment atau chat. Variabel hanya berada dalam subshell. Verifier menolak nama database produksi (juga perbedaan huruf besar/kecil), hanya membuka koneksi ke database uji di host yang dikonfigurasi, lalu memeriksa SELECT DATABASE(). Username yang sama dapat dipakai jika memiliki akses ke database uji; izin ini khusus verifier baca saja, bukan izin migrasi/impor ke produksi. Tidak mengubah config aplikasi dan tidak membutuhkan proc_open. Script memverifikasi identitas sumber capture, checksum SQL dan baseline, marker dump, lalu membandingkan multiset seluruh nilai kolom dan jumlah baris pada semua tabel akademik dalam transaksi read-only. Report baru dibuat private 0600 di direktori capture; metadata capture lama tidak ditimpa.
 
 Hasil lulus adalah `restore_academic_verification_passed`, `academic_data_matches_backup: true`, `different_tables: []`. Angka dan checksum merujuk isi backup historis, bukan database produksi saat ini. `restore_tested: true` berarti latihan restore berhasil untuk data akademik; tipe kolom/index/constraint dan data nonakademik belum dibandingkan. `cutover_allowed` tetap false: ini belum latihan migrasi/pemetaan periode campuran. Keluaran gagal tidak boleh dianggap lolos. Jangan menghapus atau memperbaiki nilai agar hash cocok. Kirim ringkasan JSON saja, bukan password atau SQL.
 
