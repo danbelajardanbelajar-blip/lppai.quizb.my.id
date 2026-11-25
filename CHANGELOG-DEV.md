@@ -55,6 +55,38 @@ Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riway
 
 ---
 
+## 2026-11-25 08:52:13 +0700 — Pembuatan Halaman Kelola Tugas Tutorial RPL (Berparitas dengan Kelola Tugas Pretes)
+
+**ID:** TUTORIAL-RPL-TUGAS-ADMIN-PAGE · **Parent Git:** `38646bf86a6c23a8c02bad5bde13df05b8c641aa`.
+
+**Permintaan dan dasar perbaikan:** Menindaklanjuti permintaan pengguna ("tolong buatkan halaman seprti ini https://lppai.quizb.my.id/admin/pretes-tugas.php di sub menu tutorial rpl"):
+1. **Helper Manajemen Tugas & Mode Kelulusan Tutorial RPL (`includes/tutorial-rpl-tasks.php`):**
+   - Membuat skema tabel `tutorial_rpl_tasks` (dengan seed awal 6 poin tugas ibadah standar saat tabel kosong) dan `tutorial_rpl_settings`.
+   - Menyediakan fungsi `ensureTutorialRplTasksTables`, `tutorialRplSettingGet`, `tutorialRplSettingSet`, `tutorialRplPassMode`, `tutorialRplTaskRows`, `tutorialRplTaskSave`, `tutorialRplTaskSetActive`, `tutorialRplTaskMove`, dan `tutorialRplTaskDelete`.
+2. **Halaman Admin Kelola Tugas Tutorial RPL (`admin/tutorial-rpl-tugas.php`):**
+   - Meniru tata letak dan fitur `admin/pretes-tugas.php`: kartu Mode Kelulusan Tutorial RPL Online (`flexible_3_options`, `cbt_only`, `cbt_and_tasks`), tabel daftar komponen tugas (baris tetap `1. Ujian tulis (CBT)` + tugas praktik/hafalan yang bisa ditambah, edit, naik/turunkan urutan, aktif/nonaktifkan, dan hapus permanen), serta form Tambah/Edit Komponen lengkap dengan link video panduan & teks bacaan/instruksi.
+3. **Navigasi Sidebar Admin (`includes/sidebar.php`):**
+   - Menambahkan submenu `📋 Kelola Tugas Tutorial RPL` (`admin/tutorial-rpl-tugas.php`) di grup `🌐 Tutorial RPL Online` dan memperbarui badge jumlah menu menjadi `8`.
+4. **Pengujian (`tests/tutorial-rpl-tugas-test.php`):**
+   - Menambahkan suite pengujian otomatis untuk seed default, CRUD tugas, pengurutan, aktif/nonaktif, hapus, penyimpanan mode kelulusan, dan verifikasi sidebar.
+
+Waktu pada tabel adalah **waktu penyimpanan terakhir file** yang tercatat di sistem (WIB).
+
+| Waktu Simpan Terakhir (WIB) | File | Baris | Bagian / Perubahan |
+|---|---|---|---|
+| 2026-11-25 08:51:46 | `includes/tutorial-rpl-tasks.php` | 1-190 (baru) | Skema `tutorial_rpl_tasks`, `tutorial_rpl_settings`, dan helper CRUD tugas + mode kelulusan. |
+| 2026-11-25 08:51:48 | `admin/tutorial-rpl-tugas.php` | 1-235 (baru) | Halaman admin Kelola Tugas Tutorial RPL berparitas dengan `admin/pretes-tugas.php`. |
+| 2026-11-25 08:52:10 | `includes/sidebar.php` | 169-205 | Penambahan submenu `Kelola Tugas Tutorial RPL` pada grup `Tutorial RPL Online`. |
+| 2026-11-25 08:52:13 | `tests/tutorial-rpl-tugas-test.php` | 1-72 (baru) | Suite pengujian otomatis halaman dan helper Kelola Tugas Tutorial RPL. |
+
+**Verifikasi:**
+- PHP lint (`php.exe -l`): lulus pada seluruh file PHP baru & diubah (`No syntax errors detected`).
+- `git diff --check`: bersih.
+- `tests/tutorial-rpl-tugas-test.php`: ALL PASS.
+- `tests/tutorial-rpl-structure-test.php`: ALL PASS.
+
+---
+
 ## 2026-11-25 08:20:21 +0700 — Penghapusan Pembatasan Blokir Nonaktifkan & Hapus Sesi Ujian CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-ALLOW-DEACTIVATE-DELETE-SESSION · **Parent Git:** `753b2e69bbb9a74ee2f195980d4932a35f881fb9`.
