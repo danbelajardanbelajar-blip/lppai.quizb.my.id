@@ -380,22 +380,15 @@ function tutorialRplCbtStart(PDO $pdo, int $userId, int $classId, ?int $now = nu
 
             $stmt = $pdo->prepare('INSERT INTO tutorial_rpl_cbt_items (attempt_id, question_id, position, category, question_text, options_json, correct_answer, answer, flagged) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0)');
             foreach ($selected as $i => $question) {
-                $old = json_decode((string)$question['options_json'], true);
-                $keys = tutorialRplCbtShuffle(range('A', 'E'));
-                $options = [];
-                $correct = '';
-                foreach (range('A', 'E') as $j => $letter) {
-                    $options[$letter] = $old[$keys[$j]] ?? '';
-                    if ($keys[$j] === $question['correct_answer']) $correct = $letter;
-                }
+                $shuffledOptions=tutorialRplCbtShuffleOptions($question['options_json'],null,(string)$question['correct_answer']);
                 $stmt->execute([
                     $attemptId,
                     (int)$question['id'],
                     $i + 1,
                     $question['category'] ?? 'Umum',
                     $question['question_text'],
-                    json_encode($options, JSON_UNESCAPED_UNICODE),
-                    $correct,
+                    $shuffledOptions['options_json'],
+                    $shuffledOptions['correct_answer'],
                 ]);
             }
             $attempt = tutorialRplCbtLock($pdo, $userId, $classId);
@@ -455,33 +448,8 @@ function tutorialRplCbtInterrupt(PDO $pdo, array $attempt, array $input, int $no
     $session = !empty($attempt['session_id']) ? tutorialRplCbtGetSession($pdo, (int)$attempt['session_id']) : tutorialRplCbtGetActiveSession($pdo);
     $shuffleOnViolation = $session ? (int)($session['shuffle_on_violation'] ?? 1) : 1;
 
-    $shuffleItemOptions = static function (array $options, ?string $selectedKey, string $correctKey): array {
-        $selectedText = $selectedKey !== null && isset($options[$selectedKey]) ? $options[$selectedKey] : null;
-        $correctText = $options[$correctKey] ?? null;
-
-        $keys = array_keys($options);
-        $order = tutorialRplCbtShuffle($keys);
-        if ($order === $keys && count($keys) > 1) {
-            $order = array_merge(array_slice($order, 1), [$order[0]]);
-        }
-
-        $newOptions = [];
-        $newAnswer = null;
-        $newCorrect = '';
-        foreach ($order as $idx => $oldKey) {
-            $letter = chr(65 + $idx);
-            $val = $options[$oldKey];
-            $newOptions[$letter] = $val;
-            if ($selectedText !== null && $val === $selectedText) $newAnswer = $letter;
-            if ($correctText !== null && $val === $correctText) $newCorrect = $letter;
-        }
-        if ($newCorrect === '' && !empty($order)) $newCorrect = 'A';
-        return [
-            'options_json' => json_encode($newOptions, JSON_UNESCAPED_UNICODE),
-            'answer' => $newAnswer,
-            'correct_answer' => $newCorrect,
-        ];
-    };
+    $shuffleItemOptions = static fn(array $options, ?string $selectedKey, string $correctKey): array
+        => tutorialRplCbtShuffleOptions($options,$selectedKey,$correctKey,true);
 
     if ($shuffleOnViolation === 1) {
         $packageIds = !empty($session['package_ids']) ? array_map('intval', $session['package_ids']) : [];

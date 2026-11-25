@@ -1,3 +1,32 @@
+## 2026-11-25 08:53:20 +0700 — Perbaiki pemetaan kunci jawaban setelah pengacakan CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-ANSWER-KEY-MAPPING · **Parent Git:** `c145f53`.
+
+**Permintaan dan temuan:** Screenshot Review attempt 7 memperlihatkan opsi A Baju batik ditandai sebagai kunci untuk pertanyaan warna pakaian Jumat, sementara Pakaian putih ada di E. Di skrip, impor/sebagian seed menyimpan opsi sebagai list numerik 0-4, tetapi engine Start mengambilnya dengan indeks A-E. Pada interupsi/soal cadangan, kunci dicari memakai huruf pada list numerik; ketika tidak ditemukan, kode lama menetapkan newCorrect A. Opsi tetap diacak sehingga huruf A dapat menunjuk isi yang salah. Kode lama juga menyamakan identitas pilihan berdasarkan kesamaan teks, menyebabkan dua opsi berteks sama berpotensi terkonflasi.
+
+**Reproduksi lokal:** Potongan closure asli dari parent commit dijalankan pada fixture lima opsi numerik dengan jawaban benar di indeks 4/kunci E: lookup E tidak ditemukan; pada eksekusi uji ini 78 dari 100 pengacakan menunjuk teks jawaban yang salah. Angka ini adalah hasil acak fixture lokal, bukan statistik ujian hosting. Jalur Start lama juga menghasilkan opsi kosong untuk bentuk list yang sama. Ini membuktikan bug skrip yang dapat menimbulkan gejala screenshot, belum memastikan seluruh isi attempt 7 tanpa membaca snapshot hosting.
+
+**Perbaikan dan alasan:** Normalisasikan list 0-4, objek huruf besar/kecil dan list objek text menjadi A-E. Kunci dan jawaban dipindahkan berdasarkan identitas indeks asal, bukan pencocokan teks. Kosong/null pada opsi yang tidak dipakai tidak diacak. Kunci hilang/kosong, pilihan jawaban tidak valid, format ambigu atau pilihan terisi kurang dari dua ditolak; tidak ada penetapan kunci A sebagai tebakan. Engine Start dan seluruh cabang interupsi menggunakan fungsi yang sama, sehingga soal cadangan numerik juga aman. Simpan/import bank memvalidasi kunci dan menulis bentuk huruf konsisten; API options dan options_json didukung. Snapshot yang dibuat melalui helper lama juga memakai bentuk opsi huruf. Tidak mengubah template Review agar menampilkan kunci tebakan dari bank yang mungkin sudah berbeda.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Baris merupakan awal hunk untuk berkas lama atau rentang penuh untuk berkas baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 08:51:21 | `includes/tutorial-rpl-cbt-options.php` | 1-66 | Normalisasi format pilihan dan pengacakan berdasarkan identitas opsi, validasi kunci/jawaban, tanpa fallback A. |
+| 2026-11-25 08:45:43 | `includes/tutorial-rpl-cbt-engine.php` | 383, 390, 451 | Gunakan normalisasi/pemetaan yang sama untuk attempt awal dan interupsi/penggantian soal cadangan. |
+| 2026-11-25 08:49:19 | `includes/tutorial-rpl-helper.php` | 2, 1867, 2331, 2375, 2616 | Validasi simpan/import bank, dukung alias options/options_json, format A-E untuk write/snapshot baru; tidak memperbarui baris lama. |
+| 2026-11-25 08:51:21 | `tests/tutorial-rpl-cbt-answer-key-test.php` | 1-58 | Uji makna teks kunci/pilihan pada berbagai format, duplikasi teks, interupsi/reserve/resume, skor, input invalid dan rollback attempt. |
+| 2026-11-25 08:47:00 | `tests/tutorial-rpl-structure-test.php` | 18 | Tambahkan dependensi normalizer ke fixture helper. |
+| 2026-11-25 08:47:00 | `tests/tutorial-rpl-dosen-csrf-test.php` | 78 | Tambahkan dependensi normalizer ke fixture helper. |
+| 2026-11-25 08:47:00 | `tests/tutorial-rpl-student-hub-test.php` | 133 | Tambahkan dependensi normalizer ke fixture helper. |
+| 2026-11-25 08:50:19 | `docs/tutorial-rpl-cbt-answer-key.md` | 1-17 | Temuan, batas perbaikan dan prosedur audit snapshot/nilai lama berbasis teks, bukan huruf saja. |
+
+**Verifikasi:** PHP lint tujuh berkas PHP berubah/tambahan lulus; git diff --check lulus. Sembilan suite lokal lulus dengan assertions aktif: tutorial-rpl-cbt-answer-key, tutorial-rpl-cbt-proctoring-parity, tutorial-rpl-cbt-parity, tutorial-rpl-cbt-nilai, tutorial-rpl-cbt-review, tutorial-rpl-structure, tutorial-rpl-dosen-csrf, tutorial-rpl-student-hub, tutorial-rpl-cbt-delete. Uji baru memeriksa isi teks jawaban benar/pilihan mahasiswa dalam 400 pengacakan berbagai format, opsi duplikat, opsi kosong/null, kunci invalid, bank numerik yang langsung dibaca engine, penggantian soal cadangan numerik akibat interupsi, jawaban yang sudah dipilih, resume, dan submit berdasarkan teks yang benar menghasilkan skor 100. Kunci bank invalid membatalkan attempt baru tanpa baris parsial; snapshot serta skor attempt sebelumnya tetap sama. Fixture CSRF/hub memakai controller halaman sebenarnya. Suite structure mencetak log tabel fixture membership/pretes/master_gelombang yang tidak disediakan, semua assertion lulus. Tidak ada perubahan UI sehingga tidak mengulang uji visual browser.
+
+**Batas penting:** Belum membaca database hosting/attempt 7 atau menguji MySQL produksi. Patch memperbaiki pembuatan/pengacakan berikutnya dan validasi input, tidak mengoreksi kunci snapshot atau menghitung ulang nilai lama otomatis. Data lama perlu audit pertanyaan/opsi/teks jawaban terhadap bank/backup yang sesuai sebelum paket perubahan nilai terpisah. Kunci berbeda huruf setelah shuffle adalah normal; jangan mengganti seluruh A menjadi E. Commit memakai ID ini, diikuti pull --rebase dan push.
+
+---
+
 ## 2026-11-25 08:37:10 +0700 — Perbaiki Delete Paket dan Sesi CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-DELETE-PERSISTENCE · **Parent Git:** `5a041c2`.

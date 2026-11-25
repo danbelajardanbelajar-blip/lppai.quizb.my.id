@@ -75,6 +75,7 @@ $pdo->exec("
 // Salin berkas asli dan stub auth
 copy(__DIR__ . '/../dosen/tutorial-rpl.php', $dir . '/dosen/tutorial-rpl.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-helper.php', $dir . '/includes/tutorial-rpl-helper.php');
+copy(__DIR__ . '/../includes/tutorial-rpl-cbt-options.php', $dir . '/includes/tutorial-rpl-cbt-options.php');
 
 file_put_contents($dir . '/includes/auth.php', <<<'PHP'
 <?php

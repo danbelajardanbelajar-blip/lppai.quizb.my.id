@@ -130,6 +130,7 @@ $pdo->exec("
 copy(__DIR__ . '/../pages/tutorial-rpl.php', $dir . '/pages/tutorial-rpl.php');
 copy(__DIR__ . '/../pages/tutorial-rpl-cbt.php', $dir . '/pages/tutorial-rpl-cbt.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-helper.php', $dir . '/includes/tutorial-rpl-helper.php');
+copy(__DIR__ . '/../includes/tutorial-rpl-cbt-options.php', $dir . '/includes/tutorial-rpl-cbt-options.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-cbt-engine.php', $dir . '/includes/tutorial-rpl-cbt-engine.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-periods.php', $dir . '/includes/tutorial-rpl-periods.php');
 copy(__DIR__ . '/../includes/tutorial-rpl-registration-policy.php', $dir . '/includes/tutorial-rpl-registration-policy.php');

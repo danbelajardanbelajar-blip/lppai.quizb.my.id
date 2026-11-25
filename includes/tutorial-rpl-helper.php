@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/tutorial-rpl-cbt-options.php';
 /**
  * LPPAI Corner - Helper & Skema Basis Data Tutorial RPL Online
  *
@@ -1863,8 +1864,10 @@ if (!function_exists('tutorialRplCbtSaveQuestion')) {
         $category = trim((string)($data['category'] ?? 'Ubudiyah'));
         $text = trim((string)($data['question_text'] ?? ''));
         $correct = strtoupper(trim((string)($data['correct_answer'] ?? 'A')));
-        $options = $data['options_json'] ?? '[]';
-        if (is_array($options)) $options = json_encode($options, JSON_UNESCAPED_UNICODE);
+        $normalized=tutorialRplCbtNormalizeOptions($data['options_json'] ?? $data['options'] ?? []);
+        if (count(array_filter($normalized,static fn($value)=>trim($value)!==''))<2) throw new InvalidArgumentException('Soal CBT harus mempunyai minimal dua pilihan terisi.');
+        if (!isset($normalized[$correct]) || trim($normalized[$correct])==='') throw new InvalidArgumentException('Kunci jawaban harus menunjuk pilihan yang terisi.');
+        $options=json_encode($normalized,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
 
         if ($text === '') {
             throw new InvalidArgumentException('Teks pertanyaan soal tidak boleh kosong.');
@@ -2325,7 +2328,7 @@ if (!function_exists('tutorialRplCbtGetOrCreateAttempt')) {
                     $idx + 1,
                     $q['category'] ?? 'Umum',
                     $q['question_text'],
-                    $q['options_json'],
+                    json_encode(tutorialRplCbtNormalizeOptions($q['options_json']),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                     $q['correct_answer']
                 ]);
             }
@@ -2369,7 +2372,7 @@ if (!function_exists('tutorialRplCbtGetOrCreateAttempt')) {
                         $idx + 1,
                         $q['category'] ?? 'Umum',
                         $q['question_text'],
-                        $q['options_json'],
+                        json_encode(tutorialRplCbtNormalizeOptions($q['options_json']),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),
                         $q['correct_answer']
                     ]);
                 }
@@ -2610,7 +2613,8 @@ if (!function_exists('tutorialRplCbtImportQuestions')) {
                 continue;
             }
 
-            $options = [$optA, $optB, $optC, $optD, $optE];
+            $options = ['A'=>$optA,'B'=>$optB,'C'=>$optC,'D'=>$optD,'E'=>$optE];
+            if (trim($options[$correct])==='') { $errors[]="Baris $lineNum: Kunci jawaban menunjuk pilihan kosong."; continue; }
             $optionsJson = json_encode($options, JSON_UNESCAPED_UNICODE);
 
             if ($code === '') {
