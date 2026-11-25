@@ -12,7 +12,16 @@ require_once __DIR__ . '/../includes/tutorial-rpl-tasks.php';
 
 $pdo = getDBConnection();
 ensureTutorialRplTables($pdo);
-ensureTutorialRplTasksTables($pdo);
+try {
+    ensureTutorialRplTasksTables($pdo, (int)(getCurrentUser()['id'] ?? 0) ?: null);
+} catch (Throwable $e) {
+    error_log('tutorial-rpl-tugas initialization: '.$e->getMessage());
+    http_response_code(503);
+    include __DIR__ . '/../includes/header.php';
+    echo '<div class="alert alert-danger">Daftar tugas RPL belum dapat disalin atau dimuat. Data sebelumnya tidak ditimpa. Silakan coba kembali atau hubungi pengelola server.</div>';
+    include __DIR__ . '/../includes/footer.php';
+    return;
+}
 
 $selfUrl = BASE_URL . '/admin/tutorial-rpl-tugas.php';
 
@@ -23,14 +32,19 @@ $formError = '';
 $formInput = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = (string)($_POST['action'] ?? '');
+    $action = is_string($_POST['action'] ?? null) ? $_POST['action'] : '';
     $id = (int)($_POST['id'] ?? 0);
     try {
-        if (!verifyCsrf((string)($_POST['csrf_token'] ?? ''))) {
+        if (!is_string($_POST['csrf_token'] ?? null) || !verifyCsrf($_POST['csrf_token'])) {
+            http_response_code(403);
             throw new InvalidArgumentException('Sesi tidak valid, muat ulang halaman lalu coba lagi.');
         }
         $msg = '';
         switch ($action) {
+            case 'copy_pretes_rpl_list':
+                $count = tutorialRplTaskCopyPretesRpl($pdo, true, (int)(getCurrentUser()['id'] ?? 0) ?: null);
+                $msg = $count.' tugas berhasil disalin dari Pretes program RPL. Daftar sebelumnya dicadangkan; mode kelulusan tidak diubah.';
+                break;
             case 'save':
                 $row = tutorialRplTaskSave($pdo, $_POST, $id ?: null);
                 $msg = ($id ? 'Perubahan tugas "' : 'Tugas baru "') . $row['label'] . '" berhasil disimpan.';
@@ -181,6 +195,11 @@ include __DIR__ . '/../includes/header.php';
     <div class="card" id="daftar-tugas">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="font-weight:700;">Daftar Komponen Tugas — Tutorial RPL Online</span>
+            <form method="post" action="<?= $e($selfUrl) ?>" data-no-spa style="margin:0" onsubmit="return confirm('Salin ulang daftar tugas dari Pretes program RPL? Daftar Tutorial RPL akan diganti, daftar sebelumnya dicadangkan. Mode kelulusan tidak berubah.')">
+                <input type="hidden" name="csrf_token" value="<?= $e(csrfToken()) ?>">
+                <input type="hidden" name="action" value="copy_pretes_rpl_list">
+                <button type="submit" class="btn btn-secondary btn-sm">Salin ulang dari Pretes RPL</button>
+            </form>
             <?php if ($cbtOnlyActive): ?>
                 <span class="ptg-chip" style="background:#e0f2fe;color:#075985;">Mode cukup CBT: hanya Ujian tulis yang wajib</span>
             <?php else: ?>
@@ -209,7 +228,8 @@ include __DIR__ . '/../includes/header.php';
                             <td style="font-size:12.5px;">
                                 <?php if (!empty($r['video_url'])): ?><div>▶ <a href="<?= $e($r['video_url']) ?>" target="_blank" rel="noopener noreferrer">Video</a></div><?php endif; ?>
                                 <?php if (!empty($r['reading_text'])): ?><div>📖 Bacaan khusus</div><?php endif; ?>
-                                <?php if (empty($r['video_url']) && empty($r['reading_text'])): ?><span style="color:#94a3b8;">—</span><?php endif; ?>
+                                <?php if (empty($r['reading_text']) && pretesComponentHasBuiltinReading($r['task_key'])): ?><div>📖 Bacaan bawaan</div><?php endif; ?>
+                                <?php if (empty($r['video_url']) && empty($r['reading_text']) && !pretesComponentHasBuiltinReading($r['task_key'])): ?><span style="color:#94a3b8;">—</span><?php endif; ?>
                             </td>
                             <td>
                                 <?php if ($active): ?><span class="ptg-chip" style="background:#dcfce7;color:#166534;">Aktif</span>
@@ -284,6 +304,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label for="ptg-reading">Teks bacaan / instruksi (opsional)</label>
                     <textarea id="ptg-reading" name="reading_text" maxlength="20000" placeholder="Tulis bacaan Arab, latin, atau instruksi tugas. Baris baru dipertahankan."><?= $e($form['reading_text'] ?? '') ?></textarea>
+                    <?php if ($isEdit && $editing && pretesComponentHasBuiltinReading($editing['task_key'])): ?><div class="ptg-hint">Komponen ini punya bacaan bawaan. Bila kolom ini diisi, teks ini yang ditampilkan menggantikan bacaan bawaan.</div><?php endif; ?>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
                     <button type="submit" class="btn btn-primary" id="ptg-submit">💾 <?= $isEdit ? 'Simpan Perubahan' : 'Tambah Komponen' ?></button>

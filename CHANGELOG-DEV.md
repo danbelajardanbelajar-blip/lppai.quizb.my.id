@@ -1,3 +1,26 @@
+## 2026-11-25 09:15:37 +0700 — Salin hanya daftar tugas Pretes RPL ke Tutorial RPL
+
+**ID:** TUTORIAL-RPL-TASK-LIST-COPY · **Parent Git:** `db5b05d4387db96ebe7c519697eac8256db37a21`.
+
+**Cakupan:** Pengguna mengonfirmasi "hanya list tugas". Salin comp_key/task_key, label, bentuk, kategori, video, judul video, judul/teks bacaan, urutan dan status aktif dari pretes_components program rpl. Daftar Reguler dan pengaturan kelulusan kedua program, nilai serta data mahasiswa tidak disalin atau diubah. Komponen CBT tetap mengikuti sistem Tutorial RPL.
+
+**Perilaku:** Pembukaan pertama halaman setelah kode terpasang menyalin daftar sekali dengan marker pretes_rpl_list_copy_v1. Daftar Tutorial sebelumnya disimpan utuh dalam tutorial_rpl_task_imports (backup_json, source_json, hash, actor, waktu database). Salinan berikutnya hanya melalui tombol Salin ulang dari Pretes RPL dengan konfirmasi dan CSRF; edit Tutorial sesudahnya berdiri sendiri. Jika sumber belum dikonfigurasi, gunakan 11 default yang sama dengan sumber tanpa membuat/mengubah tabel pretes. Kesalahan baca sumber atau tulis membatalkan transaksi, bukan menebak isi atau menimpa sebagian daftar. ID target berkunci sama dipertahankan. Tabel audit memakai LONGTEXT pada MySQL untuk cadangan teks bacaan.
+
+Waktu di bawah adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Nomor baris merupakan awal hunk pada snapshot ini; berkas baru memakai rentang penuh.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 09:08:13 | `admin/tutorial-rpl-tugas.php` | 15, 35, 38, 44, 198, 231, 307 | Inisialisasi salinan dengan actor admin dan error aman; POST salin ulang RPL dengan CSRF; tombol konfirmasi; badge bacaan bawaan. |
+| 2026-11-25 09:09:02 | `includes/tutorial-rpl-tasks.php` | 2, 9, 12, 22, 36, 46, 59, 118, 161 | Sumber daftar khusus RPL, migrasi sekali, cadangan atomik dan snapshot/hash sumber; salin ulang manual; opsi bentuk/kategori serta urutan sama dengan sumber; kategori MySQL 80 karakter. |
+| 2026-11-25 09:07:12 | `tests/tutorial-rpl-tugas-test.php` | 14, 16, 55, 57, 61 | Sesuaikan pengujian CRUD dengan daftar default sumber berisi 11 komponen. |
+| 2026-11-25 09:09:02 | `tests/tutorial-rpl-task-copy-test.php` | 1-86 | Fixture SQLite dan controller asli: kesamaan semua field, pemisahan RPL/Reguler, mode/nilai/sumber tidak berubah, backup, rollback, CSRF dan otorisasi. |
+
+**Verifikasi:** Lint PHP keempat file lulus. tests/tutorial-rpl-task-copy-test.php, tests/tutorial-rpl-tugas-test.php dan tests/pretes-components-test.php lulus dengan assertions aktif. Browser Chrome headless melalui server PHP fixture: batal/konfirmasi salin ulang, kesamaan baris sumber RPL termasuk materi/status/urutan, mode cukup CBT tetap, edit Tutorial tidak mengubah Pretes, desktop dan viewport mobile 390px tanpa overflow halaman, tanpa error JavaScript/PHP. Tabel mobile menggulir horizontal. git diff --check lulus.
+
+**Batas verifikasi:** Pengujian memakai fixture SQLite lokal dan autentikasi fixture, bukan database mahasiswa hosting; jalur DDL MySQL ditinjau tetapi tidak dijalankan pada MySQL nyata. Belum memverifikasi deployment atau penyalinan data produksi. Push Git tidak membuktikan hosting telah memperbarui kode. Screenshot lokal ada di scratch/rpl-task-copy-preview (diabaikan Git).
+
+---
+
 ## 2026-11-25 08:53:20 +0700 — Perbaiki pemetaan kunci jawaban setelah pengacakan CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-ANSWER-KEY-MAPPING · **Parent Git:** `c145f53`.

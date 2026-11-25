@@ -11,9 +11,11 @@ $pdo = new PDO('sqlite::memory:', null, null, [
 
 ensureTutorialRplTasksTables($pdo);
 
-// 1. Default 6 poin tugas ibadah ter-seed otomatis
+// 1. Daftar awal sama dengan komponen bawaan Pretes RPL
 $rows = tutorialRplTaskRows($pdo, true);
-assert(count($rows) === 6, 'Default 6 poin tugas ibadah ter-seed');
+$defaultCount=count(pretesDefaultComponentRows());
+assert(count($rows) === $defaultCount, 'Daftar awal sama dengan Pretes RPL');
+assert(array_column($rows,'task_key')===array_column(pretesDefaultComponentRows(),'comp_key'),'Kunci tugas awal mengikuti sumber RPL');
 assert(tutorialRplPassMode($pdo) === 'flexible_3_options', 'Default mode kelulusan adalah flexible_3_options');
 
 // 2. Simpan mode kelulusan
@@ -50,13 +52,13 @@ assert((int)$afterOrder[count($afterOrder) - 2] === $lastId, 'Urutan tugas naik 
 // 6. Nonaktifkan & aktifkan kembali
 tutorialRplTaskSetActive($pdo, $lastId, false);
 $activeOnly = tutorialRplTaskRows($pdo, false);
-assert(count($activeOnly) === 6, 'Tugas nonaktif tidak muncul di daftar aktif');
+assert(count($activeOnly) === $defaultCount, 'Tugas nonaktif tidak muncul di daftar aktif');
 tutorialRplTaskSetActive($pdo, $lastId, true);
-assert(count(tutorialRplTaskRows($pdo, false)) === 7, 'Tugas aktif kembali');
+assert(count(tutorialRplTaskRows($pdo, false)) === $defaultCount + 1, 'Tugas aktif kembali');
 
 // 7. Hapus tugas
 tutorialRplTaskDelete($pdo, $lastId);
-assert(count(tutorialRplTaskRows($pdo, true)) === 6, 'Hapus tugas berhasil');
+assert(count(tutorialRplTaskRows($pdo, true)) === $defaultCount, 'Hapus tugas berhasil');
 
 // 8. Verifikasi sidebar & halaman admin tersedia
 $sidebar = file_get_contents(__DIR__ . '/../includes/sidebar.php');

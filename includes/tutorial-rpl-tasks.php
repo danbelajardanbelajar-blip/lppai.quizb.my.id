@@ -1,14 +1,15 @@
 <?php
+require_once __DIR__ . '/pretes-components.php';
 /**
  * LPPAI Corner - Helper Manajemen Komponen Tugas & Mode Kelulusan Tutorial RPL Online.
  * Berparitas penuh dengan includes/pretes-components.php.
  */
 
 if (!defined('TUTORIAL_RPL_TASK_FORMS')) {
-    define('TUTORIAL_RPL_TASK_FORMS', ['Lisan / Praktik', 'Hafalan', 'Video Rekaman', 'Tertulis / Online']);
+    define('TUTORIAL_RPL_TASK_FORMS', array_values(array_unique(array_merge(PRETES_COMPONENT_FORMS, ['Video Rekaman', 'Tertulis / Online']))));
 }
 if (!defined('TUTORIAL_RPL_TASK_CATEGORIES')) {
-    define('TUTORIAL_RPL_TASK_CATEGORIES', ['Ibadah Praktik', 'Hafalan & Bacaan', 'Ubudiyah', 'Al-Qur\'an', 'Umum']);
+    define('TUTORIAL_RPL_TASK_CATEGORIES', array_values(array_unique(array_merge(PRETES_COMPONENT_CATEGORIES, ['Ibadah Praktik', 'Hafalan & Bacaan', 'Ubudiyah', 'Al-Qur\'an', 'Umum']))));
 }
 if (!defined('TUTORIAL_RPL_PASS_MODES')) {
     define('TUTORIAL_RPL_PASS_MODES', [
@@ -18,11 +19,10 @@ if (!defined('TUTORIAL_RPL_PASS_MODES')) {
     ]);
 }
 
-function ensureTutorialRplTasksTables(PDO $pdo): void {
-    static $done = [];
-    $key = spl_object_id($pdo);
-    if (!empty($done[$key])) return;
-    $done[$key] = true;
+function ensureTutorialRplTasksTables(PDO $pdo, ?int $actorId = null): void {
+    static $done = null;
+    $done ??= new WeakMap();
+    if (isset($done[$pdo])) return;
 
     $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
     $idType = $isSqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
@@ -33,7 +33,7 @@ function ensureTutorialRplTasksTables(PDO $pdo): void {
         task_key VARCHAR(80) NOT NULL UNIQUE,
         label VARCHAR(150) NOT NULL,
         bentuk VARCHAR(60) NOT NULL DEFAULT 'Lisan / Praktik',
-        kategori VARCHAR(60) NOT NULL DEFAULT 'Ibadah Praktik',
+        kategori VARCHAR(80) NOT NULL DEFAULT 'Ibadah Praktik',
         video_url VARCHAR(500) DEFAULT NULL,
         video_title VARCHAR(200) DEFAULT NULL,
         reading_title VARCHAR(200) DEFAULT NULL,
@@ -43,6 +43,12 @@ function ensureTutorialRplTasksTables(PDO $pdo): void {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )$engine");
+    if (!$isSqlite) {
+        $categoryColumn=$pdo->query("SHOW COLUMNS FROM tutorial_rpl_tasks LIKE 'kategori'")->fetch(PDO::FETCH_ASSOC);
+        if ($categoryColumn && preg_match('/varchar\((\d+)\)/i',$categoryColumn['Type'],$match) && (int)$match[1]<80) {
+            $pdo->exec("ALTER TABLE tutorial_rpl_tasks MODIFY kategori VARCHAR(80) NOT NULL DEFAULT 'Ibadah Praktik'");
+        }
+    }
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_settings (
         setting_key VARCHAR(80) PRIMARY KEY,
@@ -50,21 +56,74 @@ function ensureTutorialRplTasksTables(PDO $pdo): void {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )$engine");
 
-    // Seed 6 poin tugas ibadah standar hanya jika tabel masih kosong
-    $count = (int)$pdo->query('SELECT COUNT(*) FROM tutorial_rpl_tasks')->fetchColumn();
-    if ($count === 0) {
-        $defaults = [
-            ['wudlu_tayamum', 'Praktik Wudlu & Tayamum', 'Lisan / Praktik', 'Ibadah Praktik'],
-            ['sholat_fardhu', 'Praktik Sholat Fardhu (Bacaan & Gerakan)', 'Lisan / Praktik', 'Ibadah Praktik'],
-            ['dzikir_doa_sholat', 'Bacaan Dzikir & Doa Setelah Sholat', 'Hafalan', 'Hafalan & Bacaan'],
-            ['sholat_jenazah', 'Praktik Sholat Jenazah', 'Lisan / Praktik', 'Ibadah Praktik'],
-            ['hafalan_surat_pendek', 'Hafalan Surat-Surat Pendek (Juz Amma)', 'Hafalan', 'Al-Qur\'an'],
-            ['tahlil_doa_arwah', 'Bacaan Tahlil & Doa Arwah', 'Hafalan', 'Hafalan & Bacaan'],
-        ];
-        $stmt = $pdo->prepare('INSERT INTO tutorial_rpl_tasks (task_key, label, bentuk, kategori, sort_order, is_active) VALUES (?, ?, ?, ?, ?, 1)');
-        foreach ($defaults as $idx => [$tKey, $label, $bentuk, $kat]) {
-            $stmt->execute([$tKey, $label, $bentuk, $kat, $idx + 1]);
+    $longText = $isSqlite ? 'TEXT' : 'LONGTEXT';
+    $pdo->exec("CREATE TABLE IF NOT EXISTS tutorial_rpl_task_imports (
+        id $idType, actor_id INT NULL, source_hash VARCHAR(64) NOT NULL,
+        backup_json $longText NOT NULL, source_json $longText NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )$engine");
+    tutorialRplTaskCopyPretesRpl($pdo, false, $actorId);
+    $done[$pdo] = true;
+}
+
+/** Read only the RPL source; never seed or update pretes tables while importing tutorial tasks. */
+function tutorialRplTaskPretesRplSource(PDO $pdo): array {
+    if ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite') {
+        $exists=$pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='pretes_components'")->fetchColumn();
+    } else {
+        $exists=$pdo->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='pretes_components'")->fetchColumn();
+    }
+    if ($exists) {
+        $stmt=$pdo->prepare('SELECT comp_key,label,bentuk,kategori,video_url,video_title,reading_title,reading_text,sort_order,is_active FROM pretes_components WHERE program=? ORDER BY sort_order,id');
+        $stmt->execute(['rpl']);
+        $rows=$stmt->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows) return $rows;
+    }
+    // Same defaults the source page initializes when RPL components have not been configured.
+    $rows=[];
+    foreach (pretesDefaultComponentRows() as $i=>$row) $rows[]=[
+        'comp_key'=>$row['comp_key'],'label'=>$row['label'],'bentuk'=>'Lisan / Praktik','kategori'=>$row['kategori'],
+        'video_url'=>$row['video_url'] ?? null,'video_title'=>$row['video_title'] ?? null,
+        'reading_title'=>null,'reading_text'=>null,'sort_order'=>($i+1)*10,'is_active'=>1,
+    ];
+    return $rows;
+}
+
+/** Tables must be initialized. One-time migration, or an explicitly confirmed administrator copy. */
+function tutorialRplTaskCopyPretesRpl(PDO $pdo, bool $force = false, ?int $actorId = null): int {
+    $marker='pretes_rpl_list_copy_v1';
+    $ownsTransaction=!$pdo->inTransaction();
+    if ($ownsTransaction) $pdo->beginTransaction();
+    try {
+        $lock=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? ' FOR UPDATE' : '';
+        $stmt=$pdo->prepare('SELECT setting_value FROM tutorial_rpl_settings WHERE setting_key=?'.$lock);$stmt->execute([$marker]);
+        if (!$force && $stmt->fetchColumn()!==false) { if ($ownsTransaction) $pdo->commit(); return 0; }
+        $source=tutorialRplTaskPretesRplSource($pdo);
+        $backup=$pdo->query('SELECT * FROM tutorial_rpl_tasks ORDER BY sort_order,id')->fetchAll(PDO::FETCH_ASSOC);
+        $sourceJson=json_encode($source,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+        $hash=hash('sha256',$sourceJson);
+        $pdo->prepare('INSERT INTO tutorial_rpl_task_imports(actor_id,source_hash,backup_json,source_json) VALUES(?,?,?,?)')
+            ->execute([$actorId,$hash,json_encode($backup,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$sourceJson]);
+        $keys=[];
+        foreach ($source as $row) {
+            $key=(string)$row['comp_key'];$keys[]=$key;
+            $find=$pdo->prepare('SELECT id FROM tutorial_rpl_tasks WHERE task_key=?');$find->execute([$key]);$id=$find->fetchColumn();
+            $values=[$row['label'],$row['bentuk'],$row['kategori'],$row['video_url'],$row['video_title'],$row['reading_title'],$row['reading_text'],(int)$row['sort_order'],(int)$row['is_active']];
+            if ($id!==false) {
+                $pdo->prepare('UPDATE tutorial_rpl_tasks SET label=?,bentuk=?,kategori=?,video_url=?,video_title=?,reading_title=?,reading_text=?,sort_order=?,is_active=?,updated_at=CURRENT_TIMESTAMP WHERE id=?')->execute(array_merge($values,[$id]));
+            } else {
+                $pdo->prepare('INSERT INTO tutorial_rpl_tasks(label,bentuk,kategori,video_url,video_title,reading_title,reading_text,sort_order,is_active,task_key) VALUES(?,?,?,?,?,?,?,?,?,?)')->execute(array_merge($values,[$key]));
+            }
         }
+        $pdo->prepare('DELETE FROM tutorial_rpl_tasks WHERE task_key NOT IN ('.implode(',',array_fill(0,count($keys),'?')).')')->execute($keys);
+        $insert=$pdo->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql' ? 'INSERT INTO tutorial_rpl_settings(setting_key,setting_value) VALUES(?,?) ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value),updated_at=CURRENT_TIMESTAMP'
+            : 'INSERT INTO tutorial_rpl_settings(setting_key,setting_value) VALUES(?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=CURRENT_TIMESTAMP';
+        $pdo->prepare($insert)->execute([$marker,$hash]);
+        if ($ownsTransaction) $pdo->commit();
+        return count($source);
+    } catch (Throwable $e) {
+        if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     }
 }
 
@@ -99,7 +158,7 @@ function tutorialRplTaskRows(PDO $pdo, bool $includeInactive = true): array {
     if (!$includeInactive) {
         $sql .= ' WHERE is_active = 1';
     }
-    $sql .= ' ORDER BY is_active DESC, sort_order ASC, id ASC';
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
     return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 }
 
