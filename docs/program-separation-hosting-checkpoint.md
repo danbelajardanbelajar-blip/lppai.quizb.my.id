@@ -1,5 +1,28 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Inspeksi baca saja setelah latihan membatalkan DML
+
+Pengguna mengirim REHEARSAL INCOMPLETE: Original data changed during rehearsal; metadata updates rolled back, added columns may remain. Jangan mengulang ALTER/impor atau menghapus kolom. Produksi tidak dihubungi; DDL pada database uji dapat sudah committed. Penyebab belum terbukti: salah satu kemungkinan adalah kolom ON UPDATE yang otomatis berubah saat metadata diisi. Definisi master_pretes di admin/pretes-jadwal.php memiliki updated_at TIMESTAMP ... ON UPDATE CURRENT_TIMESTAMP; keberadaan efek pada tabel hosting harus dibuktikan, bukan diasumsikan.
+
+Inspektor berikut hanya SELECT/SHOW dalam transaksi read-only, tidak ALTER/UPDATE, tidak memperbaiki hash/nilai dan tidak menulis jurnal baru. Ia memeriksa semua jurnal preimage yang sesuai capture (tidak memilih diam-diam jika ada beberapa), membandingkan seluruh nilai kolom lama yang tersimpan, daftar/urutan tabel, keberadaan enam kolom tambahan, jumlah baris metadata baru non-NULL dan daftar kolom yang memiliki automatic ON UPDATE. Output hanya nama tabel/kolom, jumlah/hash/status; tidak ada nilai, jawaban atau identitas individual.
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+git pull --ff-only &&
+(
+  set +x
+  umask 077
+  IFS= read -r -s -p "Password database uji: " lppai_test_password || exit 1
+  printf '\n'
+  printf '%s' "$lppai_test_password" | php tools/program-separation-inspect-rehearsal.php \
+    --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+    --database=quic1934_uji \
+    --username=quic1934_zenhkm
+)
+```
+
+all_original_column_values_unchanged=true berarti proyeksi semua kolom lama saat inspeksi cocok dengan preimage, meski schema sudah bertambah; ini bukan bukti latihan berhasil. different_tables menunjukkan perbedaan yang masih ada, sedangkan automatic_update_columns hanya kandidat penyebab, bukan pembuktian kolom tersebut berubah dalam transaksi yang sudah rollback. Kirim hasil inspeksi terlebih dahulu sebelum membuat perintah recovery. Tidak ada penghapusan/restore/retry otomatis dan cutover tetap false.
+
 ## Latihan skema additive setelah restore lulus
 
 Bukti hosting terbaru: restore_academic_verification_passed, 78 tabel total, 43 tabel akademik cocok, different_tables=[], report restore-verification-20261125-174226-b6d56ecc.json. Langkah berikut hanya mengubah salinan quic1934_uji. CLI rehearsal tidak memiliki mode produksi/override dan menolak jika nama database uji sama dengan konfigurasi aplikasi. Password user yang sama dapat dipakai, tetapi koneksi dibuat eksplisit ke database uji. Semua tabel harus InnoDB; baseline akademik diperiksa ulang sebelum ALTER.

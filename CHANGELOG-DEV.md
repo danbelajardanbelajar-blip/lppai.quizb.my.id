@@ -1,3 +1,23 @@
+## 2026-11-25 18.00.05 +0700 — Inspeksi read-only setelah guard latihan membatalkan pengisian metadata
+
+**ID:** PROGRAM-SEPARATION-INSPECT-REHEARSAL · **Parent Git:** 9c0816dba614227c1c0ac25d919eb9d6e3947fe0.
+
+**Bukti:** Lampiran terminal terbaru memuat REHEARSAL INCOMPLETE: Original data changed during rehearsal; metadata updates rolled back, added columns may remain. Koneksi produksi tidak dibuka. DDL uji dapat tersisa. Sebelum error ini pengguna sempat menempelkan output terminal sebagai perintah; percobaan terakhir sudah menjalankan CLI yang benar. Tidak menyatakan latihan lulus atau semua nilai sudah kembali cocok sebelum inspeksi.
+
+**Perubahan/alasan:** Tambah AdditiveRehearsal::inspect dan CLI baca saja. Memeriksa seluruh preimage private yang sesuai database/backup, proyeksi semua kolom asli, daftar dan urutan tabel, keberadaan kolom tambahan, jumlah metadata non-NULL, dan SHOW COLUMNS Extra ON UPDATE. Menolak produksi/target selain quic1934_uji; password stdin; SELECT/SHOW dalam transaksi READ ONLY; tanpa ALTER/UPDATE, initializer, perbaikan nilai atau pemilihan jurnal diam-diam. Jalur apply/DDL lama tidak diubah atau dijalankan ulang. Automatic timestamp baru kandidat penyebab; definisi master_pretes pada admin/pretes-jadwal.php memang ON UPDATE, tetapi pengaruh pada transaksi hosting belum terbukti.
+
+**Lokasi/waktu:** Metode inspect baris 56-96, seluruh CLI baru; fixture inspeksi pada bagian akhir tes additive, guard CLI mencakup inspector juga; dokumentasi bagian awal Inspeksi baca saja. Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan seluruh waktu ketikan:
+
+- includes/program-separation/additive-rehearsal.php | snapshot 1-141 | simpan terakhir WIB 2026-11-25 17.58.32
+- tools/program-separation-inspect-rehearsal.php | snapshot 1-40 | simpan terakhir WIB 2026-11-25 17.58.32
+- tests/program-separation-additive-rehearsal-test.php | snapshot 1-57 | simpan terakhir WIB 2026-11-25 17.58.32
+- tests/program-separation-rehearsal-target-test.php | snapshot 1-31 | simpan terakhir WIB 2026-11-25 17.59.18
+- docs/program-separation-hosting-checkpoint.md | snapshot 1-208 | simpan terakhir WIB 2026-11-25 17.59.18
+
+**Verifikasi:** Lint empat file PHP berubah/baru lulus. program-separation-additive-rehearsal-test.php lulus dengan proc_open/proc_close nonaktif: setelah trigger failure, inspector mengonfirmasi proyeksi lama sama, enam kolom tersisa, metadata baru NULL, seluruh data tidak ditulis; perubahan skor buatan dilaporkan hanya nama tabel dan tidak diperbaiki. program-separation-rehearsal-target-test.php menguji CLI asli rehearsal dan inspector dengan config dummy: produksi/case-variant/target tidak disetujui ditolak sebelum koneksi; target sah mencapai guard capture tanpa ALTER. bash -n perintah hosting lulus; git diff --check lulus.
+
+**Batas:** Uji lokal SQLite/CLI guard. Penyebab MySQL hosting belum terbukti; metadata ON UPDATE hanya dibaca di jalur MySQL yang perlu output pengguna. Tidak melakukan recovery, retry migrasi, drop kolom atau impor ulang; cutover tetap false dan pemisahan produksi belum aktif.
+
 ## 2026-11-25 17.48.29 +0700 — Latihan fondasi skema pemisahan pada salinan terverifikasi
 
 **ID:** PROGRAM-SEPARATION-ADDITIVE-REHEARSAL · **Parent Git:** f2af1a4f0f5a1f231c6991fb07a3085ea9d36189.

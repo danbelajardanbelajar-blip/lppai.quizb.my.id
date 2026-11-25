@@ -53,6 +53,47 @@ final class AdditiveRehearsal
         return ['original_columns'=>$schema,'original_fingerprint'=>$fingerprint,'additions'=>self::ADDITIONS];
     }
 
+    /** Inspect a failed rehearsal without ALTER/UPDATE, using the saved preimage. */
+    public static function inspect(\PDO $pdo,array $plan): array
+    {
+        if(($plan['additions']??null)!==self::ADDITIONS || !is_array($plan['original_columns']??null) || !$plan['original_columns'] || !is_array($plan['original_fingerprint']??null))throw new \RuntimeException('Invalid rehearsal preimage.');
+        if($pdo->inTransaction())throw new \RuntimeException('Inspection requires its own read-only transaction.');
+        if($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql'){
+            $pdo->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');$pdo->exec('SET TRANSACTION READ ONLY');
+        }
+        $pdo->beginTransaction();
+        try{
+            $tables=Capture::tables($pdo);$schema=array_intersect_key($plan['original_columns'],array_flip($tables));
+            $actual=self::projection($pdo,$schema);$different=[];
+            foreach(array_unique(array_merge(array_keys($plan['original_fingerprint']),array_keys($actual))) as $table){
+                if(($actual[$table]??null)!==($plan['original_fingerprint'][$table]??null))$different[]=$table;
+            }
+            $missing=array_values(array_diff(array_keys($plan['original_columns']),$tables));
+            $extra=array_values(array_diff($tables,array_keys($plan['original_columns'])));
+            $added=[];$auto=[];$newFieldsPopulated=[];
+            foreach(self::ADDITIONS as $table=>$columns){
+                if(!in_array($table,$tables,true))continue;
+                $present=self::columns($pdo,$table);
+                foreach($columns as $column=>$type){
+                    if(!in_array($column,$present,true))continue;
+                    $added[]=$table.'.'.$column;
+                    $newFieldsPopulated[$table.'.'.$column]=(int)$pdo->query('SELECT COUNT(*) FROM '.Capture::identifier($table).' WHERE '.Capture::identifier($column).' IS NOT NULL')->fetchColumn();
+                }
+                if($pdo->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql'){
+                    foreach($pdo->query('SHOW COLUMNS FROM '.Capture::identifier($table))->fetchAll(\PDO::FETCH_ASSOC) as $column){
+                        if(stripos((string)($column['Extra']??''),'on update')!==false)$auto[]=$table.'.'.$column['Field'];
+                    }
+                }
+            }
+            $pdo->commit();sort($different,SORT_STRING);
+            return ['all_original_column_values_unchanged'=>!$different&&!$missing&&!$extra,
+                'original_tables_verified'=>count($actual),'different_tables'=>$different,'missing_tables'=>$missing,'extra_tables'=>$extra,
+                'table_order_matches_preimage'=>$tables===array_keys($plan['original_columns']),
+                'added_columns_present'=>$added,'new_fields_nonnull_rows'=>$newFieldsPopulated,'automatic_update_columns'=>$auto,
+                'database_modified_by_inspector'=>false,'cutover_allowed'=>false];
+        }catch(\Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
+    }
+
     public static function apply(\PDO $pdo,array $plan): array
     {
         // Detect changed input between journal preparation and DDL. No repair or deletion.

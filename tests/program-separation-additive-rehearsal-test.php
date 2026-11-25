@@ -44,4 +44,14 @@ $triggerPlan=AdditiveRehearsal::prepare($trigger);
 try {AdditiveRehearsal::apply($trigger,$triggerPlan);throw new LogicException('Side effect accepted');}catch(RuntimeException $expected){}
 rehearsalCheck(AdditiveRehearsal::projection($trigger,$triggerPlan['original_columns'])===$triggerPlan['original_fingerprint'],'Metadata DML and trigger side effects roll back on preservation failure');
 rehearsalCheck(in_array('program_scope',AdditiveRehearsal::columns($trigger,'master_pretes'),true),'DDL may remain after failure; never pretend schema rolled back');
+$inspectBefore=Capture::fingerprint($trigger,Capture::tables($trigger));
+$inspection=AdditiveRehearsal::inspect($trigger,$triggerPlan);
+rehearsalCheck($inspection['all_original_column_values_unchanged'] && count($inspection['added_columns_present'])===6,'Read-only inspector confirms rollback despite remaining DDL');
+rehearsalCheck(array_sum($inspection['new_fields_nonnull_rows'])===0 && !$inspection['database_modified_by_inspector'],'Rolled-back metadata stays NULL');
+rehearsalCheck(Capture::fingerprint($trigger,Capture::tables($trigger))===$inspectBefore,'Inspection does not write any field');
+$trigger->exec('UPDATE pretes_cbt_attempts SET score=1 WHERE id=1');
+$changed=Capture::fingerprint($trigger,Capture::tables($trigger));
+$inspection=AdditiveRehearsal::inspect($trigger,$triggerPlan);
+rehearsalCheck(!$inspection['all_original_column_values_unchanged'] && $inspection['different_tables']===['pretes_cbt_attempts'],'Inspector reports altered table without disclosing row values');
+rehearsalCheck(Capture::fingerprint($trigger,Capture::tables($trigger))===$changed,'Inspector cannot repair/overwrite mismatched values');
 echo "PASS: additive rehearsal, full original-data preservation, mixed/ambiguous history, ownership, tryout, stale input, repeat guard and trigger rollback with remaining DDL.\n";
