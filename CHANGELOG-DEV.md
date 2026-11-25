@@ -1,3 +1,15 @@
+## 2026-11-25 17.40.01 +0700 — Koreksi argumen impor latihan restore MariaDB
+
+**ID:** RESTORE-IMPORT-POSITIONAL-DATABASE · **Parent Git:** dc48d4825399d0251825f7bff2ab7f1232b0fdaa.
+
+**Bukti:** Pengguna menjalankan verifier dc48d48, koneksi database uji berhasil tetapi restored_total_tables=0, academic_tables=0. Checksum SQL tetap cocok. Hasil impor exit 0 sebelumnya belum membuktikan restore berhasil.
+
+**Diagnosis/perubahan:** Perintah impor agen sebelumnya menggabungkan --one-database dengan -D. Kode primer MariaDB server/11.4/client/mysql.cc: case o mengatur skip_updates=1; penanganan satu argumen database positional memulihkan skip_updates=0. Opsi D hanya memilih nama database. Karena itu query dapat dilewati tanpa kegagalan proses. Versi klien hosting belum diketahui; diagnosis berdasarkan kode dan gejala, belum reproduksi pada server. Dokumentasi kini memakai argumen nama database terakhir, host sama dengan config verifier, validasi beda database produksi, checksum SQL, cek target masih kosong, pipefail, dan wajib jumlah tabel setelah impor lebih dari 0 sebelum meminta verifikasi fingerprint. Tidak menghapus/mengubah dump, mengganti config atau menjalankan impor dari agen.
+
+**Lokasi:** docs/program-separation-hosting-checkpoint.md baris 3-46, bagian Koreksi impor MariaDB; waktu penyimpanan terakhir WIB 2026-11-25 17.39.35 (bukan riwayat semua ketikan). Sumber primer: https://github.com/MariaDB/server/blob/11.4/client/mysql.cc ; dokumentasi --one-database: https://mariadb.com/docs/server/clients-and-utilities/mariadb-client/mariadb-command-line-client .
+
+**Verifikasi:** Blok bash yang akan dikirim pengguna diekstrak dari dokumen dan bash -n lulus; inline PHP preflight diekstrak dan php -l lulus; git diff --check lulus. Tidak mengubah runtime PHP proyek sehingga tidak mengulang suite CBT. Tidak tersedia MariaDB hosting dari agen; uji impor nyata dan pemeriksaan fingerprint masih harus dijalankan pengguna. Tidak menyatakan restore atau migrasi berhasil.
+
 ## 2026-11-25 17.36.07 +0700 — Izinkan username bersama untuk verifikasi restore baca saja
 
 **ID:** RESTORE-VERIFY-SHARED-USER · **Parent Git:** 03abea70d21a7154961e042eabdc41be394d0f11.

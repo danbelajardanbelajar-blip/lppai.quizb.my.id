@@ -1,5 +1,43 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Koreksi impor MariaDB yang selesai tetapi database uji tetap kosong
+
+Keluaran hosting setelah verifier dc48d48: koneksi ke quic1934_uji berhasil, tetapi academic_tables=0 dan restored_total_tables=0. Ini belum bukti kerusakan nilai; tidak ada data restore yang dapat dibandingkan. Perintah impor sebelumnya dari agen memakai --one-database bersama -D. Pada kode klien MariaDB, opsi -o mengatur one_database=skip_updates=1; argumen database positional di akhir memulihkan skip_updates=0, sedangkan -D hanya mengatur current_db. Karena itu kombinasi lama dapat melewati query tanpa exit gagal. Referensi primer: https://github.com/MariaDB/server/blob/11.4/client/mysql.cc (case 'o', opsi database/-D, penanganan argc==1, dan skip_updates di com_go). Versi klien hosting belum dicatat, sehingga kecocokan ini merupakan diagnosis berdasarkan kode serta hasil 0 tabel, bukan reproduksi langsung pada hosting dari agen.
+
+Jangan menghapus database atau mengubah dump. Ulangi hanya bila pemeriksaan di bawah memastikan database uji masih kosong. Host dibaca dari konfigurasi yang juga dipakai verifier; tidak memakai password/config produksi untuk login, dan nama database produksi ditolak. SHA256 harus cocok dengan backup yang sudah diidentifikasi. Password uji diminta dua kali oleh klien. Nama database pada impor harus menjadi argumen terakhir, bukan -D. Opsi --one-database merupakan filter terbatas berdasarkan USE, bukan pembatas privilege pengganti akun database.
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+(
+  set +x
+  set -o pipefail
+  backup="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915/database.sql"
+  lppai_test_host=$(php -r '
+    require "config/database.php";
+    if (strcasecmp(DB_NAME,"quic1934_uji")===0) {fwrite(STDERR,"STOP: tujuan adalah database produksi.\n");exit(1);}
+    $expected="c30a4a8a54a574c5b63e3670b193537b7997621cc12f45c251f004b91af8e0ac";
+    if (!is_file($argv[1]) || !hash_equals($expected,hash_file("sha256",$argv[1]))) {fwrite(STDERR,"STOP: checksum backup berbeda.\n");exit(1);}
+    echo DB_HOST;
+  ' "$backup") || exit 1
+
+  jumlah=$(/usr/bin/mariadb --no-defaults --host="$lppai_test_host" \
+    -u quic1934_zenhkm -p -D quic1934_uji -Nse \
+    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();") || exit 1
+  [ "$jumlah" = "0" ] || { echo "STOP: database uji tidak kosong; jangan impor ulang."; exit 1; }
+
+  hasil=$({
+    cat "$backup" &&
+    printf '\nSELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE();\n'
+  } | /usr/bin/mariadb --no-defaults --binary-mode --one-database \
+      --host="$lppai_test_host" -u quic1934_zenhkm -p -N -s quic1934_uji) || exit 1
+  case "$hasil" in ''|*[!0-9]*) echo "STOP: hasil jumlah tabel tidak valid."; exit 1;; esac
+  [ "$hasil" -gt 0 ] || { echo "STOP: hasil impor masih 0 tabel."; exit 1; }
+  printf 'Impor menghasilkan %s tabel. Lanjutkan verifier fingerprint.\n' "$hasil"
+)
+```
+
+Setelah jumlah tabel lebih dari 0, jalankan verifier pada bagian berikut. Hanya kecocokan fingerprint akademik yang dapat membuktikan isi tabel akademik hasil restore sesuai backup historis. Jangan menyatakan latihan restore lulus hanya karena proses impor exit 0 atau tabel sudah ada. Perintah ini tidak mengubah konfigurasi website atau memigrasi pemisahan produksi.
+
 ## Verifikasi hasil restore pada database uji
 
 Pengguna membuat database kosong `quic1934_uji` dan memakai user `quic1934_zenhkm`, memverifikasi jumlah tabel 0, lalu melaporkan impor SQL selesai setelah checksum SQL cocok. Keluaran verifier pertama menunjukkan username tersebut sama dengan konfigurasi produksi; database tetap berbeda. Pemeriksaan SELECT-only mengizinkan username bersama, tetapi tetap menolak database produksi. Impor selesai belum membuktikan nilai/jawaban hasil restore sesuai baseline. Jangan mengimpor ulang di atas database uji yang kini berisi data.
