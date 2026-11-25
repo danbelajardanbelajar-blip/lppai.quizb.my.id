@@ -1,3 +1,33 @@
+## 2026-11-25 08:06:01 +0700 — Samakan Review CBT Tutorial RPL dengan Review CBT Pretes
+
+**ID:** TUTORIAL-RPL-CBT-REVIEW-SHARED-PARITY · **Parent Git:** `cd1eec9`.
+
+**Permintaan:** Jadikan isi tombol Review pada Hasil Ujian Tutorial RPL sama dengan Review pada Hasil Ujian CBT Pretes.
+
+**Perubahan dan alasan:** Ekstrak UI Review Pretes ke satu template PHP bersama, dipakai oleh controller Pretes dan controller RPL. Keduanya memakai susunan identitas/NIM/prodi/program, sesi dan waktu/durasi/status, enam metrik, kartu butir soal/kunci/pilihan mahasiswa, klasifikasi benar/salah/kosong, ragu-ragu, filter, palet nomor, serta cetak/simpan PDF yang sama. Label jawaban kini membungkus pada ponsel agar tidak terpotong (berlaku untuk kedua review). Teks jawaban/kunci dan URL kembali di-escape. Pretes mempertahankan sumber data, label resmi/tryout dan batas 80. RPL memakai snapshot tutorial_rpl_cbt_attempts/items serta sesi/paket/kelompoknya sendiri dan passing_grade sesi (fallback 70 sesuai modul RPL), bukan meminjam data/aturan Pretes. Review RPL baru memakai SELECT tanpa pemanggilan helper ensure/seeding atau perubahan nilai/jawaban.
+
+**Navigasi/akses:** Tombol tabel awal maupun hasil live RPL menjadi link halaman /admin/tutorial-rpl-cbt-review.php. Renderer modal lama dan endpoint JSON review_attempt tidak lagi dipakai/dihapus. Tombol kembali menuju tab results RPL dengan filter/pencarian/halaman sebelumnya melalui whitelist, bukan return URL eksternal. Guard requireAdmin tetap sebelum pembacaan jawaban/kunci; attempt hilang 404 dan kegagalan baca DB 503 dengan pesan aman. Sidebar tetap menandai grup RPL aktif.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan seluruh riwayat penekanan simpan. Baris adalah awal hunk untuk berkas lama atau rentang penuh untuk berkas baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 08:06:38 | `includes/cbt-attempt-review-view.php` | 1-822 | Template bersama hasil ekstraksi Review Pretes: metrik, identitas, status waktu, opsi/kunci, filter, navigasi, print dan responsivitas label jawaban. |
+| 2026-11-25 07:56:40 | `admin/pretes-cbt-review.php` | 57 | Pertahankan query/guard Pretes dan klasifikasi resmi/tryout; delegasikan render ke template bersama dengan ambang 80. |
+| 2026-11-25 07:57:37 | `includes/tutorial-rpl-cbt-review.php` | 1-30 | Adapter SELECT snapshot RPL saja; tanpa ensure/seeding/mutasi; whitelist konteks kembali ke hasil. |
+| 2026-11-25 07:57:37 | `admin/tutorial-rpl-cbt-review.php` | 1-26 | Halaman Review RPL khusus admin, data sesi/paket/kelompok, ambang sesi, 404 tidak ditemukan dan 503 aman saat DB gagal. |
+| 2026-11-25 08:00:03 | `admin/tutorial-rpl-cbt.php` | 10, 88, 1420, 1889, 2598, 2771 | Ganti Review modal pada tabel awal dan live update menjadi tautan halaman baru, pertahankan filter; hapus endpoint/modal/renderer lama. |
+| 2026-11-25 08:00:12 | `includes/sidebar.php` | 176 | Tandai grup Tutorial RPL aktif ketika halaman review dibuka; tidak menambah menu baru. |
+| 2026-11-25 08:04:20 | `tests/tutorial-rpl-cbt-review-test.php` | 1-83 | Uji query-only, data terpisah, rendered parity, benar/salah/kosong/ragu, opsi, skor/ambang sesi, guard, status dan filter kembali. |
+| 2026-11-25 07:58:21 | `tests/pretes-cbt-review-test.php` | 231 | Verifikasi fitur Review kini membaca controller dan template bersama. |
+| 2026-11-25 07:58:21 | `tests/tutorial-rpl-cbt-parity-test.php` | 243 | Sesuaikan assertion integrasi tombol Review menuju halaman khusus. |
+
+**Verifikasi:** PHP lint seluruh 9 berkas PHP berubah/tambahan lulus. Lima suite lokal lulus (assertions diaktifkan): tutorial-rpl-cbt-review, pretes-cbt-review, tutorial-rpl-cbt-parity, tutorial-rpl-cbt-nilai, tutorial-rpl-structure. Fixture mengeksekusi controller Pretes/RPL dan adapter RPL di koneksi SQLite query_only; memeriksa data RPL terpisah, snapshot/format opsi, klasifikasi jawaban, sesi berlangsung/selesai/kedaluwarsa, ambang sesi 70 dan 90 vs Pretes 80, guard nonadmin, 404, error DB 503 tanpa bocoran SQL, dan tautan kembali dengan filter. node --check lulus untuk keseluruhan script bank CBT setelah nilai PHP dinetralkan; fungsi URL live diuji di browser. Chrome headless lokal lulus filter salah/ragu/kosong/semua, lompat nomor, tombol print, CSS print, PDF uji, markup kartu soal identik antara Pretes/RPL pada data uji sama, desktop 1366 px dan ponsel 390 px termasuk label jawaban muat di kartu. Screenshot ditinjau di scratch/cbt-review-parity-preview; fixture autentikasi/SQLite, bukan hosting. git diff --check lulus. Suite structure tetap mencetak log tabel fixture membership/pretes/master_gelombang yang tidak disediakan; semua assertion lulus.
+
+**Batas:** Belum menguji hosting atau MySQL produksi. Pengujian browser memakai header/auth fixture dengan stylesheet proyek, bukan akun produksi. Penyamaan ini tidak mengubah aturan kelulusan RPL, bank soal, jawaban, nilai tersimpan, atau proses pengerjaan/proctoring. Commit memakai ID entri ini, diikuti pull --rebase dan push.
+
+---
+
 ## 2026-11-25 07:13:00 +0700 — Paritas Penuh CBT Mahasiswa & Pengawasan Kamera AI (Proctoring) Tutorial RPL dengan CBT Pretes
 
 **ID:** TUTORIAL-RPL-CBT-STUDENT-PROCTORING-PARITY · **Parent Git:** `a8860287c6853a2b54c08c7089b5de3ac4b77637`.

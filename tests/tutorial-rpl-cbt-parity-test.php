@@ -240,7 +240,7 @@ assert(str_contains($adminContent, 'ajax=package_questions'), 'Admin memuat endp
 assert(str_contains($adminContent, 'filterPackage'), 'Admin memuat filter Paket Soal');
 assert(str_contains($adminContent, 'reset_pretes_parity_packages'), 'Admin memuat aksi reset & tindih soal CBT Pretes');
 assert(str_contains($adminContent, 'generateRandomToken'), 'Admin memuat generator token acak');
-assert(str_contains($adminContent, 'openReviewModal'), 'Admin memuat modal review lembar jawaban');
+assert(str_contains($adminContent, 'tutorial-rpl-cbt-review.php'), 'Admin memuat tautan halaman Review yang sama dengan pretes');
 
 $studentContent = file_get_contents(__DIR__ . '/../pages/tutorial-rpl-cbt.php');
 $viewContent = file_get_contents(__DIR__ . '/../includes/pretes-cbt-view.php');

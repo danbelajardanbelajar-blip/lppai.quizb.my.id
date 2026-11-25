@@ -228,6 +228,7 @@ $reviewFile = file_get_contents(__DIR__ . '/../admin/pretes-cbt-review.php');
 reviewAssert($reviewFile !== false, 'File admin/pretes-cbt-review.php berhasil dibaca', 'File tidak ditemukan');
 reviewAssert(strpos($reviewFile, 'requireAdmin();') !== false, 'admin/pretes-cbt-review.php mengamankan akses dengan requireAdmin()', 'Tidak ada requireAdmin');
 reviewAssert(strpos($reviewFile, 'pretes_cbt_items') !== false, 'admin/pretes-cbt-review.php membaca butir dari pretes_cbt_items', 'Tidak ada query pretes_cbt_items');
+$reviewFile .= file_get_contents(__DIR__ . '/../includes/cbt-attempt-review-view.php');
 reviewAssert(strpos($reviewFile, 'opt-user-correct') !== false, 'admin/pretes-cbt-review.php memiliki styling opt-user-correct', 'Tidak ada styling opt-user-correct');
 reviewAssert(strpos($reviewFile, 'opt-user-wrong') !== false, 'admin/pretes-cbt-review.php memiliki styling opt-user-wrong', 'Tidak ada styling opt-user-wrong');
 reviewAssert(strpos($reviewFile, 'opt-is-key') !== false, 'admin/pretes-cbt-review.php memiliki styling opt-is-key', 'Tidak ada styling opt-is-key');

@@ -7,6 +7,7 @@ define('PAGE_TITLE', 'Paket Soal & Sesi CBT Tutorial RPL');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tutorial-rpl-helper.php';
 require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
+require_once __DIR__ . '/../includes/tutorial-rpl-cbt-review.php';
 requireAdmin();
 
 $pdo = getDBConnection();
@@ -83,36 +84,6 @@ if (isset($_GET['ajax'])) {
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Soal tidak ditemukan.']);
         }
-        exit;
-    }
-    if ($_GET['ajax'] === 'review_attempt') {
-        $attId = (int)($_GET['id'] ?? 0);
-        $att = tutorialRplCbtGetAttempt($pdo, $attId);
-        if (!$att) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'Attempt tidak ditemukan.']);
-            exit;
-        }
-        $items = tutorialRplCbtGetAttemptItems($pdo, $attId);
-        $formatted = [];
-        foreach ($items as $it) {
-            $opts = json_decode((string)$it['options_json'], true) ?: [];
-            $formatted[] = [
-                'position' => (int)$it['position'],
-                'category' => $it['category'],
-                'question_text' => $it['question_text'],
-                'options' => $opts,
-                'correct_answer' => $it['correct_answer'],
-                'student_answer' => $it['answer'],
-                'is_correct' => ($it['answer'] !== null && strtoupper($it['answer']) === strtoupper($it['correct_answer'])),
-                'flagged' => (int)$it['flagged']
-            ];
-        }
-        echo json_encode([
-            'success' => true,
-            'attempt' => $att,
-            'items' => $formatted
-        ]);
         exit;
     }
     if ($_GET['ajax'] === 'live_results') {
@@ -1446,7 +1417,7 @@ include __DIR__ . '/../includes/header.php';
                             </td>
                             <td style="text-align:center">
                                 <div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">
-                                    <button type="button" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" onclick="openReviewModal(<?= $attId ?>);" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">👁️ Review</button>
+                                    <a class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600;text-decoration:none" href="<?= sanitize(BASE_URL . '/admin/tutorial-rpl-cbt-review.php?' . http_build_query(array_merge(tutorialRplCbtReviewContext($_GET),['attempt_id'=>$attId]))) ?>" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">👁️ Review</a>
                                     <form method="post" action="<?= buildTutorialRplResultUrl() ?>" style="margin:0;display:inline-block;" onsubmit="return confirm('Reset attempt ujian mahasiswa <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nMahasiswa akan diizinkan memulai ujian kembali dari awal.')">
                                         <input type="hidden" name="action" value="reset_attempt">
                                         <input type="hidden" name="attempt_id" value="<?= $attId ?>">
@@ -1913,27 +1884,6 @@ include __DIR__ . '/../includes/header.php';
                 <button type="submit" class="bank-button primary">💾 Simpan Butir Soal</button>
             </div>
         </form>
-    </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════════
-     MODAL REVIEW LEMBAR JAWABAN PESERTA
-     ═══════════════════════════════════════════════════════════════════════════ -->
-<div class="bank-modal-backdrop" id="reviewModalBackdrop" style="display:none;pointer-events:none;visibility:hidden" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
-    <div class="bank-modal large" style="max-width:860px;">
-        <div class="bank-modal-head" style="background:#f0fdf4;">
-            <div>
-                <h3 id="reviewModalTitle" style="color:#166534;">👁️ Lembar Jawaban Peserta CBT</h3>
-                <div id="reviewModalMeta" style="font-size:12px; color:#475569; margin-top:2px;">Memuat rincian ujian...</div>
-            </div>
-            <button type="button" class="bank-modal-close" onclick="closeReviewModal();">✕</button>
-        </div>
-        <div class="bank-modal-body" id="reviewModalContent" style="padding:20px; max-height:75vh; overflow-y:auto;">
-            <div style="text-align:center; padding:30px; color:#64748b;">Memuat data butir soal...</div>
-        </div>
-        <div class="bank-modal-foot">
-            <button type="button" class="bank-button" onclick="closeReviewModal();">Tutup</button>
-        </div>
     </div>
 </div>
 
@@ -2645,95 +2595,14 @@ function copyTokenToClipboard() {
     });
 }
 
-// Modal Review Lembar Jawaban
-function openReviewModal(attemptId) {
-    const backdrop = document.getElementById('reviewModalBackdrop');
-    const content = document.getElementById('reviewModalContent');
-    const meta = document.getElementById('reviewModalMeta');
-
-    if (backdrop) {
-        backdrop.style.display = 'flex';
-        backdrop.style.pointerEvents = 'auto';
-        backdrop.style.visibility = 'visible';
-        backdrop.classList.add('open');
-    }
-    content.innerHTML = '<div style="text-align:center; padding:30px; color:#64748b;">Memuat data lembar jawaban...</div>';
-
-    fetch('?ajax=review_attempt&id=' + attemptId)
-        .then(r => r.json())
-        .then(res => {
-            if (!res.success) {
-                content.innerHTML = '<div class="bank-notice error">' + (res.message || 'Gagal memuat.') + '</div>';
-                return;
-            }
-            const att = res.attempt;
-            const items = res.items;
-
-            meta.innerHTML = `<strong>${att.nama_lengkap}</strong> (${att.nim || '-'}) · Kelompok: <strong>${att.nama_kelompok || '-'}</strong> · Nilai: <strong style="font-size:14px; color:${att.score >= 70 ? '#15803d' : '#b91c1c'};">${att.score}</strong> (${att.correct_count || 0}/${att.total_questions || items.length} Benar)`;
-
-            let html = '<div style="display:flex; flex-direction:column; gap:16px;">';
-            items.forEach((it, idx) => {
-                const isCorrect = it.is_correct;
-                const studentAns = it.student_answer || '-';
-                const correctAns = it.correct_answer;
-                const statusBadge = isCorrect
-                    ? '<span class="bank-badge active">✓ BENAR</span>'
-                    : '<span class="bank-badge danger-sm" style="background:#fee2e2; color:#b91c1c;">✗ SALAH</span>';
-
-                html += `
-                    <div style="border:1px solid ${isCorrect ? '#bbf7d0' : '#fecaca'}; border-radius:10px; padding:14px; background:${isCorrect ? '#f0fdf4' : '#fef2f2'};">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                            <span style="font-weight:700; font-size:13px; color:#0f172a;">No. ${it.position} [${it.category}]</span>
-                            <div>${statusBadge}</div>
-                        </div>
-                        <div style="font-size:13.5px; font-weight:600; color:#1e293b; margin-bottom:10px; line-height:1.5;">
-                            ${it.question_text.replace(/\n/g, '<br>')}
-                        </div>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; font-size:12px;">
-                `;
-
-                const letters = ['A', 'B', 'C', 'D', 'E'];
-                letters.forEach((l, lIdx) => {
-                    const optText = it.options[lIdx] || '';
-                    if (!optText) return;
-                    let optStyle = 'padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; background:#ffffff; color:#334155;';
-                    if (l === correctAns) {
-                        optStyle = 'padding:6px 10px; border-radius:6px; border:1.5px solid #16a34a; background:#dcfce7; color:#14532d; font-weight:700;';
-                    }
-                    if (l === studentAns && l !== correctAns) {
-                        optStyle = 'padding:6px 10px; border-radius:6px; border:1.5px solid #dc2626; background:#fee2e2; color:#991b1b; font-weight:700;';
-                    }
-                    const ansColor = isCorrect ? '#15803d' : '#b91c1c';
-                    html += `
-                        <div style="${optStyle}">
-                            <strong>${l}.</strong> ${optText}
-                            ${l === correctAns ? ' <span style="color:#15803d;">(Kunci)</span>' : ''}
-                            ${l === studentAns ? `<span style="color:${ansColor}; font-weight:800;">[Pilihan Mahasiswa]</span>` : ''}
-                        </div>
-                    `;
-                });
-
-                html += `
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            content.innerHTML = html;
-        })
-        .catch(err => {
-            content.innerHTML = '<div class="bank-notice error">Error memuat data: ' + err.message + '</div>';
-        });
-}
-
-function closeReviewModal() {
-    const backdrop = document.getElementById('reviewModalBackdrop');
-    if (backdrop) {
-        backdrop.classList.remove('open');
-        backdrop.style.display = 'none';
-        backdrop.style.pointerEvents = 'none';
-        backdrop.style.visibility = 'hidden';
-    }
+// Review uses the same full-page renderer as CBT Pretes.
+function tutorialRplReviewUrl(attemptId) {
+    const query = new URLSearchParams(window.location.search);
+    const context = new URLSearchParams({attempt_id: String(attemptId)});
+    ['result_filter','status_filter','pass_filter','q','group_filter','page','per_page'].forEach(key => {
+        if (query.has(key)) context.set(key, query.get(key));
+    });
+    return window.CBT_BASE_URL + '/admin/tutorial-rpl-cbt-review.php?' + context.toString();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2899,7 +2768,7 @@ function initCbtLiveMonitor() {
 
         const actionCellHtml =
             '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">' +
-                '<button type="button" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" onclick="openReviewModal(' + att.id + ');" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">👁️ Review</button>' +
+                '<a class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600;text-decoration:none" href="' + escapeHtml(tutorialRplReviewUrl(att.id)) + '" title="Review lembar jawaban mahasiswa (soal benar, salah, dan ragu)">👁️ Review</a>' +
                 '<form method="post" action="' + escapeHtml(window.location.href) + '" style="margin:0;display:inline-block;" onsubmit="return confirm(\'Reset attempt ujian mahasiswa \' + safeName + \' (NIM: \' + safeNim + \')?\\n\\nMahasiswa akan diizinkan memulai ujian kembali dari awal.\')">' +
                     '<input type="hidden" name="action" value="reset_attempt">' +
                     '<input type="hidden" name="attempt_id" value="' + att.id + '">' +

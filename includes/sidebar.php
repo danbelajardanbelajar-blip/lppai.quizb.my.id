@@ -173,6 +173,7 @@ if (!function_exists('isNavGroupActive')) {
                 'tutorial-rpl-kelas.php',
                 'tutorial-rpl-presensi.php',
                 'tutorial-rpl-cbt.php',
+                'tutorial-rpl-cbt-review.php',
                 'tutorial-rpl-nilai.php'
             ];
             $isTutorialRplGroupActive = isNavGroupActive($tutorialRplPages);
