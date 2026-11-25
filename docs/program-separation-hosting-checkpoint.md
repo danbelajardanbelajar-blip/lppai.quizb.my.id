@@ -1,5 +1,30 @@
 # Langkah terminal hosting sebelum migrasi pemisahan program
 
+## Verifikasi hasil restore pada database uji
+
+Pengguna membuat database kosong `quic1934_uji` dan user terpisah `quic1934_zenhkm`, memverifikasi jumlah tabel 0, lalu melaporkan impor SQL selesai setelah checksum SQL cocok. Impor selesai belum membuktikan nilai/jawaban hasil restore sesuai baseline. Jangan mengimpor ulang di atas database uji yang kini berisi data.
+
+Jalankan dari terminal cPanel, bukan melalui URL:
+
+```bash
+cd "$HOME/public_html/lppai.quizb.my.id/web" &&
+git pull --ff-only &&
+(
+  set +x
+  umask 077
+  IFS= read -r -s -p "Password database uji: " lppai_test_password || exit 1
+  printf '\n'
+  printf '%s' "$lppai_test_password" | php tools/program-separation-verify-restore.php \
+    --capture-dir="$HOME/lppai-private-backups/lppai-20261125-161732-97da6915" \
+    --database=quic1934_uji \
+    --username=quic1934_zenhkm
+)
+```
+
+Password melewati stdin pipe dari builtin shell, tidak melalui argumen proses, Git, environment atau chat. Variabel hanya berada dalam subshell. Verifier menolak nama database/user produksi dan hanya membuka koneksi ke database uji di host yang dikonfigurasi. Tidak mengubah config aplikasi dan tidak membutuhkan proc_open. Script memverifikasi identitas sumber capture, checksum SQL dan baseline, marker dump, lalu membandingkan multiset seluruh nilai kolom dan jumlah baris pada semua tabel akademik dalam transaksi read-only. Report baru dibuat private 0600 di direktori capture; metadata capture lama tidak ditimpa.
+
+Hasil lulus adalah `restore_academic_verification_passed`, `academic_data_matches_backup: true`, `different_tables: []`. Angka dan checksum merujuk isi backup historis, bukan database produksi saat ini. `restore_tested: true` berarti latihan restore berhasil untuk data akademik; tipe kolom/index/constraint dan data nonakademik belum dibandingkan. `cutover_allowed` tetap false: ini belum latihan migrasi/pemetaan periode campuran. Keluaran gagal tidak boleh dianggap lolos. Jangan menghapus atau memperbaiki nilai agar hash cocok. Kirim ringkasan JSON saja, bukan password atau SQL.
+
 Pengguna sudah menyatakan sesi ujian ditutup dan dinonaktifkan serta mengizinkan peralihan dilanjutkan. Akses SSH hosting menolak autentikasi dari terminal agen; pengguna menjelaskan shared hosting membatasi akses dari IP lain. Karena itu backup/audit hosting harus dijalankan pengguna dari terminal cPanel. Jangan membuka akses database/SSH ke publik atau mengirim password demi melewati batas ini.
 
 ## Pembaruan untuk shared hosting tanpa proc_open

@@ -1,3 +1,22 @@
+## 2026-11-25 17.32.37 +0700 — Verifikasi restore akademik database uji
+
+**ID:** PROGRAM-SEPARATION-VERIFY-RESTORE · **Parent Git:** 48a16103d434042f610480ccd2694dadbd2f409c.
+
+**Bukti pengguna:** Database quic1934_uji semula 0 tabel, akses user quic1934_zenhkm berhasil. Perintah impor memverifikasi SHA256 backup c30a4a8a54a574c5b63e3670b193537b7997621cc12f45c251f004b91af8e0ac dan melaporkan IMPORT DATABASE UJI SELESAI. Ini belum bukti integritas hasil restore; verifier disiapkan untuk langkah itu.
+
+**Implementasi/alasan:** RestoreVerification::baseline memvalidasi identitas sumber, marker, ukuran/checksum SQL, checksum baseline; compare membandingkan seluruh nilai kolom/jumlah baris/tabel akademik dalam transaksi read-only. CLI menolak database/user produksi, hanya koneksi database uji, password dari stdin (bukan argv/environment), tanpa initializer engine/proc_open. Report private baru 0600 menyimpan status dan checksum, tidak menimpa capture lama. Dokumentasi memuat prompt tersembunyi dan perintah terminal pengguna. Tidak mengimpor/memigrasi/menulis database.
+
+**Lokasi dan waktu:** Fungsi baseline/compare, seluruh CLI dan fixture di rentang penuh file baru; dokumentasi bagian Verifikasi hasil restore di awal file. Waktu berikut adalah waktu penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- includes/program-separation/restore-verification.php | simpan terakhir WIB 2026-11-25 17.31.07 | snapshot baris 1-61
+- tools/program-separation-verify-restore.php | simpan terakhir WIB 2026-11-25 17.31.07 | snapshot baris 1-47
+- tests/program-separation-verify-restore-test.php | simpan terakhir WIB 2026-11-25 17.31.42 | snapshot baris 1-61
+- docs/program-separation-hosting-checkpoint.md | simpan terakhir WIB 2026-11-25 17.32.12 | snapshot baris 1-121
+
+**Verifikasi:** lint ketiga file PHP lulus; program-separation-verify-restore-test.php lulus normal serta dengan proc_open/proc_close nonaktif. Menguji cocok, nilai berubah, byte biner, urutan baris, duplikasi hilang, tabel lebih/kurang, transaksi aktif, identitas sumber, checksum SQL/baseline dan dump parsial/tanpa marker; seluruh data tetap utuh setelah verifier termasuk ketika mismatch. program-separation-capture-test.php lulus. CLI --help dengan fungsi proses nonaktif lulus. git diff --check lulus sebelum commit.
+
+**Batas:** Uji integrasi lokal SQLite, belum koneksi MySQL hosting dari agen karena pembatasan akses. Pengguna harus menjalankan verifier dan mengirim hasilnya. Lulus hanya memverifikasi isi tabel akademik backup historis, bukan skema/index/constraint, seluruh data nonakademik atau database produksi terkini. cutover_allowed tetap false. Belum menjalankan migrasi pemisahan atau mengubah nilai.
+
 ## 2026-11-25 17.28.24 +0700 — Portal admin Pretes per program
 
 **ID:** PRETES-PROGRAM-ADMIN-PORTALS · **Parent Git:** 5d23d07363a66a7873500b5bf859ee6aaa9ec394.
