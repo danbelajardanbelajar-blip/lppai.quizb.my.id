@@ -2,6 +2,12 @@
 
 Pengguna sudah menyatakan sesi ujian ditutup dan dinonaktifkan serta mengizinkan peralihan dilanjutkan. Akses SSH hosting menolak autentikasi dari terminal agen; pengguna menjelaskan shared hosting membatasi akses dari IP lain. Karena itu backup/audit hosting harus dijalankan pengguna dari terminal cPanel. Jangan membuka akses database/SSH ke publik atau mengirim password demi melewati batas ini.
 
+## Pembaruan untuk shared hosting tanpa proc_open
+
+Hosting telah melaporkan `Call to undefined function proc_open()`. Jangan mengubah disable_functions atau membuka akses server. Gunakan runner `.sh` di bawah: fase PHP `--prepare` hanya membaca database dan menyiapkan berkas private; mysqldump dijalankan shell terminal; fase PHP `--finish` membandingkan checksum lalu menghasilkan ringkasan. Kedua fase PHP telah diuji dengan proc_open/proc_close dinonaktifkan. Perintah PHP langsung lama sekarang berhenti sebelum koneksi/file dibuat dan mengarahkan ke runner shell.
+
+Kegagalan percobaan lama tidak menjalankan migrasi; folder parsial tetap private dan tidak perlu dihapus. Percobaan baru memakai folder unik, tidak menimpa backup lama. Hasil dump yang gagal tidak diberi marker selesai dan ditolak saat verifikasi.
+
 ## Paket perlindungan yang sudah disiapkan
 
 - `ensurePretesCbtTables()` tidak lagi otomatis memanggil impor Paket 2 atau normalisasi/aktivasi sesi default. Sesi yang dimatikan admin tidak diaktifkan kembali oleh pembacaan biasa; fungsi maintenance yang dapat menghapus attempt tidak lagi terpanggil otomatis. Operasi CLI maintenance lama tetap eksplisit dan **tidak perlu dijalankan** untuk audit ini.
@@ -23,10 +29,10 @@ Jika ada perubahan lokal hosting, simpan/review dahulu; jangan memakai reset/cle
 git pull --ff-only &&
 (umask 077; mkdir -p "$HOME/lppai-private-backups") &&
 chmod 700 "$HOME/lppai-private-backups" &&
-php tools/program-separation-capture.php --output-dir="$HOME/lppai-private-backups"
+sh tools/program-separation-capture.sh --output-dir="$HOME/lppai-private-backups"
 ```
 
-Tidak ada flag apply/migrate pada perintah ini. Output backup ditolak jika berada di dalam folder aplikasi atau direktori `public_html`, `htdocs`, `www`; parent output harus 0700 pada Linux. Folder per-run dibuat 0700 dan berkas 0600. Pastikan kapasitas disk tersedia untuk backup penuh database. CLI membutuhkan PHP 8.1+, PDO MySQL, proc_open dan mysqldump yang tersedia melalui PATH hosting; script berhenti bila fasilitas tidak tersedia. Tabel non-InnoDB menyebabkan penolakan agar konsistensi backup tidak diasumsikan.
+Tidak ada flag apply/migrate pada perintah ini. Output backup ditolak jika berada di dalam folder aplikasi atau direktori `public_html`, `htdocs`, `www`; parent output harus 0700 pada Linux. Folder per-run dibuat 0700 dan berkas 0600. Pastikan kapasitas disk tersedia untuk backup penuh database. CLI membutuhkan PHP 8.1+, PDO MySQL, shell sh dan mysqldump yang tersedia melalui PATH terminal; proc_open PHP tidak diperlukan. PHP CLI alternatif dapat dipilih lewat PHP_BIN. Script berhenti bila fasilitas tidak tersedia. Tabel non-InnoDB menyebabkan penolakan agar konsistensi backup tidak diasumsikan.
 
 ## Hasil yang dibutuhkan untuk langkah berikutnya
 
@@ -42,8 +48,12 @@ Folder private berisi:
 | schema-gaps.json | Tabel/kolom yang berbeda dari minimum audit; tidak ada ALTER otomatis |
 | audit.json | Kandidat program dan masalah campuran/konflik/sesi aktif/attempt belum selesai; bukan keputusan migrasi |
 | summary.json | Ringkasan hasil dan checksum backup, boleh dikirim sebagai status tanpa isi data |
+| capture-state.json | Identitas database berupa hash dan checksum berkas persiapan; menolak verifikasi pada database lain/berkas yang berubah |
+| dump.sh | Perintah mysqldump private dengan argumen dikutip; tidak menampilkan password |
+| dump-complete | Marker hanya dibuat setelah mysqldump exit 0 dan berkas parsial berhasil dipromosikan |
+| dump-error.txt | Stderr mysqldump tetap private; jangan mengirim dump SQL/config untuk diagnosis |
 
-Backup SQL mencakup seluruh database aplikasi, termasuk akun dan data autentikasi; file opsi mysqldump sementara berisi kredensial, diberi 0600 dan dihapus setelah proses selesai/dalam handler kegagalan. Password tidak dimasukkan ke argumen command line atau dicetak. Jangan membagikan direktori ini melalui File Manager public link.
+Backup SQL mencakup seluruh database aplikasi, termasuk akun dan data autentikasi; file mysql-client.cnf sementara berisi kredensial dan diberi 0600. Trap shell menghapusnya saat dump selesai/gagal/interupsi; verifikasi menolak hasil jika kredensial belum dibersihkan. Jika terminal berhenti tepat setelah prepare sebelum shell dimulai, file tetap private di folder 0700 dan tidak boleh dibagikan. Password tidak dimasukkan ke argumen command line atau dicetak. Jangan membagikan direktori ini melalui File Manager public link.
 
 Sidik data mengikutkan semua kolom setiap tabel akademik dan menghitung duplikasi, null, binary serta jawaban/nilai persis; urutan fisik baris tidak memengaruhi hash. Snapshot minimum tidak membawa kolom password, token, nilai individual atau jawaban. Perubahan data akademik selama capture menyebabkan gagal, bukan laporan aman palsu. Sidik akademik bukan checksum semua tabel login/log sistem; backup SQL tetap mencakup seluruh database.
 
@@ -59,3 +69,7 @@ Sidik data mengikutkan semua kolom setiap tabel akademik dan menghitung duplikas
 Setelah hasil tersedia: audit konflik program dan periode campuran berdasarkan bukti, siapkan manifest ID, latih migrasi pada salinan dan restore backup pada database uji terisolasi. Bandingkan nilai/jawaban sebelum-sesudah. Baru kemudian perubahan skema/repository/halaman per program dapat diaktifkan dengan rencana rollback yang telah diuji. Jangan memulihkan database penuh di atas transaksi produksi baru atau menganggap backup SQL yang belum dilatih restore sebagai backup terverifikasi.
 
 Tidak ada migrasi/aktivasi pemisahan produksi dalam paket checkpoint ini. Pekerjaan eksternal yang diperlukan diserahkan dalam bentuk perintah terminal karena batas akses shared hosting; belum ada klaim integritas database hosting sebelum hasil perintah diterima.
+
+## Hasil uji kompatibilitas lokal
+
+Uji integrasi menjalankan runner shell asli dengan PHP fixture yang menonaktifkan proc_open/proc_close, serta klien mysqldump sintetis. Diuji sukses/gagal/ulang, quoting path dan database dengan kutip, pembersihan file kredensial, perbedaan database, perubahan snapshot/nilai dan larangan klaim restore/migrasi. Ini menguji alur runner, bukan backup MySQL hosting nyata. Setelah perbaikan dipull, keluaran terminal hosting tetap diperlukan untuk memastikan mysqldump/privilege tersedia.

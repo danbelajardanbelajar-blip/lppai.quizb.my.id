@@ -1,0 +1,2 @@
+# POSIX shell scripts must retain LF when authored on Windows.
+*.sh text eol=lf

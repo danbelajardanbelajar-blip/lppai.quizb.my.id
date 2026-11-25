@@ -1,3 +1,28 @@
+## 2026-11-25 16:15:12 +0700 — Jalankan backup shared hosting tanpa proc_open PHP
+
+**ID:** PROGRAM-SEPARATION-SHELL-CAPTURE · **Parent Git:** `7aeae9cfdeca1943cd9f0e1ecc4789a74450c725`.
+
+**Masalah nyata:** Pengguna berhasil pull 7aeae9c pada ~/public_html/lppai.quizb.my.id/web, lalu capture berhenti dengan Call to undefined function proc_open(). Fasilitas PHP shared hosting membatasi subprocess. Percobaan sebelumnya tidak menjalankan migrasi dan tidak menghasilkan backup SQL lengkap; folder parsial tetap private. Alat sebelumnya mengasumsikan proc_open tersedia, sehingga perlu jalur terminal yang kompatibel tanpa membuka pembatas hosting.
+
+**Perbaikan:** Gunakan shell terminal untuk menjalankan mysqldump. PHP hanya prepare dan finish dengan koneksi inspeksi read-only. Runner memeriksa PHP/mysqldump sebelum prepare; password berada dalam mysql-client.cnf 0600 di folder 0700, dihapus trap shell pada sukses/gagal/interupsi. Backup parsial tidak dipromosikan atau diberi marker bila dump gagal; percobaan ulang tidak menimpa SQL lama. Finish menolak database berbeda, perubahan berkas persiapan, cleanup belum selesai, dump parsial, atau perubahan fingerprint akademik. Summary tetap restore_tested=false dan cutover_allowed=false. Tidak ada migrasi, perubahan nilai, izin hosting, endpoint aplikasi atau jalur ujian yang diubah.
+
+Waktu berikut adalah **penyimpanan terakhir yang tersedia**, bukan riwayat tiap edit. Baris adalah awal hunk untuk berkas lama atau rentang penuh berkas baru pada snapshot ini.
+
+| Waktu edit (WIB) | File | Baris | Bagian / perubahan |
+|---|---|---|---|
+| 2026-11-25 16:05:20 | `.gitattributes` | 1-2 | Tetapkan LF untuk *.sh agar runner terminal cPanel tidak rusak karena checkout Windows. |
+| 2026-11-25 16:05:20 | `includes/program-separation/checkpoint.php` | 1-94 | Workflow prepare/dump/finish; transaksi PHP read-only, berkas private, quoting POSIX, trap cleanup kredensial, anti-overwrite, checksum snapshot/database dan validasi dump selesai. |
+| 2026-11-25 16:05:21 | `tools/program-separation-capture.php` | 4, 6, 9, 13, 20, 23, 37 | Pisahkan mode prepare dan finish tanpa fungsi proses PHP; mode lama memeriksa kemampuan lebih dahulu dan berhenti sebelum DB/file bila proc_open dinonaktifkan; kredensial tidak dicetak. |
+| 2026-11-25 16:05:20 | `tools/program-separation-capture.sh` | 1-14 | Runner terminal: preflight PHP/mysqldump, PHP prepare, sh dump, PHP finish. Semua path dikutip dan kegagalan menghentikan alur tanpa migrasi. |
+| 2026-11-25 16:13:58 | `tests/program-separation-shell-capture-test.php` | 1-90 | Uji shell asli dengan mysqldump sintetis dan PHP proc_open/proc_close dinonaktifkan; sukses/gagal/ulang, path berkutip/spasi, trap cleanup, snapshot/nilai berubah, database beda dan validasi PHP awal. |
+| 2026-11-25 16:13:15 | `docs/program-separation-hosting-checkpoint.md` | 5, 32, 35, 51, 56, 72 | Perbarui perintah hosting menjadi sh, kebutuhan fasilitas, arti berkas checkpoint dan batas verifikasi; tidak menyarankan melemahkan disable_functions. |
+
+**Verifikasi:** Lint tiga file PHP berubah/baru lulus; bash -n tools/program-separation-capture.sh lulus. tests/program-separation-shell-capture-test.php, tests/program-separation-capture-test.php dan tests/program-separation-test.php lulus dengan assertions aktif. Uji end-to-end menjalankan runner .sh asli, PHP fixture dengan proc_open/proc_close dinonaktifkan, dan klien dump sintetis; mencakup path dengan spasi/apostrof, database berkutip, sukses/gagal/ulang, cleanup kredensial dan perubahan data/snapshot. Default PHP entry point diuji dengan disable_functions dan memberi instruksi .sh sebelum koneksi DB. Cleanup fixture memverifikasi path temp sebelum recursive removal. git diff --check diperiksa sebelum commit/push.
+
+**Batas verifikasi:** Klien mysqldump pada pengujian adalah stub, bukan backup MySQL nyata. Fasilitas/privilege mysqldump dan hasil restore shared hosting masih perlu diuji dari terminal pengguna. Tidak mengklaim backup hosting lengkap, data telah dimigrasi, atau pemisahan program aktif; langkah berikutnya pengguna pull lalu jalankan runner .sh dan kirim ringkasan tanpa SQL/password. Push tidak membuktikan deployment hosting.
+
+---
+
 ## 2026-11-25 15:57:19 +0700 — Lindungi riwayat CBT dan siapkan backup/audit terminal shared hosting
 
 **ID:** PROGRAM-SEPARATION-HOSTING-CAPTURE · **Parent Git:** `70e9ae296a703cf21ff6f57f92f3a63f1705715a`.
