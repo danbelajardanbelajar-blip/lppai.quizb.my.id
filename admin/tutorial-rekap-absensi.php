@@ -464,6 +464,280 @@ if (isset($_GET['action'])) {
         fclose($out);
         exit;
     }
+
+    if ($_GET['action'] === 'export_pdf') {
+        $dtNow = new DateTime('now', new DateTimeZone('Asia/Jakarta'));
+        $indonesianMonths = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $printDateFormatted = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y') . ', ' . $dtNow->format('H:i') . ' WIB';
+        $signatureDate = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y');
+
+        $backParams = http_build_query([
+            'tab' => $activeTab,
+            'gelombang_id' => $selected_gel_id,
+            'class_id' => $selectedClassId,
+            'dosen' => $selectedDosen,
+            'hari' => $selectedHari,
+            'jurusan' => $selectedJurusan,
+            'status_kehadiran' => $selectedStatus,
+            'q' => $searchQuery
+        ]);
+        $backUrl = '?' . $backParams;
+        $periodeLabel = $current_gel
+            ? ($current_gel['tahun_ajaran'] . ' (' . $current_gel['gelombang'] . ' - ' . $current_gel['semester'] . ')')
+            : 'Semua Periode';
+        $kelasLabel = ($selectedClassId > 0 && isset($classLookup[$selectedClassId]))
+            ? ($classLookup[$selectedClassId]['nama_kelas'] . ' (' . $classLookup[$selectedClassId]['hari'] . ', ' . $classLookup[$selectedClassId]['jam'] . ')')
+            : 'Semua Kelas';
+        $statusLabelMap = ['all' => 'Semua Status', 'memenuhi' => 'Memenuhi (>= 75%)', 'rawan' => 'Rawan (< 75%)'];
+        $statusLabel = $statusLabelMap[$selectedStatus] ?? 'Semua Status';
+        $docTitle = $activeTab === 'dosen'
+            ? 'REKAPITULASI KEHADIRAN MENGAJAR DOSEN TUTORIAL'
+            : 'REKAPITULASI KEHADIRAN MAHASISWA TUTORIAL';
+        ?>
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title><?= htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8') ?></title>
+            <link rel="icon" href="<?= BASE_URL ?>/assets/logo.svg" type="image/svg+xml">
+            <style>
+                @page { size: A4 landscape; margin: 10mm; }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                body { margin: 0; padding: 0; background: #e2e8f0; color: #0f172a; font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 9pt; line-height: 1.35; }
+                .toolbar-screen { background: #ffffff; border-bottom: 1.5px solid #cbd5e1; padding: 12px 24px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+                .toolbar-screen .actions-left, .toolbar-screen .actions-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+                .btn-toolbar { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; border: none; }
+                .btn-back { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+                .btn-print { background: #dc2626; color: #ffffff; }
+                .badge-info-stat { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+                .page-sheet { width: 297mm; min-height: 210mm; padding: 12mm; margin: 16px auto; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+                .kop-surat { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 3px double #0f172a; margin-bottom: 12px; }
+                .kop-logo { width: 62px; height: 62px; object-fit: contain; flex-shrink: 0; }
+                .kop-text { flex: 1; text-align: center; }
+                .kop-text h1 { margin: 0; font-size: 13pt; font-weight: 800; text-transform: uppercase; color: #0f172a; }
+                .kop-text h2 { margin: 2px 0 0; font-size: 11pt; font-weight: 700; color: #1e293b; }
+                .kop-text p { margin: 2px 0 0; font-size: 8.5pt; color: #475569; }
+                .doc-heading { text-align: center; margin-bottom: 10px; }
+                .doc-heading h3 { margin: 0; font-size: 11.5pt; font-weight: 800; text-transform: uppercase; text-decoration: underline; }
+                .filter-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 8.5pt; }
+                .filter-summary span strong { color: #0f172a; }
+                table.pdf-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+                table.pdf-table th, table.pdf-table td { border: 1px solid #94a3b8; padding: 4px 5px; vertical-align: middle; }
+                table.pdf-table th { background: #f1f5f9; color: #0f172a; font-weight: 700; text-align: center; }
+                table.pdf-table tbody tr:nth-child(even) { background: #f8fafc; }
+                .text-center { text-align: center; }
+                .mono { font-family: monospace; }
+                .st-h { color: #166534; font-weight: 700; background: #dcfce7; }
+                .st-i { color: #0369a1; font-weight: 700; background: #e0f2fe; }
+                .st-s { color: #92400e; font-weight: 700; background: #fef3c7; }
+                .st-a { color: #991b1b; font-weight: 700; background: #fee2e2; }
+                .st-b { color: #94a3b8; }
+                .doc-footer-area { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 16px; gap: 20px; page-break-inside: avoid; }
+                .rekap-box { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; padding: 8px 12px; font-size: 8.5pt; line-height: 1.5; min-width: 280px; }
+                .signature-box { text-align: center; min-width: 220px; font-size: 9pt; }
+                .signature-space { height: 52px; }
+                @media print {
+                    body { background: #ffffff; }
+                    .toolbar-screen { display: none !important; }
+                    .page-sheet { width: 100%; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="toolbar-screen">
+                <div class="actions-left">
+                    <a href="<?= htmlspecialchars($backUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn-toolbar btn-back">← Kembali ke Rekap</a>
+                    <span class="badge-info-stat">
+                        <?= $activeTab === 'dosen' ? ('Total: ' . count($dosenClassReports) . ' Kelas') : ('Total: ' . count($filteredStudents) . ' Mahasiswa') ?>
+                    </span>
+                </div>
+                <div class="actions-right">
+                    <button type="button" class="btn-toolbar btn-print" onclick="window.print()">📄 Simpan / Cetak PDF</button>
+                </div>
+            </div>
+
+            <main class="page-sheet">
+                <header class="kop-surat">
+                    <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI" class="kop-logo" onerror="this.style.display='none'">
+                    <div class="kop-text">
+                        <h1>Lembaga Pengembangan Pendidikan Agama Islam (LPPAI)</h1>
+                        <h2>Universitas Islam Darul 'Ulum Lamongan</h2>
+                        <p>Dicetak pada: <?= htmlspecialchars($printDateFormatted, ENT_QUOTES, 'UTF-8') ?></p>
+                    </div>
+                </header>
+
+                <div class="doc-heading">
+                    <h3><?= htmlspecialchars($docTitle, ENT_QUOTES, 'UTF-8') ?></h3>
+                </div>
+
+                <div class="filter-summary">
+                    <span>Periode: <strong><?= htmlspecialchars($periodeLabel, ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Kelas: <strong><?= htmlspecialchars($kelasLabel, ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Dosen: <strong><?= htmlspecialchars($selectedDosen !== '' ? $selectedDosen : 'Semua Dosen', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Hari: <strong><?= htmlspecialchars($selectedHari !== '' ? $selectedHari : 'Semua Hari', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <?php if ($activeTab === 'mahasiswa'): ?>
+                        <span>Jurusan: <strong><?= htmlspecialchars($selectedJurusan !== '' ? $selectedJurusan : 'Semua Jurusan', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                        <span>Syarat: <strong><?= htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8') ?></strong></span>
+                        <?php if ($searchQuery !== ''): ?>
+                            <span>Kata Kunci: <strong><?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8') ?></strong></span>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ($activeTab === 'mahasiswa'): ?>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th width="26">No</th>
+                                <th width="82">NIM</th>
+                                <th>Nama Mahasiswa &amp; Prodi</th>
+                                <th>Kelas &amp; Dosen</th>
+                                <th width="24">P1</th><th width="24">P2</th><th width="24">P3</th><th width="24">P4</th>
+                                <th width="24">P5</th><th width="24">P6</th><th width="24">P7</th><th width="24">P8</th>
+                                <th width="24">H</th><th width="24">I</th><th width="24">S</th><th width="24">A</th>
+                                <th width="42">%</th>
+                                <th width="86">Kelayakan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($filteredStudents)): ?>
+                                <tr><td colspan="18" class="text-center" style="padding:14px;">Tidak ada data mahasiswa yang cocok dengan filter aktif.</td></tr>
+                            <?php else: ?>
+                                <?php $no = 1; foreach ($filteredStudents as $st):
+                                    $cid = (int)$st['tutorial_class_id'];
+                                    $uid = (int)$st['user_id'];
+                                    $sum = $studentSummaries[$uid] ?? ['hadir' => 0, 'izin' => 0, 'sakit' => 0, 'absen' => 0, 'persen' => 0, 'is_eligible' => false];
+                                ?>
+                                <tr>
+                                    <td class="text-center"><?= $no++ ?></td>
+                                    <td class="mono"><?= htmlspecialchars($st['nim'], ENT_QUOTES, 'UTF-8') ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($st['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                        <span style="color:#475569;"><?= htmlspecialchars($st['program_studi'] ?: '-', ENT_QUOTES, 'UTF-8') ?> (<?= htmlspecialchars($st['jenis_program'] ?? 'Reguler', ENT_QUOTES, 'UTF-8') ?>)</span>
+                                    </td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($st['nama_kelas'], ENT_QUOTES, 'UTF-8') ?></strong> (<?= htmlspecialchars($st['hari'], ENT_QUOTES, 'UTF-8') ?>)<br>
+                                        <span style="color:#475569;"><?= htmlspecialchars($st['dosen_pengampu'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    </td>
+                                    <?php for ($p = 1; $p <= 8; $p++):
+                                        $stVal = $attendanceMap[$cid][$uid][$p] ?? 'belum';
+                                        $cls = 'st-b'; $lbl = '-';
+                                        if ($stVal === 'hadir') { $cls = 'st-h'; $lbl = 'H'; }
+                                        elseif ($stVal === 'izin') { $cls = 'st-i'; $lbl = 'I'; }
+                                        elseif ($stVal === 'sakit') { $cls = 'st-s'; $lbl = 'S'; }
+                                        elseif ($stVal === 'absen') { $cls = 'st-a'; $lbl = 'A'; }
+                                    ?>
+                                        <td class="text-center <?= $cls ?>"><?= $lbl ?></td>
+                                    <?php endfor; ?>
+                                    <td class="text-center"><strong><?= $sum['hadir'] ?></strong></td>
+                                    <td class="text-center"><?= $sum['izin'] ?></td>
+                                    <td class="text-center"><?= $sum['sakit'] ?></td>
+                                    <td class="text-center"><?= $sum['absen'] ?></td>
+                                    <td class="text-center"><strong><?= $sum['persen'] ?>%</strong></td>
+                                    <td class="text-center" style="font-weight:700; color:<?= $sum['is_eligible'] ? '#065f46' : '#be123c' ?>;">
+                                        <?= $sum['is_eligible'] ? 'Memenuhi' : 'Perlu Perhatian' ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+
+                    <div class="doc-footer-area">
+                        <div class="rekap-box">
+                            <strong>Ringkasan Rekap Mahasiswa:</strong><br>
+                            • Total Peserta: <strong><?= count($filteredStudents) ?></strong> mahasiswa<br>
+                            • Memenuhi Syarat (&ge; 75%): <strong><?= $totalEligible ?></strong> mahasiswa<br>
+                            • Perlu Perhatian (&lt; 75%): <strong><?= $totalWarning ?></strong> mahasiswa<br>
+                            • Rata-rata Kehadiran: <strong><?= $avgStudentAttendance ?>%</strong>
+                        </div>
+                        <div class="signature-box">
+                            Lamongan, <?= htmlspecialchars($signatureDate, ENT_QUOTES, 'UTF-8') ?><br>
+                            <strong>Koordinator Tutorial LPPAI</strong>
+                            <div class="signature-space"></div>
+                            <strong>( _______________________ )</strong>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <table class="pdf-table">
+                        <thead>
+                            <tr>
+                                <th width="26">No</th>
+                                <th>Dosen Pengampu</th>
+                                <th>Kelas &amp; Jadwal</th>
+                                <th width="46">Peserta</th>
+                                <th width="42">P1</th><th width="42">P2</th><th width="42">P3</th><th width="42">P4</th>
+                                <th width="42">P5</th><th width="42">P6</th><th width="42">P7</th><th width="42">P8</th>
+                                <th width="58">Progres</th>
+                                <th width="76">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($dosenClassReports)): ?>
+                                <tr><td colspan="14" class="text-center" style="padding:14px;">Tidak ada data kelas dosen yang cocok dengan filter aktif.</td></tr>
+                            <?php else: ?>
+                                <?php $no = 1; foreach ($dosenClassReports as $rep): $c = $rep['class']; ?>
+                                <tr>
+                                    <td class="text-center"><?= $no++ ?></td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($c['dosen_pengampu'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                        <span style="color:#475569;">Ruangan: <?= htmlspecialchars($c['ruangan'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    </td>
+                                    <td>
+                                        <strong><?= htmlspecialchars($c['nama_kelas'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                        <span style="color:#475569;"><?= htmlspecialchars($c['hari'] . ', ' . $c['jam'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    </td>
+                                    <td class="text-center"><?= $rep['student_count'] ?></td>
+                                    <?php for ($p = 1; $p <= 8; $p++):
+                                        $det = $rep['meetings_detail'][$p];
+                                        $dateStr = $det['tanggal'] ? date('d/m', strtotime($det['tanggal'])) : 'Ada';
+                                    ?>
+                                        <td class="text-center <?= $det['is_held'] ? 'st-h' : 'st-b' ?>">
+                                            <?= $det['is_held'] ? ('✓<br><small>' . htmlspecialchars($dateStr, ENT_QUOTES, 'UTF-8') . '</small>') : '-' ?>
+                                        </td>
+                                    <?php endfor; ?>
+                                    <td class="text-center"><strong><?= $rep['conducted_count'] ?>/8</strong> (<?= $rep['conducted_pct'] ?>%)</td>
+                                    <td class="text-center"><?= $rep['is_completed'] ? 'Tuntas' : ($rep['conducted_count'] > 0 ? 'Berjalan' : 'Belum Mulai') ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+
+                    <div class="doc-footer-area">
+                        <div class="rekap-box">
+                            <strong>Ringkasan Mengajar Dosen:</strong><br>
+                            • Total Kelas: <strong><?= count($dosenClassReports) ?></strong> kelas<br>
+                            • Rata-rata Terlaksana: <strong><?= $avgConductedMeetings ?> / 8</strong> pertemuan<br>
+                            • Kelas Tuntas (8 Pertemuan): <strong><?= $totalDosenCompletedClasses ?></strong> kelas
+                        </div>
+                        <div class="signature-box">
+                            Lamongan, <?= htmlspecialchars($signatureDate, ENT_QUOTES, 'UTF-8') ?><br>
+                            <strong>Koordinator Tutorial LPPAI</strong>
+                            <div class="signature-space"></div>
+                            <strong>( _______________________ )</strong>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </main>
+
+            <?php if (isset($_GET['print']) && $_GET['print'] === '1'): ?>
+            <script>
+                window.addEventListener('load', function() {
+                    setTimeout(function() { window.print(); }, 300);
+                });
+            </script>
+            <?php endif; ?>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -561,9 +835,23 @@ include __DIR__ . '/../includes/header.php';
                 🖨️ Cetak Rekap
             </button>
             <?php
-            $exportUrl = '?tab=' . urlencode($activeTab) . '&gelombang_id=' . urlencode($selected_gel_id) . '&class_id=' . urlencode((string)$selectedClassId) . '&dosen=' . urlencode($selectedDosen) . '&hari=' . urlencode($selectedHari) . '&jurusan=' . urlencode($selectedJurusan) . '&status_kehadiran=' . urlencode($selectedStatus) . '&q=' . urlencode($searchQuery) . '&action=' . ($activeTab === 'dosen' ? 'export_csv_dosen' : 'export_csv_mahasiswa');
+            $baseFilterQuery = http_build_query([
+                'tab' => $activeTab,
+                'gelombang_id' => $selected_gel_id,
+                'class_id' => $selectedClassId,
+                'dosen' => $selectedDosen,
+                'hari' => $selectedHari,
+                'jurusan' => $selectedJurusan,
+                'status_kehadiran' => $selectedStatus,
+                'q' => $searchQuery
+            ]);
+            $exportUrl = '?' . $baseFilterQuery . '&action=' . ($activeTab === 'dosen' ? 'export_csv_dosen' : 'export_csv_mahasiswa');
+            $exportPdfUrl = '?' . $baseFilterQuery . '&action=export_pdf&print=1';
             ?>
-            <a href="<?= $exportUrl ?>" class="btn btn-primary" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+            <a href="<?= htmlspecialchars($exportPdfUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener" data-no-spa class="btn" style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                📄 Export PDF
+            </a>
+            <a href="<?= htmlspecialchars($exportUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-primary" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
                 📥 Unduh CSV / Excel
             </a>
         </div>

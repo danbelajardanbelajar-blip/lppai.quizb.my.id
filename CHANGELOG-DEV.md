@@ -1,3 +1,17 @@
+## 2026-11-26 14.08.50 +0700 — Tambah export PDF sesuai filter pada rekap absensi tutorial
+
+**ID:** TUTORIAL-REKAP-EXPORT-PDF · **Parent Git:** 5bbc2ff758fdc6bdac85e56ce02b72318ebccae5.
+
+**Perubahan/alasan:** Menambahkan aksi `action=export_pdf` dan tombol **Export PDF** pada `admin/tutorial-rekap-absensi.php` yang mengikuti seluruh filter aktif (`tab`, `gelombang_id`, `class_id`, `dosen`, `hari`, `jurusan`, `status_kehadiran`, `q`). Dokumen dirender sebagai lembar cetak A4 Landscape resmi berkop LPPAI UNISDA (konsisten dengan pola `admin/pretes-peserta-pdf.php` karena tidak ada library PDF Composer) lengkap dengan ringkasan filter aktif, matriks P1–P8 (baik tab Mahasiswa maupun Dosen), rekapitulasi ringkas, tanda tangan, serta pemicu `window.print()` otomatis saat `print=1`.
+
+**Lokasi/waktu:** Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- admin/tutorial-rekap-absensi.php | snapshot 464-740, 837-858 | simpan terakhir WIB 2026-11-26 14.08.50
+
+**Verifikasi:** `git diff --check admin/tutorial-rekap-absensi.php` lulus tanpa error whitespace/konflik.
+
+**Batas:** Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l`, eksekusi query database, dan pratinjau cetak PDF di browser belum dijalankan secara lokal; perlu verifikasi langsung di server setelah deploy.
+
 ## 2026-11-26 13.07.50 +0700 — Auto-save nilai dan absensi tanpa tombol simpan di role dosen
 
 **ID:** DOSEN-AUTOSAVE-NILAI-ABSENSI · **Parent Git:** f3026dcdfea4fe1464868335c4abaa51d0248294.
