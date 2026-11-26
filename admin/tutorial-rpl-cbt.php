@@ -44,6 +44,278 @@ if (isset($_GET['download'])) {
         $gen = (function() use ($rows) { foreach ($rows as $r) yield $r; })();
         cbtSendXlsx(cbtWriteXlsx($gen, 'Hasil CBT RPL', [14, 26, 22, 22, 22, 26, 24, 18, 18, 16, 14, 12, 12, 22]), 'hasil-cbt-tutorial-rpl-' . date('Ymd') . '.xlsx', true);
         exit;
+    } elseif ($dl === 'results_pdf') {
+        $filterSrc = $_GET;
+        if (!isset($filterSrc['result_filter']) && isset($filterSrc['package_id']) && in_array((string)$filterSrc['package_id'], ['1', '2'], true)) {
+            $filterSrc['result_filter'] = (string)$filterSrc['package_id'];
+        }
+        $cbtFilters = tutorialRplCbtResultFilters($filterSrc);
+        $now = time();
+        $passingGrade = 70.0;
+        [$whereSql, $params] = tutorialRplCbtResultWhere($cbtFilters, $now, $passingGrade);
+
+        $stmt = $pdo->prepare("
+            SELECT a.*,
+                   u.nama_lengkap, u.nim, u.program_studi,
+                   c.nama_kelompok, c.dosen_nama,
+                   s.title AS session_title, s.code AS session_code,
+                   p.name AS package_name, p.code AS package_code
+            FROM tutorial_rpl_cbt_attempts a
+            JOIN users u ON a.user_id = u.id
+            LEFT JOIN tutorial_rpl_classes c ON a.class_id = c.id
+            LEFT JOIN tutorial_rpl_cbt_sessions s ON a.session_id = s.id
+            LEFT JOIN tutorial_rpl_cbt_packages p ON a.package_id = p.id
+            $whereSql
+            ORDER BY a.started_at DESC
+        ");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->execute();
+        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $attemptIds = array_map(fn($a) => (int)$a['id'], $attempts);
+        $itemStatsMap = [];
+        if (!empty($attemptIds)) {
+            $placeholders = implode(',', array_fill(0, count($attemptIds), '?'));
+            $stmtStats = $pdo->prepare("
+                SELECT attempt_id,
+                       COUNT(*) AS total_items,
+                       SUM(CASE WHEN answer IS NOT NULL AND answer != '' THEN 1 ELSE 0 END) AS answered_count,
+                       SUM(CASE WHEN answer IS NOT NULL AND answer != '' AND answer = correct_answer THEN 1 ELSE 0 END) AS live_correct_count
+                FROM tutorial_rpl_cbt_items
+                WHERE attempt_id IN ($placeholders)
+                GROUP BY attempt_id
+            ");
+            $stmtStats->execute($attemptIds);
+            foreach ($stmtStats->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $itemStatsMap[(int)$row['attempt_id']] = $row;
+            }
+        }
+
+        $dtNow = new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta'));
+        $indonesianMonths = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $printDateFormatted = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y') . ', ' . $dtNow->format('H:i') . ' WIB';
+        $signatureDate = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y');
+
+        $backUrl = '?tab=results&' . http_build_query(array_filter([
+            'status_filter' => $cbtFilters['status_filter'],
+            'result_filter' => $cbtFilters['result_filter'],
+            'pass_filter' => $cbtFilters['pass_filter'],
+            'group' => $cbtFilters['group'],
+            'q' => $cbtFilters['q'],
+        ], fn($v) => $v !== ''));
+
+        $statusLabelMap = ['all' => 'Semua Sesi', 'live' => 'Sedang Berlangsung (Live)', 'finished' => 'Riwayat Selesai'];
+        $pkgLabelMap = ['all' => 'Semua Paket', '1' => 'Paket 1 (Muslim)', '2' => 'Paket 2 (Kristen)'];
+        $passLabelMap = ['all' => 'Semua Kelulusan', 'lulus' => 'Lulus (>= 70)', 'tidak_lulus' => 'Tidak Lulus (< 70)'];
+
+        $totalLulus = 0;
+        $totalTidakLulus = 0;
+        $totalOngoing = 0;
+        $sumScoreSubmitted = 0.0;
+        $cntSubmitted = 0;
+        foreach ($attempts as $a) {
+            $isSub = ($a['submitted_at'] !== null);
+            $deadline = (int)($a['deadline_at'] ?? ($a['started_at'] + 90 * 60));
+            if ($isSub) {
+                $cntSubmitted++;
+                $sc = $a['score'] !== null ? (float)$a['score'] : 0.0;
+                $sumScoreSubmitted += $sc;
+                if ($sc >= $passingGrade) $totalLulus++; else $totalTidakLulus++;
+            } elseif ($now < $deadline) {
+                $totalOngoing++;
+            }
+        }
+        $avgScore = $cntSubmitted > 0 ? round($sumScoreSubmitted / $cntSubmitted, 2) : 0;
+        ?>
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Hasil Ujian CBT Tutorial RPL - LPPAI UNISDA</title>
+            <link rel="icon" href="<?= BASE_URL ?>/assets/logo.svg" type="image/svg+xml">
+            <style>
+                @page { size: A4 landscape; margin: 10mm; }
+                * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                body { margin: 0; padding: 0; background: #e2e8f0; color: #0f172a; font-family: Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 9pt; line-height: 1.35; }
+                .toolbar-screen { background: #ffffff; border-bottom: 1.5px solid #cbd5e1; padding: 12px 24px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+                .toolbar-screen .actions-left, .toolbar-screen .actions-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+                .btn-toolbar { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer; border: none; }
+                .btn-back { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+                .btn-print { background: #dc2626; color: #ffffff; }
+                .badge-info-stat { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+                .page-sheet { width: 297mm; min-height: 210mm; padding: 12mm; margin: 16px auto; background: #ffffff; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+                .kop-surat { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 3px double #0f172a; margin-bottom: 12px; }
+                .kop-logo { width: 62px; height: 62px; object-fit: contain; flex-shrink: 0; }
+                .kop-text { flex: 1; text-align: center; }
+                .kop-text h1 { margin: 0; font-size: 13pt; font-weight: 800; text-transform: uppercase; color: #0f172a; }
+                .kop-text h2 { margin: 2px 0 0; font-size: 11pt; font-weight: 700; color: #1e293b; }
+                .kop-text p { margin: 2px 0 0; font-size: 8.5pt; color: #475569; }
+                .doc-heading { text-align: center; margin-bottom: 10px; }
+                .doc-heading h3 { margin: 0; font-size: 11.5pt; font-weight: 800; text-transform: uppercase; text-decoration: underline; }
+                .filter-summary { display: flex; flex-wrap: wrap; gap: 6px 18px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 8.5pt; }
+                table.pdf-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+                table.pdf-table th, table.pdf-table td { border: 1px solid #94a3b8; padding: 4px 6px; vertical-align: middle; }
+                table.pdf-table th { background: #f1f5f9; color: #0f172a; font-weight: 700; text-align: center; }
+                table.pdf-table tbody tr:nth-child(even) { background: #f8fafc; }
+                .text-center { text-align: center; }
+                .mono { font-family: monospace; }
+                .st-pass { color: #065f46; background: #dcfce7; font-weight: 700; }
+                .st-fail { color: #be123c; background: #fee2e2; font-weight: 700; }
+                .st-live { color: #1e40af; background: #dbeafe; font-weight: 700; }
+                .st-exp { color: #92400e; background: #fef3c7; font-weight: 700; }
+                .doc-footer-area { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 16px; gap: 20px; page-break-inside: avoid; }
+                .rekap-box { border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; padding: 8px 12px; font-size: 8.5pt; line-height: 1.5; min-width: 280px; }
+                .signature-box { text-align: center; min-width: 220px; font-size: 9pt; }
+                .signature-space { height: 52px; }
+                @media print {
+                    body { background: #ffffff; }
+                    .toolbar-screen { display: none !important; }
+                    .page-sheet { width: 100%; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="toolbar-screen">
+                <div class="actions-left">
+                    <a href="<?= htmlspecialchars($backUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn-toolbar btn-back">← Kembali ke Hasil Ujian</a>
+                    <span class="badge-info-stat">Total: <?= count($attempts) ?> Peserta</span>
+                </div>
+                <div class="actions-right">
+                    <button type="button" class="btn-toolbar btn-print" onclick="window.print()">📄 Simpan / Cetak PDF</button>
+                </div>
+            </div>
+
+            <main class="page-sheet">
+                <header class="kop-surat">
+                    <img src="<?= BASE_URL ?>/assets/logo.svg" alt="Logo LPPAI" class="kop-logo" onerror="this.style.display='none'">
+                    <div class="kop-text">
+                        <h1>Lembaga Pengembangan Pendidikan Agama Islam (LPPAI)</h1>
+                        <h2>Universitas Islam Darul 'Ulum Lamongan</h2>
+                        <p>Dicetak pada: <?= htmlspecialchars($printDateFormatted, ENT_QUOTES, 'UTF-8') ?></p>
+                    </div>
+                </header>
+
+                <div class="doc-heading">
+                    <h3>REKAPITULASI HASIL UJIAN CBT TUTORIAL RPL</h3>
+                </div>
+
+                <div class="filter-summary">
+                    <span>Status Sesi: <strong><?= htmlspecialchars($statusLabelMap[$cbtFilters['status_filter']] ?? 'Semua', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Paket Soal: <strong><?= htmlspecialchars($pkgLabelMap[$cbtFilters['result_filter']] ?? 'Semua Paket', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Kelulusan: <strong><?= htmlspecialchars($passLabelMap[$cbtFilters['pass_filter']] ?? 'Semua', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <span>Kelompok: <strong><?= htmlspecialchars($cbtFilters['group'] !== '' ? $cbtFilters['group'] : 'Semua Kelompok', ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <?php if ($cbtFilters['q'] !== ''): ?>
+                        <span>Kata Kunci: <strong><?= htmlspecialchars($cbtFilters['q'], ENT_QUOTES, 'UTF-8') ?></strong></span>
+                    <?php endif; ?>
+                </div>
+
+                <table class="pdf-table">
+                    <thead>
+                        <tr>
+                            <th width="26">No</th>
+                            <th width="82">NIM</th>
+                            <th>Nama Mahasiswa &amp; Prodi</th>
+                            <th>Kelompok &amp; Dosen</th>
+                            <th>Paket &amp; Sesi</th>
+                            <th width="92">Waktu Mulai</th>
+                            <th width="54">Terjawab</th>
+                            <th width="44">Benar</th>
+                            <th width="52">Nilai</th>
+                            <th width="94">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($attempts)): ?>
+                            <tr><td colspan="10" class="text-center" style="padding:14px;">Tidak ada data hasil ujian CBT Tutorial RPL yang cocok dengan filter aktif.</td></tr>
+                        <?php else: ?>
+                            <?php $no = 1; foreach ($attempts as $a):
+                                $attId = (int)$a['id'];
+                                $stat = $itemStatsMap[$attId] ?? null;
+                                $totalItems = $stat ? (int)$stat['total_items'] : (int)($a['total_questions'] ?? 25);
+                                $answered = $stat ? (int)$stat['answered_count'] : 0;
+                                $isSubmitted = ($a['submitted_at'] !== null);
+                                $deadline = (int)($a['deadline_at'] ?? ($a['started_at'] + 90 * 60));
+                                $isExpired = (!$isSubmitted && $now >= $deadline);
+                                $correct = $isSubmitted ? (int)($a['correct_count'] ?? 0) : ($stat ? (int)$stat['live_correct_count'] : 0);
+                                $score = $isSubmitted ? ($a['score'] !== null ? (float)$a['score'] : 0.0) : ($totalItems > 0 ? round(($correct / $totalItems) * 100, 1) : 0.0);
+                                $startedWib = (new DateTimeImmutable('@' . $a['started_at']))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i');
+                                $pkgId = (int)($a['package_id'] ?? 1);
+                                $pkgDesc = !empty($a['package_name']) ? $a['package_name'] : (($pkgId === 2) ? 'Paket 2 (Kristen)' : 'Paket 1 (Muslim)');
+
+                                if ($isSubmitted) {
+                                    $isPass = ($score >= $passingGrade);
+                                    $statusText = $isPass ? 'Lulus' : 'Tidak Lulus';
+                                    $statusCls = $isPass ? 'st-pass' : 'st-fail';
+                                } elseif ($isExpired) {
+                                    $statusText = 'Waktu Habis';
+                                    $statusCls = 'st-exp';
+                                } else {
+                                    $statusText = 'Berlangsung';
+                                    $statusCls = 'st-live';
+                                }
+                            ?>
+                            <tr>
+                                <td class="text-center"><?= $no++ ?></td>
+                                <td class="mono"><?= htmlspecialchars($a['nim'] ?: '-', ENT_QUOTES, 'UTF-8') ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($a['nama_lengkap'] ?: '-', ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                    <span style="color:#475569;"><?= htmlspecialchars($a['program_studi'] ?: '-', ENT_QUOTES, 'UTF-8') ?></span>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($a['nama_kelompok'] ?: '-', ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                    <span style="color:#475569;"><?= htmlspecialchars($a['dosen_nama'] ?: '-', ENT_QUOTES, 'UTF-8') ?></span>
+                                </td>
+                                <td>
+                                    <strong><?= htmlspecialchars($pkgDesc, ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                    <span style="color:#475569;"><?= htmlspecialchars($a['session_title'] ?: ($a['session_code'] ?: '-'), ENT_QUOTES, 'UTF-8') ?></span>
+                                </td>
+                                <td class="text-center"><?= htmlspecialchars($startedWib, ENT_QUOTES, 'UTF-8') ?></td>
+                                <td class="text-center"><?= $answered ?>/<?= $totalItems ?></td>
+                                <td class="text-center"><?= $correct ?></td>
+                                <td class="text-center"><strong><?= number_format($score, 1) ?></strong></td>
+                                <td class="text-center <?= $statusCls ?>"><?= $statusText ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <div class="doc-footer-area">
+                    <div class="rekap-box">
+                        <strong>Ringkasan Hasil Ujian:</strong><br>
+                        • Total Sesi Ditampilkan: <strong><?= count($attempts) ?></strong> peserta<br>
+                        • Selesai &amp; Lulus (&ge; <?= (int)$passingGrade ?>): <strong><?= $totalLulus ?></strong> peserta<br>
+                        • Selesai &amp; Tidak Lulus (&lt; <?= (int)$passingGrade ?>): <strong><?= $totalTidakLulus ?></strong> peserta<br>
+                        • Sedang Berlangsung: <strong><?= $totalOngoing ?></strong> peserta<br>
+                        • Rata-rata Nilai Selesai: <strong><?= $avgScore ?></strong>
+                    </div>
+                    <div class="signature-box">
+                        Lamongan, <?= htmlspecialchars($signatureDate, ENT_QUOTES, 'UTF-8') ?><br>
+                        <strong>Koordinator Tutorial RPL LPPAI</strong>
+                        <div class="signature-space"></div>
+                        <strong>( _______________________ )</strong>
+                    </div>
+                </div>
+            </main>
+
+            <?php if (isset($_GET['print']) && $_GET['print'] === '1'): ?>
+            <script>
+                window.addEventListener('load', function() {
+                    setTimeout(function() { window.print(); }, 300);
+                });
+            </script>
+            <?php endif; ?>
+        </body>
+        </html>
+        <?php
+        exit;
     }
 }
 
@@ -698,6 +970,9 @@ include __DIR__ . '/../includes/header.php';
             <a href="?download=results" class="bank-button ghost">
                 📊 Ekspor Hasil Ujian (.xlsx)
             </a>
+            <a data-no-spa href="?download=results_pdf&amp;print=1" target="_blank" rel="noopener" class="bank-button ghost">
+                📄 Export PDF
+            </a>
         </div>
     </div>
 
@@ -1169,8 +1444,17 @@ include __DIR__ . '/../includes/header.php';
                             'q' => $searchQuery ?? '',
                         ], fn($v) => $v !== ''));
                         $exportSuffix = $exportQs !== '' ? '&amp;' . htmlspecialchars($exportQs, ENT_QUOTES, 'UTF-8') : '';
+                        $exportPdfQs = http_build_query(array_filter([
+                            'status_filter' => $statusFilter !== 'all' ? $statusFilter : '',
+                            'result_filter' => $resultFilter !== 'all' ? $resultFilter : '',
+                            'pass_filter' => ($passFilter !== 'all') ? $passFilter : '',
+                            'group' => $groupFilter ?? '',
+                            'q' => $searchQuery ?? '',
+                        ], fn($v) => $v !== ''));
+                        $exportPdfSuffix = $exportPdfQs !== '' ? '&amp;' . htmlspecialchars($exportPdfQs, ENT_QUOTES, 'UTF-8') : '';
                         $exportNote = $exportQs !== '' ? ' (mengikuti filter aktif: paket/kelulusan/kelompok/pencarian)' : '';
                     ?>
+                    <a data-no-spa class="bank-button" style="background:#dc2626;color:#ffffff;border-color:#b91c1c;" href="?download=results_pdf&amp;print=1<?= $exportPdfSuffix ?>" target="_blank" rel="noopener" title="Ekspor dokumen PDF hasil ujian CBT Tutorial RPL<?= $exportNote ?>">📄 Export PDF</a>
                     <a data-no-spa class="bank-button primary" href="?download=results<?= $exportSuffix ?>" title="Ekspor data nilai ujian CBT Tutorial RPL<?= $exportNote ?>">📊 Ekspor Hasil (.xlsx)</a>
                     <?php if ($exportQs !== ''): ?>
                         <span class="cbt-export-note" id="cbtExportFilterNote">⚙️ Ekspor mengikuti filter aktif</span>

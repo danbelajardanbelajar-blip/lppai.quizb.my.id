@@ -1,3 +1,17 @@
+## 2026-11-26 14.38.18 +0700 — Tambah export PDF hasil ujian CBT Tutorial RPL
+
+**ID:** TUTORIAL-RPL-CBT-EXPORT-PDF · **Parent Git:** 8351160370511b3df22259cfa2845e28a46ff297.
+
+**Perubahan/alasan:** Menambahkan `download=results_pdf` dan tombol **Export PDF** di header halaman serta tab **Hasil Ujian** (`tab=results`) pada `admin/tutorial-rpl-cbt.php`. Fitur ini memakai `tutorialRplCbtResultFilters()` dan `tutorialRplCbtResultWhere()` sehingga dokumen PDF mengikuti seluruh filter aktif (`status_filter`, `result_filter`/`package_id`, `pass_filter`, `group`, `q`). Dokumen dirender sebagai lembar cetak A4 Landscape resmi berkop LPPAI UNISDA dengan ringkasan filter, tabel nilai dan status kelulusan/live peserta, ringkasan statistik, tanda tangan, serta pemicu `window.print()` otomatis saat `print=1`.
+
+**Lokasi/waktu:** Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- admin/tutorial-rpl-cbt.php | snapshot 42-318, 970-976, 1439-1458 | simpan terakhir WIB 2026-11-26 14.38.18
+
+**Verifikasi:** `git diff --check admin/tutorial-rpl-cbt.php` lulus tanpa error whitespace/konflik.
+
+**Batas:** Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l`, eksekusi query database, dan pratinjau cetak PDF di browser belum dijalankan secara lokal; perlu verifikasi langsung di server setelah deploy.
+
 ## 2026-11-26 14.08.50 +0700 — Tambah export PDF sesuai filter pada rekap absensi tutorial
 
 **ID:** TUTORIAL-REKAP-EXPORT-PDF · **Parent Git:** 5bbc2ff758fdc6bdac85e56ce02b72318ebccae5.
