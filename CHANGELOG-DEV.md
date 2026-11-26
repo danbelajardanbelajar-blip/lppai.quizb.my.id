@@ -1,3 +1,17 @@
+## 2026-11-26 13.02.24 +0700 — Tambah filter jurusan dan hari pada rekap absensi tutorial
+
+**ID:** TUTORIAL-REKAP-FILTER-JURUSAN-HARI · **Parent Git:** f894744b99833cdb107bcb18003efe0353dc9990.
+
+**Perubahan/alasan:** Menambahkan parameter GET `jurusan` dan `hari` pada `admin/tutorial-rekap-absensi.php` agar admin dapat memfilter rekap kehadiran mahasiswa berdasarkan program studi (`users.program_studi`) dan hari jadwal kelas (`tutorial_classes.hari`), serta memfilter rekap mengajar dosen berdasarkan hari kelas. Opsi hari diurutkan kronologis (Senin–Minggu), opsi jurusan diambil dari `program_studi` mahasiswa terdaftar pada periode terpilih dan diurutkan natural case-insensitive. Parameter `hari` dan `jurusan` juga dipertahankan pada tautan tab (`mahasiswa` / `dosen`), URL ekspor CSV, serta input tersembunyi saat berada di tab dosen agar state filter tidak hilang.
+
+**Lokasi/waktu:** Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- admin/tutorial-rekap-absensi.php | snapshot 57-62, 93-127, 147-182, 299-310, 563-579, 630-698 | simpan terakhir WIB 2026-11-26 13.02.24
+
+**Verifikasi:** `git diff --check admin/tutorial-rekap-absensi.php` lulus tanpa whitespace/conflict error.
+
+**Batas:** Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l`, eksekusi HTTP/UI, dan query database langsung belum dijalankan secara lokal; verifikasi akhir perlu dilakukan setelah deploy/di server dengan PHP.
+
 ## 2026-11-25 18.15.59 +0700 — Kredensial konfigurasi untuk database uji tanpa prompt berulang
 
 **ID:** PROGRAM-SEPARATION-CONFIG-TEST-CREDENTIALS · **Parent Git:** f2af391320ef4d2bb8dbfbc693a9dd8d8c7f0767.

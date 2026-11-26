@@ -56,6 +56,8 @@ if (!in_array($activeTab, ['mahasiswa', 'dosen'], true)) {
 
 $selectedClassId = (int)($_GET['class_id'] ?? 0);
 $selectedDosen = trim((string)($_GET['dosen'] ?? ''));
+$selectedJurusan = trim((string)($_GET['jurusan'] ?? ''));
+$selectedHari = trim((string)($_GET['hari'] ?? ''));
 $selectedStatus = trim((string)($_GET['status_kehadiran'] ?? 'all')); // 'all', 'memenuhi', 'rawan'
 $searchQuery = trim((string)($_GET['q'] ?? ''));
 
@@ -91,16 +93,37 @@ if ($current_gel) {
 $classIds = array_column($classes, 'id');
 $classLookup = [];
 $uniqueDosenList = [];
+$uniqueHariMap = [];
 foreach ($classes as $c) {
     $classLookup[$c['id']] = $c;
     if (!empty($c['dosen_pengampu']) && !in_array($c['dosen_pengampu'], $uniqueDosenList, true)) {
         $uniqueDosenList[] = $c['dosen_pengampu'];
     }
+    $hariVal = trim((string)($c['hari'] ?? ''));
+    if ($hariVal !== '') {
+        $hariKey = mb_strtolower($hariVal, 'UTF-8');
+        if (!isset($uniqueHariMap[$hariKey])) {
+            $uniqueHariMap[$hariKey] = $hariVal;
+        }
+    }
 }
 sort($uniqueDosenList);
+$hariOrder = ['senin' => 1, 'selasa' => 2, 'rabu' => 3, 'kamis' => 4, 'jumat' => 5, 'sabtu' => 6, 'minggu' => 7];
+$uniqueHariList = array_values($uniqueHariMap);
+usort($uniqueHariList, function ($a, $b) use ($hariOrder) {
+    $ka = mb_strtolower($a, 'UTF-8');
+    $kb = mb_strtolower($b, 'UTF-8');
+    $oa = $hariOrder[$ka] ?? 99;
+    $ob = $hariOrder[$kb] ?? 99;
+    if ($oa !== $ob) {
+        return $oa <=> $ob;
+    }
+    return strcasecmp($a, $b);
+});
 
 // ── 4. Ambil Data Mahasiswa, Absensi, dan Sesi QR ──────────────────────────────
 $students = [];
+$uniqueJurusanList = [];
 $attendanceMap = []; // [class_id => [user_id => [pertemuan_ke => status]]]
 $classMeetingDates = []; // [class_id => [pertemuan_ke => tanggal]]
 $classMeetingHadir = []; // [class_id => [pertemuan_ke => countHadir]]
@@ -125,12 +148,32 @@ if (!empty($classIds)) {
     $stmtSt->execute($classIds);
     $allStudents = $stmtSt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Filter mahasiswa jika ada filter kelas, dosen, status, search
+    $jurusanMap = [];
+    foreach ($allStudents as $st) {
+        $prodiVal = trim((string)($st['program_studi'] ?? ''));
+        if ($prodiVal !== '') {
+            $prodiKey = mb_strtolower($prodiVal, 'UTF-8');
+            if (!isset($jurusanMap[$prodiKey])) {
+                $jurusanMap[$prodiKey] = $prodiVal;
+            }
+        }
+    }
+    $uniqueJurusanList = array_values($jurusanMap);
+    natcasesort($uniqueJurusanList);
+    $uniqueJurusanList = array_values($uniqueJurusanList);
+
+    // Filter mahasiswa jika ada filter kelas, dosen, hari, jurusan, status, search
     foreach ($allStudents as $st) {
         if ($selectedClassId > 0 && (int)$st['tutorial_class_id'] !== $selectedClassId) {
             continue;
         }
         if ($selectedDosen !== '' && $st['dosen_pengampu'] !== $selectedDosen) {
+            continue;
+        }
+        if ($selectedHari !== '' && mb_strtolower(trim((string)($st['hari'] ?? '')), 'UTF-8') !== mb_strtolower($selectedHari, 'UTF-8')) {
+            continue;
+        }
+        if ($selectedJurusan !== '' && mb_strtolower(trim((string)($st['program_studi'] ?? '')), 'UTF-8') !== mb_strtolower($selectedJurusan, 'UTF-8')) {
             continue;
         }
         if ($searchQuery !== '') {
@@ -258,6 +301,9 @@ foreach ($classes as $c) {
         continue;
     }
     if ($selectedDosen !== '' && $c['dosen_pengampu'] !== $selectedDosen) {
+        continue;
+    }
+    if ($selectedHari !== '' && mb_strtolower(trim((string)($c['hari'] ?? '')), 'UTF-8') !== mb_strtolower($selectedHari, 'UTF-8')) {
         continue;
     }
 
@@ -515,7 +561,7 @@ include __DIR__ . '/../includes/header.php';
                 🖨️ Cetak Rekap
             </button>
             <?php
-            $exportUrl = '?tab=' . urlencode($activeTab) . '&gelombang_id=' . urlencode($selected_gel_id) . '&class_id=' . urlencode((string)$selectedClassId) . '&dosen=' . urlencode($selectedDosen) . '&status_kehadiran=' . urlencode($selectedStatus) . '&q=' . urlencode($searchQuery) . '&action=' . ($activeTab === 'dosen' ? 'export_csv_dosen' : 'export_csv_mahasiswa');
+            $exportUrl = '?tab=' . urlencode($activeTab) . '&gelombang_id=' . urlencode($selected_gel_id) . '&class_id=' . urlencode((string)$selectedClassId) . '&dosen=' . urlencode($selectedDosen) . '&hari=' . urlencode($selectedHari) . '&jurusan=' . urlencode($selectedJurusan) . '&status_kehadiran=' . urlencode($selectedStatus) . '&q=' . urlencode($searchQuery) . '&action=' . ($activeTab === 'dosen' ? 'export_csv_dosen' : 'export_csv_mahasiswa');
             ?>
             <a href="<?= $exportUrl ?>" class="btn btn-primary" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
                 📥 Unduh CSV / Excel
@@ -526,13 +572,13 @@ include __DIR__ . '/../includes/header.php';
 
 <!-- Tabs Navigasi: Rekap Mahasiswa vs Rekap Dosen -->
 <div class="tabs no-print" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
-    <a href="?tab=mahasiswa&gelombang_id=<?= urlencode($selected_gel_id) ?>&class_id=<?= $selectedClassId ?>&dosen=<?= urlencode($selectedDosen) ?>" style="padding:10px 22px; text-decoration:none; color:<?= $activeTab==='mahasiswa' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='mahasiswa' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='mahasiswa' ? 'bold' : 'normal' ?>; font-size:14px; display:inline-flex; align-items:center; gap:8px;">
+    <a href="?tab=mahasiswa&gelombang_id=<?= urlencode($selected_gel_id) ?>&class_id=<?= $selectedClassId ?>&dosen=<?= urlencode($selectedDosen) ?>&hari=<?= urlencode($selectedHari) ?>&jurusan=<?= urlencode($selectedJurusan) ?>" style="padding:10px 22px; text-decoration:none; color:<?= $activeTab==='mahasiswa' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='mahasiswa' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='mahasiswa' ? 'bold' : 'normal' ?>; font-size:14px; display:inline-flex; align-items:center; gap:8px;">
         <span>👥 Rekap Kehadiran Mahasiswa</span>
         <span style="font-size:11px; background:<?= $activeTab==='mahasiswa' ? 'var(--primary)' : '#e2e8f0' ?>; color:<?= $activeTab==='mahasiswa' ? '#ffffff' : '#475569' ?>; padding:2px 8px; border-radius:9999px;">
             <?= count($filteredStudents) ?>
         </span>
     </a>
-    <a href="?tab=dosen&gelombang_id=<?= urlencode($selected_gel_id) ?>&class_id=<?= $selectedClassId ?>&dosen=<?= urlencode($selectedDosen) ?>" style="padding:10px 22px; text-decoration:none; color:<?= $activeTab==='dosen' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='dosen' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='dosen' ? 'bold' : 'normal' ?>; font-size:14px; display:inline-flex; align-items:center; gap:8px;">
+    <a href="?tab=dosen&gelombang_id=<?= urlencode($selected_gel_id) ?>&class_id=<?= $selectedClassId ?>&dosen=<?= urlencode($selectedDosen) ?>&hari=<?= urlencode($selectedHari) ?>&jurusan=<?= urlencode($selectedJurusan) ?>" style="padding:10px 22px; text-decoration:none; color:<?= $activeTab==='dosen' ? 'var(--primary)' : '#64748b' ?>; border-bottom:2px solid <?= $activeTab==='dosen' ? 'var(--primary)' : 'transparent' ?>; font-weight:<?= $activeTab==='dosen' ? 'bold' : 'normal' ?>; font-size:14px; display:inline-flex; align-items:center; gap:8px;">
         <span>👨‍🏫 Rekap Kehadiran Mengajar Dosen</span>
         <span style="font-size:11px; background:<?= $activeTab==='dosen' ? 'var(--primary)' : '#e2e8f0' ?>; color:<?= $activeTab==='dosen' ? '#ffffff' : '#475569' ?>; padding:2px 8px; border-radius:9999px;">
             <?= count($dosenClassReports) ?> Kelas
@@ -596,7 +642,37 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
 
+            <!-- Filter Hari -->
+            <div style="flex:1; min-width:150px;">
+                <label style="display:block; margin-bottom:6px; font-weight:700; font-size:12px; color:#475569; text-transform:uppercase;">
+                    Hari
+                </label>
+                <select name="hari" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;" onchange="this.form.submit()">
+                    <option value="">-- Semua Hari --</option>
+                    <?php foreach ($uniqueHariList as $hariOpt): ?>
+                        <option value="<?= htmlspecialchars($hariOpt, ENT_QUOTES, 'UTF-8') ?>" <?= mb_strtolower($selectedHari, 'UTF-8') === mb_strtolower($hariOpt, 'UTF-8') ? 'selected' : '' ?>>
+                            <?= sanitize($hariOpt) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <?php if ($activeTab === 'mahasiswa'): ?>
+                <!-- Filter Jurusan -->
+                <div style="flex:1; min-width:180px;">
+                    <label style="display:block; margin-bottom:6px; font-weight:700; font-size:12px; color:#475569; text-transform:uppercase;">
+                        Jurusan / Prodi
+                    </label>
+                    <select name="jurusan" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;" onchange="this.form.submit()">
+                        <option value="">-- Semua Jurusan --</option>
+                        <?php foreach ($uniqueJurusanList as $jurOpt): ?>
+                            <option value="<?= htmlspecialchars($jurOpt, ENT_QUOTES, 'UTF-8') ?>" <?= mb_strtolower($selectedJurusan, 'UTF-8') === mb_strtolower($jurOpt, 'UTF-8') ? 'selected' : '' ?>>
+                                <?= sanitize($jurOpt) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
                 <!-- Filter Status Syarat -->
                 <div style="flex:1; min-width:160px;">
                     <label style="display:block; margin-bottom:6px; font-weight:700; font-size:12px; color:#475569; text-transform:uppercase;">
@@ -616,6 +692,8 @@ include __DIR__ . '/../includes/header.php';
                     </label>
                     <input type="text" name="q" value="<?= sanitize($searchQuery) ?>" placeholder="Ketik nama atau NIM..." style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px;">
                 </div>
+            <?php elseif ($selectedJurusan !== ''): ?>
+                <input type="hidden" name="jurusan" value="<?= sanitize($selectedJurusan) ?>">
             <?php endif; ?>
 
             <div style="display:flex; gap:6px;">
