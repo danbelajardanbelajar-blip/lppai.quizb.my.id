@@ -1,3 +1,17 @@
+## 2026-11-26 13.07.50 +0700 — Auto-save nilai dan absensi tanpa tombol simpan di role dosen
+
+**ID:** DOSEN-AUTOSAVE-NILAI-ABSENSI · **Parent Git:** f3026dcdfea4fe1464868335c4abaa51d0248294.
+
+**Perubahan/alasan:** Mengubah penyimpanan nilai rinci (`save_nilai_detail`) dan absensi pertemuan (`save_absensi`) pada `dosen/detail-kelas.php` menjadi auto-save berbasis `fetch()` AJAX JSON tanpa tombol simpan. Menambahkan helper `calcMateriAvg()` dan `sendJsonResponse()`, serta mengembalikan rata-rata per kategori/keseluruhan agar baris tabel dan atribut modal `data-nilai-detail` langsung terbarui tanpa reload. Pada tab absensi, tombol simpan di toolbar dan floating bar diganti indikator status auto-save; perubahan status per mahasiswa menyimpan satu baris, sedangkan aksi massal (`markAllHadir`, `resetAllBelum`) dan perubahan tanggal menyimpan satu batch.
+
+**Lokasi/waktu:** Waktu berikut hanya penyimpanan terakhir yang tersedia, bukan semua waktu ketikan:
+
+- dosen/detail-kelas.php | snapshot 57-215, 418-475, 515-658, 806-828, 930-942, 1336-1520 | simpan terakhir WIB 2026-11-26 13.07.50
+
+**Verifikasi:** `git diff --check dosen/detail-kelas.php` lulus tanpa error whitespace/konflik.
+
+**Batas:** Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l`, eksekusi AJAX/database, dan pengujian interaksi browser belum dijalankan secara lokal; perlu verifikasi langsung di server setelah deploy.
+
 ## 2026-11-26 13.02.24 +0700 — Tambah filter jurusan dan hari pada rekap absensi tutorial
 
 **ID:** TUTORIAL-REKAP-FILTER-JURUSAN-HARI · **Parent Git:** f894744b99833cdb107bcb18003efe0353dc9990.

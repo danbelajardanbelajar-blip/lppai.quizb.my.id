@@ -54,10 +54,33 @@ $materi_list = [
     ]
 ];
 
-// Handle form submission
+function calcMateriAvg(array $detail, array $keys): ?float {
+    $sum = 0.0;
+    $has_val = false;
+    foreach ($keys as $k) {
+        if (isset($detail[$k]) && $detail[$k] !== '') {
+            $sum += (float)$detail[$k];
+            $has_val = true;
+        }
+    }
+    return $has_val ? ($sum / count($keys)) : null;
+}
+
+function sendJsonResponse(array $payload, int $statusCode = 200): void {
+    http_response_code($statusCode);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($payload);
+    exit;
+}
+
+// Handle form submission (standard POST & AJAX auto-save)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $isAjax = isset($_POST['ajax']) && $_POST['ajax'] === '1';
     $token = $_POST['csrf_token'] ?? '';
     if (!verifyCsrf($token)) {
+        if ($isAjax) {
+            sendJsonResponse(['success' => false, 'message' => 'Sesi tidak valid. Silakan muat ulang halaman.'], 403);
+        }
         $message = 'Sesi tidak valid.';
         $msgType = 'danger';
     } else {
@@ -66,46 +89,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // Simpan Nilai Detail
         if ($action === 'save_nilai_detail') {
             $reg_id = (int)($_POST['reg_id'] ?? 0);
-            $detail = $_POST['detail'] ?? [];
-
-            function calcAvg($detail, $keys) {
-                $sum = 0; $has_val = false;
-                foreach($keys as $k) {
-                    if(isset($detail[$k]) && $detail[$k] !== '') {
-                        $sum += (float)$detail[$k];
-                        $has_val = true;
+            $rawDetail = $_POST['detail'] ?? [];
+            $detail = [];
+            if (is_array($rawDetail)) {
+                foreach ($rawDetail as $k => $v) {
+                    $vStr = trim((string)$v);
+                    if ($vStr !== '') {
+                        $numVal = (float)$vStr;
+                        if ($numVal < 0) $numVal = 0;
+                        if ($numVal > 100) $numVal = 100;
+                        $detail[$k] = (string)$numVal;
                     }
                 }
-                return $has_val ? ($sum / count($keys)) : null;
             }
 
-            $avg_th = calcAvg($detail, array_keys($materi_list['thaharah']));
-            $avg_sh = calcAvg($detail, array_keys($materi_list['shalat']));
-            $avg_sp = calcAvg($detail, array_keys($materi_list['surat_pendek']));
-            $avg_am = calcAvg($detail, array_keys($materi_list['amaliyah']));
-            $avg_jz = calcAvg($detail, array_keys($materi_list['jenazah']));
-            $avg_ut = calcAvg($detail, array_keys($materi_list['ujian_tulis']));
+            $avg_th = calcMateriAvg($detail, array_keys($materi_list['thaharah']));
+            $avg_sh = calcMateriAvg($detail, array_keys($materi_list['shalat']));
+            $avg_sp = calcMateriAvg($detail, array_keys($materi_list['surat_pendek']));
+            $avg_am = calcMateriAvg($detail, array_keys($materi_list['amaliyah']));
+            $avg_jz = calcMateriAvg($detail, array_keys($materi_list['jenazah']));
+            $avg_ut = calcMateriAvg($detail, array_keys($materi_list['ujian_tulis']));
 
-            try {
-                $json_detail = json_encode($detail);
-                $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? WHERE id=? AND tutorial_class_id=?");
-                $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $reg_id, $class_id]);
-
-                $message = 'Nilai rincian berhasil disimpan.';
-                $msgType = 'success';
-            } catch (Exception $e) {
-                $message = 'Gagal menyimpan nilai. Error: ' . $e->getMessage();
+            if ($reg_id <= 0) {
+                if ($isAjax) {
+                    sendJsonResponse(['success' => false, 'message' => 'ID pendaftaran tidak valid.'], 400);
+                }
+                $message = 'ID pendaftaran tidak valid.';
                 $msgType = 'danger';
+            } else {
+                try {
+                    $json_detail = json_encode($detail);
+                    $updateStmt = $pdo->prepare("UPDATE tutorial_registrations SET nilai_detail=?, nilai_thaharah=?, nilai_shalat=?, nilai_surat_pendek=?, nilai_amaliyah=?, nilai_jenazah=?, nilai_ujian_tulis=? WHERE id=? AND tutorial_class_id=?");
+                    $updateStmt->execute([$json_detail, $avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut, $reg_id, $class_id]);
+
+                    if ($isAjax) {
+                        $catAvgs = [$avg_th, $avg_sh, $avg_sp, $avg_am, $avg_jz, $avg_ut];
+                        $sumAll = 0.0;
+                        $cntAll = 0;
+                        foreach ($catAvgs as $val) {
+                            if ($val !== null) {
+                                $sumAll += $val;
+                                $cntAll++;
+                            }
+                        }
+                        sendJsonResponse([
+                            'success' => true,
+                            'message' => 'Nilai tersimpan otomatis.',
+                            'reg_id' => $reg_id,
+                            'detail' => $detail,
+                            'averages' => [
+                                'thaharah' => $avg_th !== null ? number_format($avg_th, 1) : '-',
+                                'shalat' => $avg_sh !== null ? number_format($avg_sh, 1) : '-',
+                                'surat_pendek' => $avg_sp !== null ? number_format($avg_sp, 1) : '-',
+                                'amaliyah' => $avg_am !== null ? number_format($avg_am, 1) : '-',
+                                'jenazah' => $avg_jz !== null ? number_format($avg_jz, 1) : '-',
+                                'ujian_tulis' => $avg_ut !== null ? number_format($avg_ut, 1) : '-',
+                                'overall' => $cntAll > 0 ? number_format(round($sumAll / $cntAll, 2), 2) : '-'
+                            ]
+                        ]);
+                    }
+
+                    $message = 'Nilai rincian berhasil disimpan.';
+                    $msgType = 'success';
+                } catch (Exception $e) {
+                    if ($isAjax) {
+                        sendJsonResponse(['success' => false, 'message' => 'Gagal menyimpan nilai: ' . $e->getMessage()], 500);
+                    }
+                    $message = 'Gagal menyimpan nilai. Error: ' . $e->getMessage();
+                    $msgType = 'danger';
+                }
             }
         }
 
         // Simpan Absensi
         elseif ($action === 'save_absensi') {
             $pertemuan_ke = (int)($_POST['pertemuan_ke'] ?? 0);
-            $tanggal = $_POST['tanggal'] ?? '';
+            $tanggal = trim((string)($_POST['tanggal'] ?? ''));
             $status_data = $_POST['status_hadir'] ?? [];
+            $allowedStatuses = ['belum', 'hadir', 'izin', 'sakit', 'absen'];
 
             if ($pertemuan_ke <= 0 || empty($tanggal)) {
+                if ($isAjax) {
+                    sendJsonResponse(['success' => false, 'message' => 'Pertemuan Ke dan Tanggal harus diisi.'], 400);
+                }
                 $message = 'Pertemuan Ke dan Tanggal harus diisi.';
                 $msgType = 'danger';
             } else {
@@ -114,17 +180,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $insertStmt = $pdo->prepare("INSERT INTO tutorial_attendance (tutorial_class_id, user_id, pertemuan_ke, tanggal, status_hadir) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status_hadir = ?, tanggal = ?");
                     $deleteStmt = $pdo->prepare("DELETE FROM tutorial_attendance WHERE tutorial_class_id = ? AND user_id = ? AND pertemuan_ke = ?");
                     foreach ($status_data as $user_id => $status) {
-                        if ($status === 'belum') {
-                            $deleteStmt->execute([$class_id, $user_id, $pertemuan_ke]);
+                        $uid = (int)$user_id;
+                        $stVal = strtolower(trim((string)$status));
+                        if ($uid <= 0 || !in_array($stVal, $allowedStatuses, true)) {
+                            continue;
+                        }
+                        if ($stVal === 'belum') {
+                            $deleteStmt->execute([$class_id, $uid, $pertemuan_ke]);
                         } else {
-                            $insertStmt->execute([$class_id, $user_id, $pertemuan_ke, $tanggal, $status, $status, $tanggal]);
+                            $insertStmt->execute([$class_id, $uid, $pertemuan_ke, $tanggal, $stVal, $stVal, $tanggal]);
                         }
                     }
                     $pdo->commit();
+                    if ($isAjax) {
+                        sendJsonResponse(['success' => true, 'message' => 'Absensi tersimpan otomatis.']);
+                    }
                     $message = 'Data absensi pertemuan ke-' . $pertemuan_ke . ' berhasil disimpan.';
                     $msgType = 'success';
                 } catch (Exception $e) {
-                    $pdo->rollBack();
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    if ($isAjax) {
+                        sendJsonResponse(['success' => false, 'message' => 'Gagal menyimpan absensi: ' . $e->getMessage()], 500);
+                    }
                     $message = 'Gagal menyimpan absensi. Error: ' . $e->getMessage();
                     $msgType = 'danger';
                 }
@@ -338,20 +417,20 @@ include __DIR__ . '/../includes/header.php';
                         </thead>
                         <tbody>
                             <?php $no=1; foreach($students as $s): ?>
-                            <tr>
+                            <tr data-reg-id="<?= $s['reg_id'] ?>">
                                 <td align="center" class="dosen-cell-no" data-label="No"><?= $no++ ?></td>
                                 <td class="dosen-cell-title" data-label="Mahasiswa">
                                     <strong><?= adminUserProfileLink($s['nama_lengkap'], $s['user_id'] ?? null) ?></strong><br>
                                     <small style="color:#64748b;"><?= sanitize($s['nim']) ?> - <?= sanitize($s['program_studi']) ?> <?= renderJenisProgramBadge($s['jenis_program'] ?? 'Reguler', true) ?></small>
                                 </td>
-                                <td align="center" class="dosen-cell-score" data-label="Thaharah"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
-                                <td align="center" class="dosen-cell-score" data-label="Shalat"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>
-                                <td align="center" class="dosen-cell-score" data-label="Srt Pdk"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
-                                <td align="center" class="dosen-cell-score" data-label="Amaliyah"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
-                                <td align="center" class="dosen-cell-score" data-label="Jenazah"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
-                                <td align="center" class="dosen-cell-score" data-label="UT"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Thaharah" data-score-col="thaharah"><?= $s['nilai_thaharah'] !== null ? number_format($s['nilai_thaharah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Shalat" data-score-col="shalat"><?= $s['nilai_shalat'] !== null ? number_format($s['nilai_shalat'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Srt Pdk" data-score-col="surat_pendek"><?= $s['nilai_surat_pendek'] !== null ? number_format($s['nilai_surat_pendek'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Amaliyah" data-score-col="amaliyah"><?= $s['nilai_amaliyah'] !== null ? number_format($s['nilai_amaliyah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="Jenazah" data-score-col="jenazah"><?= $s['nilai_jenazah'] !== null ? number_format($s['nilai_jenazah'], 1) : '-' ?></td>
+                                <td align="center" class="dosen-cell-score" data-label="UT" data-score-col="ujian_tulis"><?= $s['nilai_ujian_tulis'] !== null ? number_format($s['nilai_ujian_tulis'], 1) : '-' ?></td>
                                 <td align="center" class="dosen-cell-average" data-label="Rata-Rata">
-                                    <strong>
+                                    <strong data-score-col="overall">
                                         <?php
                                         $sum = 0; $count = 0;
                                         if ($s['nilai_thaharah'] !== null) { $sum += (float)$s['nilai_thaharah']; $count++; }
@@ -365,7 +444,12 @@ include __DIR__ . '/../includes/header.php';
                                     </strong>
                                 </td>
                                 <td class="dosen-cell-actions" data-label="Aksi">
-                                    <button type="button" class="btn btn-sm btn-primary" onclick="openNilaiModal(<?= $s['reg_id'] ?>, '<?= htmlspecialchars(addslashes($s['nama_lengkap'])) ?>', '<?= htmlspecialchars(addslashes($s['nilai_detail'] ?? '{}')) ?>')">✏️ Input Rinci</button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-primary btn-input-nilai"
+                                            data-reg-id="<?= $s['reg_id'] ?>"
+                                            data-student-name="<?= htmlspecialchars($s['nama_lengkap'], ENT_QUOTES, 'UTF-8') ?>"
+                                            data-nilai-detail="<?= htmlspecialchars($s['nilai_detail'] ?? '{}', ENT_QUOTES, 'UTF-8') ?>"
+                                            onclick="openNilaiModalFromBtn(this)">✏️ Input Rinci</button>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -428,34 +512,61 @@ include __DIR__ . '/../includes/header.php';
                     <?php endforeach; ?>
                 </div>
 
-                <div class="nilai-modal-foot" style="padding:20px; border-top:1px solid #e2e8f0; text-align:right; position:sticky; bottom:0; background:#fff; border-radius:0 0 8px 8px;">
-                    <button type="button" class="btn btn-outline" onclick="closeNilaiModal()" style="margin-right:10px;">Batal</button>
-                    <button type="submit" class="btn btn-primary">💾 Simpan Nilai</button>
+                <div class="nilai-modal-foot" style="padding:16px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; position:sticky; bottom:0; background:#fff; border-radius:0 0 8px 8px;">
+                    <span id="nilaiAutoSaveStatus" style="font-size:13px; font-weight:600; color:#64748b;">
+                        Perubahan nilai tersimpan otomatis
+                    </span>
+                    <button type="button" class="btn btn-outline" onclick="closeNilaiModal()">Tutup</button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
+    var nilaiSaveTimer = null;
+    var nilaiDirty = false;
+    var nilaiActiveSavePromise = null;
+
+    function setNilaiStatus(text, color) {
+        var el = document.getElementById('nilaiAutoSaveStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = color || '#64748b';
+    }
+
+    function openNilaiModalFromBtn(btn) {
+        var regId = btn.getAttribute('data-reg-id');
+        var studentName = btn.getAttribute('data-student-name') || '';
+        var detailJson = btn.getAttribute('data-nilai-detail') || '{}';
+        openNilaiModal(regId, studentName, detailJson);
+    }
+
     function openNilaiModal(regId, studentName, detailJson) {
+        if (nilaiSaveTimer) {
+            clearTimeout(nilaiSaveTimer);
+            nilaiSaveTimer = null;
+        }
+        nilaiDirty = false;
+        setNilaiStatus('Perubahan nilai tersimpan otomatis', '#64748b');
+
         document.getElementById('modal_reg_id').value = regId;
         document.getElementById('modal_student_name').innerText = studentName;
 
         // Clear all inputs first
-        let inputs = document.querySelectorAll('#formNilaiRinci input[type="number"]');
-        inputs.forEach(inp => inp.value = '');
+        var inputs = document.querySelectorAll('#formNilaiRinci input[type="number"]');
+        inputs.forEach(function(inp) { inp.value = ''; });
 
         // Parse and fill existing data
-        if(detailJson && detailJson.trim() !== '') {
+        if (detailJson && detailJson.trim() !== '') {
             try {
-                let detail = JSON.parse(detailJson);
-                for(let key in detail) {
-                    let el = document.getElementById('input_' + key);
-                    if(el) {
+                var detail = JSON.parse(detailJson);
+                for (var key in detail) {
+                    var el = document.getElementById('input_' + key);
+                    if (el) {
                         el.value = detail[key];
                     }
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error("Invalid JSON:", e);
             }
         }
@@ -464,12 +575,115 @@ include __DIR__ . '/../includes/header.php';
     }
 
     function closeNilaiModal() {
+        if (nilaiSaveTimer) {
+            clearTimeout(nilaiSaveTimer);
+            nilaiSaveTimer = null;
+        }
+        if (nilaiDirty) {
+            autoSaveNilaiNow();
+        }
         document.getElementById('nilaiModal').style.display = 'none';
     }
 
     function setVal(key, val) {
-        document.getElementById('input_' + key).value = val;
+        var inp = document.getElementById('input_' + key);
+        if (!inp) return;
+        inp.value = val;
+        nilaiDirty = true;
+        autoSaveNilaiNow();
     }
+
+    function scheduleAutoSaveNilai() {
+        nilaiDirty = true;
+        setNilaiStatus('Menunggu selesai mengetik...', '#64748b');
+        if (nilaiSaveTimer) {
+            clearTimeout(nilaiSaveTimer);
+        }
+        nilaiSaveTimer = setTimeout(function() {
+            nilaiSaveTimer = null;
+            autoSaveNilaiNow();
+        }, 550);
+    }
+
+    function autoSaveNilaiNow() {
+        var form = document.getElementById('formNilaiRinci');
+        if (!form) return Promise.resolve();
+        if (nilaiSaveTimer) {
+            clearTimeout(nilaiSaveTimer);
+            nilaiSaveTimer = null;
+        }
+
+        var regId = document.getElementById('modal_reg_id').value;
+        if (!regId) return Promise.resolve();
+
+        nilaiDirty = false;
+        setNilaiStatus('⏳ Menyimpan nilai...', '#0369a1');
+
+        var formData = new FormData(form);
+        formData.append('ajax', '1');
+
+        nilaiActiveSavePromise = fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(function(res) {
+            return res.json().then(function(data) {
+                return { ok: res.ok, data: data };
+            });
+        })
+        .then(function(result) {
+            if (!result.ok || !result.data || !result.data.success) {
+                var errMsg = (result.data && result.data.message) ? result.data.message : 'Gagal menyimpan nilai.';
+                setNilaiStatus('⚠ ' + errMsg, '#be123c');
+                return;
+            }
+            var data = result.data;
+            setNilaiStatus('✓ Tersimpan otomatis', '#059669');
+
+            var row = document.querySelector('tr[data-reg-id="' + data.reg_id + '"]');
+            if (row && data.averages) {
+                Object.keys(data.averages).forEach(function(col) {
+                    var cell = row.querySelector('[data-score-col="' + col + '"]');
+                    if (cell) {
+                        cell.textContent = data.averages[col];
+                    }
+                });
+                var btn = row.querySelector('.btn-input-nilai');
+                if (btn && data.detail !== undefined) {
+                    btn.setAttribute('data-nilai-detail', JSON.stringify(data.detail));
+                }
+            }
+        })
+        .catch(function() {
+            setNilaiStatus('⚠ Gagal terhubung ke server. Periksa koneksi.', '#be123c');
+        });
+
+        return nilaiActiveSavePromise;
+    }
+
+    (function initNilaiAutoSave() {
+        var form = document.getElementById('formNilaiRinci');
+        if (!form) return;
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            autoSaveNilaiNow();
+        });
+        var inputs = form.querySelectorAll('input[type="number"]');
+        inputs.forEach(function(inp) {
+            inp.addEventListener('input', scheduleAutoSaveNilai);
+            inp.addEventListener('change', function() {
+                if (nilaiDirty || nilaiSaveTimer) {
+                    autoSaveNilaiNow();
+                }
+            });
+            inp.addEventListener('blur', function() {
+                if (nilaiDirty || nilaiSaveTimer) {
+                    autoSaveNilaiNow();
+                }
+            });
+        });
+    })();
     </script>
 
 <?php elseif ($activeTab === 'absensi'): ?>
@@ -590,22 +804,22 @@ include __DIR__ . '/../includes/header.php';
                                 Tanggal Pertemuan *
                             </label>
                             <div class="attendance-date-row" style="display: flex; gap: 8px; align-items: center;">
-                                <input type="date" name="tanggal" id="inputTanggalAbsensi" value="<?= sanitize($tanggalSelected) ?>" required style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
-                                <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('inputTanggalAbsensi').value = '<?= date('Y-m-d') ?>'" style="padding: 7px 12px; font-size: 12px; font-weight: 600;">
+                                <input type="date" name="tanggal" id="inputTanggalAbsensi" value="<?= sanitize($tanggalSelected) ?>" required onchange="autoSaveAbsensiBatch()" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;">
+                                <button type="button" class="btn btn-sm btn-outline" onclick="setTodayAbsensi()" style="padding: 7px 12px; font-size: 12px; font-weight: 600;">
                                     Hari Ini
                                 </button>
                             </div>
                         </div>
 
-                        <div class="attendance-batch-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <div class="attendance-batch-actions" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                            <span id="absensiAutoSaveStatus" style="font-size: 12px; font-weight: 600; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 6px 12px; border-radius: 9999px;">
+                                ✓ Tersimpan otomatis
+                            </span>
                             <button type="button" class="btn btn-sm" onclick="markAllHadir()" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 600; padding: 7px 14px;">
                                 ✨ Hadir Semua
                             </button>
                             <button type="button" class="btn btn-sm btn-outline" onclick="resetAllBelum()" style="font-weight: 600; padding: 7px 12px; font-size: 12px;">
                                 ↺ Reset Belum
-                            </button>
-                            <button type="submit" class="btn btn-primary" style="font-weight: 600; padding: 7px 18px;">
-                                💾 Simpan Absensi
                             </button>
                         </div>
                     </div>
@@ -716,12 +930,12 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Floating Sticky Bottom Bar (Mobile & Desktop) -->
                     <div class="floating-attendance-bar">
                         <div class="floating-stats-text">
-                            Presensi: <strong id="floatingHadirCount">0</strong> dari <?= count($students) ?> Hadir
+                            Presensi (P-<?= $pertemuanSelected ?>): <strong id="floatingHadirCount">0</strong> dari <?= count($students) ?> Hadir
                         </div>
                         <div>
-                            <button type="submit" class="floating-save-btn">
-                                💾 Simpan Presensi (P-<?= $pertemuanSelected ?>)
-                            </button>
+                            <span id="floatingAbsensiStatus" style="font-size: 12px; font-weight: 700; color: #059669; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 9999px; display: inline-block;">
+                                ✓ Tersimpan otomatis
+                            </span>
                         </div>
                     </div>
                 </form>
@@ -1119,8 +1333,86 @@ include __DIR__ . '/../includes/header.php';
         if (e.key === 'Escape') closeFullscreenQR();
     });
 
+    function setAbsensiStatusBadge(text, state) {
+        var styles = {
+            saving: { color: '#0369a1', bg: '#e0f2fe', border: '#7dd3fc' },
+            saved: { color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
+            error: { color: '#be123c', bg: '#fff1f2', border: '#fecdd3' }
+        };
+        var s = styles[state] || styles.saved;
+        ['absensiAutoSaveStatus', 'floatingAbsensiStatus'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text;
+            el.style.color = s.color;
+            el.style.background = s.bg;
+            el.style.borderColor = s.border;
+        });
+    }
+
+    function sendAbsensiAutoSave(formData) {
+        formData.append('ajax', '1');
+        setAbsensiStatusBadge('⏳ Menyimpan...', 'saving');
+        return fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(function(res) {
+            return res.json().then(function(data) {
+                return { ok: res.ok, data: data };
+            });
+        })
+        .then(function(result) {
+            if (!result.ok || !result.data || !result.data.success) {
+                var errMsg = (result.data && result.data.message) ? result.data.message : 'Gagal menyimpan absensi.';
+                setAbsensiStatusBadge('⚠ ' + errMsg, 'error');
+                return;
+            }
+            setAbsensiStatusBadge('✓ Tersimpan otomatis', 'saved');
+        })
+        .catch(function() {
+            setAbsensiStatusBadge('⚠ Gagal terhubung ke server', 'error');
+        });
+    }
+
+    function autoSaveAbsensiSingle(userId, status) {
+        var form = document.getElementById('formAttendance');
+        var tanggalEl = document.getElementById('inputTanggalAbsensi');
+        if (!form || !tanggalEl) return;
+        if (!tanggalEl.value) {
+            setAbsensiStatusBadge('⚠ Tanggal pertemuan wajib diisi', 'error');
+            return;
+        }
+        var formData = new FormData();
+        formData.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+        formData.append('action', 'save_absensi');
+        formData.append('pertemuan_ke', form.querySelector('input[name="pertemuan_ke"]').value);
+        formData.append('tanggal', tanggalEl.value);
+        formData.append('status_hadir[' + userId + ']', status);
+        sendAbsensiAutoSave(formData);
+    }
+
+    function autoSaveAbsensiBatch() {
+        var form = document.getElementById('formAttendance');
+        var tanggalEl = document.getElementById('inputTanggalAbsensi');
+        if (!form || !tanggalEl) return;
+        if (!tanggalEl.value) {
+            setAbsensiStatusBadge('⚠ Tanggal pertemuan wajib diisi', 'error');
+            return;
+        }
+        sendAbsensiAutoSave(new FormData(form));
+    }
+
+    function setTodayAbsensi() {
+        var tanggalEl = document.getElementById('inputTanggalAbsensi');
+        if (!tanggalEl) return;
+        tanggalEl.value = '<?= date('Y-m-d') ?>';
+        autoSaveAbsensiBatch();
+    }
+
     // Attendance Sync & Live Counters
-    function syncAttendanceStatus(userId, status) {
+    function syncAttendanceStatus(userId, status, skipSave) {
         // 1. Sync Radio Input in Desktop Form
         var radio = document.querySelector('input[name="status_hadir[' + userId + ']"][value="' + status + '"]');
         if (radio) {
@@ -1156,6 +1448,11 @@ include __DIR__ . '/../includes/header.php';
 
         // 4. Update Live Counters
         updateLiveCounters();
+
+        // 5. Auto-save single student change
+        if (!skipSave) {
+            autoSaveAbsensiSingle(userId, status);
+        }
     }
 
     function markAllHadir() {
@@ -1163,9 +1460,10 @@ include __DIR__ . '/../includes/header.php';
         radios.forEach(function(r) {
             var match = r.name.match(/status_hadir\[(\d+)\]/);
             if (match && match[1]) {
-                syncAttendanceStatus(match[1], 'hadir');
+                syncAttendanceStatus(match[1], 'hadir', true);
             }
         });
+        autoSaveAbsensiBatch();
     }
 
     function resetAllBelum() {
@@ -1173,9 +1471,10 @@ include __DIR__ . '/../includes/header.php';
         radios.forEach(function(r) {
             var match = r.name.match(/status_hadir\[(\d+)\]/);
             if (match && match[1]) {
-                syncAttendanceStatus(match[1], 'belum');
+                syncAttendanceStatus(match[1], 'belum', true);
             }
         });
+        autoSaveAbsensiBatch();
     }
 
     function updateLiveCounters() {
@@ -1201,11 +1500,21 @@ include __DIR__ . '/../includes/header.php';
         if (elFloat) elFloat.textContent = counts.hadir;
     }
 
+    function initAttendanceAutoSaveForm() {
+        updateLiveCounters();
+        var form = document.getElementById('formAttendance');
+        if (form && !form.dataset.autoSaveBound) {
+            form.dataset.autoSaveBound = '1';
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                autoSaveAbsensiBatch();
+            });
+        }
+    }
+
     // Initialize counters on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        updateLiveCounters();
-    });
+    document.addEventListener('DOMContentLoaded', initAttendanceAutoSaveForm);
     if (document.readyState === 'interactive' || document.readyState === 'complete') {
-        updateLiveCounters();
+        initAttendanceAutoSaveForm();
     }
     </script>
