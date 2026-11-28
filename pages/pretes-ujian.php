@@ -144,8 +144,10 @@ $isVerified = ($regId > 0 && !empty($_SESSION['pretes_cbt_verified_v2_' . $regId
     && time() - (int)$_SESSION['pretes_cbt_verified_v2_' . $regId] <= 14400);
 
 require_once __DIR__ . '/../includes/pretes-cbt.php';
+require_once __DIR__ . '/../includes/program-separation/scope.php';
 ensurePretesCbtTables($pdo);
-$activeSession = pretesCbtGetActiveSession($pdo);
+$studentCbtProgram = (($user['role'] ?? '') === 'mahasiswa') ? \Lppai\ProgramSeparation\Scope::program($user['jenis_program'] ?? null) : null;
+$activeSession = pretesCbtGetActiveSession($pdo, null, $studentCbtProgram);
 $isCameraRequired = !$activeSession || ($activeSession['camera_mode'] ?? 'wajib') === 'wajib';
 
 // Jika sesi ujian tidak mewajibkan kamera, mahasiswa langsung masuk ruang ujian CBT

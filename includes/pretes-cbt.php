@@ -439,7 +439,8 @@ function pretesCbtState(PDO $pdo, int $userId, int $registrationId, ?int $now = 
         if ($attempt && $attempt['submitted_at'] === null && pretesCbtClock($attempt, $now) >= $attempt['deadline_at']) $attempt = pretesCbtFinalize($pdo, $attempt, $now);
         $result = pretesCbtPublic($pdo, $attempt, $now);
         if (!$attempt) {
-            $activeSessions = pretesCbtGetActiveSessions($pdo);
+            $studentProgram = pretesCbtUserProgram($pdo, $userId);
+            $activeSessions = pretesCbtGetActiveSessions($pdo, $studentProgram);
             if (count($activeSessions) > 1) {
                 $result['available_sessions'] = array_map(function($s) {
                     return [
@@ -469,16 +470,18 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
         $attempt = pretesCbtLock($pdo, $userId, $registrationId);
         if (!$attempt) {
             // Tryout memakai sesinya sendiri; ujian resmi memakai sesi resmi yang aktif
+            $studentProgram = $forcedSession ? null : pretesCbtUserProgram($pdo, $userId);
             $session = null;
             if ($forcedSession) {
                 $session = $forcedSession;
             } elseif ($requestedSessionId !== null && $requestedSessionId > 0) {
                 $session = pretesCbtGetSession($pdo, $requestedSessionId);
-                if (!$session || empty($session['is_active'])) {
+                $sesScope = strtolower(trim((string)($session['program_scope'] ?? '')));
+                if (!$session || empty($session['is_active']) || ($studentProgram !== null && $sesScope !== '' && $sesScope !== $studentProgram)) {
                     throw new InvalidArgumentException('Sesi ujian yang dipilih tidak aktif.');
                 }
             } elseif (!empty($token)) {
-                $activeSessions = pretesCbtGetActiveSessions($pdo);
+                $activeSessions = pretesCbtGetActiveSessions($pdo, $studentProgram);
                 $tokenClean = strtoupper(trim((string)$token));
                 foreach ($activeSessions as $as) {
                     if (!empty($as['token']) && strtoupper(trim((string)$as['token'])) === $tokenClean) {
@@ -487,10 +490,10 @@ function pretesCbtStart(PDO $pdo, int $userId, int $registrationId, ?int $now = 
                     }
                 }
                 if (!$session) {
-                    $session = pretesCbtGetActiveSession($pdo);
+                    $session = pretesCbtGetActiveSession($pdo, null, $studentProgram);
                 }
             } else {
-                $session = pretesCbtGetActiveSession($pdo);
+                $session = pretesCbtGetActiveSession($pdo, null, $studentProgram);
             }
             $sessionId = $session ? (int)$session['id'] : null;
 
@@ -989,9 +992,37 @@ function pretesCbtGetSession(PDO $pdo, int $sessionId): ?array {
     return $ses;
 }
 
-function pretesCbtGetActiveSessions(PDO $pdo): array {
+function pretesCbtUserProgram(PDO $pdo, int $userId): ?string {
+    if ($userId <= 0) return null;
+    try {
+        $stmt = $pdo->prepare("SELECT role, jenis_program FROM users WHERE id = ? LIMIT 1");
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || strtolower(trim((string)($row['role'] ?? ''))) !== 'mahasiswa') {
+            return null;
+        }
+        require_once __DIR__ . '/program-separation/scope.php';
+        return \Lppai\ProgramSeparation\Scope::program($row['jenis_program'] ?? null);
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function pretesCbtGetActiveSessions(PDO $pdo, ?string $program = null): array {
     ensurePretesCbtTables($pdo);
-    $rows = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    if ($program !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+        $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') AND (program_scope IS NULL OR TRIM(program_scope) = '' OR LOWER(TRIM(program_scope)) = ?) ORDER BY (LOWER(TRIM(COALESCE(program_scope, ''))) = ?) DESC, id ASC");
+        $stmt->execute([$program, $program]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $scopedRows = array_values(array_filter($rows, static fn($r) => strtolower(trim((string)($r['program_scope'] ?? ''))) === $program));
+        if (!empty($scopedRows)) {
+            $rows = $scopedRows;
+        }
+    } else {
+        $rows = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+    }
     $packages = pretesCbtGetPackages($pdo);
     $pkgMap = [];
     foreach ($packages as $pkg) {
@@ -1012,11 +1043,20 @@ function pretesCbtGetActiveSessions(PDO $pdo): array {
     return $rows;
 }
 
-function pretesCbtGetActiveSession(PDO $pdo, ?int $preferredSessionId = null): ?array {
+function pretesCbtGetActiveSession(PDO $pdo, ?int $preferredSessionId = null, ?string $program = null): ?array {
     ensurePretesCbtTables($pdo);
+    if ($program !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+    }
     if ($preferredSessionId !== null && $preferredSessionId > 0) {
-        $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE id = ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
-        $stmt->execute([$preferredSessionId]);
+        if ($program !== null) {
+            $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE id = ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') AND (program_scope IS NULL OR TRIM(program_scope) = '' OR LOWER(TRIM(program_scope)) = ?)");
+            $stmt->execute([$preferredSessionId, $program]);
+        } else {
+            $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE id = ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')");
+            $stmt->execute([$preferredSessionId]);
+        }
         $ses = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($ses) {
             $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
@@ -1026,7 +1066,13 @@ function pretesCbtGetActiveSession(PDO $pdo, ?int $preferredSessionId = null): ?
             return $ses;
         }
     }
-    $ses = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($program !== null) {
+        $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') AND (program_scope IS NULL OR TRIM(program_scope) = '' OR LOWER(TRIM(program_scope)) = ?) ORDER BY (LOWER(TRIM(COALESCE(program_scope, ''))) = ?) DESC, id DESC LIMIT 1");
+        $stmt->execute([$program, $program]);
+        $ses = $stmt->fetch(PDO::FETCH_ASSOC);
+    } else {
+        $ses = $pdo->query("SELECT * FROM pretes_cbt_sessions WHERE is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    }
     if (!$ses) return null;
     $pkgIds = json_decode((string)($ses['package_ids_json'] ?? '[]'), true) ?: [];
     $ses['package_ids'] = array_map('intval', $pkgIds);

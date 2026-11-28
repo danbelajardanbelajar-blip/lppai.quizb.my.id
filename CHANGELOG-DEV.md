@@ -1,3 +1,22 @@
+## 2026-11-28 22.00.30 +0700 — Tahap 7: Penyelarasan portal mahasiswa & sesi CBT per program
+
+**ID:** PRETES-RPL-STAGE7-PORTAL-ALIGNMENT · **Parent Git:** 8719cd5a12c7f26f1db3632ce7f9fc1813ed5815.
+
+**Perubahan/alasan:** Menyelaraskan pemilihan periode aktif dan sesi CBT pada portal mahasiswa agar ketika periode/sesi **Pretes RPL** dan **Pretes Reguler** aktif bersamaan, mahasiswa RPL otomatis menerima periode & sesi CBT RPL sementara mahasiswa Reguler tetap menerima periode & sesi CBT Reguler (dengan fallback aman ke periode `Semua` / sesi unscoped lama). Portal dosen (`dosen/pretes.php`, `dosen/pretes-rekap-nilai.php`) sudah terisolasi lewat penugasan `dosen_penguji_nim`.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/pretes-helper.php | `getActivePretesPeriod()` & `shouldShowDaftarPretesToStudent()` mendukung prioritas program | simpan terakhir WIB 2026-11-28 21.59.10
+- includes/pretes-cbt.php | `pretesCbtUserProgram()`, filter `program_scope` di `pretesCbtGetActiveSessions()`, `pretesCbtGetActiveSession()`, `pretesCbtState()`, `pretesCbtStart()` | simpan terakhir WIB 2026-11-28 21.59.53
+- pages/pretes-daftar.php | kirim `$studentProgram` ke `getActivePretesPeriod()` | simpan terakhir WIB 2026-11-28 21.58.45
+- pages/dashboard.php | kirim `$studentProgramForPretes` ke `getActivePretesPeriod()` | simpan terakhir WIB 2026-11-28 21.58.47
+- pages/pretes-ujian.php | kirim `$studentCbtProgram` ke `pretesCbtGetActiveSession()` | simpan terakhir WIB 2026-11-28 21.58.50
+- tests/pretes-portal-program-isolation-test.php | unit test SQLite in-memory periode & sesi CBT paralel RPL/Reguler | simpan terakhir WIB 2026-11-28 21.59.14
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 7 lulus tanpa error whitespace/konflik. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan eksekusi test PHP belum dapat dijalankan secara lokal.
+
+**Batas:** Seluruh Tahap 1–7 telah selesai di kode dan siap diverifikasi di server/lingkungan PHP.
+
 ## 2026-11-28 21.51.15 +0700 — Tahap 6: Integrasi grup menu Pretes RPL (8 submenu) di sidebar & tes regresi
 
 **ID:** PRETES-RPL-STAGE6-SIDEBAR-TESTS · **Parent Git:** 46d6bf2f0a2be0c3f8fceb29284e700713a57720.

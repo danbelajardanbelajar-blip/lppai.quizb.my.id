@@ -544,11 +544,22 @@ if (!function_exists('savePretesRegistrationPhoto')) {
 if (!function_exists('getActivePretesPeriod')) {
     /**
      * Mengambil periode pretes yang berstatus aktif beserta kolom target_program dan tanggal_mulai.
+     * Bila $program ('rpl' | 'reguler') diberikan, memprioritaskan periode khusus program tersebut
+     * sebelum fallback ke periode 'Semua'.
      */
-    function getActivePretesPeriod(PDO $pdo): ?array {
+    function getActivePretesPeriod(PDO $pdo, ?string $program = null): ?array {
         ensurePretesPeriodTargetColumns($pdo);
         ensurePretesRegistrationPhotoColumn($pdo);
         try {
+            if ($program !== null && trim($program) !== '') {
+                $progKey = strtolower(trim($program));
+                if ($progKey === 'rpl' || $progKey === 'reguler') {
+                    $stmt = $pdo->prepare("SELECT * FROM master_pretes WHERE status = 'aktif' AND LOWER(TRIM(COALESCE(target_program, ''))) IN (?, 'semua') ORDER BY (LOWER(TRIM(COALESCE(target_program, ''))) = ?) DESC, id DESC LIMIT 1");
+                    $stmt->execute([$progKey, $progKey]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    return is_array($row) ? $row : null;
+                }
+            }
             $row = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
             return is_array($row) ? $row : null;
         } catch (Throwable $e) {
@@ -683,7 +694,8 @@ if (!function_exists('shouldShowDaftarPretesToStudent')) {
         if (!$user) {
             return false;
         }
-        $period = getActivePretesPeriod($pdo);
+        $userProgram = (($user['role'] ?? '') === 'mahasiswa') ? pretesProgramKey($user['jenis_program'] ?? '') : null;
+        $period = getActivePretesPeriod($pdo, $userProgram);
         if (!$period) {
             return false;
         }

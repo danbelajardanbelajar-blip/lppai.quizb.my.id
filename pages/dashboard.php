@@ -72,7 +72,8 @@ $isCbtSubmitted = !empty($cbtResult) && ($cbtResult['status'] ?? '') === 'submit
 $isCbtPassed = pretesCbtResultPassed($cbtResult);
 
 // Cek status periode pretes aktif & kelayakan program mahasiswa
-$activePretes = getActivePretesPeriod($pdo);
+$studentProgramForPretes = (($user['role'] ?? '') === 'mahasiswa') ? pretesProgramKey($user['jenis_program'] ?? '') : null;
+$activePretes = getActivePretesPeriod($pdo, $studentProgramForPretes);
 $isEligibleActivePretes = isUserEligibleForPretesPeriod($user, $activePretes);
 $pretesRegisteredActive = 0;
 if ($activePretes) {

@@ -67,8 +67,9 @@ try {
     }
 } catch (Exception $e) {}
 
-// Ambil Periode Pretes Aktif & cek kelayakan program (Semua / RPL / Reguler)
-$active_pretes = getActivePretesPeriod($pdo);
+// Ambil Periode Pretes Aktif sesuai program mahasiswa & cek kelayakan program (Semua / RPL / Reguler)
+$studentProgram = (($user['role'] ?? '') === 'mahasiswa') ? pretesProgramKey($user['jenis_program'] ?? '') : null;
+$active_pretes = getActivePretesPeriod($pdo, $studentProgram);
 $isEligibleForPretes = isUserEligibleForPretesPeriod($user, $active_pretes);
 $periodSchedule = getPretesPeriodDayLabels($active_pretes);
 
