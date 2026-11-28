@@ -5,9 +5,24 @@
  * filter multi-kriteria, sinkronisasi ke hasil pretes, cetak resmi, serta export Excel/CSV.
  */
 
-define('PAGE_TITLE', 'Rekapitulasi Nilai Pretes');
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 requireLogin();
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+
+define('PAGE_TITLE', 'Rekapitulasi Nilai Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $currentUser = getCurrentUser();
 $role = $currentUser['role'] ?? '';
@@ -24,7 +39,9 @@ require_once __DIR__ . '/../includes/pretes-helper.php';
 ensurePretesFeatures($pdo);
 
 // ── Ambil Daftar Periode Pretes ───────────────────────────────────────────────
-$periods = $pdo->query("SELECT * FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC")->fetchAll();
+$stmtPeriodsR = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, created_at DESC");
+$stmtPeriodsR->execute($periodWhere['params']);
+$periods = $stmtPeriodsR->fetchAll();
 $selectedPeriodId = filter_var($_GET['pretes_id'] ?? ($_POST['pretes_id'] ?? 0), FILTER_VALIDATE_INT);
 $selectedMaster = null;
 
@@ -44,8 +61,8 @@ if (!$selectedMaster && !empty($periods)) {
 $periodeName = $selectedMaster['periode'] ?? '';
 $tahunAjaran = $selectedMaster['tahun_ajaran'] ?? '';
 
-// Komponen Pretes (12 Komponen)
-$components = pretesComponents();
+// Komponen Pretes sesuai program
+$components = pretesComponents($pretesProgram);
 $componentKeys = array_keys($components);
 $totalComponents = count($components);
 
@@ -79,14 +96,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $msgType = 'danger';
         } else {
             // Ambil semua peserta di periode terpilih (LEFT JOIN asesmen agar mahasiswa RPL tetap terjaring)
-            $stmtSync = $pdo->prepare("
+            $syncSql = "
                 SELECT pr.id as reg_id, pr.user_id, pr.periode, pa.scores_json, u.jenis_program
                 FROM pretes_registrations pr
                 JOIN users u ON u.id = pr.user_id
                 LEFT JOIN pretes_assessments pa ON pa.registration_id = pr.id
                 WHERE pr.periode = ?
-            ");
-            $stmtSync->execute([$periodeName]);
+            ";
+            $syncParams = [$periodeName];
+            if ($pretesProgram !== null) {
+                $syncSql .= " AND {$userWhere['sql']}";
+                $syncParams = array_merge($syncParams, $userWhere['params']);
+            }
+            $stmtSync = $pdo->prepare($syncSql);
+            $stmtSync->execute($syncParams);
             $toSync = $stmtSync->fetchAll();
 
             $syncedCount = 0;
@@ -270,6 +293,10 @@ $sql = "
       AND TRIM(COALESCE(u.nim, '')) <> '12345'
 ";
 $params = [$periodeName];
+if ($pretesProgram !== null) {
+    $sql .= " AND {$userWhere['sql']}";
+    $params = array_merge($params, $userWhere['params']);
+}
 
 if ($isDosen) {
     $sql .= " AND pr.dosen_penguji_nim = ?";
@@ -1123,7 +1150,7 @@ if ($isPrint) {
 <body>
     <div class="no-print-toolbar">
         <div>
-            <a href="pretes-rekap-nilai.php?pretes_id=<?= (int)$selectedPeriodId ?>" class="btn btn-back">⬅️ Kembali ke Tabel Rekap</a>
+            <a href="<?= pretesAdminRoute('rekap', $pretesProgram, ['pretes_id' => (int)$selectedPeriodId]) ?>" class="btn btn-back">⬅️ Kembali ke Tabel Rekap</a>
         </div>
         <div>
             <button onclick="window.print()" class="btn btn-print">🖨️ Cetak Dokumen / Simpan PDF</button>
@@ -1603,7 +1630,7 @@ include __DIR__ . '/../includes/header.php';
                 <button type="submit" class="btn btn-primary" style="padding:8px 16px; border-radius:8px; font-weight:700; font-size:13px;">
                     🔍 Terapkan
                 </button>
-                <a href="pretes-rekap-nilai.php?pretes_id=<?= (int)$selectedPeriodId ?>" class="btn btn-secondary" style="padding:8px 14px; border-radius:8px; font-weight:700; font-size:13px; text-decoration:none; background:#f1f5f9; color:#475569;">
+                <a href="<?= pretesAdminRoute('rekap', $pretesProgram, ['pretes_id' => (int)$selectedPeriodId]) ?>" class="btn btn-secondary" style="padding:8px 14px; border-radius:8px; font-weight:700; font-size:13px; text-decoration:none; background:#f1f5f9; color:#475569;">
                     Reset
                 </a>
             </div>
@@ -1744,7 +1771,7 @@ include __DIR__ . '/../includes/header.php';
                     <!-- Aksi -->
                     <td>
                         <?php 
-                        $inputUrl = ($isDosen ? BASE_URL . "/dosen/pretes.php" : BASE_URL . "/admin/pretes-nilai.php") . "?pretes_id={$selectedPeriodId}&registration_id={$r['reg_id']}#nilai-pretes";
+                        $inputUrl = ($isDosen ? BASE_URL . "/dosen/pretes.php" : pretesAdminRoute('nilai', $pretesProgram)) . "?pretes_id={$selectedPeriodId}&registration_id={$r['reg_id']}#nilai-pretes";
                         ?>
                         <a href="<?= $inputUrl ?>" class="btn btn-sm btn-outline-primary" style="padding:4px 8px; font-size:11.5px; font-weight:700; text-decoration:none; white-space:nowrap; border-radius:6px;" data-no-spa>
                             ✏️ Nilai

@@ -3,8 +3,21 @@
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 header('Cache-Control: private, no-store');
 header('Content-Type: text/html; charset=UTF-8');
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
 
 $pdo = getDBConnection();
 ensurePretesFeatures($pdo);
@@ -14,8 +27,8 @@ if (!$pretesId) {
     http_response_code(400);
     exit('Periode pretes tidak valid. Silakan buka export dari halaman jadwal pretes.');
 }
-$stmt = $pdo->prepare('SELECT id, periode, tahun_ajaran FROM master_pretes WHERE id = ?');
-$stmt->execute([$pretesId]);
+$stmt = $pdo->prepare("SELECT id, periode, tahun_ajaran FROM master_pretes WHERE id = ? AND {$periodWhere['sql']}");
+$stmt->execute(array_merge([$pretesId], $periodWhere['params']));
 $pretes = $stmt->fetch();
 if (!$pretes) {
     http_response_code(404);
@@ -38,6 +51,10 @@ $where = ['pr.periode = ?'];
 $where[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
 $where[] = "TRIM(COALESCE(u.nim, '')) <> '12345'";
 $params = [$pretes['periode']];
+if ($pretesProgram !== null) {
+    $where[] = $userWhere['sql'];
+    $params = array_merge($params, $userWhere['params']);
+}
 if ($filters['hari'] !== '') {
     $where[] = "COALESCE(NULLIF(TRIM(pr.hari_pilihan), ''), 'Senin') = ?";
     $params[] = $filters['hari'];

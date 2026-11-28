@@ -725,7 +725,7 @@ function addQETutorRow(day) {
     <div class="card-header">Export Absensi Pretes</div>
     <div class="card-body">
         <p style="margin-top:0;color:#475569;">Lembar absensi resmi dengan kop dan logo LPPAI. Peserta dengan hari, penguji, dan ruangan yang sama digabung dalam satu halaman A4. Waktu pelaksanaan pukul 13.00 WIB. Buka pratinjau untuk mencetak atau menyimpan sebagai PDF.</p>
-        <form action="pretes-absensi-export.php" method="GET" target="_blank" rel="noopener" data-no-spa style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <form action="<?= pretesAdminRoute('absensi_export', $pretesProgram) ?>" method="GET" target="_blank" rel="noopener" data-no-spa style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
             <input type="hidden" name="pretes_id" value="<?= (int)$active_pretes['id'] ?>">
             <div class="form-group" style="margin-bottom:0;flex:1;min-width:180px;">
                 <label>Periode</label>

@@ -4,8 +4,23 @@
  * Antarmuka modern, responsif, dan elegan untuk penilaian 12 komponen pretes serta QR absensi mandiri.
  */
 require_once __DIR__ . '/auth.php';
-define('PAGE_TITLE', 'Penilaian & Absensi Pretes');
 require_once __DIR__ . '/pretes-helper.php';
+require_once __DIR__ . '/pretes-program-scope.php';
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+
+define('PAGE_TITLE', 'Penilaian & Absensi Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $user = getCurrentUser();
 if (!in_array($user['role'] ?? '', ['admin', 'dosen'], true)) {
@@ -21,7 +36,9 @@ pretesExaminerEnsure($pdo);
 
 $message = '';
 $msgType = 'success';
-$periods = $pdo->query("SELECT * FROM master_pretes ORDER BY (status = 'aktif') DESC, created_at DESC")->fetchAll();
+$stmtPeriods = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, created_at DESC");
+$stmtPeriods->execute($periodWhere['params']);
+$periods = $stmtPeriods->fetchAll();
 $periodId = filter_var($_GET['pretes_id'] ?? ($periods[0]['id'] ?? 0), FILTER_VALIDATE_INT);
 $period = null;
 foreach ($periods as $item) {
@@ -199,6 +216,10 @@ if ($period) {
         LEFT JOIN pretes_attendance_records ar ON ar.registration_id = pr.id 
         WHERE pr.periode = ?';
     $params = [$period['periode']];
+    if ($pretesProgram !== null) {
+        $sql .= ' AND ' . $userWhere['sql'];
+        $params = array_merge($params, $userWhere['params']);
+    }
     if ($user['role'] !== 'admin') {
         // Dosen hanya melihat peserta yang dipetakan ke NIM akunnya
         $sql .= ' AND pr.dosen_penguji_nim = ?';
@@ -221,7 +242,7 @@ foreach ($participants as $row) {
     if ((int)$row['id'] === $selectedId) $selected = $row;
 }
 
-$components = pretesComponents();
+$components = pretesComponents($pretesProgram);
 $progress = pretesProgress($participants);
 
 // Pengelompokan 12 Komponen untuk Antarmuka yang Rapih & Terstruktur

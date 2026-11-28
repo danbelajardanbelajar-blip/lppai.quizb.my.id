@@ -1,3 +1,23 @@
+## 2026-11-28 21.43.20 +0700 — Tahap 4: Duplikasi Nilai Rinci & Absensi, serta Rekapitulasi Nilai Pretes RPL
+
+**ID:** PRETES-RPL-STAGE4-NILAI-REKAP · **Parent Git:** 2d5f57451cb75df9dfbda73d433f3c7b7c4dda4d.
+
+**Perubahan/alasan:** Menduplikasi submenu Nilai Rinci & Absensi Pretes, export lembar absensi, dan Rekapitulasi Nilai Pretes untuk Pretes RPL dengan wrapper `PRETES_ADMIN_PROGRAM = 'rpl'` (melengkapi `admin/pretes-rpl-tugas.php` yang sudah ada). Query periode (`master_pretes.target_program`), query peserta (`users.jenis_program`), daftar komponen (`pretesComponents($pretesProgram)`), sinkronisasi nilai ke `pretes_results`, serta tautan silang (form export absensi di jadwal, tombol edit nilai di rekap, dan reset filter) semuanya diisolasi per program.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/pretes-panel.php | header scope, query periode & peserta, komponen per program | simpan terakhir WIB 2026-11-28 21.42.13
+- admin/pretes-absensi-export.php | header scope, filter periode & peserta per program | simpan terakhir WIB 2026-11-28 21.42.15
+- admin/pretes-rekap-nilai.php | header scope, query periode, sync & roster terisolasi, tautan & tombol nilai | simpan terakhir WIB 2026-11-28 21.42.53
+- admin/pretes-jadwal.php | action form export absensi mengikuti `pretesAdminRoute()` | simpan terakhir WIB 2026-11-28 21.41.55
+- admin/pretes-rpl-nilai.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.41.57
+- admin/pretes-rpl-absensi-export.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.41.58
+- admin/pretes-rpl-rekap-nilai.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.42.00
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 4 lulus tanpa error whitespace/konflik. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan pengujian eksekusi penilaian/rekap langsung belum dijalankan secara lokal.
+
+**Batas:** Submenu Bank Soal & Hasil CBT RPL dikerjakan pada Tahap 5, dan integrasi sidebar admin pada Tahap 6.
+
 ## 2026-11-28 21.40.00 +0700 — Tahap 3: Duplikasi submenu Data Peserta Pretes & Ekspor/PDF RPL
 
 **ID:** PRETES-RPL-STAGE3-PESERTA-EXPORT · **Parent Git:** 12a20889e9ab90974c18ca666520e419e6142f5d.
