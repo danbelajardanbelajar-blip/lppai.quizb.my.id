@@ -1,3 +1,19 @@
+## 2026-11-28 21.51.15 +0700 — Tahap 6: Integrasi grup menu Pretes RPL (8 submenu) di sidebar & tes regresi
+
+**ID:** PRETES-RPL-STAGE6-SIDEBAR-TESTS · **Parent Git:** 46d6bf2f0a2be0c3f8fceb29284e700713a57720.
+
+**Perubahan/alasan:** Menambahkan grup menu **Pretes RPL** (`data-group="admin-pretes-rpl"`, badge `8`) pada `includes/sidebar.php` tepat setelah **Pretes Reguler**, lengkap dengan 8 submenu identik (ikon, label, `data-no-spa`, dan status `active`/`open`). Kondisi active CBT dipisahkan (`$isCbtRegulerActive` vs `$isCbtRplActive`) agar membuka `cbt_bank=1&program=rpl` hanya mengaktifkan grup **Pretes RPL**. Menambahkan `tests/pretes-rpl-duplication-test.php` serta memperbarui ekspektasi admin pada `tests/mahasiswa-unregistered-hide-menu-test.php`.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/sidebar.php | `menuActive()` RPL peserta-export, isolasi CBT active, grup menu Pretes RPL (8 submenu) | simpan terakhir WIB 2026-11-28 21.50.48
+- tests/mahasiswa-unregistered-hide-menu-test.php | tambah asersi label `Pretes RPL` pada menu admin | simpan terakhir WIB 2026-11-28 21.50.28
+- tests/pretes-rpl-duplication-test.php | verifikasi 14 wrapper RPL, 8 submenu sidebar, & isolasi CBT active | simpan terakhir WIB 2026-11-28 21.50.30
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 6 lulus tanpa error whitespace/konflik. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan eksekusi test PHP belum dapat dijalankan secara lokal.
+
+**Batas:** Tahap 1–6 selesai untuk seluruh menu admin **Pretes RPL**; penyelarasan portal mahasiswa/dosen (Tahap 7 opsional) dan verifikasi di server hosting dilakukan terpisah bila diminta.
+
 ## 2026-11-28 21.48.40 +0700 — Tahap 5: Duplikasi Bank Soal & Hasil CBT Pretes RPL
 
 **ID:** PRETES-RPL-STAGE5-CBT-BANK · **Parent Git:** c23024bcef5314ac0a63e3ea42973776503981c1.

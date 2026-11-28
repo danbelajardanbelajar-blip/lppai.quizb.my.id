@@ -12,6 +12,9 @@ if (!function_exists('menuActive')) {
         if ($page === 'pretes-peserta.php' && $currentPage === 'pretes-peserta-export.php') {
             return 'active';
         }
+        if ($page === 'pretes-rpl-peserta.php' && $currentPage === 'pretes-rpl-peserta-export.php') {
+            return 'active';
+        }
         return $currentPage === $page ? 'active' : '';
     }
 }
@@ -64,7 +67,8 @@ if (!function_exists('isNavGroupActive')) {
                 'pretes-rekap-nilai.php',
                 'pretes-tugas.php'
             ];
-            $isPretesGroupActive = isNavGroupActive($pretesPages, isset($_GET['cbt_bank']));
+            $isCbtRegulerActive = isset($_GET['cbt_bank']) && (($_GET['program'] ?? '') !== 'rpl');
+            $isPretesGroupActive = isNavGroupActive($pretesPages, $isCbtRegulerActive);
             ?>
             <div class="nav-group <?= $isPretesGroupActive ? 'open' : '' ?>" data-group="admin-pretes">
                 <button type="button" class="nav-group-toggle <?= $isPretesGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isPretesGroupActive ? 'true' : 'false' ?>">
@@ -92,10 +96,61 @@ if (!function_exists('isNavGroupActive')) {
                     <a href="<?= BASE_URL ?>/admin/pretes-tugas.php" class="page-nav <?= menuActive('pretes-tugas.php') ?>">
                         <span class="icon">📋</span> Kelola Tugas Pretes
                     </a>
-                    <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_bank=1" class="<?= isset($_GET['cbt_bank']) ? 'active' : '' ?>" data-no-spa>
+                    <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_bank=1" class="<?= $isCbtRegulerActive ? 'active' : '' ?>" data-no-spa>
                         <span class="icon">🧩</span> Bank Soal & Hasil CBT
                     </a>
                     <a href="<?= BASE_URL ?>/admin/pretes-rekap-nilai.php" class="page-nav <?= menuActive('pretes-rekap-nilai.php') ?>">
+                        <span class="icon">🎓</span> Rekapitulasi Nilai Pretes
+                    </a>
+                </div>
+            </div>
+
+            <!-- MANAJEMEN PRETES RPL -->
+            <?php
+            $pretesRplPages = [
+                'pretes-rpl-pengaturan-tutor.php',
+                'pretes-rpl-dosen.php',
+                'pretes-rpl-jadwal.php',
+                'pretes-rpl-peserta.php',
+                'pretes-rpl-peserta-export.php',
+                'pretes-rpl-nilai.php',
+                'pretes-rpl-rekap-nilai.php',
+                'pretes-rpl-tugas.php',
+                'pretes-rpl-bank-soal.php'
+            ];
+            $isCbtRplActive = isset($_GET['cbt_bank']) && (($_GET['program'] ?? '') === 'rpl');
+            $isPretesRplGroupActive = isNavGroupActive($pretesRplPages, $isCbtRplActive);
+            ?>
+            <div class="nav-group <?= $isPretesRplGroupActive ? 'open' : '' ?>" data-group="admin-pretes-rpl">
+                <button type="button" class="nav-group-toggle <?= $isPretesRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isPretesRplGroupActive ? 'true' : 'false' ?>">
+                    <span class="icon">🧑‍🏫</span>
+                    <span class="nav-text">Pretes RPL</span>
+                    <span class="nav-badge">8</span>
+                    <span class="chevron">▾</span>
+                </button>
+                <div class="nav-group-content">
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-pengaturan-tutor.php" class="page-nav <?= menuActive('pretes-rpl-pengaturan-tutor.php') ?>">
+                        <span class="icon">🧑‍🏫</span> Pengaturan Tutor
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-dosen.php" class="page-nav <?= menuActive('pretes-rpl-dosen.php') ?>">
+                        <span class="icon">👨‍🏫</span> Penguji & Kuota Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-jadwal.php" class="page-nav <?= menuActive('pretes-rpl-jadwal.php') ?>">
+                        <span class="icon">📅</span> Kelola Jadwal Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-peserta.php" class="page-nav <?= menuActive('pretes-rpl-peserta.php') ?>">
+                        <span class="icon">👥</span> Data Peserta Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-nilai.php" class="<?= menuActive('pretes-rpl-nilai.php') ?>" data-no-spa>
+                        <span class="icon">📚</span> Nilai Rinci & Absensi Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-tugas.php" class="page-nav <?= menuActive('pretes-rpl-tugas.php') ?>">
+                        <span class="icon">📋</span> Kelola Tugas Pretes
+                    </a>
+                    <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_bank=1&program=rpl" class="<?= $isCbtRplActive ? 'active' : '' ?>" data-no-spa>
+                        <span class="icon">🧩</span> Bank Soal & Hasil CBT
+                    </a>
+                    <a href="<?= BASE_URL ?>/admin/pretes-rpl-rekap-nilai.php" class="page-nav <?= menuActive('pretes-rpl-rekap-nilai.php') ?>">
                         <span class="icon">🎓</span> Rekapitulasi Nilai Pretes
                     </a>
                 </div>
