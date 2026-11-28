@@ -52,18 +52,6 @@ if (!function_exists('isNavGroupActive')) {
                 <span class="nav-text">Dashboard Admin</span>
             </a>
 
-            <?php $pretesProgramPages = ['pretes-rpl.php','pretes-reguler.php','pretes-rpl-tugas.php','pretes-reguler-tugas.php'];
-            $pretesProgramActive = isNavGroupActive($pretesProgramPages); ?>
-            <div class="nav-group <?= $pretesProgramActive ? 'open' : '' ?>" data-group="admin-pretes-programs">
-                <button type="button" class="nav-group-toggle <?= $pretesProgramActive ? 'has-active' : '' ?>" aria-expanded="<?= $pretesProgramActive ? 'true' : 'false' ?>">
-                    <span class="icon">🎓</span><span class="nav-text">Pretes per Program</span><span class="nav-badge">2</span><span class="chevron">▾</span>
-                </button>
-                <div class="nav-group-content">
-                    <a data-no-spa href="<?= BASE_URL ?>/admin/pretes-rpl.php" class="<?= in_array($currentPage,['pretes-rpl.php','pretes-rpl-tugas.php'],true) ? 'active' : '' ?>"><span class="icon">🌐</span> Pretes RPL</a>
-                    <a data-no-spa href="<?= BASE_URL ?>/admin/pretes-reguler.php" class="<?= in_array($currentPage,['pretes-reguler.php','pretes-reguler-tugas.php'],true) ? 'active' : '' ?>"><span class="icon">🏫</span> Pretes Reguler</a>
-                </div>
-            </div>
-
             <!-- MANAJEMEN PRETES -->
             <?php
             $pretesPages = [
