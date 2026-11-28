@@ -5,10 +5,25 @@
 
 
 
-define('PAGE_TITLE', 'Data Peserta & Credentials Tes Tulis');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 requireAdmin();
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+
+define('PAGE_TITLE', 'Data Peserta & Credentials Tes Tulis' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo     = getDBConnection();
 ensurePretesPeriodTargetColumns($pdo);
@@ -293,9 +308,24 @@ if ($autoSyncRes && (!empty($autoSyncRes['updated']) || !empty($autoSyncRes['mat
     $msgType = 'success';
 }
 // ── Pilih & Filter Periode Pretes ──────────────────────────────────────────────
-$activePretes = getActivePretesPeriod($pdo);
-$masterPeriods = $pdo->query("SELECT id, periode, tahun_ajaran, target_program, status FROM master_pretes ORDER BY (status = 'aktif') DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$extraPeriodNames = $pdo->query("SELECT DISTINCT periode FROM pretes_registrations WHERE periode IS NOT NULL AND periode != '' ORDER BY periode DESC")->fetchAll(PDO::FETCH_COLUMN);
+if ($pretesProgram !== null) {
+    $stmtActiveP = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+    $stmtActiveP->execute($periodWhere['params']);
+    $activePretes = $stmtActiveP->fetch(PDO::FETCH_ASSOC) ?: null;
+} else {
+    $activePretes = getActivePretesPeriod($pdo);
+}
+$stmtMasterP = $pdo->prepare("SELECT id, periode, tahun_ajaran, target_program, status FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC");
+$stmtMasterP->execute($periodWhere['params']);
+$masterPeriods = $stmtMasterP->fetchAll(PDO::FETCH_ASSOC);
+
+if ($pretesProgram !== null) {
+    $stmtExtraP = $pdo->prepare("SELECT DISTINCT pr.periode FROM pretes_registrations pr JOIN users u ON pr.user_id = u.id WHERE pr.periode IS NOT NULL AND pr.periode != '' AND {$userWhere['sql']} ORDER BY pr.periode DESC");
+    $stmtExtraP->execute($userWhere['params']);
+    $extraPeriodNames = $stmtExtraP->fetchAll(PDO::FETCH_COLUMN);
+} else {
+    $extraPeriodNames = $pdo->query("SELECT DISTINCT periode FROM pretes_registrations WHERE periode IS NOT NULL AND periode != '' ORDER BY periode DESC")->fetchAll(PDO::FETCH_COLUMN);
+}
 
 $periodOptions = [];
 $knownPeriodNames = [];
@@ -344,12 +374,16 @@ $baseSelect = "
     FROM pretes_registrations pr
     JOIN users u ON pr.user_id = u.id
 ";
+$partWhereSql = $userWhere['sql'];
+$partParams = $userWhere['params'];
 if ($selectedPeriode !== '' && $selectedPeriode !== '__all__') {
-    $stmtPart = $pdo->prepare($baseSelect . " WHERE pr.periode = ? ORDER BY u.nama_lengkap ASC");
-    $stmtPart->execute([$selectedPeriode]);
+    $stmtPart = $pdo->prepare($baseSelect . " WHERE pr.periode = ? AND {$partWhereSql} ORDER BY u.nama_lengkap ASC");
+    $stmtPart->execute(array_merge([$selectedPeriode], $partParams));
     $participants = $stmtPart->fetchAll();
 } else {
-    $participants = $pdo->query($baseSelect . " ORDER BY u.nama_lengkap ASC")->fetchAll();
+    $stmtPart = $pdo->prepare($baseSelect . " WHERE {$partWhereSql} ORDER BY u.nama_lengkap ASC");
+    $stmtPart->execute($partParams);
+    $participants = $stmtPart->fetchAll();
 }
 
 // Nilai hasil pretes resmi per pendaftaran (CBT resmi / cadangan ujian_tulis); belum pretes -> "-"
@@ -754,12 +788,12 @@ include __DIR__ . '/../includes/header.php';
                style="background:#0f766e;color:#ffffff;border:1px solid #0d9488;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(15,118,110,0.25);">
                 ⚡ Generate Otomatis
             </button>
-            <a href="pretes-peserta-pdf.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>" target="_blank" class="btn btn-sm"
+            <a href="<?= pretesAdminRoute('peserta_pdf', $pretesProgram, $selectedPeriode !== '__all__' ? ['periode' => $selectedPeriode] : []) ?>" target="_blank" class="btn btn-sm"
                style="background:#dc2626;color:#ffffff;border:1px solid #b91c1c;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(220,38,38,0.25);"
                title="Export data peserta ke dokumen PDF (NIM, Nama, Program RPL/Non RPL, Jurusan)">
                 📄 Export ke PDF
             </a>
-            <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>" class="btn btn-sm"
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram, $selectedPeriode !== '__all__' ? ['periode' => $selectedPeriode] : []) ?>" class="btn btn-sm"
                style="background:#16a34a;color:#ffffff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(22,163,74,0.25);">
                 📗 Halaman Export ke Excel
             </a>
@@ -1664,7 +1698,7 @@ try {
             </a>
 
             <!-- Pilihan 3: Export Semua Peserta (Excel) -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx<?= $selectedPeriode !== '__all__' ? '&periode=' . urlencode($selectedPeriode) : '' ?>" data-no-spa="true"
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram, array_merge(['download' => 1, 'format' => 'xlsx'], $selectedPeriode !== '__all__' ? ['periode' => $selectedPeriode] : [])) ?>" data-no-spa="true"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#ffffff;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">👥</span>
@@ -1677,7 +1711,7 @@ try {
             </a>
 
             <!-- Pilihan 4: Buka Halaman Export Lengkap -->
-            <a href="pretes-peserta-export.php<?= $selectedPeriode !== '__all__' ? '?periode=' . urlencode($selectedPeriode) : '' ?>"
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram, $selectedPeriode !== '__all__' ? ['periode' => $selectedPeriode] : []) ?>"
                style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid #e2e8f0;background:#f8fafc;border-radius:12px;text-decoration:none;transition:all 0.2s;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <span style="font-size:20px;">⚙️</span>
@@ -1762,9 +1796,9 @@ function exportCurrentFiltered(format) {
 
     closeExportModal();
     if (format === 'pdf') {
-        window.open('pretes-peserta-pdf.php?' + params.toString(), '_blank');
+        window.open(<?= json_encode(pretesAdminRoute('peserta_pdf', $pretesProgram)) ?> + '?' + params.toString(), '_blank');
     } else {
-        window.location.href = 'pretes-peserta-export.php?' + params.toString();
+        window.location.href = <?= json_encode(pretesAdminRoute('peserta_export', $pretesProgram)) ?> + '?' + params.toString();
     }
 }
 

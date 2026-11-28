@@ -170,6 +170,7 @@ if (!function_exists('pretesAdminRoute')) {
             'peserta' => $isRpl ? 'admin/pretes-rpl-peserta.php' : 'admin/pretes-peserta.php',
             'peserta_export' => $isRpl ? 'admin/pretes-rpl-peserta-export.php' : 'admin/pretes-peserta-export.php',
             'peserta_pdf' => $isRpl ? 'admin/pretes-rpl-peserta-pdf.php' : 'admin/pretes-peserta-pdf.php',
+            'mahasiswa_export' => $isRpl ? 'admin/pretes-rpl-mahasiswa-export.php' : 'admin/pretes-mahasiswa-export.php',
             'nilai' => $isRpl ? 'admin/pretes-rpl-nilai.php' : 'admin/pretes-nilai.php',
             'absensi_export' => $isRpl ? 'admin/pretes-rpl-absensi-export.php' : 'admin/pretes-absensi-export.php',
             'tugas' => $isRpl ? 'admin/pretes-rpl-tugas.php' : 'admin/pretes-tugas.php',

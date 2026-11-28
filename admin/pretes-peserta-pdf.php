@@ -6,17 +6,38 @@
  * Filter hari bisa lebih dari satu: hari=Senin,Rabu
  */
 
-define('PAGE_TITLE', 'Export Data Peserta Pretes ke PDF');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 ensurePretesPeriodTargetColumns($pdo);
 require_once __DIR__ . '/../includes/user-helper.php';
 
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+
+define('PAGE_TITLE', 'Export Data Peserta Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : '') . ' ke PDF');
+
 // Ambil periode pretes aktif dan daftar opsi periode
-$activeExportPretes = getActivePretesPeriod($pdo);
+if ($pretesProgram !== null) {
+    $stmtActPdf = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+    $stmtActPdf->execute($periodWhere['params']);
+    $activeExportPretes = $stmtActPdf->fetch(PDO::FETCH_ASSOC) ?: null;
+} else {
+    $activeExportPretes = getActivePretesPeriod($pdo);
+}
 $rawFilterPeriode = trim($_GET['periode'] ?? ($activeExportPretes['periode'] ?? ''));
 $filterPeriode = ($rawFilterPeriode === '__all__' || strtolower($rawFilterPeriode) === 'all') ? '' : $rawFilterPeriode;
 
@@ -33,6 +54,10 @@ $filterPretes = in_array($_GET['pretes'] ?? '', ['sudah', 'belum'], true) ? $_GE
 // Kueri filter data dinamis
 $whereConditions = ["1=1"];
 $params = [];
+if ($pretesProgram !== null) {
+    $whereConditions[] = $userWhere['sql'];
+    $params = array_merge($params, $userWhere['params']);
+}
 
 // Kecualikan akun percobaan / uji coba (username atau NIM 12345) dari dokumen export
 $whereConditions[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
@@ -134,7 +159,7 @@ $indonesianMonths = [
 $printDateFormatted = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y') . ', ' . $dtNow->format('H:i') . ' WIB';
 $signatureDate = $dtNow->format('j') . ' ' . $indonesianMonths[(int)$dtNow->format('n')] . ' ' . $dtNow->format('Y');
 
-$backUrl = 'pretes-peserta.php' . ($rawFilterPeriode !== '' ? '?periode=' . urlencode($rawFilterPeriode) : '');
+$backUrl = pretesAdminRoute('peserta', $pretesProgram, $rawFilterPeriode !== '' ? ['periode' => $rawFilterPeriode] : []);
 ?>
 <!DOCTYPE html>
 <html lang="id">

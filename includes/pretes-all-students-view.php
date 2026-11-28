@@ -25,10 +25,10 @@ $statusBadge = [
     <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
         <span>👥 Semua Mahasiswa — Status Pretes <?= $selectedPeriode === '__all__' ? '(Semua Periode)' : '(' . sanitize($selectedPeriode) . ')' ?></span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <a href="pretes-mahasiswa-export.php?<?= sanitize(http_build_query($exportQs + ['format' => 'pdf'])) ?>" target="_blank" rel="noopener" data-no-spa
+            <a href="<?= sanitize(pretesAdminRoute('mahasiswa_export', $pretesProgram ?? null, $exportQs + ['format' => 'pdf'])) ?>" target="_blank" rel="noopener" data-no-spa
                class="btn btn-sm sm-export" data-format="pdf" id="btn-sm-export-pdf"
                style="background:#dc2626;color:#fff;border:1px solid #b91c1c;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;">📄 Export PDF (sesuai filter)</a>
-            <a href="pretes-mahasiswa-export.php?<?= sanitize(http_build_query($exportQs + ['format' => 'xlsx'])) ?>" data-no-spa
+            <a href="<?= sanitize(pretesAdminRoute('mahasiswa_export', $pretesProgram ?? null, $exportQs + ['format' => 'xlsx'])) ?>" data-no-spa
                class="btn btn-sm sm-export" data-format="xlsx" id="btn-sm-export-xlsx"
                style="background:#16a34a;color:#fff;border:1px solid #15803d;font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:8px;text-decoration:none;">📗 Export Excel (sesuai filter)</a>
         </div>

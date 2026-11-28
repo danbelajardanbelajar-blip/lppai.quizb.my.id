@@ -3,22 +3,47 @@
  * LPPAI Corner - Admin: Export Data Peserta & Credentials Tes Tulis ke Excel / CSV
  */
 
-define('PAGE_TITLE', 'Export Data Peserta Pretes ke Excel');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 
 $pdo = getDBConnection();
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 ensurePretesPeriodTargetColumns($pdo);
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+
+define('PAGE_TITLE', 'Export Data Peserta Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : '') . ' ke Excel');
+
 require_once __DIR__ . '/../includes/sync_eujian.php';
 checkAutoSyncEujian($pdo);
 
-$exportPeriodOptions = $pdo->query("
+$stmtOptP = $pdo->prepare("
     SELECT periode, status, target_program
     FROM master_pretes
+    WHERE {$periodWhere['sql']}
     ORDER BY (status = 'aktif') DESC, id DESC
-")->fetchAll(PDO::FETCH_ASSOC);
-$activeExportPretes = getActivePretesPeriod($pdo);
+");
+$stmtOptP->execute($periodWhere['params']);
+$exportPeriodOptions = $stmtOptP->fetchAll(PDO::FETCH_ASSOC);
+if ($pretesProgram !== null) {
+    $stmtActExp = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+    $stmtActExp->execute($periodWhere['params']);
+    $activeExportPretes = $stmtActExp->fetch(PDO::FETCH_ASSOC) ?: null;
+} else {
+    $activeExportPretes = getActivePretesPeriod($pdo);
+}
 
 // ── Daftar Kolom yang Tersedia untuk Diexport ───────────────────────────────────
 $availableColumns = [
@@ -77,6 +102,10 @@ if (empty($selectedCols)) {
 // ── Buat Kueri Filter Dinamis ──────────────────────────────────────────────────
 $whereConditions = ["1=1"];
 $params = [];
+if ($pretesProgram !== null) {
+    $whereConditions[] = $userWhere['sql'];
+    $params = array_merge($params, $userWhere['params']);
+}
 
 // Kecualikan akun percobaan / uji coba (username atau NIM 12345) dari hasil export
 $whereConditions[] = "LOWER(TRIM(COALESCE(u.username, ''))) <> '12345'";
@@ -495,8 +524,12 @@ if ($isDownload) {
 // ── Ambil Data Ringkasan untuk Tampilan Halaman Web ───────────────────────────
 $periodeScopeSql = $filterPeriode !== '' ? " AND pr.periode = ?" : "";
 $periodeScopeParams = $filterPeriode !== '' ? [$filterPeriode] : [];
+if ($pretesProgram !== null) {
+    $periodeScopeSql .= " AND {$userWhere['sql']}";
+    $periodeScopeParams = array_merge($periodeScopeParams, $userWhere['params']);
+}
 $periodeQuery = '&periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
-$backPesertaUrl = 'pretes-peserta.php?periode=' . urlencode($filterPeriode !== '' ? $filterPeriode : '__all__');
+$backPesertaUrl = pretesAdminRoute('peserta', $pretesProgram, ['periode' => $filterPeriode !== '' ? $filterPeriode : '__all__']);
 
 $excludeTestUserSql = " AND LOWER(TRIM(COALESCE(u.username, ''))) <> '12345' AND TRIM(COALESCE(u.nim, '')) <> '12345'";
 
@@ -620,13 +653,13 @@ include __DIR__ . '/../includes/header.php';
     <div class="card-body" style="padding:18px 20px;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
             <!-- Unduh Semua Excel -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx<?= sanitize($periodeQuery) ?>" data-no-spa="true"
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram) ?>?download=1&format=xlsx<?= sanitize($periodeQuery) ?>" data-no-spa="true"
                class="btn" style="background:#1a5632;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(26,86,50,0.25);transition:all 0.2s;">
                 📥 Unduh Excel SEMUA (<?= $totalPesertaAll ?>)
             </a>
 
             <!-- Export ke PDF -->
-            <a href="pretes-peserta-pdf.php<?= sanitize($periodeQuery ? '?' . ltrim($periodeQuery, '&') : '') ?>" target="_blank" data-no-spa="true"
+            <a href="<?= pretesAdminRoute('peserta_pdf', $pretesProgram) ?><?= sanitize($periodeQuery ? '?' . ltrim($periodeQuery, '&') : '') ?>" target="_blank" data-no-spa="true"
                class="btn" style="background:#dc2626;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);transition:all 0.2s;" title="Cetak atau simpan data peserta ke dokumen PDF">
                 📄 Export ke PDF (<?= $totalPesertaAll ?>)
             </a>
@@ -634,14 +667,14 @@ include __DIR__ . '/../includes/header.php';
             <!-- Per Hari (Sabtu/Ahad tampil untuk periode Khusus RPL atau bila sudah ada pesertanya) -->
             <?php $exportDays = pretesDisplayDays($filterPeriode !== '' ? pretesPeriodByName($pdo, $filterPeriode) : null, $dayStats); ?>
             <?php foreach ($exportDays as $day): ?>
-                <a href="pretes-peserta-export.php?download=1&format=xlsx&hari=<?= $day ?><?= sanitize($periodeQuery) ?>" data-no-spa="true"
+                <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram) ?>?download=1&format=xlsx&hari=<?= $day ?><?= sanitize($periodeQuery) ?>" data-no-spa="true"
                    class="btn" style="background:#f8fafc;color:#1e293b;border:1.5px solid #cbd5e1;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.2s;">
                     📅 Khusus Hari <?= $day ?> (<?= $dayStats[$day] ?? 0 ?>)
                 </a>
             <?php endforeach; ?>
 
             <!-- Khusus Yang Sudah Ada Credentials -->
-            <a href="pretes-peserta-export.php?download=1&format=xlsx&cred=has_cred<?= sanitize($periodeQuery) ?>" data-no-spa="true"
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram) ?>?download=1&format=xlsx&cred=has_cred<?= sanitize($periodeQuery) ?>" data-no-spa="true"
                class="btn" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #bfdbfe;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all 0.2s;">
                 🔑 Khusus Ber-Credentials (<?= $totalWithCred ?>)
             </a>
@@ -662,14 +695,14 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div style="display:flex;gap:8px;">
-            <a href="pretes-peserta-export.php" class="btn btn-sm" style="background:#ffffff;border:1px solid #cbd5e1;color:#475569;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;text-decoration:none;">
+            <a href="<?= pretesAdminRoute('peserta_export', $pretesProgram) ?>" class="btn btn-sm" style="background:#ffffff;border:1px solid #cbd5e1;color:#475569;font-weight:600;font-size:12px;padding:6px 14px;border-radius:8px;text-decoration:none;">
                 🔄 Reset Form
             </a>
         </div>
     </div>
 
     <div class="card-body" style="padding:22px 24px;">
-        <form method="GET" action="pretes-peserta-export.php" id="form-export">
+        <form method="GET" action="<?= pretesAdminRoute('peserta_export', $pretesProgram) ?>" id="form-export">
             <!-- 1. Grid Filter Data -->
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:22px;">
                 <!-- Filter Periode Pretes -->
@@ -1007,7 +1040,7 @@ function triggerDownload() {
         params.append(pair[0], pair[1]);
     }
 
-    var downloadUrl = 'pretes-peserta-export.php?' + params.toString();
+    var downloadUrl = <?= json_encode(pretesAdminRoute('peserta_export', $pretesProgram)) ?> + '?' + params.toString();
     window.location.href = downloadUrl;
 }
 </script>

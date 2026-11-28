@@ -1,3 +1,26 @@
+## 2026-11-28 21.40.00 +0700 — Tahap 3: Duplikasi submenu Data Peserta Pretes & Ekspor/PDF RPL
+
+**ID:** PRETES-RPL-STAGE3-PESERTA-EXPORT · **Parent Git:** 12a20889e9ab90974c18ca666520e419e6142f5d.
+
+**Perubahan/alasan:** Menduplikasi submenu Data Peserta Pretes beserta seluruh endpoint ekspor Excel/CSV/PDF (termasuk tab Semua Mahasiswa) untuk Pretes RPL dengan wrapper `PRETES_ADMIN_PROGRAM = 'rpl'`. Query periode (`master_pretes.target_program`) dan query peserta (`users.jenis_program`) dibatasi per program di sisi server sehingga peserta/periode Reguler tidak terbawa ke daftar maupun dokumen ekspor RPL, serta seluruh tautan dan URL unduhan JS mengikuti `pretesAdminRoute()`.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/pretes-program-scope.php | tambah route `mahasiswa_export` di `pretesAdminRoute()` | simpan terakhir WIB 2026-11-28 21.37.37
+- includes/pretes-all-students-view.php | tautan ekspor PDF/XLSX mengikuti program aktif | simpan terakhir WIB 2026-11-28 21.38.48
+- admin/pretes-peserta.php | header scope, query periode & peserta terisolasi, tautan & JS ekspor/PDF | simpan terakhir WIB 2026-11-28 21.38.18
+- admin/pretes-peserta-export.php | header scope, filter query & statistik ringkasan per program, tautan & JS download | simpan terakhir WIB 2026-11-28 21.39.29
+- admin/pretes-peserta-pdf.php | header scope, filter query per program, tautan kembali | simpan terakhir WIB 2026-11-28 21.38.49
+- admin/pretes-mahasiswa-export.php | header scope, paksa filter `jenis_program`, tautan kembali | simpan terakhir WIB 2026-11-28 21.38.37
+- admin/pretes-rpl-peserta.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.38.54
+- admin/pretes-rpl-peserta-export.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.38.56
+- admin/pretes-rpl-peserta-pdf.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.38.58
+- admin/pretes-rpl-mahasiswa-export.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.38.59
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 3 lulus tanpa error whitespace/konflik. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan pengujian unduhan Excel/PDF langsung belum dijalankan secara lokal.
+
+**Batas:** Penambahan submenu ke sidebar admin dilakukan pada Tahap 6.
+
 ## 2026-11-28 21.35.00 +0700 — Tahap 2: Duplikasi submenu Pengaturan Tutor, Penguji & Kuota, serta Jadwal Pretes RPL
 
 **ID:** PRETES-RPL-STAGE2-SCHEDULE-TUTOR · **Parent Git:** 824eb095c44c810827935c04cc7948b178d0f48a.

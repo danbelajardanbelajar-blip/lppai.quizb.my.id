@@ -4,17 +4,40 @@
  * format=xlsx (Excel; fallback CSV bila ekstensi ZIP tidak ada) | format=pdf (dokumen A4 siap cetak / simpan PDF).
  * Filter: periode, status_pretes (sudah_pretes|belum_pretes|belum_daftar|belum_semua), prodi, jenis_program, angkatan, hari (koma), q.
  */
-define('PAGE_TITLE', 'Export Status Pretes Mahasiswa');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-all-students.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+
+define('PAGE_TITLE', 'Export Status Pretes Mahasiswa' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo = getDBConnection();
 ensurePretesPeriodTargetColumns($pdo);
-$active = getActivePretesPeriod($pdo);
+if ($pretesProgram !== null) {
+    $stmtActMhs = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+    $stmtActMhs->execute($periodWhere['params']);
+    $active = $stmtActMhs->fetch(PDO::FETCH_ASSOC) ?: null;
+} else {
+    $active = getActivePretesPeriod($pdo);
+}
 $periode = trim((string)($_GET['periode'] ?? ''));
 if ($periode === '') $periode = (string)($active['periode'] ?? '__all__');
 $filters = pretesAllStudentsFilters($_GET);
+if ($pretesProgram !== null) {
+    $filters['jenis_program'] = $pretesProgram === 'rpl' ? 'RPL' : 'Reguler';
+}
 $rows = pretesAllStudentsApply(pretesAllStudentsRows($pdo, $periode), $filters);
 $stats = pretesAllStudentsStats($rows);
 $periodeLabel = ($periode === '__all__' || $periode === '') ? 'Semua Periode' : $periode;
@@ -64,7 +87,7 @@ if ($format !== 'pdf') {
 $e = static fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $months = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 $printDate = $now->format('j') . ' ' . $months[(int)$now->format('n')] . ' ' . $now->format('Y') . ', ' . $now->format('H:i') . ' WIB';
-$backUrl = 'pretes-peserta.php?' . http_build_query(['tab' => 'semua', 'periode' => $periode]);
+$backUrl = pretesAdminRoute('peserta', $pretesProgram, ['tab' => 'semua', 'periode' => $periode]);
 ?>
 <!DOCTYPE html>
 <html lang="id">
