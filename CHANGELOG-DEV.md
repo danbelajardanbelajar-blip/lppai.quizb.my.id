@@ -1,3 +1,19 @@
+## 2026-11-28 21.04.40 +0700 — Sesuaikan nama menu Reguler dan RPL
+
+**ID:** SIDEBAR-REGULER-RPL-LABELS · **Parent Git:** 4def080fe499702c1934f06906534e40a9424809.
+
+**Perubahan/alasan:** Sesuai permintaan pengguna, label sidebar Manajemen Pretes menjadi Pretes Reguler, Manajemen Tutorial menjadi Tutorial Reguler, dan Tutorial RPL Online menjadi Tutorial RPL. Label Tutorial RPL pada tautan dosen juga diselaraskan. Tidak mengubah tautan, hak akses, urutan, badge, pengaturan ujian atau database. Ekspektasi teks dalam pengujian sidebar yang sudah ada diperbarui.
+
+**Lokasi snapshot:** includes/sidebar.php baris 72,127,185,369 (label menu); tests/mahasiswa-unregistered-hide-menu-test.php baris 192-193 (ekspektasi admin); tests/tutorial-rpl-structure-test.php baris 148 (ekspektasi label admin). Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/sidebar.php | simpan terakhir WIB 2026-11-28 21.03.42
+- tests/mahasiswa-unregistered-hide-menu-test.php | simpan terakhir WIB 2026-11-28 21.03.42
+- tests/tutorial-rpl-structure-test.php | simpan terakhir WIB 2026-11-28 21.03.42
+
+**Verifikasi:** php -l ketiga file PHP berubah lulus; tiga tes dengan zend.assertions=1 dan assert.exception=1 lulus: mahasiswa-unregistered-hide-menu, tutorial-rpl-structure, sidebar-accordion-compact. Tes struktur RPL mengeluarkan log lookup tabel fixture yang tidak tersedia (tutorial_registrations/pretes_results/master_gelombang), namun seluruh asersi lulus; ini keterbatasan fixture lama, bukan pengujian database hosting. git diff --check lulus. Perubahan lama di tests/program-separation-rehearsal-target-test.php dan tiga file untracked pemisahan tidak disertakan atau diubah dalam paket ini.
+
+**Batas:** Verifikasi terminal/fixture lokal; tidak mengakses desktop atau browser pengguna, dan deployment hosting belum diverifikasi.
+
 ## 2026-11-26 14.38.18 +0700 — Tambah export PDF hasil ujian CBT Tutorial RPL
 
 **ID:** TUTORIAL-RPL-CBT-EXPORT-PDF · **Parent Git:** 8351160370511b3df22259cfa2845e28a46ff297.

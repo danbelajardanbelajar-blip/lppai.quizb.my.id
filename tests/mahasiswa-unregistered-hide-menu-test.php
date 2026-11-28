@@ -189,8 +189,8 @@ echo "\n=== 5. Validasi Role Admin dan Dosen Tetap Normal ===\n";
 
 $htmlAdmin = renderSidebarTest($pdo, $admin);
 assert(strpos($htmlAdmin, 'Dashboard Admin') !== false, "[FAIL] Admin harus melihat Dashboard Admin");
-assert(strpos($htmlAdmin, 'Manajemen Pretes') !== false, "[FAIL] Admin harus melihat Manajemen Pretes");
-assert(strpos($htmlAdmin, 'Manajemen Tutorial') !== false, "[FAIL] Admin harus melihat Manajemen Tutorial");
+assert(strpos($htmlAdmin, 'Pretes Reguler') !== false, "[FAIL] Admin harus melihat Pretes Reguler");
+assert(strpos($htmlAdmin, 'Tutorial Reguler') !== false, "[FAIL] Admin harus melihat Tutorial Reguler");
 
 $htmlDosen = renderSidebarTest($pdo, $dosen);
 assert(strpos($htmlDosen, 'Dashboard Dosen') !== false, "[FAIL] Dosen harus melihat Dashboard Dosen");

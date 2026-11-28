@@ -69,7 +69,7 @@ if (!function_exists('isNavGroupActive')) {
             <div class="nav-group <?= $isPretesGroupActive ? 'open' : '' ?>" data-group="admin-pretes">
                 <button type="button" class="nav-group-toggle <?= $isPretesGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isPretesGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🧑‍🏫</span>
-                    <span class="nav-text">Manajemen Pretes</span>
+                    <span class="nav-text">Pretes Reguler</span>
                     <span class="nav-badge">8</span>
                     <span class="chevron">▾</span>
                 </button>
@@ -124,7 +124,7 @@ if (!function_exists('isNavGroupActive')) {
             <div class="nav-group <?= $isTutorialGroupActive ? 'open' : '' ?>" data-group="admin-tutorial">
                 <button type="button" class="nav-group-toggle <?= $isTutorialGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🏫</span>
-                    <span class="nav-text">Manajemen Tutorial</span>
+                    <span class="nav-text">Tutorial Reguler</span>
                     <span class="nav-badge">5</span>
                     <span class="chevron">▾</span>
                 </button>
@@ -182,7 +182,7 @@ if (!function_exists('isNavGroupActive')) {
             <div class="nav-group <?= $isTutorialRplGroupActive ? 'open' : '' ?>" data-group="admin-tutorial-rpl">
                 <button type="button" class="nav-group-toggle <?= $isTutorialRplGroupActive ? 'has-active' : '' ?>" aria-expanded="<?= $isTutorialRplGroupActive ? 'true' : 'false' ?>">
                     <span class="icon">🌐</span>
-                    <span class="nav-text">Tutorial RPL Online</span>
+                    <span class="nav-text">Tutorial RPL</span>
                     <span class="nav-badge">8</span>
                     <span class="chevron">▾</span>
                 </button>
@@ -366,7 +366,7 @@ if (!function_exists('isNavGroupActive')) {
             <?php if ($showDosenTutorialRpl): ?>
             <a href="<?= BASE_URL ?>/dosen/tutorial-rpl.php" class="page-nav <?= menuActive('tutorial-rpl.php') ?>">
                 <span class="icon">🌐</span>
-                <span class="nav-text">Tutorial RPL Online</span>
+                <span class="nav-text">Tutorial RPL</span>
             </a>
             <?php endif; ?>
 <?php else: ?>

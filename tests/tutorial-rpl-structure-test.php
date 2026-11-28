@@ -145,7 +145,7 @@ $renderSidebar = function(array $user): string {
 // 2a. Admin Sidebar
 $adminHtml = $renderSidebar(['id' => 1, 'role' => 'admin', 'nama_lengkap' => 'Administrator']);
 $check(str_contains($adminHtml, 'data-group="admin-tutorial-rpl"'), 'Admin sidebar memiliki data-group="admin-tutorial-rpl"');
-$check(str_contains($adminHtml, 'Tutorial RPL Online'), 'Admin sidebar memuat judul "Tutorial RPL Online"');
+$check(str_contains($adminHtml, '<span class="nav-text">Tutorial RPL</span>'), 'Admin sidebar memuat judul "Tutorial RPL"');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-periode.php'), 'Admin sidebar memuat menu periode pendaftaran RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-pendaftaran.php'), 'Admin sidebar memuat menu pendaftaran peserta RPL');
 $check(str_contains($adminHtml, 'admin/tutorial-rpl-kelas.php'), 'Admin sidebar memuat link tutorial-rpl-kelas.php');
