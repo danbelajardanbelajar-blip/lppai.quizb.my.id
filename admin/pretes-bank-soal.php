@@ -1,16 +1,34 @@
 <?php
-define('PAGE_TITLE', 'Bank Soal & Pengatur Sesi CBT Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-cbt.php';
 require_once __DIR__ . '/../includes/pretes-tryout.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 $tryoutLabelCache = [];
 require_once __DIR__ . '/../includes/pretes-cbt-xlsx.php';
-$bankUrl = BASE_URL . '/pretes-ujian.php?cbt_bank=1';
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$userWhere = pretesUserProgramWhere($pretesProgram, 'u');
+$cbtPkgWhere = pretesCbtProgramWhere($pretesProgram, 'p');
+
+define('PAGE_TITLE', 'Bank Soal & Pengatur Sesi CBT Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
+$bankUrl = pretesAdminRoute('cbt_bank', $pretesProgram);
 if (isset($_GET['download']) && $_GET['download'] === 'template') cbtSendXlsx(__DIR__ . '/../downloads/template-bank-soal-cbt.xlsx', 'template-bank-soal-cbt.xlsx');
 if (isset($_GET['download']) && $_GET['download'] === 'paket2kp') cbtSendXlsx(__DIR__ . '/../downloads/paket-2-kristen-protestan.xlsx', 'paket-2-kristen-protestan.xlsx');
 $pdo = getDBConnection();
 ensurePretesCbtTables($pdo);
+if ($pretesProgram !== null) {
+    ensurePretesCbtProgramScopeColumns($pdo);
+}
 
 // Endpoint AJAX untuk kebutuhan data dinamis modal tanpa reload halaman
 if (isset($_GET['ajax'])) {
@@ -66,7 +84,7 @@ if (isset($_GET['ajax'])) {
         $now = time();
 
         // Placeholder unik per kondisi (aman untuk native prepare MySQL).
-        [$whereSql, $params] = pretesCbtResultWhere($cbtFilters, $now);
+        [$whereSql, $params] = pretesCbtResultWhere($cbtFilters, $now, true, $pretesProgram);
 
         // Total filtered count
         $countStmt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id $whereSql");
@@ -164,11 +182,21 @@ if (isset($_GET['ajax'])) {
             ];
         }
 
-        $resmiStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts WHERE registration_id > 0')->fetch(PDO::FETCH_ASSOC) ?: [];
-        $tryoutStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts WHERE registration_id < 0')->fetch(PDO::FETCH_ASSOC) ?: [];
-        $totalAll = (int)($pdo->query('SELECT COUNT(*) FROM pretes_cbt_attempts')->fetchColumn() ?: 0);
-        $ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
-        $finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+        $stmtResmiSt = $pdo->prepare("SELECT COUNT(*) AS total FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.registration_id > 0 AND {$userWhere['sql']}");
+        $stmtResmiSt->execute($userWhere['params']);
+        $resmiStats = $stmtResmiSt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stmtTryoutSt = $pdo->prepare("SELECT COUNT(*) AS total FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.registration_id < 0 AND {$userWhere['sql']}");
+        $stmtTryoutSt->execute($userWhere['params']);
+        $tryoutStats = $stmtTryoutSt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stmtAllSt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE {$userWhere['sql']}");
+        $stmtAllSt->execute($userWhere['params']);
+        $totalAll = (int)($stmtAllSt->fetchColumn() ?: 0);
+        $stmtOngoingSt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.submitted_at IS NULL AND a.deadline_at > $now AND {$userWhere['sql']}");
+        $stmtOngoingSt->execute($userWhere['params']);
+        $ongoingCount = (int)($stmtOngoingSt->fetchColumn() ?: 0);
+        $stmtFinishedSt = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE (a.submitted_at IS NOT NULL OR a.deadline_at <= $now) AND {$userWhere['sql']}");
+        $stmtFinishedSt->execute($userWhere['params']);
+        $finishedCount = (int)($stmtFinishedSt->fetchColumn() ?: 0);
 
         echo json_encode([
             'success' => true,
@@ -187,7 +215,7 @@ if (isset($_GET['ajax'])) {
             'result_filter' => $filter,
             'day' => $cbtFilters['day'],
             'pass_filter' => $cbtFilters['pass_filter'],
-            'pass_counts' => pretesCbtResultPassCounts($pdo, $cbtFilters, $now),
+            'pass_counts' => pretesCbtResultPassCounts($pdo, $cbtFilters, $now, $pretesProgram),
             'data' => $data
         ], JSON_UNESCAPED_UNICODE);
         exit;
@@ -242,9 +270,9 @@ if ($rawTab === 'bank' || $rawTab === 'form') {
 $flash = $_SESSION['cbt_bank_flash'] ?? null;
 unset($_SESSION['cbt_bank_flash']);
 
-$packages = pretesCbtGetPackages($pdo);
-$activePackage = pretesCbtGetActivePackage($pdo);
-$sessions = pretesCbtGetSessions($pdo);
+$packages = pretesCbtGetPackages($pdo, $pretesProgram);
+$activePackage = pretesCbtGetActivePackage($pdo, $pretesProgram);
+$sessions = pretesCbtGetSessions($pdo, $pretesProgram);
 $activeSession = pretesCbtGetActiveSession($pdo);
 
 $isAjax = isset($_POST['ajax']) || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
@@ -270,7 +298,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'save_session') {
-            $sesId = pretesCbtSaveSession($pdo, $_POST);
+            $sesInput = $_POST;
+            if ($pretesProgram !== null) {
+                $sesInput['program_scope'] = $pretesProgram;
+            }
+            $sesId = pretesCbtSaveSession($pdo, $sesInput);
             $flashMsg = 'Sesi ujian berhasil disimpan.';
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
@@ -365,7 +397,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['cbt_bank_flash'] = $flashMsg;
             header('Location: ' . $bankUrl . '&tab=sessions'); exit;
         } elseif ($action === 'save_package') {
-            $pkgId = pretesCbtSavePackage($pdo, $_POST);
+            $pkgInput = $_POST;
+            if ($pretesProgram !== null) {
+                $pkgInput['program_scope'] = $pretesProgram;
+            }
+            $pkgId = pretesCbtSavePackage($pdo, $pkgInput);
             $flashMsg = 'Paket soal berhasil disimpan.';
             if ($isAjax) {
                 header('Content-Type: application/json; charset=utf-8');
@@ -523,9 +559,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'save_session') $sesForm = $_POST;
     }
     // Refresh lists after mutations
-    $packages = pretesCbtGetPackages($pdo);
-    $activePackage = pretesCbtGetActivePackage($pdo);
-    $sessions = pretesCbtGetSessions($pdo);
+    $packages = pretesCbtGetPackages($pdo, $pretesProgram);
+    $activePackage = pretesCbtGetActivePackage($pdo, $pretesProgram);
+    $sessions = pretesCbtGetSessions($pdo, $pretesProgram);
     $activeSession = pretesCbtGetActiveSession($pdo);
 }
 
@@ -547,7 +583,9 @@ if ($form === null && !empty($_GET['edit'])) {
     if ($form) { $activeTab = 'form'; foreach (json_decode($form['options_json'], true) as $letter => $text) $form['option_' . $letter] = $text; }
 }
 $form ??= ['is_active'=>1,'category'=>'Umum','package_id'=>$activePackage['id'] ?? ($packages[0]['id'] ?? 1)];
-$questions = $pdo->query('SELECT q.*, p.name AS package_name FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id ORDER BY q.id DESC')->fetchAll(PDO::FETCH_ASSOC);
+$stmtQList = $pdo->prepare("SELECT q.*, p.name AS package_name FROM pretes_cbt_questions q LEFT JOIN pretes_cbt_packages p ON p.id = q.package_id WHERE {$cbtPkgWhere['sql']} ORDER BY q.id DESC");
+$stmtQList->execute($cbtPkgWhere['params']);
+$questions = $stmtQList->fetchAll(PDO::FETCH_ASSOC);
 $active = count(array_filter($questions, static fn($question) => (bool)$question['is_active']));
 $categories = array_values(array_unique(array_column($questions, 'category'))); sort($categories);
 
@@ -559,17 +597,23 @@ foreach ($packages as $pkg) {
     $packageCategoriesMap[(int)$pkg['id']] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-$stats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts WHERE registration_id > 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+$stmtStatsRes = $pdo->prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN a.submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(a.score) AS average_score FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.registration_id > 0 AND {$userWhere['sql']}");
+$stmtStatsRes->execute($userWhere['params']);
+$stats = $stmtStatsRes->fetch(PDO::FETCH_ASSOC) ?: [];
 $stats['total'] = (int)($stats['total'] ?? 0);
 $stats['finished'] = (int)($stats['finished'] ?? 0);
 $stats['average_score'] = $stats['average_score'] !== null ? (float)$stats['average_score'] : null;
 
-$tryoutStats = $pdo->query('SELECT COUNT(*) AS total, SUM(CASE WHEN submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(score) AS average_score FROM pretes_cbt_attempts WHERE registration_id < 0')->fetch(PDO::FETCH_ASSOC) ?: [];
+$stmtStatsTry = $pdo->prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN a.submitted_at IS NOT NULL THEN 1 ELSE 0 END) AS finished, AVG(a.score) AS average_score FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.registration_id < 0 AND {$userWhere['sql']}");
+$stmtStatsTry->execute($userWhere['params']);
+$tryoutStats = $stmtStatsTry->fetch(PDO::FETCH_ASSOC) ?: [];
 $tryoutStats['total'] = (int)($tryoutStats['total'] ?? 0);
 $tryoutStats['finished'] = (int)($tryoutStats['finished'] ?? 0);
 $tryoutStats['average_score'] = $tryoutStats['average_score'] !== null ? (float)$tryoutStats['average_score'] : null;
 
-$allStats = $pdo->query('SELECT COUNT(*) AS total FROM pretes_cbt_attempts')->fetch(PDO::FETCH_ASSOC) ?: [];
+$stmtStatsAll = $pdo->prepare("SELECT COUNT(*) AS total FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE {$userWhere['sql']}");
+$stmtStatsAll->execute($userWhere['params']);
+$allStats = $stmtStatsAll->fetch(PDO::FETCH_ASSOC) ?: [];
 $totalAttemptCount = (int)($allStats['total'] ?? 0);
 
 $cbtFilters = pretesCbtResultFilters($_GET);
@@ -582,12 +626,16 @@ $page = $cbtFilters['page'];
 $perPage = $cbtFilters['per_page'];
 
 $now = time();
-$ongoingCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NULL AND deadline_at > $now")->fetchColumn() ?: 0);
-$finishedCount = (int)($pdo->query("SELECT COUNT(*) FROM pretes_cbt_attempts WHERE submitted_at IS NOT NULL OR deadline_at <= $now")->fetchColumn() ?: 0);
+$stmtOngoing = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE a.submitted_at IS NULL AND a.deadline_at > $now AND {$userWhere['sql']}");
+$stmtOngoing->execute($userWhere['params']);
+$ongoingCount = (int)($stmtOngoing->fetchColumn() ?: 0);
+$stmtFinished = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_attempts a JOIN users u ON u.id = a.user_id WHERE (a.submitted_at IS NOT NULL OR a.deadline_at <= $now) AND {$userWhere['sql']}");
+$stmtFinished->execute($userWhere['params']);
+$finishedCount = (int)($stmtFinished->fetchColumn() ?: 0);
 
 // Placeholder unik per kondisi (aman untuk native prepare MySQL).
-[$whereClause, $params] = pretesCbtResultWhere($cbtFilters, $now);
-$passCounts = pretesCbtResultPassCounts($pdo, $cbtFilters, $now);
+[$whereClause, $params] = pretesCbtResultWhere($cbtFilters, $now, true, $pretesProgram);
+$passCounts = pretesCbtResultPassCounts($pdo, $cbtFilters, $now, $pretesProgram);
 $dayOptions = pretesCbtResultDayOptions($pdo, $resultFilter);
 $passMinScore = pretesCbtPassMinScore();
 

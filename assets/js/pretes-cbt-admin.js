@@ -564,7 +564,7 @@
 
         const btnImport = get('btnModalImportExcel');
         if (btnImport) {
-            btnImport.href = (window.location.pathname || '') + '?cbt_bank=1&tab=import' + (packageId > 0 ? ('&target_pkg=' + packageId) : '');
+            btnImport.href = (window.location.pathname || '') + '?cbt_bank=1' + (window.CBT_PROGRAM_QS || '') + '&tab=import' + (packageId > 0 ? ('&target_pkg=' + packageId) : '');
         }
 
         if (container) {
@@ -574,7 +574,7 @@
         cbtOpenModal('modalPackageQuestions');
 
         // Fetch questions from AJAX endpoint
-        const fetchUrl = (window.location.pathname || '') + '?cbt_bank=1&ajax=package_questions&package_id=' + (packageId || 0);
+        const fetchUrl = (window.location.pathname || '') + '?cbt_bank=1' + (window.CBT_PROGRAM_QS || '') + '&ajax=package_questions&package_id=' + (packageId || 0);
         fetch(fetchUrl)
             .then(res => res.json())
             .then(data => {
@@ -711,7 +711,7 @@
             card.style.pointerEvents = 'none';
         }
 
-        fetch((window.location.pathname || '') + '?cbt_bank=1', {
+        fetch((window.location.pathname || '') + '?cbt_bank=1' + (window.CBT_PROGRAM_QS || ''), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -918,7 +918,7 @@
             const prodiText = (att.program_studi || '').trim();
             const prodiHtml = prodiText ? '<div class="cbt-user-prodi" style="font-size:11px;color:#64748b;margin-top:2px;line-height:1.25;">' + escapeHtml(prodiText) + '</div>' : '';
             const filterQuery = (currentFilter && currentFilter !== 'all') ? '&result_filter=' + encodeURIComponent(currentFilter) : '';
-            const reviewUrl = baseUrl + '/pretes-ujian.php?cbt_review=1&attempt_id=' + att.id + filterQuery;
+            const reviewUrl = baseUrl + '/pretes-ujian.php?cbt_review=1' + (window.CBT_PROGRAM_QS || '') + '&attempt_id=' + att.id + filterQuery;
 
             const actionCellHtml =
                 '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">' +

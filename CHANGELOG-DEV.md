@@ -1,3 +1,23 @@
+## 2026-11-28 21.48.40 +0700 — Tahap 5: Duplikasi Bank Soal & Hasil CBT Pretes RPL
+
+**ID:** PRETES-RPL-STAGE5-CBT-BANK · **Parent Git:** c23024bcef5314ac0a63e3ea42973776503981c1.
+
+**Perubahan/alasan:** Memisahkan pengelolaan Bank Soal, Paket, Sesi, Review Lembar Jawaban, dan Hasil CBT untuk Pretes RPL (baik via `pretes-ujian.php?cbt_bank=1&program=rpl` / `cbt_review=1&program=rpl` maupun route admin `admin/pretes-rpl-bank-soal.php` & `admin/pretes-rpl-cbt-review.php`). Helper `pretesCbtGetPackages()`, `pretesCbtGetActivePackage()`, `pretesCbtSavePackage()`, `pretesCbtGetSessions()`, `pretesCbtSaveSession()`, `pretesCbtResultWhere()`, `pretesCbtResultPassCounts()`, dan `buildCbtResultUrl()` kini mendukung scope `program_scope` / `users.jenis_program` sehingga paket/sesi dan hasil ujian RPL terisolasi penuh dari Reguler tanpa mengubah data lama.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/pretes-cbt.php | scope `program_scope` pada paket/sesi & filter hasil CBT | simpan terakhir WIB 2026-11-28 21.47.15
+- includes/pretes-cbt-admin-view.php | input hidden `program`, tautan review, dan `window.CBT_PROGRAM_QS` | simpan terakhir WIB 2026-11-28 21.46.25
+- assets/js/pretes-cbt-admin.js | teruskan `window.CBT_PROGRAM_QS` ke AJAX, import, dan review URL | simpan terakhir WIB 2026-11-28 21.46.57
+- admin/pretes-bank-soal.php | header scope, query paket/sesi/soal/statistik & live_results terisolasi | simpan terakhir WIB 2026-11-28 21.48.05
+- admin/pretes-cbt-review.php | header scope, filter attempt & tombol kembali per program | simpan terakhir WIB 2026-11-28 21.45.47
+- admin/pretes-rpl-bank-soal.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.47.21
+- admin/pretes-rpl-cbt-review.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.47.24
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 5 lulus tanpa error whitespace/konflik. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan pengujian AJAX/CBT langsung belum dijalankan secara lokal.
+
+**Batas:** Penambahan grup menu Pretes RPL ke sidebar admin dan pembaruan tes regresi dilakukan pada Tahap 6.
+
 ## 2026-11-28 21.43.20 +0700 — Tahap 4: Duplikasi Nilai Rinci & Absensi, serta Rekapitulasi Nilai Pretes RPL
 
 **ID:** PRETES-RPL-STAGE4-NILAI-REKAP · **Parent Git:** 2d5f57451cb75df9dfbda73d433f3c7b7c4dda4d.

@@ -558,6 +558,7 @@
 
                 <form method="get" action="<?= BASE_URL ?>/pretes-ujian.php" class="cbt-filter-form" id="cbtResultSearchForm" data-no-spa role="search">
                     <input type="hidden" name="cbt_bank" value="1">
+                    <?php if (!empty($pretesProgram)): ?><input type="hidden" name="program" value="<?= htmlspecialchars($pretesProgram, ENT_QUOTES, 'UTF-8') ?>"><?php endif; ?>
                     <input type="hidden" name="tab" value="results">
                     <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status_filter" value="<?= sanitize($statusFilter) ?>"><?php endif; ?>
                     <?php if ($resultFilter !== 'all'): ?><input type="hidden" name="result_filter" value="<?= sanitize($resultFilter) ?>"><?php endif; ?>
@@ -732,7 +733,7 @@
                         </td>
                         <td style="text-align:center">
                             <div style="display:inline-flex;align-items:center;gap:6px;justify-content:center;flex-wrap:wrap">
-                                <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_review=1&amp;attempt_id=<?= (int)$attempt['id'] ?><?= $resultFilter !== 'all' ? '&amp;result_filter=' . urlencode($resultFilter) : '' ?>" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" title="Review lembar jawaban peserta (soal benar, salah, dan ragu)">👁️ Review</a>
+                                <a href="<?= BASE_URL ?>/pretes-ujian.php?cbt_review=1<?= !empty($pretesProgram) ? '&amp;program=' . urlencode($pretesProgram) : '' ?>&amp;attempt_id=<?= (int)$attempt['id'] ?><?= $resultFilter !== 'all' ? '&amp;result_filter=' . urlencode($resultFilter) : '' ?>" class="bank-button" style="background:#2563eb;color:#ffffff;border-color:#1d4ed8;padding:4px 9px;font-size:11.5px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;line-height:1.2;font-weight:600" title="Review lembar jawaban peserta (soal benar, salah, dan ragu)">👁️ Review</a>
                                 <form method="post" action="<?= $bankUrl ?>&amp;tab=results" style="margin:0;display:inline-block;" onsubmit="return confirm('Yakin ingin menghapus sesi CBT <?= htmlspecialchars(addslashes($attempt['nama_lengkap']), ENT_QUOTES, 'UTF-8') ?> (NIM: <?= htmlspecialchars($attempt['nim'] ?? '-', ENT_QUOTES, 'UTF-8') ?>)?\n\nData jawaban dan nilai akan dihapus, dan peserta dapat memulai ujian kembali.')">
                                     <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
                                     <input type="hidden" name="action" value="delete_attempt">
@@ -1192,4 +1193,5 @@ window.CBT_PASS_MIN_SCORE = <?= json_encode((float)($passMinScore ?? 80.0)) ?>;
 window.CBT_PAGE = <?= (int)($page ?? 1) ?>;
 window.CBT_PER_PAGE = <?= (int)($perPage ?? 25) ?>;
 </script>
+<script>window.CBT_PROGRAM_QS = <?= json_encode(!empty($pretesProgram) ? '&program=' . rawurlencode($pretesProgram) : '') ?>;</script>
 <script src="<?= BASE_URL ?>/pretes-ujian.php?cbt_admin_asset=1&amp;v=<?= filemtime(__DIR__ . '/../assets/js/pretes-cbt-admin.js') ?>"></script>

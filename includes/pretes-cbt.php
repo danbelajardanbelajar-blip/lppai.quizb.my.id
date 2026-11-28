@@ -758,8 +758,16 @@ function pretesCbtGetPackageQuestions(PDO $pdo, int $packageId = 0): array {
     return $rows;
 }
 
-function pretesCbtGetPackages(PDO $pdo): array {
+function pretesCbtGetPackages(PDO $pdo, ?string $program = null): array {
     ensurePretesCbtTables($pdo);
+    if ($program !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+        $w = pretesCbtProgramWhere($program, 'p');
+        $stmt = $pdo->prepare("SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p WHERE {$w['sql']} ORDER BY p.is_active DESC, p.id DESC");
+        $stmt->execute($w['params']);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     return $pdo->query('SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p ORDER BY p.is_active DESC, p.id DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -771,14 +779,31 @@ function pretesCbtGetPackage(PDO $pdo, int $packageId): ?array {
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-function pretesCbtGetActivePackage(PDO $pdo): ?array {
+function pretesCbtGetActivePackage(PDO $pdo, ?string $program = null): ?array {
     ensurePretesCbtTables($pdo);
+    if ($program !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+        $w = pretesCbtProgramWhere($program, 'p');
+        $stmt = $pdo->prepare("SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p WHERE p.is_active = 1 AND {$w['sql']} ORDER BY p.id DESC LIMIT 1");
+        $stmt->execute($w['params']);
+        $pkg = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $pkg ?: null;
+    }
     $pkg = $pdo->query('SELECT p.*, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id) AS total_questions, (SELECT COUNT(*) FROM pretes_cbt_questions q WHERE q.package_id = p.id AND q.is_active = 1) AS question_count_actual FROM pretes_cbt_packages p WHERE p.is_active = 1 ORDER BY p.id DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
     return $pkg ?: null;
 }
 
 function pretesCbtSavePackage(PDO $pdo, array $input): int {
     ensurePretesCbtTables($pdo);
+    $programScope = isset($input['program_scope']) && $input['program_scope'] !== '' ? (string)$input['program_scope'] : null;
+    if ($programScope !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+        $scopeWhere = pretesCbtProgramWhere($programScope);
+    } else {
+        $scopeWhere = ['sql' => '1=1', 'params' => []];
+    }
     $name = trim((string)($input['name'] ?? ''));
     if ($name === '') {
         throw new InvalidArgumentException('Nama paket soal wajib diisi.');
@@ -795,24 +820,31 @@ function pretesCbtSavePackage(PDO $pdo, array $input): int {
     $pdo->beginTransaction();
     try {
         if ($isActive === 1) {
-            $pdo->exec('UPDATE pretes_cbt_packages SET is_active = 0');
+            $pdo->prepare("UPDATE pretes_cbt_packages SET is_active = 0 WHERE {$scopeWhere['sql']}")->execute($scopeWhere['params']);
         } else {
-            $otherCount = (int)$pdo->query('SELECT COUNT(*) FROM pretes_cbt_packages WHERE id != ' . $pkgId)->fetchColumn();
+            $stmtOther = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_packages WHERE id != ? AND {$scopeWhere['sql']}");
+            $stmtOther->execute(array_merge([$pkgId], $scopeWhere['params']));
+            $otherCount = (int)$stmtOther->fetchColumn();
             if ($otherCount === 0) {
                 $isActive = 1;
             }
         }
 
         if ($pkgId > 0) {
-            $stmt = $pdo->prepare('UPDATE pretes_cbt_packages SET name = ?, description = ?, duration_minutes = ?, question_count = ?, is_active = ? WHERE id = ?');
-            $stmt->execute([$name, $description !== '' ? $description : null, $duration, $questionCount, $isActive, $pkgId]);
+            $stmt = $pdo->prepare("UPDATE pretes_cbt_packages SET name = ?, description = ?, duration_minutes = ?, question_count = ?, is_active = ? WHERE id = ? AND {$scopeWhere['sql']}");
+            $stmt->execute(array_merge([$name, $description !== '' ? $description : null, $duration, $questionCount, $isActive, $pkgId], $scopeWhere['params']));
         } else {
             $code = trim((string)($input['code'] ?? ''));
             if ($code === '') {
                 $code = 'PKT-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
             }
-            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_packages (code, name, description, duration_minutes, question_count, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$code, $name, $description !== '' ? $description : null, $duration, $questionCount, $isActive, time()]);
+            if ($programScope !== null) {
+                $stmt = $pdo->prepare('INSERT INTO pretes_cbt_packages (code, name, description, duration_minutes, question_count, is_active, created_at, program_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$code, $name, $description !== '' ? $description : null, $duration, $questionCount, $isActive, time(), $programScope]);
+            } else {
+                $stmt = $pdo->prepare('INSERT INTO pretes_cbt_packages (code, name, description, duration_minutes, question_count, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$code, $name, $description !== '' ? $description : null, $duration, $questionCount, $isActive, time()]);
+            }
             $pkgId = (int)$pdo->lastInsertId();
         }
         $pdo->commit();
@@ -892,10 +924,19 @@ function pretesCbtGenerateToken(int $length = 6): string {
     return $token;
 }
 
-function pretesCbtGetSessions(PDO $pdo): array {
+function pretesCbtGetSessions(PDO $pdo, ?string $program = null): array {
     ensurePretesCbtTables($pdo);
-    $sessions = $pdo->query('SELECT * FROM pretes_cbt_sessions ORDER BY is_active DESC, id DESC')->fetchAll(PDO::FETCH_ASSOC);
-    $packages = pretesCbtGetPackages($pdo);
+    if ($program !== null) {
+        require_once __DIR__ . '/pretes-program-scope.php';
+        ensurePretesCbtProgramScopeColumns($pdo);
+        $w = pretesCbtProgramWhere($program);
+        $stmt = $pdo->prepare("SELECT * FROM pretes_cbt_sessions WHERE {$w['sql']} ORDER BY is_active DESC, id DESC");
+        $stmt->execute($w['params']);
+        $sessions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $sessions = $pdo->query('SELECT * FROM pretes_cbt_sessions ORDER BY is_active DESC, id DESC')->fetchAll(PDO::FETCH_ASSOC);
+    }
+    $packages = pretesCbtGetPackages($pdo, $program);
     $pkgMap = [];
     foreach ($packages as $pkg) {
         $pkgMap[(int)$pkg['id']] = $pkg;
@@ -1095,9 +1136,20 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
 
     $pdo->beginTransaction();
     try {
+        $programScope = isset($input['program_scope']) && $input['program_scope'] !== '' ? (string)$input['program_scope'] : null;
+        if ($programScope !== null) {
+            require_once __DIR__ . '/pretes-program-scope.php';
+            ensurePretesCbtProgramScopeColumns($pdo);
+            $scopeWhere = pretesCbtProgramWhere($programScope);
+        } else {
+            $scopeWhere = ['sql' => '1=1', 'params' => []];
+        }
+
         if ($mode === 'resmi') {
             if ($isActive === 0) {
-                $otherCount = (int)$pdo->query("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != " . (int)$sessionId . " AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi')")->fetchColumn();
+                $stmtOther = $pdo->prepare("SELECT COUNT(*) FROM pretes_cbt_sessions WHERE id != ? AND is_active = 1 AND (mode IS NULL OR mode = '' OR mode = 'resmi') AND {$scopeWhere['sql']}");
+                $stmtOther->execute(array_merge([(int)$sessionId], $scopeWhere['params']));
+                $otherCount = (int)$stmtOther->fetchColumn();
                 if ($otherCount === 0) {
                     $isActive = 1;
                 }
@@ -1105,26 +1157,35 @@ function pretesCbtSaveSession(PDO $pdo, array $input): int {
         }
 
         if ($sessionId > 0) {
-            $stmt = $pdo->prepare('UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, shuffle_on_violation = ?, is_active = ?, mode = ?, max_attempts = ? WHERE id = ?');
-            $stmt->execute([
+            $stmt = $pdo->prepare("UPDATE pretes_cbt_sessions SET title = ?, description = ?, package_ids_json = ?, category_quotas_json = ?, camera_mode = ?, duration_minutes = ?, scoring_method = ?, passing_grade = ?, start_time = ?, end_time = ?, token = ?, token_required = ?, shuffle_on_violation = ?, is_active = ?, mode = ?, max_attempts = ? WHERE id = ? AND {$scopeWhere['sql']}");
+            $stmt->execute(array_merge([
                 $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
                 $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
                 $token, $tokenRequired, $shuffleOnViolation, $isActive, $mode, $maxAttempts, $sessionId
-            ]);
+            ], $scopeWhere['params']));
             if ($examOpen !== null) {
-                $pdo->prepare('UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ?')->execute([$examOpen, $sessionId]);
+                $pdo->prepare("UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ? AND {$scopeWhere['sql']}")->execute(array_merge([$examOpen, $sessionId], $scopeWhere['params']));
             }
         } else {
             $code = trim((string)($input['code'] ?? ''));
             if ($code === '') {
                 $code = 'SESI-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
             }
-            $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at, mode, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-            $stmt->execute([
-                $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
-                $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
-                $token, $tokenRequired, $shuffleOnViolation, $isActive, time(), $mode, $maxAttempts
-            ]);
+            if ($programScope !== null) {
+                $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at, mode, max_attempts, program_scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([
+                    $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
+                    $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
+                    $token, $tokenRequired, $shuffleOnViolation, $isActive, time(), $mode, $maxAttempts, $programScope
+                ]);
+            } else {
+                $stmt = $pdo->prepare('INSERT INTO pretes_cbt_sessions (code, title, description, package_ids_json, category_quotas_json, camera_mode, duration_minutes, scoring_method, passing_grade, start_time, end_time, token, token_required, shuffle_on_violation, is_active, created_at, mode, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([
+                    $code, $title, $description !== '' ? $description : null, $packageIdsJson, $categoryQuotasJson,
+                    $cameraMode, $duration, $scoringMethod, $passingGrade, $startTime, $endTime,
+                    $token, $tokenRequired, $shuffleOnViolation, $isActive, time(), $mode, $maxAttempts
+                ]);
+            }
             $sessionId = (int)$pdo->lastInsertId();
             $pdo->prepare('UPDATE pretes_cbt_sessions SET exam_open = ? WHERE id = ?')->execute([$examOpen ?? 1, $sessionId]);
         }
@@ -1432,9 +1493,13 @@ if (!function_exists('pretesCbtPassMinScore')) {
  * PDO::ATTR_EMULATE_PREPARES => false (MySQL native prepare).
  */
 if (!function_exists('pretesCbtResultWhere')) {
-    function pretesCbtResultWhere(array $f, int $now, bool $withPass = true): array {
+    function pretesCbtResultWhere(array $f, int $now, bool $withPass = true, ?string $program = null): array {
         $conds = [];
         $params = [];
+        if ($program !== null) {
+            $conds[] = "LOWER(TRIM(COALESCE(u.jenis_program, ''))) = :scope_program";
+            $params[':scope_program'] = $program;
+        }
         if ($f['status_filter'] === 'live') {
             $conds[] = '(a.submitted_at IS NULL AND a.deadline_at > :now_ts)';
             $params[':now_ts'] = $now;
@@ -1477,10 +1542,10 @@ if (!function_exists('pretesCbtResultWhere')) {
 
 /** Jumlah sesi selesai lulus / tidak lulus untuk filter aktif (tanpa filter lulus). */
 if (!function_exists('pretesCbtResultPassCounts')) {
-    function pretesCbtResultPassCounts(PDO $pdo, array $f, int $now): array {
+    function pretesCbtResultPassCounts(PDO $pdo, array $f, int $now, ?string $program = null): array {
         // Klik chip lulus/tidak lulus selalu menuju sesi selesai, jadi hitungannya juga dari sesi selesai.
         if (($f['status_filter'] ?? 'all') === 'live') $f['status_filter'] = 'finished';
-        [$where, $params] = pretesCbtResultWhere($f, $now, false);
+        [$where, $params] = pretesCbtResultWhere($f, $now, false, $program);
         $params[':pc_min1'] = pretesCbtPassMinScore();
         $params[':pc_min2'] = pretesCbtPassMinScore();
         $sql = "SELECT
@@ -1531,11 +1596,14 @@ if (!function_exists('pretesCbtResultDayOptions')) {
 
 if (!function_exists('buildCbtResultUrl')) {
     function buildCbtResultUrl(array $overrides = []): string {
-        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page, $dayFilter, $passFilter;
+        global $statusFilter, $resultFilter, $searchQuery, $perPage, $page, $dayFilter, $passFilter, $pretesProgram;
         $params = [
             'cbt_bank' => 1,
             'tab' => 'results'
         ];
+        if (!empty($pretesProgram)) {
+            $params['program'] = $pretesProgram;
+        }
         $mergedStatus = $overrides['status_filter'] ?? ($statusFilter ?? 'all');
         if ($mergedStatus !== 'all') {
             $params['status_filter'] = $mergedStatus;
