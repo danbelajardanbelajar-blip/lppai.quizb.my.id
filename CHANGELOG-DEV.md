@@ -1,3 +1,18 @@
+## 2026-11-28 21.31.10 +0700 — Tahap 1: Fondasi helper scope program Pretes RPL/Reguler
+
+**ID:** PRETES-RPL-STAGE1-SCOPE-FOUNDATION · **Parent Git:** 8687c42930dc672a3d9ad6ac09782129cadadb29.
+
+**Perubahan/alasan:** Menyiapkan fondasi pembatas program di sisi server (`includes/pretes-program-scope.php`) untuk tahap awal duplikasi penuh Pretes Reguler menjadi Pretes RPL. Helper menyediakan `pretesAdminResolveProgram()` (menolak konflik parameter GET/POST terhadap halaman program tetap), `pretesAdminProgramLabel()`, `pretesAdminTargetProgramValue()`, builder filter SQL terparameter (`pretesPeriodTargetWhere()`, `pretesUserProgramWhere()`, `pretesCbtProgramWhere()`), pemetaan URL `pretesAdminRoute()`, serta `ensurePretesCbtProgramScopeColumns()` untuk memastikan kolom nullable `program_scope` pada `pretes_cbt_packages` dan `pretes_cbt_sessions` tanpa mengubah baris lama. Menambahkan unit test `tests/pretes-program-scope-test.php` (resolusi program, proteksi konflik, route mapping, filter SQL ketat, dan auto-migration SQLite in-memory).
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- includes/pretes-program-scope.php | fungsi helper scope, route, dan migrasi `program_scope` | simpan terakhir WIB 2026-11-28 21.30.47
+- tests/pretes-program-scope-test.php | unit test resolusi, filter SQL, route, dan migrasi SQLite | simpan terakhir WIB 2026-11-28 21.30.48
+
+**Verifikasi:** `git diff --check -- includes/pretes-program-scope.php tests/pretes-program-scope-test.php` lulus tanpa error whitespace/konflik. Binary `php` tidak ditemukan di PATH maupun `C:\xampp\php\php.exe` pada lingkungan lokal Windows sehingga `php -l` dan eksekusi `tests/pretes-program-scope-test.php` belum dijalankan secara lokal dan perlu diverifikasi pada lingkungan PHP/server. Perubahan lama pada `tests/program-separation-rehearsal-target-test.php` dan tiga file untracked pemisahan tidak disentuh.
+
+**Batas:** Tahap 1 belum menghubungkan halaman admin aktif maupun mengubah sidebar; integrasi 8 submenu admin dilakukan pada Tahap 2–6.
+
 ## 2026-11-28 21.04.40 +0700 — Sesuaikan nama menu Reguler dan RPL
 
 **ID:** SIDEBAR-REGULER-RPL-LABELS · **Parent Git:** 4def080fe499702c1934f06906534e40a9424809.
