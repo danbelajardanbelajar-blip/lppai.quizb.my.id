@@ -4,12 +4,28 @@
  * Halaman terpadu untuk mengelola sesi ujian pretes per dosen, per ruang, dan per hari
  * (Fokus murni pada konfigurasi sesi, jadwal, ruangan, dan penguji tanpa menampilkan daftar mahasiswa)
  */
-define('PAGE_TITLE', 'Pengaturan Sesi & Penguji Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$forcedTargetProgram = pretesAdminTargetProgramValue($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+
+define('PAGE_TITLE', 'Pengaturan Sesi & Penguji Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo = getDBConnection();
+ensurePretesPeriodTargetColumns($pdo);
 $message = '';
 $msgType = '';
 
@@ -494,7 +510,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $message = 'Periode dan jam sesi wajib diisi.';
                 $msgType = 'danger';
             } else {
-                $pdo->prepare("UPDATE master_pretes SET jam = ? WHERE id = ?")->execute([$customJam, $masterId]);
+                $pdo->prepare("UPDATE master_pretes SET jam = ? WHERE id = ? AND {$periodWhere['sql']}")
+                    ->execute(array_merge([$customJam, $masterId], $periodWhere['params']));
                 $message = "Jam sesi default periode berhasil diatur menjadi <strong>" . htmlspecialchars($customJam) . "</strong>.";
                 $msgType = 'success';
             }
@@ -522,15 +539,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     UPDATE master_pretes 
                     SET penguji_senin = ?, penguji_selasa = ?, penguji_rabu = ?, penguji_kamis = ?, penguji_jumat = ?,
                         kuota_senin = ?, kuota_selasa = ?, kuota_rabu = ?, kuota_kamis = ?, kuota_jumat = ?
-                    WHERE id = ?
-                ")->execute([
+                    WHERE id = ? AND {$periodWhere['sql']}
+                ")->execute(array_merge([
                     $pengujiSenin, $pengujiSelasa, $pengujiRabu, $pengujiKamis, $pengujiJumat,
                     $kuotaSenin, $kuotaSelasa, $kuotaRabu, $kuotaKamis, $kuotaJumat,
                     $masterId
-                ]);
+                ], $periodWhere['params']));
                 // Sabtu & Ahad: khusus periode RPL
-                $masterTarget = $pdo->query("SELECT target_program FROM master_pretes WHERE id = " . (int)$masterId)->fetch();
-                pretesSaveWeekendSlots($pdo, $masterId, (string)($masterTarget['target_program'] ?? 'Semua'), $_POST);
+                $stmtTarget = $pdo->prepare("SELECT target_program FROM master_pretes WHERE id = ? AND {$periodWhere['sql']}");
+                $stmtTarget->execute(array_merge([$masterId], $periodWhere['params']));
+                $masterTarget = $stmtTarget->fetch();
+                if ($masterTarget) {
+                    pretesSaveWeekendSlots($pdo, $masterId, (string)($masterTarget['target_program'] ?? 'Semua'), $_POST);
+                }
 
                 $message = 'Jadwal tutor harian dan kuota master pretes berhasil disimpan!';
                 $msgType = 'success';
@@ -668,7 +689,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 // ── 2. QUERY DATA PERIODE & MASTER PRETES ──────────────────────────────────────
 $periodsList = [];
 try {
-    $periodsList = $pdo->query("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes ORDER BY id DESC")->fetchAll() ?: [];
+    $stmtPeriods = $pdo->prepare("SELECT id, periode, tahun_ajaran, status, jam FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY id DESC");
+    $stmtPeriods->execute($periodWhere['params']);
+    $periodsList = $stmtPeriods->fetchAll() ?: [];
 } catch (Throwable $e) {}
 
 $selectedPeriodName = trim($_GET['periode'] ?? '');
@@ -676,30 +699,34 @@ $currentMaster = null;
 
 if (!empty($selectedPeriodName)) {
     try {
-        $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? LIMIT 1");
-        $stmtM->execute([$selectedPeriodName]);
+        $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? AND {$periodWhere['sql']} LIMIT 1");
+        $stmtM->execute(array_merge([$selectedPeriodName], $periodWhere['params']));
         $currentMaster = $stmtM->fetch() ?: null;
     } catch (Throwable $e) {}
 }
 
 if (!$currentMaster) {
     try {
-        $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch()
-                      ?: $pdo->query("SELECT * FROM master_pretes ORDER BY id DESC LIMIT 1")->fetch() ?: null;
+        $stmtA = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+        $stmtA->execute($periodWhere['params']);
+        $currentMaster = $stmtA->fetch() ?: null;
     } catch (Throwable $e) {}
 }
 
 if (!$currentMaster) {
     $curYear = (int)date('Y');
     $ta  = $curYear . ' - ' . ($curYear + 1);
-    $per = 'Pretes ' . $curYear . '/' . ($curYear + 1);
+    $per = ($pretesProgram === 'rpl' ? 'Pretes RPL ' : 'Pretes ') . $curYear . '/' . ($curYear + 1);
+    $defaultTarget = $forcedTargetProgram ?? 'Semua';
     try {
         $pdo->prepare("
-            INSERT INTO master_pretes 
-            (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) 
-            VALUES (?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
-        ")->execute([$per, $ta]);
-        $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE id = " . $pdo->lastInsertId())->fetch() ?: [];
+            INSERT INTO master_pretes
+            (periode, tahun_ajaran, target_program, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat)
+            VALUES (?, ?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
+        ")->execute([$per, $ta, $defaultTarget]);
+        $stmtNewM = $pdo->prepare("SELECT * FROM master_pretes WHERE id = ?");
+        $stmtNewM->execute([$pdo->lastInsertId()]);
+        $currentMaster = $stmtNewM->fetch() ?: [];
     } catch (Throwable $e) {}
 }
 
@@ -1314,7 +1341,7 @@ input:checked + .slider:before { transform: translateX(16px); }
                 <a href="https://api.whatsapp.com/send?text=<?= rawurlencode($waTextSchedule) ?>" target="_blank" class="btn btn-sm" style="background: #25d366; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 14px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;">
                     <span>📲</span> Bagikan ke WA
                 </a>
-                <a href="<?= BASE_URL ?>/admin/pretes-jadwal-cetak.php?periode=<?= urlencode($periodeName) ?>" target="_blank" class="btn btn-sm" style="background: #0284c7; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;">
+                <a href="<?= pretesAdminRoute('jadwal_cetak', $pretesProgram, ['periode' => $periodeName]) ?>" target="_blank" class="btn btn-sm" style="background: #0284c7; color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 16px; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;">
                     <span>🖨️</span> Cetak / Simpan PDF
                 </a>
                 <a href="?periode=<?= urlencode($periodeName) ?>&tab=jadwal" class="btn btn-sm btn-outline-primary" style="background: #fff; font-weight: 600; border-radius: 8px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;" title="Edit Susunan Dosen Penguji">

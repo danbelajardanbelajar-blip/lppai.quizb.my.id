@@ -2,10 +2,25 @@
 /**
  * LPPAI Corner - Admin: Kelola Jadwal & Generate Pretes
  */
-define('PAGE_TITLE', 'Kelola Jadwal Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 requireAdmin();
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$forcedTargetProgram = pretesAdminTargetProgramValue($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+
+define('PAGE_TITLE', 'Kelola Jadwal Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo = getDBConnection();
 ensurePretesPeriodTargetColumns($pdo);
@@ -47,20 +62,24 @@ try {
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
 } catch (Exception $e) {}
 
-// Ambil data periode aktif
-$active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY created_at DESC LIMIT 1")->fetch()
-               ?: $pdo->query("SELECT * FROM master_pretes ORDER BY created_at DESC LIMIT 1")->fetch();
+// Ambil data periode aktif sesuai lingkup program
+$stmtActive = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1");
+$stmtActive->execute($periodWhere['params']);
+$active_pretes = $stmtActive->fetch();
 
 if (!$active_pretes) {
     $curYear = (int)date('Y');
     $ta = $curYear . ' - ' . ($curYear + 1);
-    $per = 'Pretes ' . $curYear . '/' . ($curYear + 1);
+    $per = ($pretesProgram === 'rpl' ? 'Pretes RPL ' : 'Pretes ') . $curYear . '/' . ($curYear + 1);
+    $defaultTarget = $forcedTargetProgram ?? 'Semua';
     $pdo->prepare("
-        INSERT INTO master_pretes 
-        (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) 
-        VALUES (?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
-    ")->execute([$per, $ta]);
-    $active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE id = " . $pdo->lastInsertId())->fetch();
+        INSERT INTO master_pretes
+        (periode, tahun_ajaran, target_program, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat)
+        VALUES (?, ?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
+    ")->execute([$per, $ta, $defaultTarget]);
+    $stmtNew = $pdo->prepare("SELECT * FROM master_pretes WHERE id = ?");
+    $stmtNew->execute([$pdo->lastInsertId()]);
+    $active_pretes = $stmtNew->fetch();
 }
 
 // Daftar Dosen Penguji & Ruangan
@@ -216,25 +235,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $penguji_kamis  = isset($_POST['penguji_kamis']) && is_array($_POST['penguji_kamis']) ? implode('|||', array_filter(array_map('trim', $_POST['penguji_kamis']))) : '';
                 $penguji_jumat  = isset($_POST['penguji_jumat']) && is_array($_POST['penguji_jumat']) ? implode('|||', array_filter(array_map('trim', $_POST['penguji_jumat']))) : '';
 
-                $pdo->prepare("
+                $stmtUpdMaster = $pdo->prepare("
                     UPDATE master_pretes 
                     SET kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?,
                         penguji_senin=?, penguji_selasa=?, penguji_rabu=?, penguji_kamis=?, penguji_jumat=?
-                    WHERE id=?
-                ")->execute([
+                    WHERE id=? AND {$periodWhere['sql']}
+                ");
+                $stmtUpdMaster->execute(array_merge([
                     $kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat,
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat,
                     $active_id
-                ]);
+                ], $periodWhere['params']));
                 // Sabtu & Ahad: khusus periode RPL
-                $periodRowForWeekend = $pdo->query("SELECT target_program FROM master_pretes WHERE id = " . (int)$active_id)->fetch();
-                pretesSaveWeekendSlots($pdo, $active_id, (string)($periodRowForWeekend['target_program'] ?? 'Semua'), $_POST);
+                $stmtRowW = $pdo->prepare("SELECT target_program FROM master_pretes WHERE id = ? AND {$periodWhere['sql']}");
+                $stmtRowW->execute(array_merge([$active_id], $periodWhere['params']));
+                $periodRowForWeekend = $stmtRowW->fetch();
+                if ($periodRowForWeekend) {
+                    pretesSaveWeekendSlots($pdo, $active_id, (string)($periodRowForWeekend['target_program'] ?? 'Semua'), $_POST);
+                }
 
                 $message = 'Pengaturan Dosen Penguji dan Kuota Pretes berhasil disimpan.';
                 $msgType = 'success';
 
                 // Refresh active_pretes
-                $active_pretes = $pdo->query("SELECT * FROM master_pretes WHERE id = $active_id")->fetch();
+                $stmtRef = $pdo->prepare("SELECT * FROM master_pretes WHERE id = ? AND {$periodWhere['sql']}");
+                $stmtRef->execute(array_merge([$active_id], $periodWhere['params']));
+                $active_pretes = $stmtRef->fetch() ?: $active_pretes;
             }
 
         // 2. GENERATE JADWAL PRETES OTOMATIS
@@ -491,7 +517,7 @@ include __DIR__ . '/../includes/header.php';
                 Jam: <strong><?= sanitize($active_pretes['jam'] ?? '13.00 WIB (Jam 1)') ?></strong>
             </p>
         </div>
-        <a href="<?= BASE_URL ?>/admin/pretes-dosen.php" class="btn btn-outline-primary" style="white-space:nowrap; padding:8px 16px; font-weight:600; text-decoration:none; background:#fff;">
+        <a href="<?= pretesAdminRoute('dosen', $pretesProgram) ?>" class="btn btn-outline-primary" style="white-space:nowrap; padding:8px 16px; font-weight:600; text-decoration:none; background:#fff;">
             ⚙️ Master Periode & Penguji
         </a>
     </div>
@@ -1105,7 +1131,7 @@ document.addEventListener('change', function(e) {
     formData.append('reg_id', regId);
     formData.append('ruangan', newVal);
 
-    fetch('<?= BASE_URL ?>/admin/pretes-jadwal.php', {
+    fetch('<?= pretesAdminRoute('jadwal', $pretesProgram) ?>', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData

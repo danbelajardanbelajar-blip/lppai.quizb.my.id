@@ -2,10 +2,25 @@
 /**
  * LPPAI Corner - Admin: Kelola Dosen Penguji & Kuota Pretes
  */
-define('PAGE_TITLE', 'Dosen Penguji & Kuota Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
 requireAdmin();
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$forcedTargetProgram = pretesAdminTargetProgramValue($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+
+define('PAGE_TITLE', 'Dosen Penguji & Kuota Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo = getDBConnection();
 
@@ -47,18 +62,21 @@ try {
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
 } catch (Exception $e) {}
 
-// Cek apakah tabel master_pretes masih kosong, jika ya buat periode default aktif
+// Cek apakah tabel master_pretes pada lingkup ini masih kosong, jika ya buat periode default aktif
 try {
-    $hasMaster = $pdo->query("SELECT COUNT(*) FROM master_pretes")->fetchColumn();
+    $stmtCntMaster = $pdo->prepare("SELECT COUNT(*) FROM master_pretes WHERE {$periodWhere['sql']}");
+    $stmtCntMaster->execute($periodWhere['params']);
+    $hasMaster = $stmtCntMaster->fetchColumn();
     if ($hasMaster == 0) {
         $curYear = (int)date('Y');
         $ta = $curYear . ' - ' . ($curYear + 1);
-        $per = 'Pretes ' . $curYear . '/' . ($curYear + 1);
+        $per = ($pretesProgram === 'rpl' ? 'Pretes RPL ' : 'Pretes ') . $curYear . '/' . ($curYear + 1);
+        $defaultTarget = $forcedTargetProgram ?? 'Semua';
         $pdo->prepare("
-            INSERT INTO master_pretes 
-            (periode, tahun_ajaran, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat) 
-            VALUES (?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
-        ")->execute([$per, $ta]);
+            INSERT INTO master_pretes
+            (periode, tahun_ajaran, target_program, status, jam, kuota_senin, kuota_selasa, kuota_rabu, kuota_kamis, kuota_jumat)
+            VALUES (?, ?, ?, 'aktif', '13.00 WIB (Jam 1)', 30, 30, 30, 30, 30)
+        ")->execute([$per, $ta, $defaultTarget]);
     }
 } catch (Exception $e) {}
 
@@ -81,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         if ($action === 'create_periode') {
             $periode        = trim($_POST['periode'] ?? '');
             $tahun_ajaran   = trim($_POST['tahun_ajaran'] ?? '');
-            $targetProgram  = normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
+            $targetProgram  = $forcedTargetProgram ?? normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
             $rawTglMulai    = trim((string)($_POST['tanggal_mulai'] ?? ''));
             $tanggalMulai   = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawTglMulai) === 1) ? $rawTglMulai : null;
             $jam            = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
@@ -104,7 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $msgType = 'danger';
             } else {
                 if ($status === 'aktif') {
-                    $pdo->exec("UPDATE master_pretes SET status = 'nonaktif' WHERE status = 'aktif'");
+                    $pdo->prepare("UPDATE master_pretes SET status = 'nonaktif' WHERE status = 'aktif' AND {$periodWhere['sql']}")
+                        ->execute($periodWhere['params']);
                 }
 
                 $stmt = $pdo->prepare("
@@ -129,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $id             = (int)($_POST['id'] ?? ($_POST['pretes_id'] ?? 0));
             $periode        = trim($_POST['periode'] ?? '');
             $tahun_ajaran   = trim($_POST['tahun_ajaran'] ?? '');
-            $targetProgram  = normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
+            $targetProgram  = $forcedTargetProgram ?? normalizePretesTargetProgram($_POST['target_program'] ?? 'Semua');
             $rawTglMulai    = trim((string)($_POST['tanggal_mulai'] ?? ''));
             $tanggalMulai   = (preg_match('/^\d{4}-\d{2}-\d{2}$/', $rawTglMulai) === 1) ? $rawTglMulai : null;
             $jam            = trim($_POST['jam'] ?? '13.00 WIB (Jam 1)');
@@ -165,7 +184,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
 
                 if ($status === 'aktif') {
-                    $pdo->prepare("UPDATE master_pretes SET status = 'nonaktif' WHERE id != ? AND status = 'aktif'")->execute([$id]);
+                    $pdo->prepare("UPDATE master_pretes SET status = 'nonaktif' WHERE id != ? AND status = 'aktif' AND {$periodWhere['sql']}")
+                        ->execute(array_merge([$id], $periodWhere['params']));
                 }
 
                 $stmt = $pdo->prepare("
@@ -173,14 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     SET periode=?, tahun_ajaran=?, target_program=?, tanggal_mulai=?, status=?, jam=?,
                         kuota_senin=?, kuota_selasa=?, kuota_rabu=?, kuota_kamis=?, kuota_jumat=?,
                         penguji_senin=?, penguji_selasa=?, penguji_rabu=?, penguji_kamis=?, penguji_jumat=?
-                    WHERE id=?
+                    WHERE id=? AND {$periodWhere['sql']}
                 ");
-                $stmt->execute([
+                $stmt->execute(array_merge([
                     $periode, $tahun_ajaran, $targetProgram, $tanggalMulai, $status, $jam,
                     $kuota_senin, $kuota_selasa, $kuota_rabu, $kuota_kamis, $kuota_jumat,
                     $penguji_senin, $penguji_selasa, $penguji_rabu, $penguji_kamis, $penguji_jumat,
                     $id
-                ]);
+                ], $periodWhere['params']));
                 // Sabtu & Ahad: hanya disimpan untuk periode Khusus RPL (selain itu dikosongkan)
                 pretesSaveWeekendSlots($pdo, $id, $targetProgram, $_POST);
 
@@ -192,8 +212,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'set_active') {
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $pdo->exec("UPDATE master_pretes SET status = 'nonaktif' WHERE status = 'aktif'");
-                $pdo->prepare("UPDATE master_pretes SET status = 'aktif' WHERE id = ?")->execute([$id]);
+                $pdo->prepare("UPDATE master_pretes SET status = 'nonaktif' WHERE status = 'aktif' AND {$periodWhere['sql']}")
+                    ->execute($periodWhere['params']);
+                $pdo->prepare("UPDATE master_pretes SET status = 'aktif' WHERE id = ? AND {$periodWhere['sql']}")
+                    ->execute(array_merge([$id], $periodWhere['params']));
                 $message = 'Periode pretes berhasil diaktifkan!';
                 $msgType = 'success';
             }
@@ -202,7 +224,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } elseif ($action === 'delete') {
             $id = (int)($_POST['id'] ?? 0);
             if ($id > 0) {
-                $pdo->prepare("DELETE FROM master_pretes WHERE id = ?")->execute([$id]);
+                $pdo->prepare("DELETE FROM master_pretes WHERE id = ? AND {$periodWhere['sql']}")
+                    ->execute(array_merge([$id], $periodWhere['params']));
                 $message = 'Periode pretes berhasil dihapus.';
                 $msgType = 'success';
             }
@@ -211,10 +234,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 
 // Ambil Periode Aktif
-$active_pretes = getActivePretesPeriod($pdo);
+if ($pretesProgram !== null) {
+    $stmtActive = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, created_at DESC LIMIT 1");
+    $stmtActive->execute($periodWhere['params']);
+    $active_pretes = $stmtActive->fetch() ?: null;
+} else {
+    $active_pretes = getActivePretesPeriod($pdo);
+}
 
-// Ambil Seluruh Data Master Pretes
-$all_pretes = $pdo->query("SELECT * FROM master_pretes ORDER BY created_at DESC")->fetchAll();
+// Ambil Seluruh Data Master Pretes sesuai lingkup program
+$stmtAllPretes = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY created_at DESC");
+$stmtAllPretes->execute($periodWhere['params']);
+$all_pretes = $stmtAllPretes->fetchAll();
 
 // Hitung Pendaftar Pretes per Hari khusus untuk periode aktif
 $registeredCounts = array_fill_keys(pretesAllDays(), 0);
@@ -509,9 +540,13 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group">
                     <label>Target Peserta Program *</label>
                     <select name="target_program" id="create_target_program" required style="width:100%;padding:9px;border:1.5px solid #cbd5e1;border-radius:6px;font-weight:600;">
+                        <?php if ($forcedTargetProgram !== null): ?>
+                        <option value="<?= $forcedTargetProgram ?>" selected>Khusus <?= htmlspecialchars($pretesProgramLabel) ?></option>
+                        <?php else: ?>
                         <option value="Semua">Semua Program (Reguler &amp; RPL)</option>
                         <option value="RPL">Khusus RPL</option>
                         <option value="Reguler">Khusus Reguler</option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="form-group">
@@ -601,9 +636,13 @@ include __DIR__ . '/../includes/header.php';
                 <div class="form-group" style="margin:0;">
                     <label style="font-size:13px; font-weight:600; color:#334155; margin-bottom:4px; display:block;">Target Program *</label>
                     <select name="target_program" id="edit_target_program" required style="width:100%;padding:8px 12px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;font-weight:600;">
+                        <?php if ($forcedTargetProgram !== null): ?>
+                        <option value="<?= $forcedTargetProgram ?>" selected>Khusus <?= htmlspecialchars($pretesProgramLabel) ?></option>
+                        <?php else: ?>
                         <option value="Semua">Semua Program</option>
                         <option value="RPL">Khusus RPL</option>
                         <option value="Reguler">Khusus Reguler</option>
+                        <?php endif; ?>
                     </select>
                 </div>
                 <div class="form-group" style="margin:0;">

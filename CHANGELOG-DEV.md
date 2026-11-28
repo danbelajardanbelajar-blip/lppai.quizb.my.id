@@ -1,3 +1,24 @@
+## 2026-11-28 21.35.00 +0700 — Tahap 2: Duplikasi submenu Pengaturan Tutor, Penguji & Kuota, serta Jadwal Pretes RPL
+
+**ID:** PRETES-RPL-STAGE2-SCHEDULE-TUTOR · **Parent Git:** 824eb095c44c810827935c04cc7948b178d0f48a.
+
+**Perubahan/alasan:** Menduplikasi 3 submenu awal Pretes Reguler untuk Pretes RPL menggunakan wrapper program tetap (`PRETES_ADMIN_PROGRAM = 'rpl'`) dan isolasi query `master_pretes.target_program` via `includes/pretes-program-scope.php`. Pengaktifan, penyuntingan, penghapusan, dan auto-seed periode di halaman RPL tidak lagi memengaruhi periode aktif Reguler maupun sebaliknya, serta seluruh tautan silang (cetak jadwal, penguji & kuota, fetch AJAX jadwal) otomatis mengikuti lingkup program aktif.
+
+**Lokasi snapshot:** Waktu berikut adalah penyimpanan terakhir yang tersedia, bukan riwayat setiap ketikan:
+
+- admin/pretes-pengaturan-tutor.php | header scope, update jam/jadwal master, query periode, tautan cetak | simpan terakhir WIB 2026-11-28 21.34.55
+- admin/pretes-dosen.php | header scope, CRUD periode terisolasi per program, penguncian target modal | simpan terakhir WIB 2026-11-28 21.34.55
+- admin/pretes-jadwal.php | header scope, query/seed periode aktif, update kuota/penguji, tautan dosen & fetch | simpan terakhir WIB 2026-11-28 21.34.55
+- admin/pretes-jadwal-cetak.php | header scope, lookup periode terisolasi, tautan kembali | simpan terakhir WIB 2026-11-28 21.33.41
+- admin/pretes-rpl-pengaturan-tutor.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.34.22
+- admin/pretes-rpl-dosen.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.34.23
+- admin/pretes-rpl-jadwal.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.34.26
+- admin/pretes-rpl-jadwal-cetak.php | route wrapper RPL (baris 1-3) | simpan terakhir WIB 2026-11-28 21.34.27
+
+**Verifikasi:** `git diff --check` pada seluruh file Tahap 2 lulus tanpa error whitespace/konflik setelah pembersihan trailing whitespace. Binary `php` tidak tersedia di lingkungan lokal Windows sehingga `php -l` dan pengujian HTTP/DB langsung belum dijalankan secara lokal.
+
+**Batas:** Tautan menu sidebar untuk grup Pretes RPL akan ditambahkan di Tahap 6 setelah seluruh 8 submenu selesai.
+
 ## 2026-11-28 21.31.10 +0700 — Tahap 1: Fondasi helper scope program Pretes RPL/Reguler
 
 **ID:** PRETES-RPL-STAGE1-SCOPE-FOUNDATION · **Parent Git:** 8687c42930dc672a3d9ad6ac09782129cadadb29.

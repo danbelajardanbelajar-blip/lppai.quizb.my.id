@@ -3,10 +3,24 @@
  * LPPAI Corner - Cetak & Bagikan Jadwal Dosen Penguji Pretes
  * Format resmi siap cetak (A4 Landscape) & siap share ke grup WhatsApp para tutor
  */
-define('PAGE_TITLE', 'Cetak Jadwal Penguji Pretes');
 require_once __DIR__ . '/../includes/auth.php';
 requireAdmin();
 require_once __DIR__ . '/../includes/pretes-helper.php';
+require_once __DIR__ . '/../includes/pretes-program-scope.php';
+
+try {
+    $pretesProgram = pretesAdminResolveProgram(defined('PRETES_ADMIN_PROGRAM') ? PRETES_ADMIN_PROGRAM : null);
+} catch (DomainException $e) {
+    http_response_code(403);
+    exit($e->getMessage());
+} catch (InvalidArgumentException $e) {
+    http_response_code(400);
+    exit($e->getMessage());
+}
+$pretesProgramLabel = pretesAdminProgramLabel($pretesProgram);
+$periodWhere = pretesPeriodTargetWhere($pretesProgram);
+
+define('PAGE_TITLE', 'Cetak Jadwal Penguji Pretes' . ($pretesProgramLabel !== '' ? ' ' . $pretesProgramLabel : ''));
 
 $pdo = getDBConnection();
 ensurePretesFeatures($pdo);
@@ -15,14 +29,15 @@ $selectedPeriod = trim($_GET['periode'] ?? '');
 $currentMaster = null;
 
 if (!empty($selectedPeriod)) {
-    $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? LIMIT 1");
-    $stmtM->execute([$selectedPeriod]);
+    $stmtM = $pdo->prepare("SELECT * FROM master_pretes WHERE periode = ? AND {$periodWhere['sql']} LIMIT 1");
+    $stmtM->execute(array_merge([$selectedPeriod], $periodWhere['params']));
     $currentMaster = $stmtM->fetch();
 }
 
 if (!$currentMaster) {
-    $currentMaster = $pdo->query("SELECT * FROM master_pretes WHERE status = 'aktif' ORDER BY id DESC LIMIT 1")->fetch()
-                  ?: $pdo->query("SELECT * FROM master_pretes ORDER BY id DESC LIMIT 1")->fetch();
+    $stmtA = $pdo->prepare("SELECT * FROM master_pretes WHERE {$periodWhere['sql']} ORDER BY (status = 'aktif') DESC, id DESC LIMIT 1");
+    $stmtA->execute($periodWhere['params']);
+    $currentMaster = $stmtA->fetch();
 }
 
 if (!$currentMaster) {
@@ -536,7 +551,7 @@ $waText .= "_Lembaga Pengembangan Pendidikan Agama Islam (LPPAI) Universitas Isl
     <!-- ── TOOLBAR ATAS (HANYA MUNCUL DI LAYAR) ── -->
     <div class="no-print-toolbar no-print">
         <div style="display:flex; align-items:center; gap:8px;">
-            <a href="<?= BASE_URL ?>/admin/pretes-pengaturan-tutor.php?periode=<?= urlencode($periodeName) ?>&tab=sesi" class="btn-action btn-back">
+            <a href="<?= pretesAdminRoute('tutor', $pretesProgram, ['periode' => $periodeName, 'tab' => 'sesi']) ?>" class="btn-action btn-back">
                 🔙 Kembali ke Pengaturan Sesi
             </a>
             <span style="font-size:13px; color:#64748b; font-weight:600;">Jadwal Siap Cetak & Siap Share</span>
